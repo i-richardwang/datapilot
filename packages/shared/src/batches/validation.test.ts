@@ -125,6 +125,57 @@ describe('validateBatchesContent', () => {
     expect(result.valid).toBe(true)
     expect(result.warnings).toHaveLength(0)
   })
+
+  it('should accept valid output config', () => {
+    const json = JSON.stringify({
+      batches: [{
+        name: 'Test',
+        source: { type: 'json', path: 'data.json', idField: 'id' },
+        action: { type: 'prompt', prompt: 'test' },
+        output: {
+          path: 'output/results.jsonl',
+          schema: {
+            type: 'object',
+            properties: { summary: { type: 'string' }, score: { type: 'number' } },
+            required: ['summary'],
+          },
+        },
+      }],
+    })
+    const result = validateBatchesContent(json)
+    expect(result.valid).toBe(true)
+  })
+
+  it('should warn about non-.jsonl output path', () => {
+    const json = JSON.stringify({
+      batches: [{
+        name: 'Test',
+        source: { type: 'json', path: 'data.json', idField: 'id' },
+        action: { type: 'prompt', prompt: 'test' },
+        output: { path: 'output/results.json' },
+      }],
+    })
+    const result = validateBatchesContent(json)
+    expect(result.valid).toBe(true)
+    expect(result.warnings.some(w => w.message.includes('.jsonl'))).toBe(true)
+  })
+
+  it('should warn about empty output schema properties', () => {
+    const json = JSON.stringify({
+      batches: [{
+        name: 'Test',
+        source: { type: 'json', path: 'data.json', idField: 'id' },
+        action: { type: 'prompt', prompt: 'test' },
+        output: {
+          path: 'output/results.jsonl',
+          schema: { type: 'object', properties: {} },
+        },
+      }],
+    })
+    const result = validateBatchesContent(json)
+    expect(result.valid).toBe(true)
+    expect(result.warnings.some(w => w.message.includes('no properties'))).toBe(true)
+  })
 })
 
 describe('validateBatches', () => {

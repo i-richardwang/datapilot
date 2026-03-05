@@ -137,6 +137,25 @@ export interface ValidatorInterface {
 }
 
 // ============================================================
+// Batch Context
+// ============================================================
+
+/**
+ * Context for batch output collection.
+ * Present only when a session is created by the batch processor.
+ */
+export interface BatchContext {
+  /** Batch ID this session belongs to */
+  batchId: string
+  /** Item ID being processed */
+  itemId: string
+  /** Output file path (absolute) */
+  outputPath: string
+  /** JSON Schema for output validation (if configured) */
+  outputSchema?: Record<string, unknown>
+}
+
+// ============================================================
 // Session Tool Context
 // ============================================================
 
@@ -320,6 +339,16 @@ export interface SessionToolContext {
    * Used by transform_data and render_template for output files.
    */
   dataPath?: string;
+
+  // ============================================================
+  // Batch Context (optional — only for batch-spawned sessions)
+  // ============================================================
+
+  /**
+   * Batch processing context. Present only when this session was
+   * created by the batch processor. Enables the `batch_output` tool.
+   */
+  batchContext?: BatchContext;
 }
 
 // ============================================================

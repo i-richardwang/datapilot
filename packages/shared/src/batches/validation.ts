@@ -71,6 +71,31 @@ export function validateBatchesContent(jsonString: string, fileName?: string): V
         suggestion: 'Consider using "safe" or "ask" permission mode instead',
       })
     }
+
+    // Validate output config
+    if (batch.output) {
+      // Check that output path ends with .jsonl
+      if (!batch.output.path.endsWith('.jsonl')) {
+        warnings.push({
+          file,
+          path: `batches[${i}].output.path`,
+          message: 'Output path should use .jsonl extension for line-delimited JSON output',
+          severity: 'warning',
+          suggestion: 'Change the file extension to .jsonl (e.g., "output/results.jsonl")',
+        })
+      }
+
+      // Check output schema has at least one property
+      if (batch.output.schema?.properties && Object.keys(batch.output.schema.properties).length === 0) {
+        warnings.push({
+          file,
+          path: `batches[${i}].output.schema.properties`,
+          message: 'Output schema has no properties defined',
+          severity: 'warning',
+          suggestion: 'Define at least one property in the output schema',
+        })
+      }
+    }
   }
 
   return {

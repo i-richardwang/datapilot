@@ -3,6 +3,7 @@ import {
   BatchSourceSchema,
   BatchExecutionSchema,
   BatchPromptActionSchema,
+  BatchOutputConfigSchema,
   BatchConfigSchema,
   BatchesFileConfigSchema,
   zodErrorToIssues,
@@ -79,6 +80,46 @@ describe('BatchPromptActionSchema', () => {
   })
 })
 
+describe('BatchOutputConfigSchema', () => {
+  it('should accept valid output config', () => {
+    const result = BatchOutputConfigSchema.safeParse({
+      path: 'output/results.jsonl',
+      schema: {
+        type: 'object',
+        properties: {
+          summary: { type: 'string' },
+          score: { type: 'number' },
+        },
+        required: ['summary'],
+      },
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('should accept output without schema', () => {
+    const result = BatchOutputConfigSchema.safeParse({
+      path: 'output/results.jsonl',
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it('should reject empty path', () => {
+    const result = BatchOutputConfigSchema.safeParse({ path: '' })
+    expect(result.success).toBe(false)
+  })
+
+  it('should reject schema with wrong type', () => {
+    const result = BatchOutputConfigSchema.safeParse({
+      path: 'output.jsonl',
+      schema: {
+        type: 'array',
+        properties: {},
+      },
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
 describe('BatchConfigSchema', () => {
   it('should accept valid batch config', () => {
     const result = BatchConfigSchema.safeParse({
@@ -105,6 +146,23 @@ describe('BatchConfigSchema', () => {
       action: { type: 'prompt', prompt: 'test' },
     })
     expect(result.success).toBe(false)
+  })
+
+  it('should accept batch config with output', () => {
+    const result = BatchConfigSchema.safeParse({
+      name: 'My Batch',
+      source: { type: 'json', path: 'data.json', idField: 'id' },
+      action: { type: 'prompt', prompt: 'test' },
+      output: {
+        path: 'output/results.jsonl',
+        schema: {
+          type: 'object',
+          properties: { summary: { type: 'string' } },
+          required: ['summary'],
+        },
+      },
+    })
+    expect(result.success).toBe(true)
   })
 })
 

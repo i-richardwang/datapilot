@@ -52,6 +52,21 @@ export interface BatchPromptAction {
 }
 
 // ============================================================================
+// Output Configuration
+// ============================================================================
+
+export interface BatchOutputConfig {
+  /** Output file path relative to workspace root (must be .jsonl) */
+  path: string
+  /** JSON Schema defining the expected structure of each output record */
+  schema?: {
+    type: 'object'
+    properties: Record<string, unknown>
+    required?: string[]
+  }
+}
+
+// ============================================================================
 // Configuration Types
 // ============================================================================
 
@@ -68,6 +83,8 @@ export interface BatchConfig {
   execution?: BatchExecution
   /** Action to perform for each item */
   action: BatchPromptAction
+  /** Structured output configuration for collecting results */
+  output?: BatchOutputConfig
 }
 
 export interface BatchesFileConfig {
@@ -133,6 +150,13 @@ export interface BatchExecutePromptParams {
   mentions?: string[]
   llmConnection?: string
   model?: string
+  /** Batch context for structured output collection */
+  batchContext?: {
+    batchId: string
+    itemId: string
+    outputPath: string
+    outputSchema?: Record<string, unknown>
+  }
 }
 
 export interface BatchSystemOptions {

@@ -33,6 +33,7 @@ import { handleUpdatePreferences } from './handlers/update-preferences.ts';
 import { handleTransformData } from './handlers/transform-data.ts';
 import { handleRenderTemplate } from './handlers/render-template.ts';
 import { handleSendDeveloperFeedback } from './handlers/send-developer-feedback.ts';
+import { handleBatchOutput } from './handlers/batch-output.ts';
 
 // ============================================================
 // Canonical Zod Schemas
@@ -129,6 +130,11 @@ export const RenderTemplateSchema = z.object({
 
 export const SendDeveloperFeedbackSchema = z.object({
   message: z.string().describe('Freeform markdown feedback — be detailed, use headings, lists, code blocks. Include what happened, what you expected, what would help, or any ideas/suggestions.'),
+});
+
+export const BatchOutputSchema = z.object({
+  data: z.record(z.string(), z.unknown())
+    .describe('Structured output data for this batch item. Must conform to the output schema defined in batch config.'),
 });
 
 // Browser tool schema (single CLI-like tool for all browser actions)
@@ -360,6 +366,21 @@ Only use 'attachments' for existing file paths on disk — the tool reads them a
   send_developer_feedback: `Send freeform feedback to the Craft Agent development team.
 
 Use this to share anything that would help improve the product — issues you hit, ideas for better tools, suggestions for improved workflows, or patterns you notice. Write in markdown with as much detail as possible. This is your direct line to the developers.`,
+
+  batch_output: `Record structured output for the current batch item.
+
+This tool is only available in batch-spawned sessions. Call it to write your result to the shared batch output file (JSONL format). The data must conform to the output schema defined in the batch configuration.
+
+**Usage:**
+- Call this tool exactly once per batch session with your final structured result
+- The \`data\` parameter should be a JSON object containing your analysis/result fields
+- Metadata fields (\`_item_id\`, \`_timestamp\`) are injected automatically — do not include them
+- If an output schema is configured, your data will be validated before writing
+
+**Example:**
+\`\`\`json
+{ "data": { "summary": "High-value user", "risk_level": "low", "score": 92 } }
+\`\`\``,
 } as const;
 
 // ============================================================
@@ -412,6 +433,7 @@ export const SESSION_TOOL_DEFS: SessionToolDef[] = [
   { name: 'transform_data', description: TOOL_DESCRIPTIONS.transform_data, inputSchema: TransformDataSchema, executionMode: 'registry', handler: handleTransformData },
   { name: 'render_template', description: TOOL_DESCRIPTIONS.render_template, inputSchema: RenderTemplateSchema, executionMode: 'registry', handler: handleRenderTemplate },
   { name: 'send_developer_feedback', description: TOOL_DESCRIPTIONS.send_developer_feedback, inputSchema: SendDeveloperFeedbackSchema, executionMode: 'registry', handler: handleSendDeveloperFeedback },
+  { name: 'batch_output', description: TOOL_DESCRIPTIONS.batch_output, inputSchema: BatchOutputSchema, executionMode: 'registry', handler: handleBatchOutput },
   { name: 'call_llm', description: TOOL_DESCRIPTIONS.call_llm, inputSchema: CallLlmSchema, executionMode: 'backend', handler: null },
   { name: 'spawn_session', description: TOOL_DESCRIPTIONS.spawn_session, inputSchema: SpawnSessionSchema, executionMode: 'backend', handler: null },
   // Browser tool (backend-specific — requires BrowserPaneManager in Electron)
@@ -422,6 +444,8 @@ export const SESSION_TOOL_DEFS: SessionToolDef[] = [
 export interface SessionToolFilterOptions {
   /** Include the experimental send_developer_feedback tool. */
   includeDeveloperFeedback?: boolean;
+  /** Include batch_output tool (only for batch-spawned sessions). Defaults to false. */
+  includeBatchOutput?: boolean;
 }
 
 /**
@@ -432,9 +456,13 @@ export interface SessionToolFilterOptions {
  */
 export function getSessionToolDefs(options?: SessionToolFilterOptions): SessionToolDef[] {
   const includeDeveloperFeedback = options?.includeDeveloperFeedback ?? true;
+  const includeBatchOutput = options?.includeBatchOutput ?? false;
 
   return SESSION_TOOL_DEFS.filter(def => {
     if (!includeDeveloperFeedback && def.name === 'send_developer_feedback') {
+      return false;
+    }
+    if (!includeBatchOutput && def.name === 'batch_output') {
       return false;
     }
     return true;
@@ -504,14 +532,19 @@ export interface JsonSchemaToolDef {
  *
  * @param opts.prefix - Optional prefix for tool names (e.g., 'mcp__session__' for Pi)
  * @param opts.includeDeveloperFeedback - Include experimental feedback tool in output
+ * @param opts.includeBatchOutput - Include batch_output tool (only for batch sessions)
  * @returns Array of tool definitions with JSON Schema inputSchema
  */
 export function getToolDefsAsJsonSchema(opts?: {
   prefix?: string;
   includeDeveloperFeedback?: boolean;
+  includeBatchOutput?: boolean;
 }): JsonSchemaToolDef[] {
   const prefix = opts?.prefix || '';
-  const defs = getSessionToolDefs({ includeDeveloperFeedback: opts?.includeDeveloperFeedback });
+  const defs = getSessionToolDefs({
+    includeDeveloperFeedback: opts?.includeDeveloperFeedback,
+    includeBatchOutput: opts?.includeBatchOutput,
+  });
 
   return defs.map(def => {
     // Explicit `as any` avoids TS2589 ("type instantiation is excessively deep")

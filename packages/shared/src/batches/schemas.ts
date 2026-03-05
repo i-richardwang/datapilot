@@ -33,6 +33,15 @@ export const BatchPromptActionSchema = z.object({
   mentions: z.array(z.string()).optional(),
 })
 
+export const BatchOutputConfigSchema = z.object({
+  path: z.string().min(1, 'Output path cannot be empty'),
+  schema: z.object({
+    type: z.literal('object'),
+    properties: z.record(z.string(), z.unknown()),
+    required: z.array(z.string()).optional(),
+  }).optional(),
+})
+
 export const BatchConfigSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, 'Batch name cannot be empty'),
@@ -40,6 +49,7 @@ export const BatchConfigSchema = z.object({
   source: BatchSourceSchema,
   execution: BatchExecutionSchema.optional(),
   action: BatchPromptActionSchema,
+  output: BatchOutputConfigSchema.optional(),
 })
 
 export const BatchesFileConfigSchema = z.object({

@@ -58,3 +58,7 @@ export type { RenderTemplateArgs } from './render-template.ts';
 // Send Developer Feedback
 export { handleSendDeveloperFeedback } from './send-developer-feedback.ts';
 export type { SendDeveloperFeedbackArgs } from './send-developer-feedback.ts';
+
+// Batch Output
+export { handleBatchOutput } from './batch-output.ts';
+export type { BatchOutputArgs } from './batch-output.ts';

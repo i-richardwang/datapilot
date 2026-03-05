@@ -20,6 +20,8 @@ export {
   registerSessionScopedToolCallbacks,
   unregisterSessionScopedToolCallbacks,
   mergeSessionScopedToolCallbacks,
+  // Batch context registry for batch-spawned sessions
+  registerSessionBatchContext,
   // Types
   type SessionScopedToolCallbacks,
   type BrowserPaneFns,

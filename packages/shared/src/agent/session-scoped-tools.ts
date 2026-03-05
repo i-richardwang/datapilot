@@ -31,6 +31,7 @@ import {
   // Types
   type ToolResult,
   type AuthRequest,
+  type BatchContext,
 } from '@craft-agent/session-tools-core';
 import { createLLMTool, type LLMQueryRequest, type LLMQueryResult } from './llm-tool.ts';
 import { createSpawnSessionTool, type SpawnSessionFn } from './spawn-session-tool.ts';
@@ -163,6 +164,36 @@ function assertClaudeBackendSessionToolParity(): void {
 }
 
 // ============================================================
+// Batch Context Registry
+// ============================================================
+
+// Registry of batch context keyed by sessionId (for batch-spawned sessions)
+const sessionBatchContextRegistry = new Map<string, BatchContext>();
+
+/**
+ * Register batch context for a session.
+ * Called by SessionManager before the first message is sent.
+ */
+export function registerSessionBatchContext(sessionId: string, batchContext: BatchContext): void {
+  sessionBatchContextRegistry.set(sessionId, batchContext);
+  debug('session-scoped-tools', `Registered batch context for session ${sessionId} (item: ${batchContext.itemId})`);
+}
+
+/**
+ * Get batch context for a session.
+ */
+export function getSessionBatchContext(sessionId: string): BatchContext | undefined {
+  return sessionBatchContextRegistry.get(sessionId);
+}
+
+/**
+ * Clean up batch context for a session.
+ */
+export function cleanupSessionBatchContext(sessionId: string): void {
+  sessionBatchContextRegistry.delete(sessionId);
+}
+
+// ============================================================
 // Plan State Management
 // ============================================================
 
@@ -240,6 +271,8 @@ export function cleanupSessionScopedTools(sessionId: string): void {
       sessionScopedToolsCache.delete(key);
     }
   }
+  // Also clean up batch context for this session
+  cleanupSessionBatchContext(sessionId);
 }
 
 // ============================================================
@@ -293,6 +326,7 @@ export function getSessionScopedTools(
       const callbacks = getSessionScopedToolCallbacks(sessionId);
       callbacks?.onAuthRequest?.(request as AuthRequest);
     },
+    batchContext: getSessionBatchContext(sessionId),
   });
 
   // Helper to create a tool from the canonical registry.
@@ -312,7 +346,11 @@ export function getSessionScopedTools(
 
   // Create tools from the canonical registry — all tools with handlers.
   // Tool visibility is centrally filtered in session-tools-core to avoid backend drift.
-  const tools = getSessionToolDefs({ includeDeveloperFeedback: FEATURE_FLAGS.developerFeedback })
+  const isBatchSession = !!getSessionBatchContext(sessionId);
+  const tools = getSessionToolDefs({
+    includeDeveloperFeedback: FEATURE_FLAGS.developerFeedback,
+    includeBatchOutput: isBatchSession,
+  })
     .filter(def => def.handler !== null) // Skip backend-specific tools (call_llm)
     .map(def => registryTool(def.name, def.inputSchema.shape));
 

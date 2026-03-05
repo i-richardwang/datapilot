@@ -119,6 +119,7 @@ export type {
   CredentialManagerInterface,
   ValidatorInterface,
   LoadedSource,
+  BatchContext,
   // MCP validation types
   StdioMcpConfig,
   HttpMcpConfig,
@@ -156,6 +157,8 @@ export {
   handleRenderTemplate,
   // Send Developer Feedback
   handleSendDeveloperFeedback,
+  // Batch Output
+  handleBatchOutput,
 } from './handlers/index.ts';
 
 export type {
@@ -173,6 +176,7 @@ export type {
   TransformDataArgs,
   RenderTemplateArgs,
   SendDeveloperFeedbackArgs,
+  BatchOutputArgs,
 } from './handlers/index.ts';
 
 // Tool definitions — single source of truth
@@ -189,6 +193,8 @@ export {
   UpdatePreferencesSchema,
   TransformDataSchema,
   RenderTemplateSchema,
+  // Batch output schema
+  BatchOutputSchema,
   // Browser tool schema
   BrowserToolSchema,
   // Developer feedback schema

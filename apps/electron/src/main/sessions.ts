@@ -5,7 +5,7 @@ import { existsSync } from 'fs'
 import { appendFile, readFile, writeFile, mkdir, realpath } from 'fs/promises'
 import { homedir, tmpdir } from 'os'
 import { randomUUID } from 'node:crypto'
-import { type AgentEvent, setPermissionMode, hydratePreviousPermissionMode, getPermissionModeDiagnostics, type PermissionMode, unregisterSessionScopedToolCallbacks, mergeSessionScopedToolCallbacks, AbortReason, type AuthRequest, type AuthResult, type CredentialAuthRequest, type BrowserPaneFns } from '@craft-agent/shared/agent'
+import { type AgentEvent, setPermissionMode, hydratePreviousPermissionMode, getPermissionModeDiagnostics, type PermissionMode, unregisterSessionScopedToolCallbacks, mergeSessionScopedToolCallbacks, registerSessionBatchContext, AbortReason, type AuthRequest, type AuthResult, type CredentialAuthRequest, type BrowserPaneFns } from '@craft-agent/shared/agent'
 import {
   resolveSessionConnection,
   createBackendFromConnection,
@@ -1186,6 +1186,7 @@ export class SessionManager {
             params.llmConnection,
             params.model,
             true,
+            params.batchContext,
           )
         },
         onProgress: (progress) => {
@@ -5899,6 +5900,7 @@ To view this task's output:
     llmConnection?: string,
     model?: string,
     hidden?: boolean,
+    batchContext?: { batchId: string; itemId: string; outputPath: string; outputSchema?: Record<string, unknown> },
   ): Promise<{ sessionId: string }> {
     // Warn if llmConnection was specified but doesn't resolve
     if (llmConnection) {
@@ -5921,6 +5923,12 @@ To view this task's output:
       model,
       hidden,
     })
+
+    // Register batch context before sending the first message so that
+    // getSessionScopedTools() picks it up when building the tool context
+    if (batchContext) {
+      registerSessionBatchContext(session.id, batchContext)
+    }
 
     // Send the prompt
     await this.sendMessage(session.id, prompt, undefined, undefined, {

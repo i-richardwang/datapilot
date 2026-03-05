@@ -39,4 +39,33 @@ describe('session tool filtering helpers', () => {
 
     expect(names.includes('send_developer_feedback')).toBe(false);
   });
+
+  it('excludes batch_output by default', () => {
+    const defs = getSessionToolDefs();
+    const names = defs.map(d => d.name);
+
+    expect(names.includes('batch_output')).toBe(false);
+  });
+
+  it('excludes batch_output when includeBatchOutput is false', () => {
+    const defs = getSessionToolDefs({ includeBatchOutput: false });
+    const names = defs.map(d => d.name);
+
+    expect(names.includes('batch_output')).toBe(false);
+  });
+
+  it('includes batch_output when includeBatchOutput is true', () => {
+    const defs = getSessionToolDefs({ includeBatchOutput: true });
+    const names = defs.map(d => d.name);
+
+    expect(names.includes('batch_output')).toBe(true);
+  });
+
+  it('json schema conversion respects includeBatchOutput filter', () => {
+    const withBatch = getToolDefsAsJsonSchema({ includeBatchOutput: true });
+    const withoutBatch = getToolDefsAsJsonSchema({ includeBatchOutput: false });
+
+    expect(withBatch.some(d => d.name === 'batch_output')).toBe(true);
+    expect(withoutBatch.some(d => d.name === 'batch_output')).toBe(false);
+  });
 });

@@ -18,6 +18,7 @@ import type {
   CredentialManagerInterface,
   ValidatorInterface,
   LoadedSource,
+  BatchContext,
   StdioMcpConfig,
   StdioValidationResult,
   HttpMcpConfig,
@@ -81,6 +82,8 @@ export interface ClaudeContextOptions {
   workspaceId: string;
   onPlanSubmitted: (planPath: string) => void;
   onAuthRequest: (request: unknown) => void;
+  /** Batch context for batch-spawned sessions (enables batch_output tool) */
+  batchContext?: BatchContext;
 }
 
 /**
@@ -94,7 +97,7 @@ export interface ClaudeContextOptions {
  * - Icon management
  */
 export function createClaudeContext(options: ClaudeContextOptions): SessionToolContext {
-  const { sessionId, workspacePath, workspaceId, onPlanSubmitted, onAuthRequest } = options;
+  const { sessionId, workspacePath, workspaceId, onPlanSubmitted, onAuthRequest, batchContext } = options;
 
   // File system implementation
   const fs: FileSystemInterface = {
@@ -297,6 +300,9 @@ export function createClaudeContext(options: ClaudeContextOptions): SessionToolC
         return false;
       }
     },
+
+    // Batch context (for batch-spawned sessions)
+    batchContext,
 
     deriveServiceUrl: (source: SourceConfig): string | null => {
       if (source.type === 'api' && source.api?.baseUrl) {
