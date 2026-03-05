@@ -50,6 +50,7 @@ import {
 import { readSessionHeader } from '../sessions/jsonl.ts';
 import type { SessionHeader } from '../sessions/types.ts';
 import { AUTOMATIONS_CONFIG_FILE } from '../automations/constants.ts';
+import { BATCHES_CONFIG_FILE } from '../batches/constants.ts';
 import { loadAppTheme, loadPresetThemes, loadPresetTheme, getAppThemesDir } from './storage.ts';
 import type { ThemeOverrides, PresetTheme } from './theme.ts';
 
@@ -129,6 +130,10 @@ export interface ConfigWatcherCallbacks {
   // Automations callbacks
   /** Called when automations.json changes */
   onAutomationsConfigChange?: (workspaceId: string) => void;
+
+  // Batches callbacks
+  /** Called when batches.json changes */
+  onBatchesConfigChange?: (workspaceId: string) => void;
 
   // Session callbacks
   /** Called when a session's JSONL header is modified externally (labels, name, flags, etc.) */
@@ -381,6 +386,13 @@ export class ConfigWatcher {
     if (relativePath === AUTOMATIONS_CONFIG_FILE) {
       debug('[ConfigWatcher] automations config change detected:', relativePath);
       this.debounce('automations-config', () => this.handleAutomationsConfigChange());
+      return;
+    }
+
+    // Workspace-level batches config file
+    if (relativePath === BATCHES_CONFIG_FILE) {
+      debug('[ConfigWatcher] batches config change detected:', relativePath);
+      this.debounce('batches-config', () => this.handleBatchesConfigChange());
       return;
     }
 
@@ -898,6 +910,14 @@ export class ConfigWatcher {
   private handleAutomationsConfigChange(): void {
     debug('[ConfigWatcher] automations config changed:', this.workspaceId);
     this.callbacks.onAutomationsConfigChange?.(this.workspaceId);
+  }
+
+  /**
+   * Handle batches config change.
+   */
+  private handleBatchesConfigChange(): void {
+    debug('[ConfigWatcher] batches config changed:', this.workspaceId);
+    this.callbacks.onBatchesConfigChange?.(this.workspaceId);
   }
 
   // ============================================================

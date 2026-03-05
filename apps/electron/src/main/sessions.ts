@@ -1059,6 +1059,15 @@ export class SessionManager {
         // Notify renderer to re-read automations.json
         this.broadcastAutomationsChanged(workspaceId)
       },
+      onBatchesConfigChange: () => {
+        sessionLog.info(`Batches config changed in ${workspaceId}`)
+        const batchProcessor = this.batchProcessors.get(workspaceRootPath)
+        if (batchProcessor) {
+          batchProcessor.loadConfig()
+          sessionLog.info(`Reloaded batch config for workspace ${workspaceId}`)
+        }
+        this.broadcastBatchesChanged(workspaceId)
+      },
       onLlmConnectionsChange: () => {
         sessionLog.info(`LLM connections changed in ${workspaceId}`)
         this.broadcastLlmConnectionsChanged()
@@ -1253,6 +1262,15 @@ export class SessionManager {
     if (!this.windowManager) return
     sessionLog.info(`Broadcasting automations changed for ${workspaceId}`)
     this.windowManager.broadcastToAll(IPC_CHANNELS.AUTOMATIONS_CHANGED, workspaceId)
+  }
+
+  /**
+   * Broadcast batches changed event to all windows
+   */
+  private broadcastBatchesChanged(workspaceId: string): void {
+    if (!this.windowManager) return
+    sessionLog.info(`Broadcasting batches changed for ${workspaceId}`)
+    this.windowManager.broadcastToAll(IPC_CHANNELS.BATCHES_CHANGED, workspaceId)
   }
 
   /**

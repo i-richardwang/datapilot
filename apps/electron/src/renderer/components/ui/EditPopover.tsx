@@ -85,6 +85,7 @@ export type EditContextKey =
   | 'edit-views'
   | 'edit-tool-icons'
   | 'automation-config'
+  | 'batch-config'
 
 /**
  * Full edit configuration including context for agent and example for UI.
@@ -493,6 +494,25 @@ const EDIT_CONFIGS: Record<EditContextKey, (location: string) => EditConfig> = {
         'After editing, confirm clearly what changed.',
     },
     example: 'Change the cron schedule to every 30 minutes',
+    model: 'sonnet',
+    systemPromptPreset: 'mini',
+    inlineExecution: true,
+  }),
+
+  'batch-config': (location) => ({
+    context: {
+      label: 'Batch Configuration',
+      filePath: `${location}/batches.json`,
+      context:
+        'The user is editing batches.json which configures batch processing jobs. ' +
+        'Structure: { version: 1, batches: [{ id?, name, enabled?, source: { type, path, idField }, ' +
+        'execution?: { maxConcurrency?, retryOnFailure?, maxRetries?, permissionMode?, model?, llmConnection? }, ' +
+        'action: { type: "prompt", prompt, labels?, mentions? } }] }. ' +
+        'Source types: csv, json, jsonl. Prompt uses $BATCH_ITEM_* variable placeholders. ' +
+        'Read ~/.craft-agent/docs/batches.md for full format reference. ' +
+        'After editing, confirm clearly what changed.',
+    },
+    example: 'Add a new batch that processes users from users.csv',
     model: 'sonnet',
     systemPromptPreset: 'mini',
     inlineExecution: true,

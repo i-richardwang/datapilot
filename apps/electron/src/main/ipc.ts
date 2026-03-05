@@ -2947,6 +2947,78 @@ export function registerIpcHandlers(sessionManager: SessionManager, windowManage
     return processor.getState(batchId)
   })
 
+  // Shared helper: resolve workspace, read batches.json, validate batch, mutate, write back
+  async function withBatchMutation(
+    workspaceId: string,
+    batchId: string,
+    mutate: (batches: Record<string, unknown>[], index: number, config: Record<string, unknown>, genId: () => string) => void
+  ) {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error('Workspace not found')
+
+    await withConfigMutex(workspace.rootPath, async () => {
+      const { BATCHES_CONFIG_FILE } = await import('@craft-agent/shared/batches')
+      const { randomBytes } = await import('crypto')
+      const genId = () => randomBytes(3).toString('hex')
+      const configPath = join(workspace.rootPath, BATCHES_CONFIG_FILE)
+      const raw = await readFile(configPath, 'utf-8')
+      const config = JSON.parse(raw)
+      const batches = config.batches
+      if (!Array.isArray(batches)) throw new Error('Invalid batches.json: missing batches array')
+      const index = batches.findIndex((b: Record<string, unknown>) => b.id === batchId)
+      if (index < 0) throw new Error(`Batch not found: ${batchId}`)
+
+      mutate(batches, index, config, genId)
+
+      // Backfill missing IDs on all batches before writing
+      for (const b of batches) {
+        if (!b.id) b.id = genId()
+      }
+      await writeFile(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8')
+    })
+  }
+
+  // Batch enabled state management (toggle enabled/disabled in batches.json)
+  ipcMain.handle(IPC_CHANNELS.BATCH_SET_ENABLED, async (_event, workspaceId: string, batchId: string, enabled: boolean) => {
+    await withBatchMutation(workspaceId, batchId, (batches, idx) => {
+      if (enabled) {
+        // Remove the enabled field entirely (defaults to true) to keep JSON clean
+        delete batches[idx].enabled
+      } else {
+        batches[idx].enabled = false
+      }
+    })
+  })
+
+  // Duplicate a batch (deep-clone, new ID, append " Copy" to name, insert after original)
+  ipcMain.handle(IPC_CHANNELS.BATCH_DUPLICATE, async (_event, workspaceId: string, batchId: string) => {
+    await withBatchMutation(workspaceId, batchId, (batches, idx, _config, genId) => {
+      const clone = JSON.parse(JSON.stringify(batches[idx]))
+      clone.id = genId()
+      clone.name = clone.name ? `${clone.name} Copy` : 'Untitled Copy'
+      batches.splice(idx + 1, 0, clone)
+    })
+  })
+
+  // Delete a batch (remove from array, clean up state file)
+  ipcMain.handle(IPC_CHANNELS.BATCH_DELETE, async (_event, workspaceId: string, batchId: string) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error('Workspace not found')
+
+    await withBatchMutation(workspaceId, batchId, (batches, idx) => {
+      batches.splice(idx, 1)
+    })
+
+    // Clean up state file
+    try {
+      const { BATCH_STATE_FILE_PREFIX } = await import('@craft-agent/shared/batches')
+      const stateFilePath = join(workspace.rootPath, `${BATCH_STATE_FILE_PREFIX}${batchId}.json`)
+      await unlink(stateFilePath)
+    } catch {
+      // State file may not exist — ignore
+    }
+  })
+
   // Generic workspace image loading (for source icons, status icons, etc.)
   ipcMain.handle(IPC_CHANNELS.WORKSPACE_READ_IMAGE, async (_event, workspaceId: string, relativePath: string) => {
     const workspace = getWorkspaceByNameOrId(workspaceId)

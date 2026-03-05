@@ -630,6 +630,25 @@ const api: ElectronAPI = {
   resumeBatch: (workspaceId: string, batchId: string) => ipcRenderer.invoke(IPC_CHANNELS.BATCH_RESUME, workspaceId, batchId),
   getBatchStatus: (workspaceId: string, batchId: string) => ipcRenderer.invoke(IPC_CHANNELS.BATCH_GET_STATUS, workspaceId, batchId),
   getBatchState: (workspaceId: string, batchId: string) => ipcRenderer.invoke(IPC_CHANNELS.BATCH_GET_STATE, workspaceId, batchId),
+
+  // Batch CRUD
+  setBatchEnabled: (workspaceId: string, batchId: string, enabled: boolean) =>
+    ipcRenderer.invoke(IPC_CHANNELS.BATCH_SET_ENABLED, workspaceId, batchId, enabled),
+  duplicateBatch: (workspaceId: string, batchId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.BATCH_DUPLICATE, workspaceId, batchId),
+  deleteBatch: (workspaceId: string, batchId: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.BATCH_DELETE, workspaceId, batchId),
+
+  // Batches change listener (live updates when batches.json changes on disk)
+  onBatchesChanged: (callback: (workspaceId: string) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, workspaceId: string) => {
+      callback(workspaceId)
+    }
+    ipcRenderer.on(IPC_CHANNELS.BATCHES_CHANGED, handler)
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.BATCHES_CHANGED, handler)
+    }
+  },
 }
 
 contextBridge.exposeInMainWorld('electronAPI', api)

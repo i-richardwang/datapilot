@@ -7,14 +7,17 @@
 
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { Play, Pause, RotateCcw, ExternalLink } from 'lucide-react'
+import { Play, Pause, RotateCcw, ExternalLink, PauseCircle } from 'lucide-react'
 import {
   Info_Page,
   Info_Section,
   Info_Table,
+  Info_Alert,
   Info_Badge,
   Info_Markdown,
 } from '@/components/info'
+import { EditPopover, EditButton, getEditConfig } from '@/components/ui/EditPopover'
+import { useActiveWorkspace } from '@/context/AppShellContext'
 import { BatchAvatar } from './BatchAvatar'
 import { BatchMenu } from './BatchMenu'
 import { BatchProgressBar } from './BatchProgressBar'
@@ -32,6 +35,9 @@ export interface BatchInfoPageProps {
   onStart?: () => void
   onPause?: () => void
   onResume?: () => void
+  onToggleEnabled?: () => void
+  onDuplicate?: () => void
+  onDelete?: () => void
   getBatchState?: (batchId: string) => Promise<BatchState | null>
   onNavigateToSession?: (sessionId: string) => void
   className?: string
@@ -42,12 +48,25 @@ export function BatchInfoPage({
   onStart,
   onPause,
   onResume,
+  onToggleEnabled,
+  onDuplicate,
+  onDelete,
   getBatchState,
   onNavigateToSession,
   className,
 }: BatchInfoPageProps) {
+  const workspace = useActiveWorkspace()
   const [batchState, setBatchState] = useState<BatchState | null>(null)
   const status: BatchStatus = batch.progress?.status ?? 'pending'
+  const enabled = batch.enabled !== false
+
+  const editActions = workspace?.rootPath ? (
+    <EditPopover
+      trigger={<EditButton />}
+      {...getEditConfig('batch-config', workspace.rootPath)}
+      secondaryAction={{ label: 'Edit File', filePath: `${workspace.rootPath}/batches.json` }}
+    />
+  ) : undefined
 
   // Load full batch state (with items) on mount and when progress changes
   useEffect(() => {
@@ -67,23 +86,40 @@ export function BatchInfoPage({
           <BatchMenu
             batchId={batch.id ?? ''}
             status={status}
+            enabled={enabled}
             onStart={onStart}
             onPause={onPause}
             onResume={onResume}
+            onToggleEnabled={onToggleEnabled}
+            onDuplicate={onDuplicate}
+            onDelete={onDelete}
           />
         }
       />
 
       <Info_Page.Content>
         {/* Hero */}
-        <Info_Page.Hero
-          avatar={<BatchAvatar status={status} fluid />}
-          title={batch.name}
-          tagline={`${BATCH_STATUS_DISPLAY[status]} batch — ${batch.source.type.toUpperCase()} source`}
-        />
+        <div className="flex items-start justify-between">
+          <Info_Page.Hero
+            avatar={<BatchAvatar status={status} fluid />}
+            title={batch.name}
+            tagline={`${BATCH_STATUS_DISPLAY[status]} batch — ${batch.source.type.toUpperCase()} source`}
+          />
+          {editActions}
+        </div>
+
+        {/* Disabled warning */}
+        {!enabled && (
+          <Info_Alert variant="warning" icon={<PauseCircle className="h-4 w-4" />}>
+            <Info_Alert.Title>Disabled</Info_Alert.Title>
+            <Info_Alert.Description>
+              This batch is disabled. Enable it from the menu to allow execution.
+            </Info_Alert.Description>
+          </Info_Alert>
+        )}
 
         {/* Section: Data Source */}
-        <Info_Section title="Data Source">
+        <Info_Section title="Data Source" actions={editActions}>
           <Info_Table>
             <Info_Table.Row label="Type" value={batch.source.type.toUpperCase()} />
             <Info_Table.Row label="Path" value={batch.source.path} />
@@ -92,7 +128,7 @@ export function BatchInfoPage({
         </Info_Section>
 
         {/* Section: Execution */}
-        <Info_Section title="Execution">
+        <Info_Section title="Execution" actions={editActions}>
           <Info_Table>
             <Info_Table.Row label="Max Concurrency" value={String(batch.execution?.maxConcurrency ?? 3)} />
             <Info_Table.Row label="Retry on Failure" value={batch.execution?.retryOnFailure ? 'Yes' : 'No'} />
@@ -108,7 +144,7 @@ export function BatchInfoPage({
         </Info_Section>
 
         {/* Section: Prompt Template */}
-        <Info_Section title="Prompt Template">
+        <Info_Section title="Prompt Template" actions={editActions}>
           <Info_Markdown>{`\`\`\`\n${batch.action.prompt}\n\`\`\``}</Info_Markdown>
           {batch.action.labels && batch.action.labels.length > 0 && (
             <div className="flex gap-1.5 flex-wrap mt-2">

@@ -796,6 +796,8 @@ function AppShellContent({
     handleStartBatch, handlePauseBatch, handleResumeBatch,
     getBatchState,
     updateBatchProgress, handleBatchComplete,
+    batchPendingDelete, pendingDeleteBatch, setBatchPendingDelete,
+    handleToggleBatch, handleDuplicateBatch, handleDeleteBatch, confirmDeleteBatch,
   } = useBatches(activeWorkspaceId)
 
   // Wire up batch event handlers ref for App.tsx
@@ -1584,7 +1586,10 @@ function AppShellContent({
     onPauseBatch: handlePauseBatch,
     onResumeBatch: handleResumeBatch,
     getBatchState,
-  }), [contextValue, handleDeleteSession, sources, skills, labelConfigs, handleSessionLabelsChange, enabledModes, effectiveSessionStatuses, handleSessionSourcesChange, searchActive, searchQuery, handleChatMatchInfoChange, handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, automationTestResults, getAutomationHistory, handleStartBatch, handlePauseBatch, handleResumeBatch, getBatchState])
+    onToggleBatch: handleToggleBatch,
+    onDuplicateBatch: handleDuplicateBatch,
+    onDeleteBatch: handleDeleteBatch,
+  }), [contextValue, handleDeleteSession, sources, skills, labelConfigs, handleSessionLabelsChange, enabledModes, effectiveSessionStatuses, handleSessionSourcesChange, searchActive, searchQuery, handleChatMatchInfoChange, handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, automationTestResults, getAutomationHistory, handleStartBatch, handlePauseBatch, handleResumeBatch, getBatchState, handleToggleBatch, handleDuplicateBatch, handleDeleteBatch])
 
   // Persist expanded folders to localStorage (workspace-scoped)
   React.useEffect(() => {
@@ -3172,7 +3177,11 @@ function AppShellContent({
                 onStartBatch={handleStartBatch}
                 onPauseBatch={handlePauseBatch}
                 onResumeBatch={handleResumeBatch}
+                onToggleBatch={handleToggleBatch}
+                onDuplicateBatch={handleDuplicateBatch}
+                onDeleteBatch={handleDeleteBatch}
                 selectedBatchId={isBatchesNavigation(navState) && navState.details ? navState.details.batchId : null}
+                workspaceRootPath={activeWorkspace?.rootPath}
               />
             )}
             {isSettingsNavigation(navState) && (
@@ -3495,6 +3504,22 @@ function AppShellContent({
           <DialogFooter>
             <Button variant="outline" onClick={() => setAutomationPendingDelete(null)}>Cancel</Button>
             <Button variant="destructive" onClick={confirmDeleteAutomation}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete batch confirmation dialog */}
+      <Dialog open={!!batchPendingDelete} onOpenChange={(open) => { if (!open) setBatchPendingDelete(null) }}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Delete Batch</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{pendingDeleteBatch?.name}</strong>? This will remove the batch configuration and its state file.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBatchPendingDelete(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDeleteBatch}>Delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

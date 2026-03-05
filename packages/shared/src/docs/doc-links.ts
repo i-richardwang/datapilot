@@ -19,6 +19,7 @@ export type DocFeature =
   | 'app-settings'
   | 'preferences'
   | 'automations'
+  | 'batches'
 
 export interface DocInfo {
   /** Path relative to DOC_BASE_URL */
@@ -107,6 +108,12 @@ export const DOCS: Record<DocFeature, DocInfo> = {
     title: 'Automations',
     summary:
       'Automate actions when events occur — run commands on schedules, react to label changes, or trigger prompts. Configured in automations.json.',
+  },
+  batches: {
+    path: '/batches/overview',
+    title: 'Batches',
+    summary:
+      'Process lists of items in bulk — run prompt actions across CSV, JSON, or JSONL data with concurrency, retries, and progress tracking. Configured in batches.json.',
   },
 }
 

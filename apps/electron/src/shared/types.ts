@@ -941,6 +941,10 @@ export const IPC_CHANNELS = {
   BATCH_GET_STATE: 'batches:getState',
   BATCH_PROGRESS: 'batches:progress',      // Broadcast: progress update
   BATCH_COMPLETE: 'batches:complete',      // Broadcast: batch finished
+  BATCH_SET_ENABLED: 'batches:setEnabled',
+  BATCH_DUPLICATE: 'batches:duplicate',
+  BATCH_DELETE: 'batches:delete',
+  BATCHES_CHANGED: 'batches:changed',       // Broadcast: config file changed
 } as const
 
 // Re-import types for ElectronAPI
@@ -1333,6 +1337,14 @@ export interface ElectronAPI {
   resumeBatch(workspaceId: string, batchId: string): Promise<import('@craft-agent/shared/batches').BatchProgress>
   getBatchStatus(workspaceId: string, batchId: string): Promise<import('@craft-agent/shared/batches').BatchProgress | null>
   getBatchState(workspaceId: string, batchId: string): Promise<import('@craft-agent/shared/batches').BatchState | null>
+
+  // Batch CRUD
+  setBatchEnabled(workspaceId: string, batchId: string, enabled: boolean): Promise<void>
+  duplicateBatch(workspaceId: string, batchId: string): Promise<void>
+  deleteBatch(workspaceId: string, batchId: string): Promise<void>
+
+  // Batches change listener (live updates when batches.json changes on disk)
+  onBatchesChanged(callback: (workspaceId: string) => void): () => void
 }
 
 /**
