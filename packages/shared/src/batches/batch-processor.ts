@@ -149,8 +149,21 @@ export class BatchProcessor {
   start(batchId: string): BatchProgress {
     const state = this.ensureActive(batchId)
 
+    // Full (re)start: reset every item to pending so the batch re-executes
+    for (const itemId of Object.keys(state.items)) {
+      updateItemState(state, itemId, {
+        status: 'pending',
+        sessionId: undefined,
+        startedAt: undefined,
+        completedAt: undefined,
+        error: undefined,
+        retryCount: 0,
+      })
+    }
+
     state.status = 'running'
-    state.startedAt = state.startedAt ?? Date.now()
+    state.startedAt = Date.now()
+    state.completedAt = undefined
     saveBatchState(this.options.workspaceRootPath, state)
 
     const config = this.getBatchConfig(batchId)!
@@ -192,6 +205,13 @@ export class BatchProcessor {
 
     if (state.status !== 'paused') {
       throw new Error(`Batch "${batchId}" is not paused (status: ${state.status})`)
+    }
+
+    // Crash recovery: running items lost their sessions on restart
+    for (const [itemId, itemState] of Object.entries(state.items)) {
+      if (itemState.status === 'running') {
+        updateItemState(state, itemId, { status: 'pending', sessionId: undefined })
+      }
     }
 
     state.status = 'running'
@@ -292,8 +312,9 @@ export class BatchProcessor {
   // ============================================================================
 
   /**
-   * Ensure a batch is loaded into memory: validate config, load data source,
-   * create or recover state. Called by start() and resume() before dispatching.
+   * Load a batch into memory: validate config, load data source, create or
+   * recover state. Pure loading — no item reset logic. Called by start() and
+   * resume() before they apply their own reset semantics.
    */
   private ensureActive(batchId: string): BatchState {
     const config = this.getBatchConfig(batchId)
@@ -319,12 +340,6 @@ export class BatchProcessor {
 
     if (state) {
       log.info(`[BatchProcessor] Recovering batch "${batchId}" from persisted state`)
-      // Reset running items to pending (sessions may have been lost on restart)
-      for (const [itemId, itemState] of Object.entries(state.items)) {
-        if (itemState.status === 'running') {
-          updateItemState(state, itemId, { status: 'pending', sessionId: undefined })
-        }
-      }
       // Add any new items that appeared in the data source
       for (const item of items) {
         if (!(item.id in state.items)) {

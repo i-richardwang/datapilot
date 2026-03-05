@@ -332,12 +332,13 @@ export function validateAll(workspaceId?: string, workspaceRoot?: string): Valid
     results.push(validateAllSources(workspaceId));
   }
 
-  // Include skill, status, label, automations, and permissions validation if workspaceRoot is provided
+  // Include skill, status, label, automations, batches, and permissions validation if workspaceRoot is provided
   if (workspaceRoot) {
     results.push(validateAllSkills(workspaceRoot));
     results.push(validateStatuses(workspaceRoot));
     results.push(validateLabels(workspaceRoot));
     results.push(validateAutomations(workspaceRoot));
+    results.push(validateBatches(workspaceRoot));
     results.push(validateAllPermissions(workspaceRoot));
   }
 
@@ -1315,6 +1316,7 @@ import {
   getAppPermissionsDir,
 } from '../agent/permissions-config.ts';
 import { validateAutomationsContent, validateAutomations, AUTOMATIONS_CONFIG_FILE } from '../automations/index.ts';
+import { validateBatchesContent, validateBatches, BATCHES_CONFIG_FILE } from '../batches/index.ts';
 
 /**
  * Internal: Validate a single permissions.json file
@@ -1835,7 +1837,7 @@ export function formatValidationResult(result: ValidationResult): string {
  * Result of detecting what type of config file a path corresponds to.
  */
 export interface ConfigFileDetection {
-  type: 'source' | 'skill' | 'statuses' | 'labels' | 'permissions' | 'tool-icons' | 'automations';
+  type: 'source' | 'skill' | 'statuses' | 'labels' | 'permissions' | 'tool-icons' | 'automations' | 'batch-config';
   /** Slug of the source or skill (if applicable) */
   slug?: string;
   /** Display file path for error messages */
@@ -1851,6 +1853,8 @@ export interface ConfigFileDetection {
  * - .../skills/{slug}/SKILL.md → skill definition
  * - .../statuses/config.json → status workflow config
  * - .../labels/config.json → label config
+ * - .../automations.json → automation config
+ * - .../batches.json → batch config
  * - .../permissions.json (workspace or source-level) → permission rules
  */
 export function detectConfigFileType(filePath: string, workspaceRootPath: string): ConfigFileDetection | null {
@@ -1892,6 +1896,11 @@ export function detectConfigFileType(filePath: string, workspaceRootPath: string
   // Match: automations config file
   if (relativePath === AUTOMATIONS_CONFIG_FILE) {
     return { type: 'automations', displayFile: relativePath };
+  }
+
+  // Match: batches config file
+  if (relativePath === BATCHES_CONFIG_FILE) {
+    return { type: 'batch-config', displayFile: relativePath };
   }
 
   // Match: permissions.json (workspace-level)
@@ -1955,6 +1964,8 @@ export function validateConfigFileContent(
       return validateLabelsContent(content);
     case 'automations':
       return validateAutomationsContent(content, detection.displayFile);
+    case 'batch-config':
+      return validateBatchesContent(content, detection.displayFile);
     case 'permissions':
       return validatePermissionsContent(content, detection.displayFile);
     case 'tool-icons':

@@ -197,6 +197,69 @@ describe('BatchProcessor', () => {
   })
 
   // =========================================================================
+  // Restart completed/failed batches
+  // =========================================================================
+
+  describe('restart completed batch', () => {
+    it('should re-execute all items when starting a completed batch', async () => {
+      // Run batch to completion
+      setup.processor.start('test-batch')
+      await tick()
+      for (const session of [...setup.createdSessions]) {
+        setup.processor.onSessionComplete(session.sessionId, 'complete')
+        await tick()
+      }
+      // Complete the 3rd dispatched session
+      const thirdSession = setup.createdSessions[2]
+      if (thirdSession) {
+        setup.processor.onSessionComplete(thirdSession.sessionId, 'complete')
+        await tick()
+      }
+
+      const stateAfterFirst = setup.processor.getState('test-batch')
+      expect(stateAfterFirst!.status).toBe('completed')
+
+      // Now start again — should reset all items and re-dispatch
+      const sessionCountBefore = setup.createdSessions.length
+      const progress = setup.processor.start('test-batch')
+
+      expect(progress.status).toBe('running')
+      expect(progress.pendingItems).toBe(3)
+      expect(progress.completedItems).toBe(0)
+
+      await tick()
+
+      // New sessions should have been created
+      expect(setup.createdSessions.length).toBeGreaterThan(sessionCountBefore)
+    })
+
+    it('should re-execute all items when starting a failed batch', async () => {
+      setup.processor.start('test-batch')
+      await tick()
+
+      // Fail all sessions
+      for (const session of [...setup.createdSessions]) {
+        setup.processor.onSessionComplete(session.sessionId, 'error')
+        await tick()
+      }
+      const thirdSession = setup.createdSessions[2]
+      if (thirdSession) {
+        setup.processor.onSessionComplete(thirdSession.sessionId, 'error')
+        await tick()
+      }
+
+      const stateAfterFail = setup.processor.getState('test-batch')
+      expect(stateAfterFail!.status).toBe('failed')
+
+      // Start again — should reset all items
+      const progress = setup.processor.start('test-batch')
+      expect(progress.status).toBe('running')
+      expect(progress.pendingItems).toBe(3)
+      expect(progress.failedItems).toBe(0)
+    })
+  })
+
+  // =========================================================================
   // Session Completion & Dispatch Chain
   // =========================================================================
 
@@ -363,22 +426,24 @@ describe('BatchProcessor', () => {
   // =========================================================================
 
   describe('resume from persisted state', () => {
-    it('should resume from disk state on start', async () => {
+    it('should preserve partial progress when resuming after restart', async () => {
       setup.processor.start('test-batch')
       await tick()
       const sessionId = setup.createdSessions[0]!.sessionId
       setup.processor.onSessionComplete(sessionId, 'complete')
       await tick()
 
-      // Simulate restart
+      // Simulate restart — dispose() saves running batches as paused
       setup.processor.dispose()
       const newProcessor = new BatchProcessor({
         ...setup.processor['options'],
         onExecutePrompt: setup.executePrompt,
       })
 
-      const progress = newProcessor.start('test-batch')
+      // resume() preserves completed items; start() would reset them
+      const progress = newProcessor.resume('test-batch')
       expect(progress.completedItems).toBe(1)
+      expect(progress.status).toBe('running')
       newProcessor.dispose()
     })
   })
