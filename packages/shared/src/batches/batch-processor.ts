@@ -443,19 +443,13 @@ export class BatchProcessor {
     const env = this.buildItemEnv(item)
 
     // Expand prompt template with item variables
-    const basePrompt = expandEnvVars(config.action.prompt, env)
-    let expandedPrompt = basePrompt
-
-    // Append output instructions if output is configured
-    if (config.output) {
-      expandedPrompt += this.buildOutputInstruction(config)
-    }
+    const expandedPrompt = expandEnvVars(config.action.prompt, env)
 
     // Mark as running with truncated prompt summary for UI display
     updateItemState(state, itemId, {
       status: 'running',
       startedAt: Date.now(),
-      summary: basePrompt.length > 100 ? basePrompt.slice(0, 100) + '…' : basePrompt,
+      summary: expandedPrompt.length > 100 ? expandedPrompt.slice(0, 100) + '…' : expandedPrompt,
     })
     saveBatchState(this.options.workspaceRootPath, state)
 
@@ -510,58 +504,6 @@ export class BatchProcessor {
       })
       saveBatchState(this.options.workspaceRootPath, state)
     }
-  }
-
-  /**
-   * Build prompt instruction for structured output.
-   * Appended to the expanded prompt when the batch has output configured.
-   */
-  private buildOutputInstruction(config: BatchConfig): string {
-    if (!config.output) return ''
-
-    const lines = [
-      '',
-      '',
-      '---',
-      '## Required Structured Output',
-      '',
-      'After completing your analysis, you **MUST** call the `batch_output` tool to record your structured result.',
-      'Pass your result as the `data` parameter (a JSON object). Do NOT include `_item_id` or `_timestamp` — they are injected automatically.',
-      'Ensure double quotes inside string values are escaped with backslash (e.g. `\\"`).',
-    ]
-
-    if (config.output.schema) {
-      lines.push(
-        '',
-        '### Output Schema',
-        '',
-        '```json',
-        JSON.stringify(config.output.schema, null, 2),
-        '```',
-      )
-
-      // Extract field descriptions for clarity
-      const properties = config.output.schema.properties as Record<string, Record<string, unknown>> | undefined
-      const required = config.output.schema.required
-
-      if (properties && Object.keys(properties).length > 0) {
-        lines.push('', '### Fields', '')
-        for (const [key, prop] of Object.entries(properties)) {
-          const desc = prop.description ? ` — ${prop.description}` : ''
-          const isRequired = required?.includes(key) ? ' **(required)**' : ' *(optional)*'
-          const typeStr = prop.type ? ` \`${prop.type}\`` : ''
-          const enumStr = Array.isArray(prop.enum) ? ` (one of: ${prop.enum.map(v => `\`${JSON.stringify(v)}\``).join(', ')})` : ''
-          lines.push(`- \`${key}\`${typeStr}${isRequired}${enumStr}${desc}`)
-        }
-      }
-    }
-
-    lines.push(
-      '',
-      'Call `batch_output` with your result. Do not skip this step.',
-    )
-
-    return lines.join('\n')
   }
 
   /**

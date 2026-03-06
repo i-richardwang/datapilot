@@ -32,6 +32,7 @@ import {
   registerSessionScopedToolCallbacks,
   unregisterSessionScopedToolCallbacks,
   getSessionScopedTools,
+  getSessionBatchContext,
   cleanupSessionScopedTools,
   type AuthRequest,
 } from './session-scoped-tools.ts';
@@ -1652,9 +1653,13 @@ export class ClaudeAgent extends BaseAgent {
 
     // Add context parts using centralized PromptBuilder
     // This includes: date/time, session state (with plansFolderPath),
-    // workspace capabilities, and working directory context
+    // workspace capabilities, working directory context, and batch output instructions
+    const batchCtx = getSessionBatchContext(this.modeSessionId);
     const contextParts = this.promptBuilder.buildContextParts(
-      { plansFolderPath: getSessionPlansPath(this.workspaceRootPath, this.modeSessionId) },
+      {
+        plansFolderPath: getSessionPlansPath(this.workspaceRootPath, this.modeSessionId),
+        batchOutputSchema: batchCtx?.outputSchema,
+      },
       this.sourceManager.formatSourceState()
     );
 
@@ -1693,9 +1698,13 @@ export class ClaudeAgent extends BaseAgent {
 
     // Add context parts using centralized PromptBuilder
     // This includes: date/time, session state (with plansFolderPath),
-    // workspace capabilities, and working directory context
+    // workspace capabilities, working directory context, and batch output instructions
+    const batchCtx = getSessionBatchContext(this.modeSessionId);
     const contextParts = this.promptBuilder.buildContextParts(
-      { plansFolderPath: getSessionPlansPath(this.workspaceRootPath, this.modeSessionId) },
+      {
+        plansFolderPath: getSessionPlansPath(this.workspaceRootPath, this.modeSessionId),
+        batchOutputSchema: batchCtx?.outputSchema,
+      },
       this.sourceManager.formatSourceState()
     );
 

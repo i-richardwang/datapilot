@@ -55,6 +55,7 @@ import {
   unregisterSessionScopedToolCallbacks,
   setLastPlanFilePath,
   getSessionScopedToolCallbacks,
+  getSessionBatchContext,
 } from './session-scoped-tools.ts';
 
 // Session tool proxy definitions (for registering with subprocess)
@@ -1606,8 +1607,12 @@ export class PiAgent extends BaseAgent {
       const sourceContext = this.sourceManager.formatSourceState();
 
       // Build context parts using centralized PromptBuilder
+      const batchCtx = getSessionBatchContext(this._sessionId);
       const contextParts = this.promptBuilder.buildContextParts(
-        { plansFolderPath: getSessionPlansPath(this.config.workspace.rootPath, this._sessionId) },
+        {
+          plansFolderPath: getSessionPlansPath(this.config.workspace.rootPath, this._sessionId),
+          batchOutputSchema: batchCtx?.outputSchema,
+        },
         sourceContext
       );
 

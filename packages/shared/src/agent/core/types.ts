@@ -112,6 +112,8 @@ export interface ContextBlockOptions {
   inactiveSources?: LoadedSource[];
   /** Whether local MCP is enabled */
   localMcpEnabled?: boolean;
+  /** Batch output schema (when present, injects structured output instructions into context) */
+  batchOutputSchema?: Record<string, unknown>;
 }
 
 /**

@@ -17,6 +17,7 @@ import { formatPreferencesForPrompt } from '../../config/preferences.ts';
 import { formatSessionState } from '../mode-manager.ts';
 import { getDateTimeContext, getWorkingDirectoryContext } from '../../prompts/system.ts';
 import { getSessionPlansPath, getSessionDataPath, getSessionPath } from '../../sessions/storage.ts';
+import { buildBatchOutputInstruction } from '../../batches/output-instruction.ts';
 import type {
   PromptBuilderConfig,
   ContextBlockOptions,
@@ -92,6 +93,14 @@ export class PromptBuilder {
     const workingDirContext = this.getWorkingDirectoryContext();
     if (workingDirContext) {
       parts.push(workingDirContext);
+    }
+
+    // Add batch output instructions (only for batch sessions with output schema)
+    if (options.batchOutputSchema) {
+      const outputInstruction = buildBatchOutputInstruction(options.batchOutputSchema);
+      if (outputInstruction) {
+        parts.push(outputInstruction);
+      }
     }
 
     return parts;
