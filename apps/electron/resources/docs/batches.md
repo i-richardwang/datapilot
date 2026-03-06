@@ -52,6 +52,7 @@ Each batch in the `batches` array has the following fields:
 | `source` | object | Yes | Data source configuration |
 | `execution` | object | No | Execution settings (concurrency, retries, etc.) |
 | `action` | object | Yes | Action to perform for each item |
+| `output` | object | No | Structured output collection (writes results to JSONL) |
 
 ## Data Sources
 
@@ -143,11 +144,85 @@ The optional `execution` object controls how items are processed.
 }
 ```
 
+## Output Configuration
+
+The optional `output` object enables structured result collection. When configured, each batch session receives the `batch_output` tool and prompt instructions to record a structured result. All results are appended to a shared JSONL file.
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `path` | string | Yes | Output file path relative to workspace root (should be `.jsonl`) |
+| `schema` | object | No | JSON Schema defining the expected structure of each output record |
+
+### Schema Definition
+
+The `schema` object follows standard JSON Schema format with `type: "object"`:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `type` | `"object"` | Must be `"object"` |
+| `properties` | object | Field definitions with `type`, `description`, and optional `enum` |
+| `required` | string[] | List of required field names |
+
+### How It Works
+
+1. When a batch has `output` configured, the `batch_output` tool is automatically made available in each session
+2. The prompt is automatically appended with structured output instructions and the schema definition
+3. The agent calls `batch_output` with a `data` parameter containing the result fields
+4. Each record is validated against the schema (if provided) before being written
+5. Metadata fields `_item_id` and `_timestamp` are injected automatically
+
+### Output File Format (JSONL)
+
+Each line in the output file is a JSON object:
+
+```jsonl
+{"_item_id":"u001","_timestamp":"2026-03-06T10:30:00.000Z","summary":"High-value user","risk_level":"low","score":92}
+{"_item_id":"u002","_timestamp":"2026-03-06T10:30:05.000Z","summary":"At-risk user","risk_level":"high","score":34}
+```
+
+- `_item_id` — The item's unique ID from the data source (auto-injected)
+- `_timestamp` — When the output was recorded (auto-injected)
+- All other fields are the agent's structured result
+
+### Example
+
+```json
+{
+  "output": {
+    "path": "output/user-analysis.jsonl",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "summary": { "type": "string", "description": "One-sentence summary" },
+        "risk_level": { "type": "string", "enum": ["low", "medium", "high"] },
+        "score": { "type": "number", "description": "Risk score 0-100" },
+        "recommendations": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Actionable recommendations"
+        }
+      },
+      "required": ["summary", "risk_level"]
+    }
+  }
+}
+```
+
+Without a schema, the agent can output any JSON object (freeform mode):
+
+```json
+{
+  "output": {
+    "path": "output/results.jsonl"
+  }
+}
+```
+
 ## Complete Examples
 
 ### CSV User Processing
 
-Process a list of users from a CSV file, generating an onboarding summary for each.
+Process a list of users from a CSV file, generating an onboarding summary for each with structured output.
 
 ```json
 {
@@ -170,6 +245,18 @@ Process a list of users from a CSV file, generating an onboarding summary for ea
         "type": "prompt",
         "prompt": "Generate an onboarding summary for user $BATCH_ITEM_NAME ($BATCH_ITEM_EMAIL). Their role is $BATCH_ITEM_ROLE and they joined on $BATCH_ITEM_START_DATE.",
         "labels": ["Batch", "onboarding"]
+      },
+      "output": {
+        "path": "output/onboarding-summaries.jsonl",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "summary": { "type": "string", "description": "Onboarding summary" },
+            "priority_actions": { "type": "array", "items": { "type": "string" } },
+            "onboarding_risk": { "type": "string", "enum": ["low", "medium", "high"] }
+          },
+          "required": ["summary", "onboarding_risk"]
+        }
       }
     }
   ]
@@ -288,3 +375,7 @@ Or use the `config_validate` tool directly with `target: "batches"`.
 - Unsupported `source.type` (must be `csv`, `json`, or `jsonl`)
 - Duplicate `idField` values in data source
 - Missing `idField` column in data file
+
+**Output-related warnings:**
+- `output.path` does not end with `.jsonl`
+- `output.schema.properties` is empty (no fields defined)

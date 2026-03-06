@@ -304,6 +304,7 @@ Configuration is stored at `~/.craft-agent/`:
         ├── config.json      # Workspace settings
         ├── theme.json       # Workspace theme override
         ├── automations.json  # Event-driven automations
+        ├── batches.json      # Batch processing jobs
         ├── sessions/        # Session data (JSONL)
         ├── sources/         # Connected sources
         ├── skills/          # Custom skills
@@ -353,6 +354,38 @@ Or configure manually in `~/.craft-agent/workspaces/{id}/automations.json`:
 **Supported events:** `LabelAdd`, `LabelRemove`, `PermissionModeChange`, `FlagChange`, `SessionStatusChange`, `SchedulerTick`, `PreToolUse`, `PostToolUse`, `SessionStart`, `SessionEnd`, and more.
 
 See the [Automations documentation](https://agents.craft.do/docs/automations/overview) for the full reference.
+
+### Batches
+
+Batches let you process large lists of items by running a prompt action for each one — from a CSV, JSON, or JSONL data source.
+
+**Just ask the agent:**
+- "Create a batch that processes each row in users.csv"
+- "Set up a batch to summarise every issue in issues.jsonl"
+
+Or configure manually in `~/.craft-agent/workspaces/{id}/batches.json`:
+
+```json
+{
+  "version": 1,
+  "batches": [
+    {
+      "name": "Process user list",
+      "source": {
+        "type": "csv",
+        "path": "data/users.csv",
+        "idField": "user_id"
+      },
+      "action": {
+        "type": "prompt",
+        "prompt": "Look up user $BATCH_ITEM_USER_ID and summarise their account status"
+      }
+    }
+  ]
+}
+```
+
+Features include configurable concurrency, automatic retries, pause/resume, structured output collection (JSONL), and live progress tracking.
 
 ## Advanced Features
 

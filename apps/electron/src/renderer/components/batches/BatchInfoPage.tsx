@@ -182,6 +182,38 @@ export function BatchInfoPage({
           </Info_Table>
         </Info_Section>
 
+        {/* Section: Output (only when configured) */}
+        {batch.output && (
+          <Info_Section title="Output" description="Structured result collection" actions={editActions}>
+            <Info_Table>
+              <Info_Table.Row label="Path">
+                <code className="text-xs font-mono bg-foreground/5 px-1.5 py-0.5 rounded">
+                  {batch.output.path}
+                </code>
+              </Info_Table.Row>
+              <Info_Table.Row label="Schema">
+                <Info_Badge color={batch.output.schema ? 'success' : 'muted'}>
+                  {batch.output.schema ? 'Defined' : 'Freeform'}
+                </Info_Badge>
+              </Info_Table.Row>
+              {batch.output.schema?.properties && Object.keys(batch.output.schema.properties).length > 0 && (
+                <Info_Table.Row label="Fields">
+                  <div className="flex gap-1.5 flex-wrap">
+                    {Object.entries(batch.output.schema.properties).map(([key, _prop]) => {
+                      const isRequired = batch.output?.schema?.required?.includes(key)
+                      return (
+                        <Info_Badge key={key} color={isRequired ? 'default' : 'muted'}>
+                          {key}{isRequired ? '*' : ''}
+                        </Info_Badge>
+                      )
+                    })}
+                  </div>
+                </Info_Table.Row>
+              )}
+            </Info_Table>
+          </Info_Section>
+        )}
+
         {/* Section: Progress */}
         {batch.progress && (
           <Info_Section

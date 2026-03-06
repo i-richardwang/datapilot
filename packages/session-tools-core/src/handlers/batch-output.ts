@@ -93,7 +93,15 @@ export async function handleBatchOutput(
   ctx: SessionToolContext,
   args: BatchOutputArgs,
 ): Promise<ToolResult> {
-  const { itemId, outputPath, outputSchema } = ctx.batchContext!;
+  // Guard: only available in batch sessions
+  if (!ctx.batchContext) {
+    return errorResponse(
+      'batch_output can only be used within a batch session. ' +
+      'This session was not created by the batch processor.',
+    );
+  }
+
+  const { itemId, outputPath, outputSchema } = ctx.batchContext;
 
   // Validate args.data is a non-empty object
   if (!args.data || typeof args.data !== 'object' || Array.isArray(args.data)) {

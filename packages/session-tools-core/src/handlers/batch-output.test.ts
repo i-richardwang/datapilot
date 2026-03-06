@@ -44,6 +44,13 @@ describe('handleBatchOutput', () => {
     rmSync(tempDir, { recursive: true, force: true })
   })
 
+  it('should reject when not in a batch session', async () => {
+    const ctx = createTestContext(undefined)
+    const result = await handleBatchOutput(ctx, { data: { summary: 'test' } })
+    expect(result.isError).toBe(true)
+    expect(result.content[0]!.text).toContain('batch session')
+  })
+
   it('should write JSONL output with metadata', async () => {
     const outputPath = join(tempDir, 'output.jsonl')
     const ctx = createTestContext({

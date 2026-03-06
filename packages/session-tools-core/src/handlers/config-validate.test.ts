@@ -55,3 +55,27 @@ describe('config-validate automations target', () => {
     expect(result.content[0]?.text).toContain('No automations.json');
   });
 });
+
+describe('config-validate batches target', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'config-validate-batches-test-'));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('validates batches.json when present', async () => {
+    writeFileSync(join(tempDir, 'batches.json'), JSON.stringify({ version: 1, batches: [] }));
+
+    const result = await handleConfigValidate(createCtx(tempDir), { target: 'batches' });
+    expect(result.content[0]?.text).toContain('Validation passed');
+  });
+
+  it('returns no-config message when batches.json does not exist', async () => {
+    const result = await handleConfigValidate(createCtx(tempDir), { target: 'batches' });
+    expect(result.content[0]?.text).toContain('No batches.json');
+  });
+});

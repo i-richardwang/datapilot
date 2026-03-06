@@ -131,6 +131,7 @@ export interface ValidatorInterface {
   validatePreferences(): import('./types.js').ValidationResult;
   validatePermissions(workspaceRootPath: string, sourceSlug?: string): import('./types.js').ValidationResult;
   validateAutomations(workspaceRootPath: string): import('./types.js').ValidationResult;
+  validateBatches(workspaceRootPath: string): import('./types.js').ValidationResult;
   validateToolIcons(): import('./types.js').ValidationResult;
   validateAll(workspaceRootPath: string): import('./types.js').ValidationResult;
   validateSkill(workspaceRootPath: string, skillSlug: string): import('./types.js').ValidationResult;

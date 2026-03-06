@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 
 const AUTOMATIONS_CONFIG_FILE = 'automations.json';
+const BATCHES_CONFIG_FILE = 'batches.json';
 import type { SessionToolContext } from '../context.ts';
 import type { ToolResult } from '../types.ts';
 import { successResponse, errorResponse } from '../response.ts';
@@ -20,7 +21,7 @@ import {
 import { getSourceConfigPath } from '../source-helpers.ts';
 
 export interface ConfigValidateArgs {
-  target: 'config' | 'sources' | 'statuses' | 'preferences' | 'permissions' | 'automations' | 'tool-icons' | 'all';
+  target: 'config' | 'sources' | 'statuses' | 'preferences' | 'permissions' | 'automations' | 'batches' | 'tool-icons' | 'all';
   sourceSlug?: string;
 }
 
@@ -64,6 +65,9 @@ export async function handleConfigValidate(
           break;
         case 'automations':
           result = ctx.validators.validateAutomations(ctx.workspacePath);
+          break;
+        case 'batches':
+          result = ctx.validators.validateBatches(ctx.workspacePath);
           break;
         case 'tool-icons':
           result = ctx.validators.validateToolIcons();
@@ -163,6 +167,15 @@ export async function handleConfigValidate(
       return successResponse(`✓ No ${AUTOMATIONS_CONFIG_FILE} (no automations configured)`);
     }
 
+    case 'batches': {
+      const batchesPath = join(ctx.workspacePath, BATCHES_CONFIG_FILE);
+      if (ctx.fs.exists(batchesPath)) {
+        const result = validateJsonFileHasFields(batchesPath, []);
+        return successResponse(formatValidationResult(result));
+      }
+      return successResponse(`✓ No ${BATCHES_CONFIG_FILE} (no batches configured)`);
+    }
+
     case 'tool-icons': {
       const result = validateJsonFileHasFields(
         join(craftAgentRoot, 'tool-icons', 'tool-icons.json'),
@@ -186,7 +199,7 @@ export async function handleConfigValidate(
 
     default:
       return errorResponse(
-        `Unknown validation target: ${target}. Valid targets: config, sources, statuses, preferences, permissions, automations, tool-icons, all`
+        `Unknown validation target: ${target}. Valid targets: config, sources, statuses, preferences, permissions, automations, batches, tool-icons, all`
       );
   }
 }

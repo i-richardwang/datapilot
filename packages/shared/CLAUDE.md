@@ -21,6 +21,7 @@ This package uses subpath exports for clean imports:
 
 ```typescript
 import { CraftAgent, getPermissionMode, setPermissionMode } from '@craft-agent/shared/agent';
+import { BatchProcessor, type BatchConfig } from '@craft-agent/shared/batches';
 import { loadStoredConfig, type Workspace } from '@craft-agent/shared/config';
 import { getCredentialManager } from '@craft-agent/shared/credentials';
 import { CraftMcpClient } from '@craft-agent/shared/mcp';
@@ -36,6 +37,7 @@ import { debug } from '@craft-agent/shared/utils';
 src/
 ├── agent/              # CraftAgent, session-scoped-tools, mode-manager, mode-types, permissions-config
 ├── auth/               # OAuth, craft-token, claude-token, state
+├── batches/            # Batch processing system (processor, state, data sources, validation)
 ├── config/             # Storage, preferences, models, theme, watcher
 ├── credentials/        # Secure credential storage (AES-256-GCM)
 ├── headless/           # Non-interactive execution mode
