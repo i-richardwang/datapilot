@@ -806,7 +806,7 @@ function AppShellContent({
     getBatchState,
     updateBatchProgress, handleBatchComplete,
     batchPendingDelete, pendingDeleteBatch, setBatchPendingDelete,
-    handleToggleBatch, handleDuplicateBatch, handleDeleteBatch, confirmDeleteBatch,
+    handleDuplicateBatch, handleDeleteBatch, confirmDeleteBatch,
   } = useBatches(activeWorkspaceId)
 
   // Wire up batch event handlers ref for App.tsx
@@ -1597,10 +1597,9 @@ function AppShellContent({
     onPauseBatch: handlePauseBatch,
     onResumeBatch: handleResumeBatch,
     getBatchState,
-    onToggleBatch: handleToggleBatch,
     onDuplicateBatch: handleDuplicateBatch,
     onDeleteBatch: handleDeleteBatch,
-  }), [contextValue, handleDeleteSession, sources, skills, labelConfigs, handleSessionLabelsChange, enabledModes, effectiveSessionStatuses, handleSessionSourcesChange, searchActive, searchQuery, handleChatMatchInfoChange, handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, automationTestResults, getAutomationHistory, handleStartBatch, handlePauseBatch, handleResumeBatch, getBatchState, handleToggleBatch, handleDuplicateBatch, handleDeleteBatch])
+  }), [contextValue, handleDeleteSession, sources, skills, labelConfigs, handleSessionLabelsChange, enabledModes, effectiveSessionStatuses, handleSessionSourcesChange, searchActive, searchQuery, handleChatMatchInfoChange, handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, automationTestResults, getAutomationHistory, handleStartBatch, handlePauseBatch, handleResumeBatch, getBatchState, handleDuplicateBatch, handleDeleteBatch])
 
   // Persist expanded folders to localStorage (workspace-scoped)
   React.useEffect(() => {
@@ -3200,7 +3199,6 @@ function AppShellContent({
                 onStartBatch={handleStartBatch}
                 onPauseBatch={handlePauseBatch}
                 onResumeBatch={handleResumeBatch}
-                onToggleBatch={handleToggleBatch}
                 onDuplicateBatch={handleDuplicateBatch}
                 onDeleteBatch={handleDeleteBatch}
                 selectedBatchId={isBatchesNavigation(navState) && navState.details ? navState.details.batchId : null}

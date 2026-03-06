@@ -7,12 +7,10 @@
 
 import * as React from 'react'
 import { useState, useEffect } from 'react'
-import { PauseCircle } from 'lucide-react'
 import {
   Info_Page,
   Info_Section,
   Info_Table,
-  Info_Alert,
   Info_Badge,
   Info_Markdown,
 } from '@/components/info'
@@ -35,7 +33,6 @@ export interface BatchInfoPageProps {
   onStart?: () => void
   onPause?: () => void
   onResume?: () => void
-  onToggleEnabled?: () => void
   onDuplicate?: () => void
   onDelete?: () => void
   getBatchState?: (batchId: string) => Promise<BatchState | null>
@@ -47,7 +44,6 @@ export function BatchInfoPage({
   onStart,
   onPause,
   onResume,
-  onToggleEnabled,
   onDuplicate,
   onDelete,
   getBatchState,
@@ -56,9 +52,8 @@ export function BatchInfoPage({
   const workspace = useActiveWorkspace()
   const [batchState, setBatchState] = useState<BatchState | null>(null)
   const status: BatchStatus = batch.progress?.status ?? 'pending'
-  const enabled = batch.enabled !== false
 
-  const editActions = workspace?.rootPath ? (
+  const editActions = status === 'pending' && workspace?.rootPath ? (
     <EditPopover
       trigger={<EditButton />}
       {...getEditConfig('batch-config', workspace.rootPath)}
@@ -86,11 +81,9 @@ export function BatchInfoPage({
           <BatchMenu
             batchId={batch.id ?? ''}
             status={status}
-            enabled={enabled}
             onStart={onStart}
             onPause={onPause}
             onResume={onResume}
-            onToggleEnabled={onToggleEnabled}
             onDuplicate={onDuplicate}
             onDelete={onDelete}
           />
@@ -107,16 +100,6 @@ export function BatchInfoPage({
           />
           {editActions}
         </div>
-
-        {/* Disabled warning */}
-        {!enabled && (
-          <Info_Alert variant="warning" icon={<PauseCircle className="h-4 w-4" />}>
-            <Info_Alert.Title>Disabled</Info_Alert.Title>
-            <Info_Alert.Description>
-              This batch is disabled. Enable it from the menu to allow execution.
-            </Info_Alert.Description>
-          </Info_Alert>
-        )}
 
         {/* Section: Source */}
         <Info_Section title="Source" description="Where to read items from" actions={editActions}>

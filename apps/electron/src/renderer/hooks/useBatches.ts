@@ -28,7 +28,6 @@ export interface UseBatchesResult {
   batchPendingDelete: string | null
   pendingDeleteBatch: BatchListItem | undefined
   setBatchPendingDelete: (id: string | null) => void
-  handleToggleBatch: (batchId: string) => void
   handleDuplicateBatch: (batchId: string) => void
   handleDeleteBatch: (batchId: string) => void
   confirmDeleteBatch: () => void
@@ -118,14 +117,6 @@ export function useBatches(
     }
   }, [activeWorkspaceId])
 
-  // Toggle enabled/disabled
-  const handleToggleBatch = useCallback((batchId: string) => {
-    const batch = findBatch(batchId)
-    if (!batch || !activeWorkspaceId) return
-    window.electronAPI.setBatchEnabled(activeWorkspaceId, batchId, batch.enabled === false)
-      .catch(() => toast.error('Failed to toggle batch'))
-  }, [findBatch, activeWorkspaceId])
-
   // Duplicate
   const handleDuplicateBatch = useCallback((batchId: string) => {
     if (!activeWorkspaceId) return
@@ -158,7 +149,6 @@ export function useBatches(
     batchPendingDelete,
     pendingDeleteBatch,
     setBatchPendingDelete,
-    handleToggleBatch,
     handleDuplicateBatch,
     handleDeleteBatch,
     confirmDeleteBatch,

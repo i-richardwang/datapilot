@@ -82,7 +82,6 @@ export function MainContentPanel({
     onPauseBatch,
     onResumeBatch,
     getBatchState,
-    onToggleBatch,
     onDuplicateBatch,
     onDeleteBatch,
   } = useAppShellContext()
@@ -320,7 +319,6 @@ export function MainContentPanel({
               onStart={onStartBatch ? () => onStartBatch(batch.id ?? '') : undefined}
               onPause={onPauseBatch ? () => onPauseBatch(batch.id ?? '') : undefined}
               onResume={onResumeBatch ? () => onResumeBatch(batch.id ?? '') : undefined}
-              onToggleEnabled={onToggleBatch ? () => onToggleBatch(batch.id ?? '') : undefined}
               onDuplicate={onDuplicateBatch ? () => onDuplicateBatch(batch.id ?? '') : undefined}
               onDelete={onDeleteBatch ? () => onDeleteBatch(batch.id ?? '') : undefined}
               getBatchState={getBatchState}

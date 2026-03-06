@@ -42,7 +42,6 @@ interface BatchItemProps {
   onStart?: () => void
   onPause?: () => void
   onResume?: () => void
-  onToggleEnabled?: () => void
   onDuplicate?: () => void
   onDelete?: () => void
 }
@@ -55,12 +54,10 @@ function BatchItem({
   onStart,
   onPause,
   onResume,
-  onToggleEnabled,
   onDuplicate,
   onDelete,
 }: BatchItemProps) {
   const status: BatchStatus = batch.progress?.status ?? 'pending'
-  const enabled = batch.enabled !== false
   const statusColors = BATCH_STATUS_COLOR[status]
   const progressText = batch.progress
     ? `${batch.progress.completedItems + batch.progress.failedItems}/${batch.progress.totalItems}`
@@ -91,11 +88,9 @@ function BatchItem({
         <BatchMenu
           batchId={batch.id ?? ''}
           status={status}
-          enabled={enabled}
           onStart={onStart}
           onPause={onPause}
           onResume={onResume}
-          onToggleEnabled={onToggleEnabled}
           onDuplicate={onDuplicate}
           onDelete={onDelete}
         />
@@ -115,7 +110,6 @@ export interface BatchesListPanelProps {
   onStartBatch?: (batchId: string) => void
   onPauseBatch?: (batchId: string) => void
   onResumeBatch?: (batchId: string) => void
-  onToggleBatch?: (batchId: string) => void
   onDuplicateBatch?: (batchId: string) => void
   onDeleteBatch?: (batchId: string) => void
   selectedBatchId?: string | null
@@ -130,7 +124,6 @@ export function BatchesListPanel({
   onStartBatch,
   onPauseBatch,
   onResumeBatch,
-  onToggleBatch,
   onDuplicateBatch,
   onDeleteBatch,
   selectedBatchId,
@@ -232,7 +225,6 @@ export function BatchesListPanel({
                   onStart={onStartBatch ? () => onStartBatch(batch.id ?? '') : undefined}
                   onPause={onPauseBatch ? () => onPauseBatch(batch.id ?? '') : undefined}
                   onResume={onResumeBatch ? () => onResumeBatch(batch.id ?? '') : undefined}
-                  onToggleEnabled={onToggleBatch ? () => onToggleBatch(batch.id ?? '') : undefined}
                   onDuplicate={onDuplicateBatch ? () => onDuplicateBatch(batch.id ?? '') : undefined}
                   onDelete={onDeleteBatch ? () => onDeleteBatch(batch.id ?? '') : undefined}
                 />

@@ -164,8 +164,6 @@ export interface AppShellContextType {
   onResumeBatch?: (batchId: string) => void
   /** Get full batch state (including items) by ID */
   getBatchState?: (batchId: string) => Promise<import('@craft-agent/shared/batches').BatchState | null>
-  /** Toggle a batch's enabled state by ID */
-  onToggleBatch?: (batchId: string) => void
   /** Duplicate a batch by ID — clones config with " Copy" suffix */
   onDuplicateBatch?: (batchId: string) => void
   /** Delete a batch by ID — removes from batches config and state file */
