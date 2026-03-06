@@ -4,7 +4,7 @@
 > Its purpose is to serve as a reference when merging upstream updates, helping to identify conflict zones,
 > understand the intent of each change, and make informed resolution decisions.
 >
-> **Last updated after:** v0.7.0 merge (upstream's major RPC/transport refactoring)
+> **Last updated after:** v0.7.0 merge + post-merge batch refinements
 
 ## Overview
 
@@ -70,9 +70,10 @@ These files are entirely new. They won't conflict unless upstream adds a similar
 | `schemas.ts` | Zod schemas for `batches.json` validation; `zodErrorToIssues()` helper (same pattern as `automations/schemas.ts`) |
 | `data-source.ts` | CSV/JSON/JSONL parser with `loadBatchItems()`, idField validation, uniqueness checks |
 | `batch-state-manager.ts` | State persistence: `loadBatchState()`, `saveBatchState()`, `createInitialBatchState()`, `updateItemState()`, `computeProgress()`, `isBatchDone()` |
-| `batch-processor.ts` | Core orchestrator: lifecycle (start/pause/resume/stop), concurrency dispatch, retry, env var building, output instruction generation. **Imports `expandEnvVars()` and `sanitizeForShell()` from `automations/utils.ts` and `automations/security.ts`** |
+| `batch-processor.ts` | Core orchestrator: lifecycle (start/pause/resume/stop), concurrency dispatch, retry, env var building. **Imports `expandEnvVars()` and `sanitizeForShell()` from `automations/utils.ts` and `automations/security.ts`** |
+| `output-instruction.ts` | `buildBatchOutputInstruction()` — generates the structured output instruction block injected into agent context (not user-visible prompt). Used by `PromptBuilder.buildContextParts()`. |
 | `validation.ts` | Two-level validation: `validateBatchesContent()` (no disk) + `validateBatches()` (workspace-aware). Mirrors `automations/validation.ts` |
-| `index.ts` | Barrel exports |
+| `index.ts` | Barrel exports (includes `buildBatchOutputInstruction`) |
 
 **Tests (in same directory):**
 - `batch-processor.test.ts` (564 lines)
@@ -87,14 +88,14 @@ These files are entirely new. They won't conflict unless upstream adds a similar
 
 | File | Purpose |
 |------|---------|
-| `batch-output.ts` | `handleBatchOutput()` handler: validates args against optional JSON Schema, appends JSONL record with `_item_id` + `_timestamp` metadata to shared output file |
-| `batch-output.test.ts` | 238 lines, 10 test cases covering non-batch rejection, schema validation, append logic |
+| `batch-output.ts` | `handleBatchOutput()` handler: coerces stringified JSON args, validates against output schema using **ajv** (full JSON Schema support), appends JSONL record with `_item_id` + `_timestamp` metadata to shared output file |
+| `batch-output.test.ts` | 16 test cases covering non-batch rejection, schema validation (including nullable union types), string coercion, append logic |
 
 ### 1.3 RPC Handlers — `packages/server-core/src/handlers/rpc/batches.ts`
 
 | File | Purpose |
 |------|---------|
-| `batches.ts` | 9 RPC handlers (LIST, START, PAUSE, RESUME, GET_STATUS, GET_STATE, SET_ENABLED, DUPLICATE, DELETE) + `withConfigMutex` / `withBatchMutation` helpers |
+| `batches.ts` | 9 RPC handlers (LIST, START, PAUSE, RESUME, GET_STATUS, GET_STATE, SET_ENABLED, DUPLICATE, DELETE) + `withConfigMutex` / `withBatchMutation` helpers. Note: SET_ENABLED is retained in backend but no longer called from UI (batches are one-shot; enable/disable removed from menu). |
 
 **Pattern followed:** Mirrors `automations.ts` handler structure exactly. Uses `deps.sessionManager.getBatchProcessor?.(workspace.rootPath)`.
 
@@ -106,7 +107,7 @@ These files are entirely new. They won't conflict unless upstream adds a similar
 | `BatchInfoPage.tsx` | Detail view: hero, source, action, execution, output, progress, items timeline, raw config | `AutomationInfoPage` |
 | `BatchActionRow.tsx` | Displays batch prompt action with @mention highlighting | `AutomationActionRow` |
 | `BatchItemTimeline.tsx` | Timeline of item processing results with status icons and session links | `AutomationEventTimeline` |
-| `BatchMenu.tsx` | Context menu: start/pause/resume, toggle, duplicate, delete | Automations menu pattern |
+| `BatchMenu.tsx` | Context menu: start (pending only), pause, resume, duplicate, delete. No enable/disable — batches are one-shot tasks. | Automations menu pattern (simplified) |
 | `BatchAvatar.tsx` | Status-colored icon (Layers) with size variants | `AutomationAvatar` |
 | `types.ts` | `BatchListItem`, `BatchFilterKind`, status display/color maps | Automations component types |
 | `index.ts` | Barrel exports | |
@@ -116,7 +117,7 @@ These files are entirely new. They won't conflict unless upstream adds a similar
 | File | Purpose |
 |------|---------|
 | `atoms/batches.ts` | Jotai atom `batchesAtom` storing `BatchListItem[]` |
-| `hooks/useBatches.ts` | Full state management hook: loading, IPC calls, progress updates, CRUD operations. Mirrors `useAutomations` |
+| `hooks/useBatches.ts` | State management hook: loading, IPC calls, progress updates, CRUD (no toggle — batches are one-shot). Mirrors `useAutomations` (minus toggle) |
 
 ### 1.6 Documentation
 
@@ -172,7 +173,61 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** LOW — additive export.
 
-### 2.4 `packages/shared/src/config/validators.ts`
+### 2.4 `packages/shared/src/agent/claude-agent.ts`
+
+**What we changed:**
+- Added import: `getSessionBatchContext` from `session-scoped-tools.ts`
+- In `buildTextPrompt()` and `buildSDKUserMessage()`: reads batch context for the session and passes `batchOutputSchema` to `buildContextParts()`
+
+**Why:** Injects structured output instructions into the agent's context (hidden from user) instead of appending them to the visible user prompt.
+
+**Pattern followed:** Same as how `sourceManager.formatSourceState()` is passed to `buildContextParts()`.
+
+**Conflict likelihood:** MEDIUM — `buildTextPrompt` is where all context assembly happens. If upstream changes context injection flow, our batch schema injection needs re-applying.
+
+### 2.5 `packages/shared/src/agent/pi-agent.ts`
+
+**What we changed:**
+- Added import: `getSessionBatchContext` from `session-scoped-tools.ts`
+- In prompt building: reads batch context and passes `batchOutputSchema` to `buildContextParts()`
+
+**Why:** Ensures batch output instructions are injected as hidden context for PiAgent-backed sessions (non-Claude LLMs).
+
+**Pattern followed:** Same as how `sourceManager.formatSourceState()` is passed to `buildContextParts()`.
+
+**Conflict likelihood:** MEDIUM — if upstream changes PiAgent's prompt building flow.
+
+### 2.6 `packages/shared/src/agent/core/prompt-builder.ts`
+
+**What we changed:**
+- Added import: `buildBatchOutputInstruction` from `batches/output-instruction.ts`
+- In `buildContextParts()`: if `options.batchOutputSchema` is present, generates and appends output instruction block (wrapped in `<batch_output_instructions>` XML tags)
+
+**Why:** Centralizes batch output instruction injection in the same place as all other context parts (session state, sources, workspace capabilities).
+
+**Pattern followed:** Same pattern as workspace capabilities injection — check option, generate block, push to parts array.
+
+**Conflict likelihood:** MEDIUM — if upstream changes `buildContextParts()` signature or adds new context blocks.
+
+### 2.7 `packages/shared/src/agent/core/types.ts`
+
+**What we changed:**
+- Added `batchOutputSchema?: Record<string, unknown>` to `ContextBlockOptions` interface
+
+**Conflict likelihood:** LOW — additive field.
+
+### 2.8 `packages/shared/src/agent/mode-manager.ts`
+
+**What we changed:**
+- In `getSessionSafeAllowedToolNames()` call: added `includeBatchOutput: true` so `batch_output` is allowed in Explore (safe) mode
+
+**Why:** `batch_output` must work in safe mode because batch sessions default to `permissionMode: 'safe'`.
+
+**Pattern followed:** Mirrors `includeDeveloperFeedback: FEATURE_FLAGS.developerFeedback` on the same call.
+
+**Conflict likelihood:** LOW — single line addition, but in a frequently-edited function.
+
+### 2.9 `packages/shared/src/config/validators.ts`
 
 **What we changed:**
 - Added imports: `validateBatchesContent`, `validateBatches`, `BATCHES_CONFIG_FILE`
@@ -185,7 +240,7 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** MEDIUM — if upstream adds new config types, the same detection/validation switch needs updating.
 
-### 2.5 `packages/shared/src/config/watcher.ts`
+### 2.10 `packages/shared/src/config/watcher.ts`
 
 **What we changed:**
 - Added import: `BATCHES_CONFIG_FILE`
@@ -197,7 +252,7 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** MEDIUM — if upstream refactors the watcher, our additions need porting.
 
-### 2.6 `packages/shared/src/docs/doc-links.ts`
+### 2.11 `packages/shared/src/docs/doc-links.ts`
 
 **What we changed:**
 - Added `'batches'` to `DocFeature` union type
@@ -205,21 +260,21 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** LOW — additive.
 
-### 2.7 `packages/shared/src/docs/index.ts`
+### 2.12 `packages/shared/src/docs/index.ts`
 
 **What we changed:**
 - Added `batches: \`${APP_ROOT}/docs/batches.md\`` to `DOC_REFS`
 
 **Conflict likelihood:** LOW — additive.
 
-### 2.8 `packages/shared/src/prompts/system.ts`
+### 2.13 `packages/shared/src/prompts/system.ts`
 
 **What we changed:**
 - Added one row to the doc reference table: `| Batches | \`${DOC_REFS.batches}\` | BEFORE creating/modifying batch processing jobs |`
 
 **Conflict likelihood:** LOW — additive table row.
 
-### 2.9 `packages/shared/CLAUDE.md`
+### 2.14 `packages/shared/CLAUDE.md`
 
 **What we changed:**
 - Added import example for batches
@@ -227,14 +282,14 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** LOW.
 
-### 2.10 `packages/shared/package.json`
+### 2.15 `packages/shared/package.json`
 
 **What we changed:**
 - Added subpath export: `"./batches": "./src/batches/index.ts"`
 
 **Conflict likelihood:** LOW — additive entry in exports map.
 
-### 2.11 `packages/session-tools-core/src/context.ts`
+### 2.16 `packages/session-tools-core/src/context.ts`
 
 **What we changed:**
 - Added `validateBatches()` method to `ValidatorInterface`
@@ -245,7 +300,7 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** MEDIUM — if upstream adds new validators or context fields.
 
-### 2.12 `packages/session-tools-core/src/handlers/config-validate.ts`
+### 2.17 `packages/session-tools-core/src/handlers/config-validate.ts`
 
 **What we changed:**
 - Added `BATCHES_CONFIG_FILE` constant
@@ -257,21 +312,21 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** MEDIUM — if upstream adds new validation targets.
 
-### 2.13 `packages/session-tools-core/src/handlers/index.ts`
+### 2.18 `packages/session-tools-core/src/handlers/index.ts`
 
 **What we changed:**
 - Added exports: `handleBatchOutput`, `BatchOutputArgs`
 
 **Conflict likelihood:** LOW — additive.
 
-### 2.14 `packages/session-tools-core/src/index.ts`
+### 2.19 `packages/session-tools-core/src/index.ts`
 
 **What we changed:**
 - Added exports: `BatchContext` type, `handleBatchOutput` handler, `BatchOutputArgs` type, `BatchOutputSchema`
 
 **Conflict likelihood:** LOW — additive.
 
-### 2.15 `packages/session-tools-core/src/tool-defs.ts`
+### 2.20 `packages/session-tools-core/src/tool-defs.ts`
 
 **What we changed:**
 - Added import: `handleBatchOutput`
@@ -288,7 +343,7 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** HIGH — `tool-defs.ts` is a central registry. Any upstream tool additions/changes touch the same arrays and functions.
 
-### 2.16 `packages/server-core/src/sessions/SessionManager.ts`
+### 2.21 `packages/server-core/src/sessions/SessionManager.ts`
 
 **What we changed:**
 - Added imports: `registerSessionBatchContext`, `BatchProcessor`
@@ -308,7 +363,7 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** HIGH — SessionManager is a large, frequently-changed file. The workspace init block, `executePromptAutomation()`, session completion handler, and `dispose()` are all hot zones.
 
-### 2.17 `packages/server-core/src/handlers/session-manager-interface.ts`
+### 2.22 `packages/server-core/src/handlers/session-manager-interface.ts`
 
 **What we changed:**
 - Added `getBatchProcessor?()` method returning `BatchProcessor | undefined`
@@ -318,35 +373,35 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** MEDIUM — if upstream changes the interface signature.
 
-### 2.18 `packages/shared/src/protocol/channels.ts`
+### 2.23 `packages/shared/src/protocol/channels.ts`
 
 **What we changed:**
 - Added `batches` namespace to `RPC_CHANNELS` with 10 channels (LIST, START, PAUSE, RESUME, GET_STATUS, GET_STATE, SET_ENABLED, DUPLICATE, DELETE, CHANGED)
 
 **Conflict likelihood:** LOW — additive namespace.
 
-### 2.19 `packages/shared/src/protocol/dto.ts`
+### 2.24 `packages/shared/src/protocol/dto.ts`
 
 **What we changed:**
 - Added `batch_progress` and `batch_complete` event types to `SessionEvent` union
 
 **Conflict likelihood:** MEDIUM — if upstream adds new event types to the same union.
 
-### 2.20 `packages/shared/src/protocol/events.ts`
+### 2.25 `packages/shared/src/protocol/events.ts`
 
 **What we changed:**
 - Added `[RPC_CHANNELS.batches.CHANGED]: [workspaceId: string]` to `BroadcastEventMap`
 
 **Conflict likelihood:** LOW — additive.
 
-### 2.21 `apps/electron/src/transport/channel-map.ts`
+### 2.26 `apps/electron/src/transport/channel-map.ts`
 
 **What we changed:**
 - Added 10 batch channel mappings: `listBatches`, `startBatch`, `pauseBatch`, `resumeBatch`, `getBatchStatus`, `getBatchState`, `setBatchEnabled`, `duplicateBatch`, `deleteBatch`, `onBatchesChanged`
 
 **Conflict likelihood:** LOW — additive entries at end of map.
 
-### 2.22 `apps/electron/src/shared/types.ts`
+### 2.27 `apps/electron/src/shared/types.ts`
 
 **What we changed:**
 - Added `BatchFilter`, `BatchesNavigationState` interfaces
@@ -359,14 +414,14 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** MEDIUM — navigation state changes are a common edit target.
 
-### 2.23 `apps/electron/src/shared/routes.ts`
+### 2.28 `apps/electron/src/shared/routes.ts`
 
 **What we changed:**
 - Added `batches()` route builder to `routes.view`
 
 **Conflict likelihood:** LOW — additive.
 
-### 2.24 `apps/electron/src/shared/route-parser.ts`
+### 2.29 `apps/electron/src/shared/route-parser.ts`
 
 **What we changed:**
 - Added `'batches'` to `NavigatorType` union
@@ -378,7 +433,7 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** MEDIUM — each modified function may have upstream changes if new navigators are added.
 
-### 2.25 `apps/electron/src/renderer/App.tsx`
+### 2.30 `apps/electron/src/renderer/App.tsx`
 
 **What we changed:**
 - Added `batchHandlersRef` (React ref for batch event callbacks)
@@ -387,7 +442,7 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** MEDIUM — `onSessionEvent` handler is a common edit target.
 
-### 2.26 `apps/electron/src/renderer/components/app-shell/AppShell.tsx`
+### 2.31 `apps/electron/src/renderer/components/app-shell/AppShell.tsx`
 
 **What we changed:**
 - Added imports for batch types, components, hook
@@ -405,7 +460,7 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** HIGH — `AppShell.tsx` is very large and frequently modified.
 
-### 2.27 `apps/electron/src/renderer/components/app-shell/MainContentPanel.tsx`
+### 2.32 `apps/electron/src/renderer/components/app-shell/MainContentPanel.tsx`
 
 **What we changed:**
 - Added imports for batch guard, component, atom
@@ -414,7 +469,7 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** MEDIUM.
 
-### 2.28 `apps/electron/src/renderer/components/ui/EditPopover.tsx`
+### 2.33 `apps/electron/src/renderer/components/ui/EditPopover.tsx`
 
 **What we changed:**
 - Added `'batch-config'` to `EditContextKey` union
@@ -422,21 +477,21 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Conflict likelihood:** MEDIUM — if upstream adds new edit contexts.
 
-### 2.29 `apps/electron/src/renderer/context/AppShellContext.tsx`
+### 2.34 `apps/electron/src/renderer/context/AppShellContext.tsx`
 
 **What we changed:**
-- Added 7 batch-related methods to `AppShellContextType` interface
+- Added 6 batch-related methods to `AppShellContextType` interface (no toggle — batches are one-shot)
 
 **Conflict likelihood:** LOW-MEDIUM — additive interface extension.
 
-### 2.30 `apps/electron/src/renderer/contexts/NavigationContext.tsx`
+### 2.35 `apps/electron/src/renderer/contexts/NavigationContext.tsx`
 
 **What we changed:**
 - Re-exported `isBatchesNavigation` type guard
 
 **Conflict likelihood:** LOW.
 
-### 2.31 `README.md`
+### 2.36 `README.md`
 
 **What we changed:**
 - Added `batches.json` to config file structure diagram
@@ -469,6 +524,7 @@ These are the upstream interfaces/functions our batch code depends on. If upstre
 | `ConfigWatcherCallbacks` | `config/watcher.ts` | `onBatchesConfigChange?` callback |
 | `ConfigFileDetection` | `config/validators.ts` | `'batch-config'` variant |
 | `SessionToolFilterOptions` | `session-tools-core/tool-defs.ts` | `includeBatchOutput?: boolean` |
+| `ContextBlockOptions` | `agent/core/types.ts` | `batchOutputSchema?: Record<string, unknown>` |
 | `ISessionManager` | `server-core/handlers/session-manager-interface.ts` | `getBatchProcessor?()`, `batchContext` param |
 | `SessionEvent` | `shared/protocol/dto.ts` | `batch_progress`, `batch_complete` |
 | `RPC_CHANNELS` | `shared/protocol/channels.ts` | `batches.*` namespace |
@@ -491,6 +547,10 @@ These are the upstream interfaces/functions our batch code depends on. If upstre
 | `validateConfigFileContent()` | `config/validators.ts` | Handle `batch-config` case |
 | `getSessionToolDefs()` | `session-tools-core/tool-defs.ts` | Filter `batch_output` by flag |
 | `getToolDefsAsJsonSchema()` | `session-tools-core/tool-defs.ts` | Propagate `includeBatchOutput` |
+| `buildContextParts()` | `agent/core/prompt-builder.ts` | Inject `<batch_output_instructions>` when `batchOutputSchema` present |
+| `buildTextPrompt()` | `agent/claude-agent.ts` | Read batch context, pass `batchOutputSchema` to `buildContextParts()` |
+| `buildTextPrompt()` | `agent/pi-agent.ts` | Same as ClaudeAgent |
+| `getSessionSafeAllowedToolNames()` call | `agent/mode-manager.ts` | Added `includeBatchOutput: true` |
 | `executePromptAutomation()` | `server-core sessions/SessionManager.ts` | Added `hidden` + `batchContext` params |
 | Session completion handler | `server-core sessions/SessionManager.ts` | Notify batch processors |
 | `dispose()` | `server-core sessions/SessionManager.ts` | Clean up batch processors |
@@ -523,6 +583,9 @@ When merging upstream updates:
    - `packages/session-tools-core/src/tool-defs.ts` — our tool registration and filter options are in the tool array and filter functions
    - `packages/shared/src/agent/session-scoped-tools.ts` — our batch context registry modifies the tool initialization flow
    - `packages/shared/src/agent/claude-context.ts` — our batch context passing modifies the context creation
+   - `packages/shared/src/agent/claude-agent.ts` / `pi-agent.ts` — our `batchOutputSchema` injection in `buildTextPrompt()`
+   - `packages/shared/src/agent/core/prompt-builder.ts` — our batch output instruction injection in `buildContextParts()`
+   - `packages/shared/src/agent/mode-manager.ts` — our `includeBatchOutput: true` in safe mode allowlist
    - `packages/server-core/src/handlers/session-manager-interface.ts` — our interface extensions for batch processor access
 4. **If upstream moves automations utilities** (`expandEnvVars`, `sanitizeForShell`): update import paths in `batch-processor.ts`
 5. **If upstream adds new navigator types**: check `route-parser.ts` functions for our batch cases
@@ -538,3 +601,4 @@ When merging upstream updates:
 | Upstream Version | Date | Conflicts | Notes |
 |-----------------|------|-----------|-------|
 | v0.7.0 | 2026-03-06 | 9 (2 modify/delete + 7 content) | Major RPC/transport refactoring. Ported batch IPC handlers → `rpc/batches.ts`, preload methods → `channel-map.ts`, types → protocol layer. |
+| post-merge | 2026-03-06 | — | Batch refinements: LLM string coercion in batch_output, safe mode allowlist fix, ajv schema validation, one-shot menu simplification (removed enable/disable + restart), output instructions moved from user prompt to context injection. |
