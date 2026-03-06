@@ -92,6 +92,13 @@ export type LlmAuthType =
   | 'none';
 
 /**
+ * Ownership mode for a connection's model list.
+ * - automaticallySyncedFromProvider: provider defaults are synced automatically.
+ * - userDefined3Tier: user-picked Best/Balanced/Fast list is preserved.
+ */
+export type ModelSelectionMode = 'automaticallySyncedFromProvider' | 'userDefined3Tier';
+
+/**
  * LLM Connection configuration.
  * Stored in config.llmConnections array.
  */
@@ -122,6 +129,13 @@ export interface LlmConnection {
 
   /** Default model for this connection */
   defaultModel?: string;
+
+  /**
+   * Ownership mode for the model list.
+   * - automaticallySyncedFromProvider: provider defaults are kept in sync.
+   * - userDefined3Tier: preserve user-selected Best/Balanced/Fast list.
+   */
+  modelSelectionMode?: ModelSelectionMode;
 
   /**
    * Pi auth provider name (e.g., 'anthropic', 'openai', 'github-copilot').
@@ -215,6 +229,13 @@ function findSmallModel(connection: Pick<LlmConnection, 'models' | 'providerType
   const toSearchStr = (m: ModelDefinition | string) =>
     typeof m === 'string' ? m.toLowerCase() : `${m.id} ${m.name} ${m.shortName}`.toLowerCase();
 
+  const isDeniedSmallModel = (modelId: string): boolean => {
+    const bare = modelId.startsWith('pi/') ? modelId.slice(3) : modelId;
+    return bare === 'codex-mini-latest';
+  };
+
+  const isAllowedModel = (m: ModelDefinition | string): boolean => !isDeniedSmallModel(toId(m));
+
   // Provider-aware keyword search
   const keywords: string[] = [];
 
@@ -229,6 +250,7 @@ function findSmallModel(connection: Pick<LlmConnection, 'models' | 'providerType
 
   if (keywords.length > 0) {
     const match = connection.models.find(m => {
+      if (!isAllowedModel(m)) return false;
       const searchStr = toSearchStr(m);
       return keywords.some(k => searchStr.includes(k));
     });
@@ -237,8 +259,9 @@ function findSmallModel(connection: Pick<LlmConnection, 'models' | 'providerType
     }
   }
 
-  // Fallback: last model in the list
-  return toId(connection.models[connection.models.length - 1]!);
+  // Fallback: last allowed model in the list, otherwise final entry.
+  const fallback = [...connection.models].reverse().find(isAllowedModel);
+  return fallback ? toId(fallback) : toId(connection.models[connection.models.length - 1]!);
 }
 
 /**

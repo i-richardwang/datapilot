@@ -49,9 +49,14 @@ interface MarkdownMermaidBlockProps {
    *  Set to false when the mermaid block is the first block in a message,
    *  where the TurnCard's own fullscreen button already occupies the same position. */
   showExpandButton?: boolean
+  /** Whether clicking/tapping the inline diagram should open fullscreen.
+   *  Enabled by default for chat parity with image blocks; editor node-views can disable it. */
+  tapToOpen?: boolean
+  /** Optional minimum block height to reserve space before responsive sizing settles. */
+  minHeight?: number
 }
 
-export function MarkdownMermaidBlock({ code, className, showExpandButton = true }: MarkdownMermaidBlockProps) {
+export function MarkdownMermaidBlock({ code, className, showExpandButton = true, tapToOpen = true, minHeight }: MarkdownMermaidBlockProps) {
   // Render synchronously — no flash between CodeBlock and SVG.
   // Colors are CSS variable references so the SVG inherits from the app's theme
   // via CSS cascade. Theme switches apply automatically without re-rendering.
@@ -167,6 +172,7 @@ export function MarkdownMermaidBlock({ code, className, showExpandButton = true 
   }
 
   const scaledDims = getScaledDimensions()
+  const minHeightStyle = minHeight != null ? { minHeight: `${minHeight}px` } : undefined
 
   // Scaling mode: when dimensions are provided OR scale !== 1
   // This is separate from needsScroll — we may scale to fit without scrolling
@@ -175,7 +181,7 @@ export function MarkdownMermaidBlock({ code, className, showExpandButton = true 
   return (
     <>
       {/* Wrapper with group class so the expand button shows on hover */}
-      <div className={cn('relative group', className)}>
+      <div className={cn('relative group', className)} style={minHeightStyle}>
         {/* Expand button — matches code block expand button style (TurnCard pattern).
             Hidden when showExpandButton is false (first block in message, where
             TurnCard's own fullscreen button occupies the same top-right position). */}
@@ -204,6 +210,7 @@ export function MarkdownMermaidBlock({ code, className, showExpandButton = true 
             overflowY: 'hidden',
             maskImage,
             WebkitMaskImage: maskImage,
+            ...minHeightStyle,
           }}
         >
           {/* Size wrapper — uses explicit dimensions when scaling or scrolling.
@@ -215,7 +222,18 @@ export function MarkdownMermaidBlock({ code, className, showExpandButton = true 
               display: needsScaling ? 'block' : 'flex',
               justifyContent: needsScaling ? undefined : 'center',
               margin: needsScaling && !scaledDims?.needsScroll ? '0 auto' : undefined,
+              cursor: tapToOpen ? 'pointer' : undefined,
             }}
+            onClick={tapToOpen ? () => setIsFullscreen(true) : undefined}
+            role={tapToOpen ? 'button' : undefined}
+            aria-label={tapToOpen ? 'Open Mermaid diagram fullscreen' : undefined}
+            tabIndex={tapToOpen ? 0 : undefined}
+            onKeyDown={tapToOpen ? (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setIsFullscreen(true)
+              }
+            } : undefined}
           >
             {/* SVG container — CSS transform scales the SVG visually.
                 transform-origin: top left ensures scaling expands down and right. */}

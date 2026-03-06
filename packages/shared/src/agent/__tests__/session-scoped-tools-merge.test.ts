@@ -44,6 +44,7 @@ describe('session-scoped tool callback merge', () => {
       closeWindow: async () => ({ action: 'closed' as const, affectedIds: [] }),
       hideWindow: async () => ({ action: 'hidden' as const, affectedIds: [] }),
       listWindows: async () => [],
+      detectChallenge: async () => ({ detected: false, provider: 'none', signals: [] }),
     };
 
     registerSessionScopedToolCallbacks(sessionId, {

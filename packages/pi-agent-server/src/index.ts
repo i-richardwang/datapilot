@@ -51,9 +51,9 @@ import { buildCallLlmRequest, withTimeout, LLM_QUERY_TIMEOUT_MS } from '../../sh
 import type { LLMQueryRequest, LLMQueryResult } from '../../shared/src/agent/llm-tool.ts';
 import { PI_TOOL_NAME_MAP, THINKING_TO_PI } from '../../shared/src/agent/backend/pi/constants.ts';
 import { getDefaultSummarizationModel } from '../../shared/src/config/models.ts';
-import { webSearchTool } from './tools/web-search.ts';
 import { createWebFetchTool } from './tools/web-fetch.ts';
-import { createGoogleSearchTool } from './tools/google-search.ts';
+import { resolveSearchProvider } from './tools/search/resolve-provider.ts';
+import { createSearchTool } from './tools/search/create-search-tool.ts';
 
 // ============================================================
 // Types — JSONL Protocol
@@ -61,7 +61,7 @@ import { createGoogleSearchTool } from './tools/google-search.ts';
 
 /** Messages from main process (stdin) */
 type InboundMessage =
-  | { type: 'init'; apiKey: string; model: string; cwd: string; thinkingLevel: string; workspaceRootPath: string; sessionId: string; sessionPath: string; workingDirectory: string; plansFolderPath: string; miniModel?: string; agentDir?: string; providerType?: string; authType?: string; workspaceId?: string; branchFromSdkSessionId?: string; branchFromSessionPath?: string; piAuth?: { provider: string; credential: { type: 'api_key'; key: string } | { type: 'oauth'; access: string; refresh: string; expires: number } } }
+  | { type: 'init'; apiKey: string; model: string; cwd: string; thinkingLevel: string; workspaceRootPath: string; sessionId: string; sessionPath: string; workingDirectory: string; plansFolderPath: string; miniModel?: string; agentDir?: string; providerType?: string; authType?: string; workspaceId?: string; baseUrl?: string; branchFromSdkSessionId?: string; branchFromSessionPath?: string; piAuth?: { provider: string; credential: { type: 'api_key'; key: string } | { type: 'oauth'; access: string; refresh: string; expires: number } } }
   | { type: 'prompt'; id: string; message: string; systemPrompt: string; images?: Array<{ type: 'image'; data: string; mimeType: string }> }
   | { type: 'register_tools'; tools: ProxyToolDef[] }
   | { type: 'tool_execute_response'; requestId: string; result: { content: string; isError: boolean } }
@@ -99,7 +99,13 @@ type OutboundAgentEvent = AgentSessionEvent | EnrichedToolExecutionStartEvent;
 /** Messages to main process (stdout) */
 interface OutboundReady { type: 'ready'; sessionId: string | null; callbackPort: number }
 interface OutboundEvent { type: 'event'; event: OutboundAgentEvent }
-interface OutboundPreToolUseReq { type: 'pre_tool_use_request'; requestId: string; toolName: string; input: Record<string, unknown> }
+interface OutboundPreToolUseReq {
+  type: 'pre_tool_use_request';
+  requestId: string;
+  toolName: string;
+  toolCallId?: string;
+  input: Record<string, unknown>;
+}
 interface OutboundToolExecReq { type: 'tool_execute_request'; requestId: string; toolName: string; args: Record<string, unknown> }
 interface OutboundSessionToolCompleted { type: 'session_tool_completed'; toolName: string; args: Record<string, unknown>; isError: boolean }
 interface OutboundMiniResult { type: 'mini_completion_result'; id: string; text: string | null }
@@ -330,6 +336,14 @@ function createAuthenticatedRegistry(): {
     authStorage.set(provider, credential);
     debugLog(`Injected ${credential.type} credential for provider: ${provider}`);
   } else if (initConfig?.apiKey) {
+    const hasCustomEndpoint = !!initConfig.baseUrl?.trim();
+    if (hasCustomEndpoint) {
+      throw new Error(
+        'Custom endpoint in Craft Agents Backend mode requires explicit provider selection. ' +
+        'Use a provider preset in Pi API key mode, or use Anthropic API key mode for arbitrary compatible endpoints.'
+      );
+    }
+
     authStorage.set('anthropic', { type: 'api_key', key: initConfig.apiKey });
     debugLog('Injected API key into auth storage (legacy fallback)');
   }
@@ -347,15 +361,23 @@ async function ensureSession(): Promise<AgentSession> {
   piModelRegistry = modelRegistry;
 
   // Build tools: coding tools + web tools wrapped with permission hooks + proxy tools.
-  // When the provider is Google, replace DuckDuckGo web_search with a Google Search
-  // grounding tool that makes a separate Gemini API call with { googleSearch: {} }.
-  // (The main session can't combine googleSearch with function calling in one request.)
-  const isGoogleProvider = initConfig.piAuth?.provider === 'google';
-  const googleApiKey = initConfig.piAuth?.credential?.type === 'api_key'
-    ? initConfig.piAuth.credential.key : undefined;
-  const searchTool = isGoogleProvider && googleApiKey
-    ? createGoogleSearchTool(googleApiKey)
-    : webSearchTool;
+  // Search provider is selected based on the user's LLM connection:
+  //   - OpenAI/OpenRouter → Responses API built-in web_search
+  //   - ChatGPT Plus (openai-codex) → ChatGPT backend responses endpoint
+  //   - Google → Gemini API with googleSearch grounding
+  //   - Others → DuckDuckGo fallback
+  //
+  // IMPORTANT: resolve dynamically on each search call so token_update refreshes
+  // are used without recreating the session.
+  const searchProvider = {
+    get name() {
+      return resolveSearchProvider(initConfig?.piAuth).name;
+    },
+    async search(query: string, count: number) {
+      return resolveSearchProvider(initConfig?.piAuth).search(query, count);
+    },
+  };
+  const searchTool = createSearchTool(searchProvider);
   const webFetchTool = createWebFetchTool(() =>
     initConfig ? getSessionPath(initConfig.workspaceRootPath, initConfig.sessionId) : null
   );
@@ -485,6 +507,7 @@ async function ensureSession(): Promise<AgentSession> {
 async function requestPreToolUseApproval(
   sdkToolName: string,
   input: Record<string, unknown>,
+  toolCallId?: string,
 ): Promise<Record<string, unknown>> {
   const requestId = `pi-ptu-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -492,6 +515,7 @@ async function requestPreToolUseApproval(
     type: 'pre_tool_use_request',
     requestId,
     toolName: sdkToolName,
+    ...(toolCallId ? { toolCallId } : {}),
     input,
   });
 
@@ -539,7 +563,7 @@ function wrapSingleTool(tool: AgentTool<any>): AgentTool<any> {
     }
 
     // Send to main process for permission checking + transforms
-    inputObj = await requestPreToolUseApproval(sdkToolName, inputObj);
+    inputObj = await requestPreToolUseApproval(sdkToolName, inputObj, toolCallId);
 
     // Execute original tool with (potentially modified) input
     const result = await originalExecute(toolCallId, inputObj, signal, onUpdate);
@@ -614,7 +638,7 @@ function buildProxyTools(): AgentTool<any>[] {
       const inputObj = params as Record<string, unknown>;
 
       // Permission checking via main process
-      const approvedInput = await requestPreToolUseApproval(def.name, inputObj);
+      const approvedInput = await requestPreToolUseApproval(def.name, inputObj, toolCallId);
 
       // Execute via main process
       const requestId = `proxy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -656,119 +680,182 @@ async function queryLlm(request: LLMQueryRequest): Promise<LLMQueryResult> {
   // Create authenticated registry upfront — used by both the provider guard and the ephemeral session.
   const { authStorage, modelRegistry } = createAuthenticatedRegistry();
 
+  const isModelNotFoundError = (message: string): boolean => {
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes('model_not_found') ||
+      normalized.includes('does not exist') ||
+      normalized.includes('no such model') ||
+      normalized.includes('requested model') && normalized.includes('not') && normalized.includes('exist')
+    );
+  };
+
+  const isDeniedMiniModelId = (modelId: string): boolean => {
+    const bare = modelId.startsWith('pi/') ? modelId.slice(3) : modelId;
+    return bare === 'codex-mini-latest';
+  };
+
   // If piAuth is set, ensure the mini model uses the same provider.
   // Pi SDK will fail with "No API key found" if the model requires a different provider.
   if (initConfig.piAuth) {
     const authProvider = initConfig.piAuth.provider;
     const bareModel = model.startsWith('pi/') ? model.slice(3) : model;
     const resolved = resolvePiModel(modelRegistry, bareModel, authProvider);
-    if (!resolved || (resolved as any).provider !== authProvider) {
-      const fallback = initConfig.miniModel ?? getDefaultSummarizationModel();
+    if (!resolved || (resolved as any).provider !== authProvider || isDeniedMiniModelId(model)) {
+      const fallback = getDefaultSummarizationModel();
       debugLog(`[queryLlm] Model ${bareModel} incompatible with ${authProvider}, falling back to ${fallback}`);
       model = fallback;
     }
   }
 
-  debugLog(`[queryLlm] Using model: ${model}`);
+  const runQueryWithModel = async (modelId: string): Promise<string> => {
+    debugLog(`[queryLlm] Using model: ${modelId}`);
 
-  // Create minimal ephemeral session
-  const ephemeralOptions: CreateAgentSessionOptions = {
-    cwd: resolvedCwd(),
-    authStorage,
-    modelRegistry,
-    tools: [],
-    sessionManager: PiSessionManager.inMemory(),
+    // Create minimal ephemeral session
+    const ephemeralOptions: CreateAgentSessionOptions = {
+      cwd: resolvedCwd(),
+      authStorage,
+      modelRegistry,
+      tools: [],
+      sessionManager: PiSessionManager.inMemory(),
+    };
+
+    // Resolve model
+    let piModel: ReturnType<typeof resolvePiModel>;
+    try {
+      piModel = resolvePiModel(modelRegistry, modelId, initConfig.piAuth?.provider);
+      if (piModel) {
+        ephemeralOptions.model = piModel;
+      }
+    } catch {
+      debugLog(`[queryLlm] Could not resolve model: ${modelId}`);
+    }
+
+    const { session: ephemeralSession } = await createAgentSession(ephemeralOptions);
+
+    // Pi SDK ignores options.model for ephemeral sessions (same issue as options.tools).
+    // Explicitly set the model after creation to ensure the mini model is used.
+    if (piModel) {
+      try {
+        await ephemeralSession.setModel(piModel);
+      } catch {
+        debugLog(`[queryLlm] Failed to set model on ephemeral session, proceeding with default`);
+      }
+    }
+
+    debugLog(`[queryLlm] Created ephemeral session: ${ephemeralSession.sessionId}`);
+
+    // Set system prompt
+    if (request.systemPrompt) {
+      ephemeralSession.agent.setSystemPrompt(request.systemPrompt);
+    } else {
+      ephemeralSession.agent.setSystemPrompt('Reply with ONLY the requested text. No explanation.');
+    }
+
+    // Collect response text and errors from events
+    let result = '';
+    let lastError = '';
+    let completionResolve: () => void;
+    const completionPromise = new Promise<void>((resolve) => {
+      completionResolve = resolve;
+    });
+
+    const unsub = ephemeralSession.subscribe((event: AgentSessionEvent) => {
+      if (event.type === 'message_end') {
+        // Only capture assistant messages — Pi SDK emits message_end for user messages too
+        const msg = event.message as {
+          role?: string;
+          content?: string | Array<{ type: string; text?: string }>;
+          stopReason?: string;
+          errorMessage?: string;
+        };
+        if (msg.role !== 'assistant') return;
+
+        // Capture API errors from message_end (e.g. auth failures, model errors)
+        if (msg.stopReason === 'error' && msg.errorMessage) {
+          lastError = msg.errorMessage;
+          debugLog(`[queryLlm] API error in message_end: ${msg.errorMessage}`);
+        }
+
+        if (typeof msg.content === 'string') {
+          result = msg.content;
+        } else if (Array.isArray(msg.content)) {
+          result = msg.content
+            .filter((c) => c.type === 'text' && c.text)
+            .map((c) => c.text!)
+            .join('');
+        }
+      }
+      if (event.type === 'agent_end') {
+        completionResolve();
+      }
+    });
+
+    try {
+      await ephemeralSession.prompt(request.prompt);
+      await withTimeout(
+        completionPromise,
+        LLM_QUERY_TIMEOUT_MS,
+        `queryLlm timed out after ${LLM_QUERY_TIMEOUT_MS / 1000}s`
+      );
+      debugLog(`[queryLlm] Result length: ${result.trim().length}`);
+
+      // If we got no text but captured an error, throw so callers see the real issue
+      if (!result.trim() && lastError) {
+        throw new Error(lastError);
+      }
+
+      return result.trim();
+    } finally {
+      unsub();
+      ephemeralSession.dispose();
+    }
   };
 
-  // Resolve model
-  let piModel: ReturnType<typeof resolvePiModel>;
-  try {
-    piModel = resolvePiModel(modelRegistry, model, initConfig.piAuth?.provider);
-    if (piModel) {
-      ephemeralOptions.model = piModel;
-    }
-  } catch {
-    debugLog(`[queryLlm] Could not resolve model: ${model}`);
-  }
+  const fallbackCandidates = [
+    'pi/gpt-5.1-codex-mini',
+    'pi/gpt-5-mini',
+    initConfig.miniModel,
+    getDefaultSummarizationModel(),
+  ].filter((candidate): candidate is string => !!candidate && !isDeniedMiniModelId(candidate));
 
-  const { session: ephemeralSession } = await createAgentSession(ephemeralOptions);
+  const triedModels = new Set<string>();
+  let currentModel = model;
 
-  // Pi SDK ignores options.model for ephemeral sessions (same issue as options.tools).
-  // Explicitly set the model after creation to ensure the mini model is used.
-  if (piModel) {
+  while (true) {
+    triedModels.add(currentModel);
     try {
-      await ephemeralSession.setModel(piModel);
-    } catch {
-      debugLog(`[queryLlm] Failed to set model on ephemeral session, proceeding with default`);
-    }
-  }
+      const text = await runQueryWithModel(currentModel);
+      return { text, model: currentModel };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const shouldRetry = isModelNotFoundError(errorMsg);
 
-  debugLog(`[queryLlm] Created ephemeral session: ${ephemeralSession.sessionId}`);
-
-  // Set system prompt
-  if (request.systemPrompt) {
-    ephemeralSession.agent.setSystemPrompt(request.systemPrompt);
-  } else {
-    ephemeralSession.agent.setSystemPrompt('Reply with ONLY the requested text. No explanation.');
-  }
-
-  // Collect response text and errors from events
-  let result = '';
-  let lastError = '';
-  let completionResolve: () => void;
-  const completionPromise = new Promise<void>((resolve) => {
-    completionResolve = resolve;
-  });
-
-  const unsub = ephemeralSession.subscribe((event: AgentSessionEvent) => {
-    if (event.type === 'message_end') {
-      // Only capture assistant messages — Pi SDK emits message_end for user messages too
-      const msg = event.message as {
-        role?: string;
-        content?: string | Array<{ type: string; text?: string }>;
-        stopReason?: string;
-        errorMessage?: string;
-      };
-      if (msg.role !== 'assistant') return;
-
-      // Capture API errors from message_end (e.g. auth failures, model errors)
-      if (msg.stopReason === 'error' && msg.errorMessage) {
-        lastError = msg.errorMessage;
-        debugLog(`[queryLlm] API error in message_end: ${msg.errorMessage}`);
+      if (!shouldRetry) {
+        throw error;
       }
 
-      if (typeof msg.content === 'string') {
-        result = msg.content;
-      } else if (Array.isArray(msg.content)) {
-        result = msg.content
-          .filter((c) => c.type === 'text' && c.text)
-          .map((c) => c.text!)
-          .join('');
+      const retryModel = fallbackCandidates.find(candidate => {
+        if (triedModels.has(candidate)) return false;
+        try {
+          const resolved = resolvePiModel(modelRegistry, candidate, initConfig.piAuth?.provider);
+          if (!resolved) return false;
+          if (initConfig.piAuth && (resolved as any).provider !== initConfig.piAuth.provider) {
+            return false;
+          }
+          return true;
+        } catch {
+          return false;
+        }
+      });
+
+      if (!retryModel) {
+        throw error;
       }
-    }
-    if (event.type === 'agent_end') {
-      completionResolve();
-    }
-  });
 
-  try {
-    await ephemeralSession.prompt(request.prompt);
-    await withTimeout(
-      completionPromise,
-      LLM_QUERY_TIMEOUT_MS,
-      `queryLlm timed out after ${LLM_QUERY_TIMEOUT_MS / 1000}s`
-    );
-    debugLog(`[queryLlm] Result length: ${result.trim().length}`);
-
-    // If we got no text but captured an error, throw so callers see the real issue
-    if (!result.trim() && lastError) {
-      throw new Error(lastError);
+      debugLog(`[queryLlm] Model ${currentModel} not found, retrying with ${retryModel}`);
+      currentModel = retryModel;
     }
-
-    return { text: result.trim(), model };
-  } finally {
-    unsub();
-    ephemeralSession.dispose();
   }
 }
 
@@ -877,6 +964,13 @@ async function handleInit(msg: Extract<InboundMessage, { type: 'init' }>): Promi
   }
 
   initConfig = msg;
+
+  // Azure OpenAI requires a tenant-specific endpoint URL.
+  // The Pi SDK (via Vercel AI SDK) reads AZURE_OPENAI_BASE_URL from env.
+  if (msg.piAuth?.provider === 'azure-openai-responses' && msg.baseUrl) {
+    process.env.AZURE_OPENAI_BASE_URL = msg.baseUrl;
+    debugLog(`Set AZURE_OPENAI_BASE_URL=${msg.baseUrl}`);
+  }
 
   // Start callback server for call_llm (idempotent — skips if already running)
   await startCallbackServer();
@@ -1213,6 +1307,9 @@ async function processMessage(msg: InboundMessage): Promise<void> {
       if (moduleAuthStorage) {
         const { provider, credential } = msg.piAuth;
         moduleAuthStorage.set(provider, credential);
+        if (initConfig) {
+          initConfig.piAuth = msg.piAuth;
+        }
         debugLog(`Updated ${credential.type} credential for provider: ${provider}`);
       } else {
         debugLog('token_update received but no authStorage initialized');

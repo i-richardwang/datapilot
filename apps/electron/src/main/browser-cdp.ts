@@ -88,14 +88,20 @@ function summarizeTopCounts(map: Map<string, number>, maxEntries = 8): string {
     .join(', ')
 }
 
+const CDP_IDLE_DETACH_MS = 5_000
+
 export class BrowserCDP {
   private webContents: WebContents
   private attached = false
   private detachListenerRegistered = false
-  // Map from "@eN" refs to backend node IDs (refreshed on each snapshot)
+  private idleDetachTimer: ReturnType<typeof setTimeout> | null = null
+  // Map from "@eN" refs to backend node IDs for the current snapshot.
   private refMap: Map<string, number> = new Map()
-  // Map from "@eN" refs to semantic details captured during snapshot
+  // Map from "@eN" refs to semantic details captured during snapshot.
   private refDetails: Map<string, { role: string; name: string }> = new Map()
+  // Stable mapping for backend DOM nodes across snapshots.
+  private backendNodeRefMap: Map<number, string> = new Map()
+  private nextRefCounter = 0
 
   constructor(webContents: WebContents) {
     this.webContents = webContents
@@ -123,7 +129,23 @@ export class BrowserCDP {
     }
   }
 
+  private resetIdleDetachTimer(): void {
+    if (this.idleDetachTimer) {
+      clearTimeout(this.idleDetachTimer)
+    }
+    this.idleDetachTimer = setTimeout(() => {
+      if (this.attached) {
+        mainLog.info('[browser-cdp] idle detach — detaching debugger after inactivity')
+        this.detach()
+      }
+    }, CDP_IDLE_DETACH_MS)
+  }
+
   detach(): void {
+    if (this.idleDetachTimer) {
+      clearTimeout(this.idleDetachTimer)
+      this.idleDetachTimer = null
+    }
     if (this.attached) {
       try {
         this.webContents.debugger.detach()
@@ -134,7 +156,30 @@ export class BrowserCDP {
 
   private async send(method: string, params?: Record<string, unknown>): Promise<any> {
     await this.ensureAttached()
-    return this.webContents.debugger.sendCommand(method, params)
+    try {
+      return await this.webContents.debugger.sendCommand(method, params)
+    } finally {
+      // Keep detach countdown tied to completed calls so we do not detach mid-flight.
+      this.resetIdleDetachTimer()
+    }
+  }
+
+  private allocateRef(backendDOMNodeId?: number): string {
+    if (backendDOMNodeId !== undefined) {
+      const existing = this.backendNodeRefMap.get(backendDOMNodeId)
+      if (existing) {
+        return existing
+      }
+    }
+
+    this.nextRefCounter += 1
+    const ref = `@e${this.nextRefCounter}`
+
+    if (backendDOMNodeId !== undefined) {
+      this.backendNodeRefMap.set(backendDOMNodeId, ref)
+    }
+
+    return ref
   }
 
   // ---------------------------------------------------------------------------
@@ -162,7 +207,7 @@ export class BrowserCDP {
     const rawRoleCounts = new Map<string, number>()
     const droppedReasonCounts = new Map<string, number>()
 
-    let refCounter = 0
+    const seenBackendNodeIds = new Set<number>()
 
     const pushAccessNode = (entry: {
       backendDOMNodeId?: number
@@ -174,15 +219,21 @@ export class BrowserCDP {
       checked?: boolean
       disabled?: boolean
     }): boolean => {
-      if (refCounter >= MAX_AX_SNAPSHOT_NODES) return false
+      if (result.length >= MAX_AX_SNAPSHOT_NODES) return false
 
-      refCounter++
-      const ref = `@e${refCounter}`
-
-      if (entry.backendDOMNodeId) {
-        this.refMap.set(ref, entry.backendDOMNodeId)
-        this.refDetails.set(ref, { role: entry.role, name: entry.name })
+      if (entry.backendDOMNodeId !== undefined) {
+        if (seenBackendNodeIds.has(entry.backendDOMNodeId)) {
+          return true
+        }
+        seenBackendNodeIds.add(entry.backendDOMNodeId)
       }
+
+      const ref = this.allocateRef(entry.backendDOMNodeId)
+
+      if (entry.backendDOMNodeId !== undefined) {
+        this.refMap.set(ref, entry.backendDOMNodeId)
+      }
+      this.refDetails.set(ref, { role: entry.role, name: entry.name })
 
       const accessNode: AccessibilityNode = {
         ref,
@@ -251,7 +302,7 @@ export class BrowserCDP {
           disabled,
         })
 
-        if (refCounter >= MAX_AX_SNAPSHOT_NODES) break
+        if (result.length >= MAX_AX_SNAPSHOT_NODES) break
         continue
       }
 
@@ -457,7 +508,7 @@ export class BrowserCDP {
           box.style.height = g.box.height + 'px';
           box.style.border = '2px solid rgba(59, 130, 246, 0.95)';
           box.style.borderRadius = '6px';
-          box.style.boxShadow = '0 0 0 1px rgba(255,255,255,0.8) inset';
+
           root.appendChild(box);
 
           const label = document.createElement('div');
@@ -486,7 +537,7 @@ export class BrowserCDP {
             point.style.height = '8px';
             point.style.borderRadius = '999px';
             point.style.background = 'rgba(239, 68, 68, 0.98)';
-            point.style.boxShadow = '0 0 0 2px rgba(255,255,255,0.8)';
+
             root.appendChild(point);
           }
         }
@@ -520,38 +571,80 @@ export class BrowserCDP {
   }
 
   // ---------------------------------------------------------------------------
-  // Element Interaction
+  // Native Mouse Input (uses webContents.sendInputEvent for trusted events)
   // ---------------------------------------------------------------------------
 
-  async clickAtCoordinates(x: number, y: number): Promise<void> {
+  /**
+   * Generate a series of intermediate points between two coordinates.
+   * Adds slight curve and jitter for realistic mouse movement.
+   */
+  private generateTrajectory(
+    fromX: number, fromY: number,
+    toX: number, toY: number,
+    steps: number,
+  ): Array<{ x: number; y: number }> {
+    const points: Array<{ x: number; y: number }> = []
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps
+      // Slight arc: offset perpendicular to the line
+      const arcOffset = Math.sin(t * Math.PI) * Math.min(15, Math.sqrt((toX - fromX) ** 2 + (toY - fromY) ** 2) * 0.05)
+      const dx = toX - fromX
+      const dy = toY - fromY
+      const len = Math.sqrt(dx * dx + dy * dy) || 1
+      const perpX = -dy / len
+      const perpY = dx / len
+      // Small per-step jitter (±2px)
+      const jitterX = (Math.random() - 0.5) * 4
+      const jitterY = (Math.random() - 0.5) * 4
+      points.push({
+        x: Math.round(fromX + dx * t + perpX * arcOffset + jitterX),
+        y: Math.round(fromY + dy * t + perpY * arcOffset + jitterY),
+      })
+    }
+    // Ensure last point is exactly the target
+    if (points.length > 0) {
+      points[points.length - 1] = { x: Math.round(toX), y: Math.round(toY) }
+    }
+    return points
+  }
+
+  private sendMouseEvent(type: 'mouseMove' | 'mouseDown' | 'mouseUp', x: number, y: number, button?: 'left' | 'right' | 'middle', clickCount?: number): void {
+    const event: Record<string, unknown> = { type, x: Math.round(x), y: Math.round(y) }
+    if (button) event.button = button
+    if (clickCount !== undefined) event.clickCount = clickCount
+    this.webContents.sendInputEvent(event as any)
+  }
+
+  // Explicit CDP mouse fallback methods kept for resilience.
+  private async clickAtCDP(x: number, y: number): Promise<void> {
     await this.send('Input.dispatchMouseEvent', {
       type: 'mousePressed',
-      x, y,
+      x,
+      y,
       button: 'left',
       clickCount: 1,
     })
     await this.send('Input.dispatchMouseEvent', {
       type: 'mouseReleased',
-      x, y,
+      x,
+      y,
       button: 'left',
       clickCount: 1,
     })
   }
 
-  async drag(x1: number, y1: number, x2: number, y2: number): Promise<void> {
-    // Interpolate intermediate mouseMoved events for realistic drag
+  private async dragCDP(x1: number, y1: number, x2: number, y2: number): Promise<void> {
     const dx = x2 - x1
     const dy = y2 - y1
     const distance = Math.sqrt(dx * dx + dy * dy)
     const steps = Math.max(5, Math.min(20, Math.round(distance / 20)))
     let lastX = x1
     let lastY = y1
-    let primaryError: unknown = null
 
-    // Press at start position
     await this.send('Input.dispatchMouseEvent', {
       type: 'mousePressed',
-      x: x1, y: y1,
+      x: x1,
+      y: y1,
       button: 'left',
       buttons: 1,
       clickCount: 1,
@@ -564,24 +657,19 @@ export class BrowserCDP {
         const y = Math.round(y1 + dy * t)
         await this.send('Input.dispatchMouseEvent', {
           type: 'mouseMoved',
-          x, y,
+          x,
+          y,
           button: 'left',
           buttons: 1,
         })
         lastX = x
         lastY = y
 
-        // Small delay between moves for realistic drag behavior
         if (i < steps) {
           await new Promise(resolve => setTimeout(resolve, 10))
         }
       }
-    } catch (error) {
-      primaryError = error
-    }
-
-    // Always attempt release so page state is not left in pressed/dragging mode.
-    try {
+    } finally {
       await this.send('Input.dispatchMouseEvent', {
         type: 'mouseReleased',
         x: lastX,
@@ -590,16 +678,76 @@ export class BrowserCDP {
         buttons: 0,
         clickCount: 1,
       })
-    } catch (releaseError) {
-      if (!primaryError) throw releaseError
-      mainLog.warn(
-        `[browser-cdp] drag release failed after primary error: ${
-          releaseError instanceof Error ? releaseError.message : String(releaseError)
-        }`,
-      )
     }
+  }
 
-    if (primaryError) throw primaryError
+  // ---------------------------------------------------------------------------
+  // Element Interaction
+  // ---------------------------------------------------------------------------
+
+  async clickAtCoordinates(x: number, y: number): Promise<void> {
+    try {
+      // Generate short trajectory to the click target for realism
+      const startX = x + (Math.random() - 0.5) * 60
+      const startY = y + (Math.random() - 0.5) * 60
+      const trajectory = this.generateTrajectory(startX, startY, x, y, 3 + Math.floor(Math.random() * 3))
+
+      for (const point of trajectory) {
+        this.sendMouseEvent('mouseMove', point.x, point.y)
+        await new Promise(resolve => setTimeout(resolve, 4 + Math.random() * 8))
+      }
+
+      this.sendMouseEvent('mouseDown', Math.round(x), Math.round(y), 'left', 1)
+      await new Promise(resolve => setTimeout(resolve, 20 + Math.random() * 40))
+      this.sendMouseEvent('mouseUp', Math.round(x), Math.round(y), 'left', 1)
+    } catch (error) {
+      mainLog.warn(`[browser-cdp] native clickAt failed, falling back to CDP: ${error instanceof Error ? error.message : String(error)}`)
+      await this.clickAtCDP(x, y)
+    }
+  }
+
+  async drag(x1: number, y1: number, x2: number, y2: number): Promise<void> {
+    try {
+      const dx = x2 - x1
+      const dy = y2 - y1
+      const distance = Math.sqrt(dx * dx + dy * dy)
+      const steps = Math.max(5, Math.min(20, Math.round(distance / 20)))
+
+      // Move to start position
+      this.sendMouseEvent('mouseMove', x1, y1)
+      await new Promise(resolve => setTimeout(resolve, 10))
+
+      // Press at start position
+      this.sendMouseEvent('mouseDown', x1, y1, 'left', 1)
+      await new Promise(resolve => setTimeout(resolve, 30))
+
+      let lastX = x1
+      let lastY = y1
+
+      try {
+        const trajectory = this.generateTrajectory(x1, y1, x2, y2, steps)
+        for (let i = 0; i < trajectory.length; i++) {
+          const point = trajectory[i]!
+          this.sendMouseEvent('mouseMove', point.x, point.y)
+          lastX = point.x
+          lastY = point.y
+
+          if (i < trajectory.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 8 + Math.random() * 12))
+          }
+        }
+      } catch (error) {
+        // Always release even on error
+        this.sendMouseEvent('mouseUp', lastX, lastY, 'left', 1)
+        throw error
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 20))
+      this.sendMouseEvent('mouseUp', lastX, lastY, 'left', 1)
+    } catch (error) {
+      mainLog.warn(`[browser-cdp] native drag failed, falling back to CDP: ${error instanceof Error ? error.message : String(error)}`)
+      await this.dragCDP(x1, y1, x2, y2)
+    }
   }
 
   async typeText(text: string): Promise<void> {
@@ -647,19 +795,8 @@ export class BrowserCDP {
       const x = geometry.clickPoint.x
       const y = geometry.clickPoint.y
 
-      // Dispatch mouse events (mousedown + mouseup + click)
-      await this.send('Input.dispatchMouseEvent', {
-        type: 'mousePressed',
-        x, y,
-        button: 'left',
-        clickCount: 1,
-      })
-      await this.send('Input.dispatchMouseEvent', {
-        type: 'mouseReleased',
-        x, y,
-        button: 'left',
-        clickCount: 1,
-      })
+      // Use native input events for trusted mouse interaction
+      await this.clickAtCoordinates(x, y)
 
       return geometry
     } catch (err) {

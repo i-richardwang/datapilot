@@ -1,4 +1,5 @@
 import * as React from 'react'
+import type { CSSProperties } from 'react'
 import type { StatusConfig } from '@craft-agent/shared/statuses'
 import { isEmoji } from '@craft-agent/shared/utils/icon-constants'
 import { resolveEntityColor, getDefaultStatusColor } from '@craft-agent/shared/colors'
@@ -110,6 +111,26 @@ export function getStateIcon(
 ): React.ReactNode {
   const state = states.find(s => s.id === stateId)
   return state?.icon ?? <span className="h-3.5 w-3.5">●</span>
+}
+
+/**
+ * Return inline style for a status icon only when the icon is colorable.
+ *
+ * Colorable icons (SVG/currentColor) receive the resolved status color.
+ * Non-colorable icons (emoji/images) return undefined so they render at full native color/opacity.
+ */
+export function getStatusIconStyle(state?: SessionStatus): CSSProperties | undefined {
+  return state?.iconColorable ? { color: state.resolvedColor } : undefined
+}
+
+/**
+ * Resolve a status by ID and return icon style only when color should be applied.
+ */
+export function getStateIconStyle(
+  stateId: string,
+  states: SessionStatus[]
+): CSSProperties | undefined {
+  return getStatusIconStyle(states.find(s => s.id === stateId))
 }
 
 /**

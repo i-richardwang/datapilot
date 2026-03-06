@@ -2,8 +2,7 @@ import * as React from 'react'
 import { Check, Globe, Copy, RefreshCw, Link2Off } from 'lucide-react'
 import { toast } from 'sonner'
 import type { MenuComponents } from '@/components/ui/menu-context'
-import type { SessionStatusId } from '@/config/session-status-config'
-import type { SessionStatus } from '@/config/session-status-config'
+import { getStatusIconStyle, type SessionStatusId, type SessionStatus } from '@/config/session-status-config'
 import type { LabelConfig } from '@craft-agent/shared/labels'
 import { LabelIcon } from '@/components/ui/label-icon'
 
@@ -86,7 +85,6 @@ export function StatusMenuItems({
   return (
     <>
       {sessionStatuses.map((state) => {
-        const applyColor = state.iconColorable
         const bareIcon = React.isValidElement(state.icon)
           ? React.cloneElement(state.icon as React.ReactElement<{ bare?: boolean }>, { bare: true })
           : state.icon
@@ -96,7 +94,7 @@ export function StatusMenuItems({
             onClick={() => onSelect(state.id)}
             className={activeStateId === state.id ? 'bg-foreground/5' : ''}
           >
-            <span style={applyColor ? { color: state.resolvedColor } : undefined}>
+            <span style={getStatusIconStyle(state)}>
               {bareIcon}
             </span>
             <span className="flex-1">{state.label}</span>

@@ -555,7 +555,7 @@ export function MarkdownDatatableBlock({ code, className }: MarkdownDatatableBlo
           <ListFilter className="w-3.5 h-3.5" />
         </button>
       </DropdownMenuTrigger>
-      <StyledDropdownMenuContent sideOffset={6} align="end" className="min-w-36" style={{ zIndex: 400 }}>
+      <StyledDropdownMenuContent sideOffset={6} align="end" className="min-w-36" style={{ zIndex: 'var(--z-floating-menu, 400)' }}>
         {/* Sort sub-menu */}
         <DropdownMenuSub>
           <StyledDropdownMenuSubTrigger>
@@ -563,7 +563,7 @@ export function MarkdownDatatableBlock({ code, className }: MarkdownDatatableBlo
             <span className="flex-1">Sort by</span>
             {sortKey && sortDir && <Check className="w-3 h-3 text-accent" />}
           </StyledDropdownMenuSubTrigger>
-          <StyledDropdownMenuSubContent style={{ zIndex: 401 }}>
+          <StyledDropdownMenuSubContent style={{ zIndex: 'calc(var(--z-floating-menu, 400) + 1)' }}>
             {parsed.columns.map((col) => {
               const isActive = sortKey === col.key && sortDir !== null
               return (
@@ -585,7 +585,7 @@ export function MarkdownDatatableBlock({ code, className }: MarkdownDatatableBlo
             <span className="flex-1">Group by</span>
             {groupKey && <Check className="w-3 h-3 text-accent" />}
           </StyledDropdownMenuSubTrigger>
-          <StyledDropdownMenuSubContent style={{ zIndex: 401 }}>
+          <StyledDropdownMenuSubContent style={{ zIndex: 'calc(var(--z-floating-menu, 400) + 1)' }}>
             {parsed.columns.map((col) => {
               const isActive = groupKey === col.key
               const opts = granularityOptions.get(col.key)
@@ -598,7 +598,7 @@ export function MarkdownDatatableBlock({ code, className }: MarkdownDatatableBlo
                       <span className={cn('flex-1', isActive && 'text-accent font-medium')}>{col.label}</span>
                       {isActive && <Check className="w-3 h-3 text-accent" />}
                     </StyledDropdownMenuSubTrigger>
-                    <StyledDropdownMenuSubContent style={{ zIndex: 402 }}>
+                    <StyledDropdownMenuSubContent style={{ zIndex: 'calc(var(--z-floating-menu, 400) + 2)' }}>
                       {opts.map((opt) => {
                         const optActive = isActive && groupGranularity === opt.value
                         return (

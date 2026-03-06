@@ -216,8 +216,8 @@ export const reconcilePanelStackAtom = atom(
       )
     ) {
       const targetFocusId =
-        normalized.find((p) => p.route === requestedFocusRoute)?.id ??
         normalized[Math.min(requestedFocusIndex, normalized.length - 1)]?.id ??
+        normalized.find((p) => p.route === requestedFocusRoute)?.id ??
         null
       if (get(focusedPanelIdAtom) !== targetFocusId) {
         set(focusedPanelIdAtom, targetFocusId)
@@ -228,8 +228,8 @@ export const reconcilePanelStackAtom = atom(
     set(panelStackAtom, normalized)
 
     const focusId =
-      normalized.find((p) => p.route === requestedFocusRoute)?.id ??
       normalized[Math.min(requestedFocusIndex, normalized.length - 1)]?.id ??
+      normalized.find((p) => p.route === requestedFocusRoute)?.id ??
       null
     set(focusedPanelIdAtom, focusId)
 

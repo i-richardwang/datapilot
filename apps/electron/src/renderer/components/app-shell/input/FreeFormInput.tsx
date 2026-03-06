@@ -1,5 +1,4 @@
 import * as React from 'react'
-import * as ReactDOM from 'react-dom'
 import { Command as CommandPrimitive } from 'cmdk'
 import { toast } from 'sonner'
 import {
@@ -9,10 +8,9 @@ import {
   Check,
   DatabaseZap,
   ChevronDown,
-  Loader2,
   AlertCircle,
 } from 'lucide-react'
-import { Icon_Home, Icon_Folder } from '@craft-agent/ui'
+import { Icon_Home, Icon_Folder, Spinner } from '@craft-agent/ui'
 
 import * as storage from '@/lib/local-storage'
 import { extractWorkspaceSlugFromPath } from '@craft-agent/shared/utils/workspace-slug'
@@ -60,6 +58,7 @@ import { resolveEffectiveConnectionSlug, isCompatProvider } from '@config/llm-co
 import { useOptionalAppShellContext } from '@/context/AppShellContext'
 import { EditPopover, getEditConfig } from '@/components/ui/EditPopover'
 import { SourceAvatar } from '@/components/ui/source-avatar'
+import { SourceSelectorPopover } from '@/components/ui/SourceSelectorPopover'
 import { ConnectionIcon } from '@/components/icons/ConnectionIcon'
 import { FreeFormInputContextBadge } from './FreeFormInputContextBadge'
 import type { FileAttachment, LoadedSource, LoadedSkill } from '../../../../shared/types'
@@ -68,6 +67,8 @@ import { type ThinkingLevel, THINKING_LEVELS, getThinkingLevelName } from '@craf
 import { useEscapeInterrupt } from '@/context/EscapeInterruptContext'
 import { hasOpenOverlay } from '@/lib/overlay-detection'
 import { ToolbarStatusSlot } from './ToolbarStatusSlot'
+import { shouldHandleScopedInputEvent } from './input-event-guards'
+import { clearPendingFocusForSession, consumePendingFocusForSession } from './focus-input-events'
 
 /**
  * Format token count for display (e.g., 1500 -> "1.5k", 200000 -> "200k")
@@ -80,6 +81,10 @@ function formatTokenCount(tokens: number): string {
     return `${(tokens / 1000).toFixed(tokens >= 10000 ? 0 : 1)}k`
   }
   return tokens.toString()
+}
+
+function stripPiPrefixForDisplay(value: string): string {
+  return value.startsWith('pi/') ? value.slice(3) : value
 }
 
 /** Platform-specific modifier key for keyboard shortcuts */
@@ -129,8 +134,6 @@ export interface FreeFormInputProps {
   /** Callback when thinking level changes */
   onThinkingLevelChange?: (level: ThinkingLevel) => void
   // Advanced options
-  ultrathinkEnabled?: boolean
-  onUltrathinkChange?: (enabled: boolean) => void
   permissionMode?: PermissionMode
   onPermissionModeChange?: (mode: PermissionMode) => void
   /** Enabled permission modes for Shift+Tab cycling (min 2 modes) */
@@ -220,8 +223,6 @@ export function FreeFormInput({
   onModelChange,
   thinkingLevel = 'think',
   onThinkingLevelChange,
-  ultrathinkEnabled = false,
-  onUltrathinkChange,
   permissionMode = 'ask',
   onPermissionModeChange,
   enabledModes = ['safe', 'ask', 'allow-all'],
@@ -303,9 +304,9 @@ export function FreeFormInput({
     )
     if (!model) {
       // Fallback: use helper function to format unknown model IDs nicely
-      return getModelDisplayName(modelToDisplay)
+      return stripPiPrefixForDisplay(getModelDisplayName(modelToDisplay))
     }
-    return typeof model === 'string' ? model : model.name
+    return typeof model === 'string' ? stripPiPrefixForDisplay(model) : model.name
   }, [availableModels, currentModel, connectionDefaultModel])
 
   // Group connections by provider type for hierarchical dropdown
@@ -443,7 +444,6 @@ export function FreeFormInput({
   const [isDraggingOver, setIsDraggingOver] = React.useState(false)
   const [loadingCount, setLoadingCount] = React.useState(0)
   const [sourceDropdownOpen, setSourceDropdownOpen] = React.useState(false)
-  const [sourceFilter, setSourceFilter] = React.useState('')
   const [isFocused, setIsFocused] = React.useState(false)
   const [inputMaxHeight, setInputMaxHeight] = React.useState(540)
   const [modelDropdownOpen, setModelDropdownOpen] = React.useState(false)
@@ -490,8 +490,6 @@ export function FreeFormInput({
   const dragCounterRef = React.useRef(0)
   const containerRef = React.useRef<HTMLDivElement>(null)
   const sourceButtonRef = React.useRef<HTMLButtonElement>(null)
-  const sourceFilterInputRef = React.useRef<HTMLInputElement>(null)
-  const [sourceDropdownPosition, setSourceDropdownPosition] = React.useState<{ top: number; left: number } | null>(null)
 
   // Merge refs for RichTextInput
   const internalInputRef = React.useRef<RichTextInputHandle>(null)
@@ -503,7 +501,10 @@ export function FreeFormInput({
   // Listen for craft:insert-text events (generic mechanism for inserting text into input)
   // Used by components that want to pre-fill the input with text
   React.useEffect(() => {
-    const handleInsertText = (e: CustomEvent<{ text: string }>) => {
+    const handleInsertText = (e: CustomEvent<{ text: string; sessionId?: string }>) => {
+      const targetSessionId = e.detail?.sessionId
+      if (!shouldHandleScopedInputEvent({ sessionId, isFocusedPanel, targetSessionId })) return
+
       const { text } = e.detail
       setInput(text)
       syncToParent(text)
@@ -517,7 +518,7 @@ export function FreeFormInput({
 
     window.addEventListener('craft:insert-text', handleInsertText as EventListener)
     return () => window.removeEventListener('craft:insert-text', handleInsertText as EventListener)
-  }, [syncToParent, richInputRef])
+  }, [sessionId, isFocusedPanel, syncToParent, richInputRef])
 
   // Listen for craft:approve-plan events (used by ResponseCard's Accept Plan button)
   // This disables safe mode AND submits the message in one action
@@ -654,7 +655,15 @@ export function FreeFormInput({
 
   // Listen for craft:focus-input events (restore focus after popover/dropdown closes)
   React.useEffect(() => {
-    const handleFocusInput = () => {
+    const handleFocusInput = (e: Event) => {
+      const detail = (e as CustomEvent<{ sessionId?: string }>).detail
+      const targetSessionId = detail?.sessionId
+      if (!shouldHandleScopedInputEvent({ sessionId, isFocusedPanel, targetSessionId })) return
+
+      if (targetSessionId) {
+        clearPendingFocusForSession(targetSessionId)
+      }
+
       richInputRef.current?.focus()
       // Restore caret position if saved, then clear it (one-shot)
       if (lastCaretPositionRef.current !== null) {
@@ -668,7 +677,16 @@ export function FreeFormInput({
 
     window.addEventListener('craft:focus-input', handleFocusInput)
     return () => window.removeEventListener('craft:focus-input', handleFocusInput)
-  }, [richInputRef])
+  }, [sessionId, isFocusedPanel, richInputRef])
+
+  // Recover queued focus requests after session switch/mount races.
+  React.useEffect(() => {
+    if (!consumePendingFocusForSession(sessionId)) return
+
+    setTimeout(() => {
+      richInputRef.current?.focus()
+    }, 0)
+  }, [sessionId, richInputRef])
 
   // Get the next available number for a pasted file prefix (e.g., pasted-image-1, pasted-image-2)
   const getNextPastedNumber = (
@@ -688,8 +706,11 @@ export function FreeFormInput({
 
   // Listen for craft:paste-files events (for global paste when input not focused)
   React.useEffect(() => {
-    const handlePasteFiles = async (e: CustomEvent<{ files: File[] }>) => {
+    const handlePasteFiles = async (e: CustomEvent<{ files: File[]; sessionId?: string }>) => {
       if (disabled) return
+
+      const targetSessionId = e.detail?.sessionId
+      if (!shouldHandleScopedInputEvent({ sessionId, isFocusedPanel, targetSessionId })) return
 
       const { files } = e.detail
       if (!files || files.length === 0) return
@@ -724,7 +745,7 @@ export function FreeFormInput({
 
     window.addEventListener('craft:paste-files', handlePasteFiles as unknown as EventListener)
     return () => window.removeEventListener('craft:paste-files', handlePasteFiles as unknown as EventListener)
-  }, [disabled, richInputRef])
+  }, [disabled, sessionId, isFocusedPanel, richInputRef])
 
   // Build active commands list for slash command menu
   const activeCommands = React.useMemo(() => {
@@ -733,17 +754,15 @@ export function FreeFormInput({
     if (permissionMode === 'safe') active.push('safe')
     else if (permissionMode === 'ask') active.push('ask')
     else if (permissionMode === 'allow-all') active.push('allow-all')
-    if (ultrathinkEnabled) active.push('ultrathink')
     return active
-  }, [permissionMode, ultrathinkEnabled])
+  }, [permissionMode])
 
   // Handle slash command selection (mode/feature commands)
   const handleSlashCommand = React.useCallback((commandId: SlashCommandId) => {
     if (commandId === 'safe') onPermissionModeChange?.('safe')
     else if (commandId === 'ask') onPermissionModeChange?.('ask')
     else if (commandId === 'allow-all') onPermissionModeChange?.('allow-all')
-    else if (commandId === 'ultrathink') onUltrathinkChange?.(!ultrathinkEnabled)
-  }, [permissionMode, ultrathinkEnabled, onPermissionModeChange, onUltrathinkChange])
+  }, [onPermissionModeChange])
 
   // Handle folder selection from slash command menu
   const handleSlashFolderSelect = React.useCallback((path: string) => {
@@ -1108,6 +1127,11 @@ export function FreeFormInput({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // During IME composition, ESC should cancel composition, not trigger app/menu ESC behavior.
+    if (e.key === 'Escape' && e.nativeEvent.isComposing) {
+      return
+    }
+
     // Don't submit when mention menu is open AND has visible content
     if (inlineMention.isOpen) {
       // Only intercept navigation/selection keys if menu actually shows items or is loading
@@ -1495,108 +1519,25 @@ export function FreeFormInput({
                 isOpen={sourceDropdownOpen}
                 disabled={disabled}
                 data-tutorial="source-selector-button"
-                onClick={() => {
-                  if (!sourceDropdownOpen && sourceButtonRef.current) {
-                    const rect = sourceButtonRef.current.getBoundingClientRect()
-                    setSourceDropdownPosition({
-                      top: rect.top,
-                      left: rect.left,
-                    })
-                    // Focus filter input after popover opens
-                    setTimeout(() => sourceFilterInputRef.current?.focus(), 0)
-                  } else {
-                    // Clear filter when closing
-                    setSourceFilter('')
-                  }
-                  setSourceDropdownOpen(!sourceDropdownOpen)
-                }}
+                onClick={() => setSourceDropdownOpen(prev => !prev)}
                 tooltip="Sources"
               />
-              {sourceDropdownOpen && sourceDropdownPosition && ReactDOM.createPortal(
-                <>
-                  <div
-                    className="fixed inset-0 z-floating-backdrop"
-                    onClick={() => {
-                      setSourceDropdownOpen(false)
-                      setSourceFilter('')
-                    }}
-                  />
-                  <div
-                    className="fixed z-floating-menu min-w-[200px] overflow-hidden rounded-[8px] bg-background text-foreground shadow-modal-small"
-                    style={{
-                      top: sourceDropdownPosition.top - 8,
-                      left: sourceDropdownPosition.left,
-                      transform: 'translateY(-100%)',
-                    }}
-                  >
-                    {sources.length === 0 ? (
-                      <div className="text-xs text-muted-foreground p-3 select-none">
-                        No sources configured.
-                        <br />
-                        Add sources in Settings.
-                      </div>
-                    ) : (
-                      <CommandPrimitive
-                        className="min-w-[200px]"
-                        shouldFilter={false}
-                      >
-                        <div className="border-b border-border/50 px-3 py-2">
-                          <CommandPrimitive.Input
-                            ref={sourceFilterInputRef}
-                            value={sourceFilter}
-                            onValueChange={setSourceFilter}
-                            placeholder="Search sources..."
-                            className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground placeholder:select-none"
-                          />
-                        </div>
-                        <CommandPrimitive.List className="max-h-[240px] overflow-y-auto p-1">
-                          {sources
-                            .filter(source => source.config.name.toLowerCase().includes(sourceFilter.toLowerCase()))
-                            .map((source, index) => {
-                              const isEnabled = optimisticSourceSlugs.includes(source.config.slug)
-                              return (
-                                <CommandPrimitive.Item
-                                  key={source.config.slug}
-                                  value={source.config.slug}
-                                  data-tutorial={index === 0 ? "source-dropdown-item-first" : undefined}
-                                  onSelect={() => {
-                                    const newSlugs = isEnabled
-                                      ? optimisticSourceSlugs.filter(slug => slug !== source.config.slug)
-                                      : [...optimisticSourceSlugs, source.config.slug]
-                                    // Optimistic update - UI updates immediately
-                                    setOptimisticSourceSlugs(newSlugs)
-                                    // Then trigger async server update
-                                    onSourcesChange?.(newSlugs)
-                                  }}
-                                  className={cn(
-                                    "flex cursor-pointer select-none items-center gap-3 rounded-[6px] px-3 py-2 text-[13px]",
-                                    "outline-none data-[selected=true]:bg-foreground/5",
-                                    isEnabled && "bg-foreground/3"
-                                  )}
-                                >
-                                  <div className="shrink-0 text-muted-foreground flex items-center">
-                                    <SourceAvatar
-                                      source={source}
-                                      size="sm"
-                                    />
-                                  </div>
-                                  <div className="flex-1 min-w-0 truncate">{source.config.name}</div>
-                                  <div className={cn(
-                                    "shrink-0 h-4 w-4 rounded-full bg-current flex items-center justify-center",
-                                    !isEnabled && "opacity-0"
-                                  )}>
-                                    <Check className="h-2.5 w-2.5 text-white dark:text-black" strokeWidth={3} />
-                                  </div>
-                                </CommandPrimitive.Item>
-                              )
-                            })}
-                        </CommandPrimitive.List>
-                      </CommandPrimitive>
-                    )}
-                  </div>
-                </>,
-                document.body
-              )}
+
+              <SourceSelectorPopover
+                open={sourceDropdownOpen}
+                onOpenChange={setSourceDropdownOpen}
+                anchorRef={sourceButtonRef}
+                sources={sources}
+                selectedSlugs={optimisticSourceSlugs}
+                onToggleSlug={(slug) => {
+                  const isEnabled = optimisticSourceSlugs.includes(slug)
+                  const newSlugs = isEnabled
+                    ? optimisticSourceSlugs.filter(currentSlug => currentSlug !== slug)
+                    : [...optimisticSourceSlugs, slug]
+                  setOptimisticSourceSlugs(newSlugs)
+                  onSourcesChange?.(newSlugs)
+                }}
+              />
             </div>
           )}
 
@@ -1666,7 +1607,7 @@ Model
                   className="flex items-center justify-between px-2 py-2 rounded-lg"
                 >
                   <div className="text-left">
-                    <div className="font-medium text-sm">{connectionDefaultModel}</div>
+                    <div className="font-medium text-sm">{stripPiPrefixForDisplay(connectionDefaultModel)}</div>
                     <div className="text-xs text-muted-foreground">Connection default</div>
                   </div>
                   <Check className="h-3 w-3 text-foreground shrink-0 ml-3" />
@@ -1707,7 +1648,7 @@ Model
                               {/* Show models for this connection - use provider-specific models as fallback */}
                               {(conn.models || ANTHROPIC_MODELS).map((model) => {
                                 const modelId = typeof model === 'string' ? model : model.id
-                                const modelName = typeof model === 'string' ? getModelShortName(model) : model.name
+                                const modelName = typeof model === 'string' ? stripPiPrefixForDisplay(getModelShortName(model)) : model.name
                                 const isSelectedModel = isCurrentConnection && currentModel === modelId
                                 return (
                                   <StyledDropdownMenuItem
@@ -1754,7 +1695,7 @@ Model
                   {/* Model options based on effective connection's provider type */}
                   {availableModels.map((model) => {
                     const modelId = typeof model === 'string' ? model : model.id
-                    const modelName = typeof model === 'string' ? getModelShortName(model) : model.name
+                    const modelName = typeof model === 'string' ? stripPiPrefixForDisplay(getModelShortName(model)) : model.name
                     const isSelected = currentModel === modelId
                     const description = typeof model !== 'string' && 'description' in model ? (model.description as string) : ''
                     return (
@@ -1824,7 +1765,7 @@ Model
                       <span>Context</span>
                       <span className="flex items-center gap-1.5">
                         {contextStatus.isCompacting && (
-                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <Spinner className="h-3 w-3" />
                         )}
                         {formatTokenCount(contextStatus.inputTokens)} tokens used
                       </span>

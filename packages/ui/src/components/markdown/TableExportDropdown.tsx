@@ -56,7 +56,7 @@ export function TableExportDropdown({ columns, rows, filename }: TableExportDrop
           <ChevronDown className="w-3 h-3" />
         </button>
       </DropdownMenuTrigger>
-      <StyledDropdownMenuContent sideOffset={6} align="end" style={{ zIndex: 400 }}>
+      <StyledDropdownMenuContent sideOffset={6} align="end" style={{ zIndex: 'var(--z-floating-menu, 400)' }}>
         <StyledDropdownMenuItem onSelect={() => handleExport('markdown')}>
           {copiedFormat === 'markdown' ? <Check className="text-success" /> : <FileText />}
           Copy as Markdown

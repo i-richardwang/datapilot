@@ -79,18 +79,22 @@ export function handleToolResult(
 
   const toolIndex = findToolMessage(session.messages, event.toolUseId)
 
+  const inferredError = event.isError === true || /^\s*(\[ERROR\]|Error:|error:)/.test(event.result || '')
+
   if (toolIndex !== -1) {
     // Detect "persisted output" - SDK marks as error but data was actually saved successfully
-    const isPersistedOutput = event.isError && (
+    const isPersistedOutput = inferredError && (
       event.result?.includes('Output has been saved to') ||
       event.result?.includes('Full output saved to')
     )
 
+    const effectiveIsError = isPersistedOutput ? false : inferredError
+
     // Update existing tool message
     let updatedSession = updateMessageAt(session, toolIndex, {
       toolResult: event.result,
-      toolStatus: 'completed',
-      isError: isPersistedOutput ? false : event.isError,
+      toolStatus: effectiveIsError ? 'error' : 'completed',
+      isError: effectiveIsError,
       errorCode: isPersistedOutput ? 'response_too_large' : undefined,
     })
 
@@ -128,10 +132,12 @@ export function handleToolResult(
   // locate this message by toolUseId and update it with input/intent/displayMeta.
 
   // Detect "persisted output" - SDK marks as error but data was actually saved successfully
-  const isPersistedOutput = event.isError && (
+  const isPersistedOutput = inferredError && (
     event.result?.includes('Output has been saved to') ||
     event.result?.includes('Full output saved to')
   )
+
+  const effectiveIsError = isPersistedOutput ? false : inferredError
 
   const toolMessage: Message = {
     id: generateMessageId(),
@@ -141,8 +147,8 @@ export function handleToolResult(
     toolUseId: event.toolUseId,
     toolName: event.toolName,
     toolResult: event.result,
-    toolStatus: 'completed',
-    isError: isPersistedOutput ? false : event.isError,
+    toolStatus: effectiveIsError ? 'error' : 'completed',
+    isError: effectiveIsError,
     errorCode: isPersistedOutput ? 'response_too_large' : undefined,
     turnId: event.turnId,
     parentToolUseId: event.parentToolUseId,

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MetadataBadge } from '@/components/ui/metadata-badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   DropdownMenu,
@@ -29,6 +30,12 @@ import {
 import { TiptapMarkdownEditor } from '@craft-agent/ui'
 import { cn } from '@/lib/utils'
 import { getResizeGradientStyle } from '@/hooks/useResizeGradient'
+import {
+  PANEL_GAP,
+  PANEL_SASH_HALF_HIT_WIDTH,
+  PANEL_SASH_HIT_WIDTH,
+  PANEL_SASH_LINE_WIDTH,
+} from '@/components/app-shell/panel-constants'
 import './planner.css'
 
 type TaskState = 'todo' | 'in_progress' | 'done' | 'cancelled'
@@ -246,7 +253,7 @@ const initialTasks: PlannerTask[] = [
     id: 'ms1',
     headingId: 'h4',
     title: 'Mermaid: Data flow diagram',
-    notes: 'Document the full data pipeline from user action to persistence.\n\n```mermaid\ngraph LR\n    A[User Action] --> B[React State]\n    B --> C[SQLite WAL]\n    C --> D[Sync Engine]\n    D --> E[Remote API]\n    E --> F[Conflict Resolution]\n    F --> C\n```\n\nThe sync engine should handle **offline-first** writes and queue them for upload when connectivity resumes.',
+    notes: 'Document the full data pipeline from user action to persistence.\n\n```mermaid\ngraph LR\n    A[User Action] --> B[React State]\n    B --> C[SQLite WAL]\n    C --> D[Sync Engine]\n    D --> E[Remote API]\n    E --> F[Conflict Resolution]\n    F --> C\n```\n\n![Planner pipeline board mock](https://picsum.photos/seed/planner-pipeline/1200/620 "Planner pipeline mock")\n\nThe sync engine should handle **offline-first** writes and queue them for upload when connectivity resumes.',
     state: 'in_progress',
     due: '',
   },
@@ -310,7 +317,7 @@ const initialTasks: PlannerTask[] = [
     id: 'ms9',
     headingId: 'h6',
     title: 'Long-form: Full architecture spec',
-    notes: '# Planner V2 Architecture\n\nThis document outlines the **complete architecture** for the Planner V2 system.\n\n## Overview\n\nThe planner is a *three-layer* system:\n\n1. **Presentation layer** — React components with Tiptap editors\n2. **State layer** — SQLite with WAL mode, exposed via typed queries\n3. **Sync layer** — Offline-first CRDT sync with conflict resolution\n\n## Data Model\n\nCore entities:\n- **Project** — top-level container with ACL\n- **Heading** — ordered sections within a project\n- **Task** — individual work items with state machine\n- **Event** — append-only audit log\n- **SessionLink** — references to agent sessions\n\n## Task State Machine\n\n```mermaid\nstateDiagram-v2\n    [*] --> todo\n    todo --> in_progress: Start\n    in_progress --> done: Complete\n    in_progress --> todo: Pause\n    todo --> cancelled: Cancel\n    in_progress --> cancelled: Cancel\n    done --> todo: Reopen\n    cancelled --> todo: Reopen\n```\n\n## Sync Protocol\n\nEach mutation produces a **sync event** that is:\n1. Applied locally (optimistic)\n2. Queued in `sync_outbox` table\n3. Sent to server when online\n4. Acknowledged with server timestamp\n5. Conflicts resolved via LWW per field\n\n> The sync engine must handle **network partitions** gracefully. Tasks created offline should sync without data loss when connectivity is restored.\n\n## Performance Targets\n\n| Metric | Target |\n|--------|--------|\n| Task list render | < 16ms |\n| Task create (local) | < 5ms |\n| Sync round-trip | < 200ms |\n| Offline queue capacity | 10,000 events |\n\n## Open Questions\n\n- Should we support **real-time collaboration** (multiple users editing the same task)?\n- How do we handle **schema migrations** for the SQLite database?\n- What is the **retention policy** for events?',
+    notes: '# Planner V2 Architecture\n\nThis document outlines the **complete architecture** for the Planner V2 system.\n\n## Overview\n\nThe planner is a *three-layer* system:\n\n1. **Presentation layer** — React components with Tiptap editors\n2. **State layer** — SQLite with WAL mode, exposed via typed queries\n3. **Sync layer** — Offline-first CRDT sync with conflict resolution\n\n![Architecture concept sketch](https://picsum.photos/seed/planner-arch-spec/1280/720 "Architecture concept")\n\n## Data Model\n\nCore entities:\n- **Project** — top-level container with ACL\n- **Heading** — ordered sections within a project\n- **Task** — individual work items with state machine\n- **Event** — append-only audit log\n- **SessionLink** — references to agent sessions\n\n## Task State Machine\n\n```mermaid\nstateDiagram-v2\n    [*] --> todo\n    todo --> in_progress: Start\n    in_progress --> done: Complete\n    in_progress --> todo: Pause\n    todo --> cancelled: Cancel\n    in_progress --> cancelled: Cancel\n    done --> todo: Reopen\n    cancelled --> todo: Reopen\n```\n\n## Sync Protocol\n\nEach mutation produces a **sync event** that is:\n1. Applied locally (optimistic)\n2. Queued in `sync_outbox` table\n3. Sent to server when online\n4. Acknowledged with server timestamp\n5. Conflicts resolved via LWW per field\n\n> The sync engine must handle **network partitions** gracefully. Tasks created offline should sync without data loss when connectivity is restored.\n\n## Performance Targets\n\n| Metric | Target |\n|--------|--------|\n| Task list render | < 16ms |\n| Task create (local) | < 5ms |\n| Sync round-trip | < 200ms |\n| Offline queue capacity | 10,000 events |\n\n## Open Questions\n\n- Should we support **real-time collaboration** (multiple users editing the same task)?\n- How do we handle **schema migrations** for the SQLite database?\n- What is the **retention policy** for events?',
     state: 'todo',
     due: '',
   },
@@ -334,7 +341,7 @@ const initialTasks: PlannerTask[] = [
     id: 'ms12',
     headingId: 'h6',
     title: 'Prose: Rich formatting showcase',
-    notes: 'This task demonstrates all **basic** formatting.\n\n## Headings work\n\n### And sub-headings too\n\nHere is some *italic text*, some **bold text**, and some ***bold italic***. We also have `inline code` and ~~strikethrough~~.\n\n## Lists\n\nUnordered:\n- First item\n- Second item with **bold** inside\n  - Nested item\n  - Another nested one\n- Third item\n\nOrdered:\n1. Step one\n2. Step two\n3. Step three\n\n## Blockquotes\n\n> This is a quote.\n> It can span multiple lines.\n>\n> And even have **formatting** inside.\n\n## Links and code\n\nVisit [Craft](https://craft.do) for more info.\n\n```bash\n# A simple shell script\nfor i in $(seq 1 5); do\n  echo \"Task $i completed\"\ndone\n```\n\n---\n\nThat horizontal rule above separates sections nicely.',
+    notes: 'This task demonstrates all **basic** formatting.\n\n## Headings work\n\n### And sub-headings too\n\nHere is some *italic text*, some **bold text**, and some ***bold italic***. We also have `inline code` and ~~strikethrough~~.\n\n## Lists\n\nUnordered:\n- First item\n- Second item with **bold** inside\n  - Nested item\n  - Another nested one\n- Third item\n\nOrdered:\n1. Step one\n2. Step two\n3. Step three\n\n## Blockquotes\n\n> This is a quote.\n> It can span multiple lines.\n>\n> And even have **formatting** inside.\n\n## Links, images, and code\n\nVisit [Craft](https://craft.do) for more info.\n\n![Rich formatting sample image](https://picsum.photos/seed/planner-rich-formatting/1100/520 "Rich formatting sample")\n\n```bash\n# A simple shell script\nfor i in $(seq 1 5); do\n  echo \"Task $i completed\"\ndone\n```\n\n---\n\nThat horizontal rule above separates sections nicely.',
     state: 'done',
     due: '',
   },
@@ -894,7 +901,7 @@ function PlannerBoard() {
                         'planner-sortable-item w-full rounded-[8px] px-3 py-2 text-left select-none',
                         selectedTaskId === task.id
                           ? 'planner-sortable-item--selected bg-background'
-                          : 'bg-transparent shadow-none hover:bg-transparent'
+                          : 'bg-background shadow-none'
                       )}
                     >
                       <div className="flex items-center gap-2">
@@ -922,35 +929,49 @@ function PlannerBoard() {
             <div className="p-5 text-sm text-foreground/50">Select a task to inspect details.</div>
           ) : (
             <ScrollArea className="flex-1">
-              <div className="px-6 py-5">
+              <div className="w-full max-w-[720px] mx-auto px-6 pt-8 pb-5">
                 {/* Editable title */}
                 <div
                   key={selectedTask.id + '-title'}
                   contentEditable
                   suppressContentEditableWarning
                   onBlur={(e) => updateTaskTitle(selectedTask.id, e.currentTarget.textContent ?? '')}
-                  className="text-xl font-bold leading-snug outline-none mb-3"
+                  className="text-xl font-bold leading-snug outline-none mb-5"
                 >
                   {selectedTask.title}
                 </div>
 
-                {/* Props row */}
+                {/* Metadata badges under title */}
                 <div className="flex items-center gap-2 flex-wrap mb-5">
-                  <span className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium', stateStyles[selectedTask.state])}>
-                    {selectedTask.state === 'done' ? (
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                    ) : (
-                      <Circle className="h-3.5 w-3.5" />
-                    )}
-                    {stateLabels[selectedTask.state]}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-xs text-foreground/55">
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    {selectedTask.due}
-                  </span>
+                  <MetadataBadge
+                    interactive={false}
+                    icon={selectedTask.state === 'done'
+                      ? <CheckCircle2 className={cn('h-3.5 w-3.5', stateStyles[selectedTask.state])} />
+                      : <Circle className={cn('h-3.5 w-3.5', stateStyles[selectedTask.state])} />}
+                    label={stateLabels[selectedTask.state]}
+                  />
+
+                  <MetadataBadge
+                    interactive={false}
+                    icon={<CalendarDays className="h-3.5 w-3.5 text-foreground/55" />}
+                    label="Due"
+                    value={selectedTask.due}
+                  />
+
                   {selectedHeading && (
-                    <span className="text-xs text-foreground/40">{selectedHeading.title}</span>
+                    <MetadataBadge
+                      interactive={false}
+                      label="Section"
+                      value={selectedHeading.title}
+                    />
                   )}
+
+                  <MetadataBadge
+                    interactive={false}
+                    icon={<Link2 className="h-3.5 w-3.5 text-foreground/55" />}
+                    label="Sessions"
+                    value={String(selectedLinks.length)}
+                  />
                 </div>
 
                 {/* Editable notes */}
@@ -959,11 +980,12 @@ function PlannerBoard() {
                   content={selectedTask.notes}
                   onUpdate={(md) => updateTaskNotes(selectedTask.id, md)}
                   placeholder="Add notes..."
+                  markdownEngine="official"
                   className="text-sm leading-relaxed text-foreground/75"
                 />
 
                 {/* Separator */}
-                <div className="border-t border-border/60 my-5" />
+                <div className="border-t border-border/60 mt-5 mb-1" />
 
                 {/* Attached Sessions */}
                 <div className="mb-1 text-sm font-semibold">Attached Sessions</div>
@@ -1032,10 +1054,19 @@ function PlannerBoard() {
           }
         }}
         onMouseLeave={() => { if (isResizing !== 'sidebar') setSidebarHandleY(null) }}
-        className="absolute top-0 w-3 h-full cursor-col-resize z-10 flex justify-center"
-        style={{ left: sidebarWidth - 3 }}
+        className="absolute top-0 h-full cursor-col-resize z-10 flex justify-center"
+        style={{
+          width: PANEL_SASH_HIT_WIDTH,
+          left: sidebarWidth + (PANEL_GAP / 2) - PANEL_SASH_HALF_HIT_WIDTH,
+        }}
       >
-        <div className="w-0.5 h-full" style={getResizeGradientStyle(sidebarHandleY)} />
+        <div
+          className="h-full"
+          style={{
+            width: PANEL_SASH_LINE_WIDTH,
+            ...getResizeGradientStyle(sidebarHandleY, sidebarHandleRef.current?.clientHeight ?? null),
+          }}
+        />
       </div>
 
       {/* Navigator resize handle (absolute) */}
@@ -1049,10 +1080,19 @@ function PlannerBoard() {
           }
         }}
         onMouseLeave={() => { if (isResizing !== 'navigator') setNavigatorHandleY(null) }}
-        className="absolute top-0 w-3 h-full cursor-col-resize z-10 flex justify-center"
-        style={{ left: sidebarWidth + 6 + navigatorWidth - 2 }}
+        className="absolute top-0 h-full cursor-col-resize z-10 flex justify-center"
+        style={{
+          width: PANEL_SASH_HIT_WIDTH,
+          left: sidebarWidth + PANEL_GAP + navigatorWidth + (PANEL_GAP / 2) - PANEL_SASH_HALF_HIT_WIDTH,
+        }}
       >
-        <div className="w-0.5 h-full" style={getResizeGradientStyle(navigatorHandleY)} />
+        <div
+          className="h-full"
+          style={{
+            width: PANEL_SASH_LINE_WIDTH,
+            ...getResizeGradientStyle(navigatorHandleY, navigatorHandleRef.current?.clientHeight ?? null),
+          }}
+        />
       </div>
     </div>
   )

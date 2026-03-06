@@ -243,11 +243,12 @@ export class PiEventAdapter extends BaseEventAdapter {
           args.model = this.miniModel;
         }
 
-        // Canonical metadata from subprocess event payload (interceptor-authoritative path).
+        // Canonical metadata from subprocess event payload (interceptor/bridge-authoritative path).
         const eventMeta = this.extractToolMetadataFromEvent(event);
 
-        // Backward-compatibility fallback: shared store (legacy side-channel).
-        const storedMeta = toolMetadataStore.get(toolCallId, this.sessionDir);
+        // Backward-compatibility fallback: shared store (legacy side-channel),
+        // with id canonicalization fallback for mixed call-id formats.
+        const { meta: storedMeta, keyTried } = this.resolveStoredMetadata(toolCallId);
 
         // Last-resort fallback: args metadata if present.
         const argsIntent = typeof args._intent === 'string' ? args._intent : undefined;
@@ -262,6 +263,24 @@ export class PiEventAdapter extends BaseEventAdapter {
           || storedMeta?.displayName
           || argsDisplayName
           || this.getToolDisplayName(toolName);
+
+        const metadataSource = eventMeta
+          ? 'event'
+          : storedMeta
+            ? `store(${keyTried})`
+            : (argsIntent || argsDisplayName)
+              ? 'args'
+              : (typeof args.description === 'string')
+                ? 'description'
+                : 'fallback';
+
+        this.log.debug('Tool metadata resolution', {
+          toolName,
+          toolCallId,
+          metadataSource,
+          hasIntent: !!intent,
+          hasDisplayName: !!displayName,
+        });
 
         // Classify bash commands that are actually file reads
         if (toolName === 'Bash' && typeof args.command === 'string') {
@@ -403,6 +422,25 @@ export class PiEventAdapter extends BaseEventAdapter {
 
     if (!intent && !displayName) return undefined;
     return { intent, displayName };
+  }
+
+  /**
+   * Resolve stored metadata by tool call id with fallback variants.
+   * Handles mixed id forms like `call_xxx|fc_yyy` by trying the base id.
+   */
+  private resolveStoredMetadata(toolCallId: string): { meta?: { intent?: string; displayName?: string }; keyTried?: string } {
+    const candidates = new Set<string>([toolCallId]);
+    if (toolCallId.includes('|')) {
+      const [base] = toolCallId.split('|');
+      if (base) candidates.add(base);
+    }
+
+    for (const candidate of candidates) {
+      const meta = toolMetadataStore.get(candidate, this.sessionDir);
+      if (meta) return { meta, keyTried: candidate };
+    }
+
+    return { meta: undefined, keyTried: Array.from(candidates).join(' -> ') };
   }
 
   /**

@@ -53,6 +53,8 @@ import {
   JSONPreviewOverlay,
 } from '@craft-agent/ui'
 import { useLinkInterceptor, type FilePreviewState } from '@/hooks/useLinkInterceptor'
+import { useTransportConnectionState } from '@/hooks/useTransportConnectionState'
+import { TransportConnectionBanner, shouldShowTransportConnectionBanner } from '@/components/app-shell/TransportConnectionBanner'
 import { getFileManagerName } from '@/lib/platform'
 import { ActionRegistryProvider } from '@/actions'
 import { toast } from 'sonner'
@@ -217,8 +219,7 @@ export default function App() {
     onProgress: (progress: import('@craft-agent/shared/batches').BatchProgress) => void
     onComplete: (batchId: string) => void
   } | null>(null)
-  // Unified session options - replaces ultrathinkSessions and sessionModes
-  // All session-scoped options in one place (ultrathink, permissionMode)
+  // Unified session options for all session-scoped settings
   const [sessionOptions, setSessionOptions] = useState<Map<string, SessionOptions>>(new Map())
 
   // Theme state (app-level only)
@@ -454,7 +455,6 @@ export default function App() {
         const hasNonDefaultThinking = s.thinkingLevel && s.thinkingLevel !== 'think'
         if (hasNonDefaultMode || hasNonDefaultThinking) {
           optionsMap.set(s.id, {
-            ultrathinkEnabled: false, // ultrathink is single-shot, never persisted
             permissionMode: s.permissionMode ?? 'ask',
             thinkingLevel: s.thinkingLevel ?? 'think',
           })
@@ -811,7 +811,6 @@ export default function App() {
       setSessionOptions(prev => {
         const next = new Map(prev)
         next.set(session.id, {
-          ultrathinkEnabled: false,
           permissionMode: session.permissionMode ?? 'ask',
           thinkingLevel: session.thinkingLevel ?? 'think',
         })
@@ -993,10 +992,7 @@ export default function App() {
         )
       }
 
-      // Step 3: Check if ultrathink is enabled for this session
-      const isUltrathink = sessionOptions.get(sessionId)?.ultrathinkEnabled ?? false
-
-      // Step 4: Extract badges from mentions (sources/skills) with embedded icons
+      // Step 3: Extract badges from mentions (sources/skills) with embedded icons
       // Badges are self-contained for display in UserMessageBubble and viewer
       // Merge with any externally provided badges (e.g., from EditPopover context badges)
       // Use workspace slug (not UUID) for skill qualification - SDK expects "workspaceSlug:skillSlug"
@@ -1047,7 +1043,6 @@ export default function App() {
         timestamp: Date.now(),
         attachments: storedAttachments,
         badges: badges.length > 0 ? badges : undefined,
-        ultrathink: isUltrathink || undefined,  // Only set if true
         isPending: true,  // Optimistic - will be confirmed by backend
       }
 
@@ -1060,16 +1055,10 @@ export default function App() {
 
       // Step 6: Send to Claude with processed attachments + stored attachments for persistence
       await window.electronAPI.sendMessage(sessionId, message, processedAttachments, storedAttachments, {
-        ultrathinkEnabled: isUltrathink,
         skillSlugs,
         badges: badges.length > 0 ? badges : undefined,
         optimisticMessageId: userMessage.id,
       })
-
-      // Auto-disable ultrathink after sending (single-shot activation)
-      if (isUltrathink) {
-        handleSessionOptionsChange(sessionId, { ultrathinkEnabled: false })
-      }
     } catch (error) {
       console.error('Failed to send message:', error)
       updateSessionById(sessionId, (s) => ({
@@ -1108,7 +1097,6 @@ export default function App() {
       // Sync thinking level change with backend (session-level, persisted)
       window.electronAPI.sessionCommand(sessionId, { type: 'setThinkingLevel', level: updates.thinkingLevel })
     }
-    // ultrathinkEnabled is UI-only (single-shot), no backend persistence needed
   }, [sessionOptions])
 
   // Handle input draft changes per session with debounced persistence
@@ -1286,6 +1274,16 @@ export default function App() {
     readFileDataUrl: (path) => window.electronAPI.readFileDataUrl(path),
     readFileBinary: (path) => window.electronAPI.readFileBinary(path),
   })
+
+  const transportConnectionState = useTransportConnectionState()
+  const showTransportConnectionBanner = shouldShowTransportConnectionBanner(transportConnectionState)
+
+  const handleReconnectTransport = useCallback(() => {
+    void window.electronAPI.reconnectTransport().catch((error) => {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      toast.error('Reconnect failed', { description: message })
+    })
+  }, [])
 
   const handleOpenFile = linkInterceptor.handleOpenFile
   const handleOpenUrl = linkInterceptor.handleOpenUrl
@@ -1594,6 +1592,7 @@ export default function App() {
           getDraft={getDraft}
           onAutoDeleteEmptySession={handleAutoDeleteEmptySession}
           isReady={appState === 'ready'}
+          isSessionsReady={sessionsLoaded}
         >
           {/* Handle window close requests (X button, Cmd+W) - close modal first if open */}
           <WindowCloseHandler />
@@ -1608,6 +1607,12 @@ export default function App() {
 
           {/* Main UI - always rendered, splash fades away to reveal it */}
           <div className="h-full flex flex-col text-foreground">
+            {showTransportConnectionBanner && transportConnectionState && (
+              <TransportConnectionBanner
+                state={transportConnectionState}
+                onRetry={handleReconnectTransport}
+              />
+            )}
             <div className="flex-1 min-h-0">
               <AppShell
                 contextValue={appShellContextValue}

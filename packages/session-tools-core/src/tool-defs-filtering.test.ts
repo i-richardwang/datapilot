@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'bun:test';
 import {
+  SESSION_TOOL_DEFS,
   getSessionToolDefs,
   getSessionToolNames,
   getSessionToolRegistry,
+  getSessionSafeAllowedToolNames,
+  getSessionSafeBlockedToolNames,
   getToolDefsAsJsonSchema,
 } from './tool-defs.ts';
 
@@ -67,5 +70,36 @@ describe('session tool filtering helpers', () => {
 
     expect(withBatch.some(d => d.name === 'batch_output')).toBe(true);
     expect(withoutBatch.some(d => d.name === 'batch_output')).toBe(false);
+  });
+
+  it('all canonical session tools declare safeMode metadata', () => {
+    for (const def of SESSION_TOOL_DEFS) {
+      expect(def.safeMode === 'allow' || def.safeMode === 'block').toBe(true);
+    }
+  });
+
+  it('safe-mode helper sets classify expected tools', () => {
+    const allowed = getSessionSafeAllowedToolNames();
+    const blocked = getSessionSafeBlockedToolNames();
+
+    expect(allowed.has('send_developer_feedback')).toBe(true);
+    expect(allowed.has('call_llm')).toBe(true);
+    expect(allowed.has('browser_tool')).toBe(true);
+    expect(allowed.has('script_sandbox')).toBe(true);
+
+    expect(blocked.has('source_oauth_trigger')).toBe(true);
+    expect(blocked.has('source_credential_prompt')).toBe(true);
+    expect(blocked.has('spawn_session')).toBe(true);
+  });
+
+  it('safe-mode helpers support MCP prefixing', () => {
+    const allowedPrefixed = getSessionSafeAllowedToolNames({ prefix: 'mcp__session__' });
+    const blockedPrefixed = getSessionSafeBlockedToolNames({ prefix: 'mcp__session__' });
+
+    expect(allowedPrefixed.has('mcp__session__send_developer_feedback')).toBe(true);
+    expect(allowedPrefixed.has('mcp__session__call_llm')).toBe(true);
+    expect(allowedPrefixed.has('mcp__session__script_sandbox')).toBe(true);
+    expect(blockedPrefixed.has('mcp__session__source_oauth_trigger')).toBe(true);
+    expect(blockedPrefixed.has('mcp__session__spawn_session')).toBe(true);
   });
 });

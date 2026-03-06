@@ -31,6 +31,7 @@ import {
 import { handleCredentialPrompt } from './handlers/credential-prompt.ts';
 import { handleUpdatePreferences } from './handlers/update-preferences.ts';
 import { handleTransformData } from './handlers/transform-data.ts';
+import { handleScriptSandbox } from './handlers/script-sandbox.ts';
 import { handleRenderTemplate } from './handlers/render-template.ts';
 import { handleSendDeveloperFeedback } from './handlers/send-developer-feedback.ts';
 import { handleBatchOutput } from './handlers/batch-output.ts';
@@ -120,6 +121,14 @@ export const TransformDataSchema = z.object({
   script: z.string().describe('Transform script source code. Receives input file paths as command-line args (sys.argv[1:] or process.argv.slice(2)), last arg is the output file path.'),
   inputFiles: z.array(z.string()).describe('Input file paths relative to session dir (e.g., "long_responses/stripe_txns.txt")'),
   outputFile: z.string().describe('Output file name relative to session data/ dir (e.g., "transactions.json")'),
+});
+
+export const ScriptSandboxSchema = z.object({
+  language: z.enum(['python3', 'node', 'bun']).describe('Script runtime to use'),
+  script: z.string().describe('Inline script source to execute in a sandboxed subprocess.'),
+  inputFiles: z.array(z.string()).optional().describe('Optional input file paths relative to the session directory.'),
+  stdin: z.string().optional().describe('Optional stdin payload passed to the script process.'),
+  timeoutMs: z.number().min(1).max(15000).optional().describe('Optional timeout in milliseconds (default 5000, max 15000).'),
 });
 
 export const RenderTemplateSchema = z.object({
@@ -286,6 +295,23 @@ Use this tool when you need to transform large datasets (20+ rows) into structur
 
 **Security:** Runs in an isolated subprocess with no access to API keys or credentials. 30-second timeout.`,
 
+  script_sandbox: `Run quick inline diagnostics in a sandboxed subprocess with network isolation.
+
+Use this for short Python/Node/Bun snippets when strict Explore-mode Bash parsing blocks inline diagnostics.
+
+**Behavior:**
+- Executes script source from \`script\` in a temporary file
+- Returns stdout/stderr, exit code, duration, and timeout status
+- Accepts optional input files and stdin
+- Requires enforced network and filesystem isolation; if unsupported or unusable, execution is blocked
+
+**Safety:**
+- Sensitive credential env vars are stripped
+- Input files are restricted to the current session directory
+- Filesystem writes are restricted to the current session directory
+- Timeout is capped (default 5000ms, max 15000ms)
+- Network/filesystem isolation is required in all permission modes; if unavailable, execution is blocked`,
+
   render_template: `Render a source's HTML template with data.
 
 Use this when a source provides HTML templates for rich rendering of its data (e.g., issue detail views, email threads, ticket summaries).
@@ -394,10 +420,15 @@ export type SessionToolHandler = (ctx: SessionToolContext, args: any) => Promise
 /** Where a session tool is executed. */
 export type SessionToolExecutionMode = 'registry' | 'backend';
 
+/** Safe/Explore mode behavior for a session tool. */
+export type SessionToolSafeMode = 'allow' | 'block';
+
 interface SessionToolDefBase {
   name: string;
   description: string;
   inputSchema: z.ZodObject<z.ZodRawShape>;
+  /** Whether this tool is allowed in Explore/Safe mode. */
+  safeMode: SessionToolSafeMode;
 }
 
 /** Tool executed from the canonical registry (requires a concrete handler). */
@@ -420,26 +451,27 @@ export type SessionToolDef = RegistrySessionToolDef | BackendSessionToolDef;
 // ============================================================
 
 export const SESSION_TOOL_DEFS: SessionToolDef[] = [
-  { name: 'SubmitPlan', description: TOOL_DESCRIPTIONS.SubmitPlan, inputSchema: SubmitPlanSchema, executionMode: 'registry', handler: handleSubmitPlan },
-  { name: 'config_validate', description: TOOL_DESCRIPTIONS.config_validate, inputSchema: ConfigValidateSchema, executionMode: 'registry', handler: handleConfigValidate },
-  { name: 'skill_validate', description: TOOL_DESCRIPTIONS.skill_validate, inputSchema: SkillValidateSchema, executionMode: 'registry', handler: handleSkillValidate },
-  { name: 'mermaid_validate', description: TOOL_DESCRIPTIONS.mermaid_validate, inputSchema: MermaidValidateSchema, executionMode: 'registry', handler: handleMermaidValidate },
-  { name: 'source_test', description: TOOL_DESCRIPTIONS.source_test, inputSchema: SourceTestSchema, executionMode: 'registry', handler: handleSourceTest },
-  { name: 'source_oauth_trigger', description: TOOL_DESCRIPTIONS.source_oauth_trigger, inputSchema: SourceOAuthTriggerSchema, executionMode: 'registry', handler: handleSourceOAuthTrigger },
-  { name: 'source_google_oauth_trigger', description: TOOL_DESCRIPTIONS.source_google_oauth_trigger, inputSchema: SourceOAuthTriggerSchema, executionMode: 'registry', handler: handleGoogleOAuthTrigger },
-  { name: 'source_slack_oauth_trigger', description: TOOL_DESCRIPTIONS.source_slack_oauth_trigger, inputSchema: SourceOAuthTriggerSchema, executionMode: 'registry', handler: handleSlackOAuthTrigger },
-  { name: 'source_microsoft_oauth_trigger', description: TOOL_DESCRIPTIONS.source_microsoft_oauth_trigger, inputSchema: SourceOAuthTriggerSchema, executionMode: 'registry', handler: handleMicrosoftOAuthTrigger },
-  { name: 'source_credential_prompt', description: TOOL_DESCRIPTIONS.source_credential_prompt, inputSchema: CredentialPromptSchema, executionMode: 'registry', handler: handleCredentialPrompt },
-  { name: 'update_user_preferences', description: TOOL_DESCRIPTIONS.update_user_preferences, inputSchema: UpdatePreferencesSchema, executionMode: 'registry', handler: handleUpdatePreferences },
-  { name: 'transform_data', description: TOOL_DESCRIPTIONS.transform_data, inputSchema: TransformDataSchema, executionMode: 'registry', handler: handleTransformData },
-  { name: 'render_template', description: TOOL_DESCRIPTIONS.render_template, inputSchema: RenderTemplateSchema, executionMode: 'registry', handler: handleRenderTemplate },
-  { name: 'send_developer_feedback', description: TOOL_DESCRIPTIONS.send_developer_feedback, inputSchema: SendDeveloperFeedbackSchema, executionMode: 'registry', handler: handleSendDeveloperFeedback },
-  { name: 'batch_output', description: TOOL_DESCRIPTIONS.batch_output, inputSchema: BatchOutputSchema, executionMode: 'registry', handler: handleBatchOutput },
-  { name: 'call_llm', description: TOOL_DESCRIPTIONS.call_llm, inputSchema: CallLlmSchema, executionMode: 'backend', handler: null },
-  { name: 'spawn_session', description: TOOL_DESCRIPTIONS.spawn_session, inputSchema: SpawnSessionSchema, executionMode: 'backend', handler: null },
+  { name: 'SubmitPlan', description: TOOL_DESCRIPTIONS.SubmitPlan, inputSchema: SubmitPlanSchema, executionMode: 'registry', safeMode: 'allow', handler: handleSubmitPlan },
+  { name: 'config_validate', description: TOOL_DESCRIPTIONS.config_validate, inputSchema: ConfigValidateSchema, executionMode: 'registry', safeMode: 'allow', handler: handleConfigValidate },
+  { name: 'skill_validate', description: TOOL_DESCRIPTIONS.skill_validate, inputSchema: SkillValidateSchema, executionMode: 'registry', safeMode: 'allow', handler: handleSkillValidate },
+  { name: 'mermaid_validate', description: TOOL_DESCRIPTIONS.mermaid_validate, inputSchema: MermaidValidateSchema, executionMode: 'registry', safeMode: 'allow', handler: handleMermaidValidate },
+  { name: 'source_test', description: TOOL_DESCRIPTIONS.source_test, inputSchema: SourceTestSchema, executionMode: 'registry', safeMode: 'allow', handler: handleSourceTest },
+  { name: 'source_oauth_trigger', description: TOOL_DESCRIPTIONS.source_oauth_trigger, inputSchema: SourceOAuthTriggerSchema, executionMode: 'registry', safeMode: 'block', handler: handleSourceOAuthTrigger },
+  { name: 'source_google_oauth_trigger', description: TOOL_DESCRIPTIONS.source_google_oauth_trigger, inputSchema: SourceOAuthTriggerSchema, executionMode: 'registry', safeMode: 'block', handler: handleGoogleOAuthTrigger },
+  { name: 'source_slack_oauth_trigger', description: TOOL_DESCRIPTIONS.source_slack_oauth_trigger, inputSchema: SourceOAuthTriggerSchema, executionMode: 'registry', safeMode: 'block', handler: handleSlackOAuthTrigger },
+  { name: 'source_microsoft_oauth_trigger', description: TOOL_DESCRIPTIONS.source_microsoft_oauth_trigger, inputSchema: SourceOAuthTriggerSchema, executionMode: 'registry', safeMode: 'block', handler: handleMicrosoftOAuthTrigger },
+  { name: 'source_credential_prompt', description: TOOL_DESCRIPTIONS.source_credential_prompt, inputSchema: CredentialPromptSchema, executionMode: 'registry', safeMode: 'block', handler: handleCredentialPrompt },
+  { name: 'update_user_preferences', description: TOOL_DESCRIPTIONS.update_user_preferences, inputSchema: UpdatePreferencesSchema, executionMode: 'registry', safeMode: 'block', handler: handleUpdatePreferences },
+  { name: 'transform_data', description: TOOL_DESCRIPTIONS.transform_data, inputSchema: TransformDataSchema, executionMode: 'registry', safeMode: 'allow', handler: handleTransformData },
+  { name: 'script_sandbox', description: TOOL_DESCRIPTIONS.script_sandbox, inputSchema: ScriptSandboxSchema, executionMode: 'registry', safeMode: 'allow', handler: handleScriptSandbox },
+  { name: 'render_template', description: TOOL_DESCRIPTIONS.render_template, inputSchema: RenderTemplateSchema, executionMode: 'registry', safeMode: 'allow', handler: handleRenderTemplate },
+  { name: 'send_developer_feedback', description: TOOL_DESCRIPTIONS.send_developer_feedback, inputSchema: SendDeveloperFeedbackSchema, executionMode: 'registry', safeMode: 'allow', handler: handleSendDeveloperFeedback },
+  { name: 'batch_output', description: TOOL_DESCRIPTIONS.batch_output, inputSchema: BatchOutputSchema, executionMode: 'registry', safeMode: 'allow', handler: handleBatchOutput },
+  { name: 'call_llm', description: TOOL_DESCRIPTIONS.call_llm, inputSchema: CallLlmSchema, executionMode: 'backend', safeMode: 'allow', handler: null },
+  { name: 'spawn_session', description: TOOL_DESCRIPTIONS.spawn_session, inputSchema: SpawnSessionSchema, executionMode: 'backend', safeMode: 'block', handler: null },
   // Browser tool (backend-specific — requires BrowserPaneManager in Electron)
   // Single CLI-like tool that handles all browser actions via command string.
-  { name: 'browser_tool', description: TOOL_DESCRIPTIONS.browser_tool, inputSchema: BrowserToolSchema, executionMode: 'backend', handler: null },
+  { name: 'browser_tool', description: TOOL_DESCRIPTIONS.browser_tool, inputSchema: BrowserToolSchema, executionMode: 'backend', safeMode: 'allow', handler: null },
 ];
 
 export interface SessionToolFilterOptions {
@@ -498,6 +530,35 @@ export function getSessionRegistryToolNames(options?: SessionToolFilterOptions):
   return new Set(getSessionToolDefs(options).filter(d => d.executionMode === 'registry').map(d => d.name));
 }
 
+export interface SessionToolNameOptions extends SessionToolFilterOptions {
+  /** Optional name prefix for consumers (e.g. 'mcp__session__'). */
+  prefix?: string;
+}
+
+/**
+ * Return session tool names that are allowed in Explore/Safe mode.
+ */
+export function getSessionSafeAllowedToolNames(options?: SessionToolNameOptions): Set<string> {
+  const prefix = options?.prefix ?? '';
+  return new Set(
+    getSessionToolDefs(options)
+      .filter(def => def.safeMode === 'allow')
+      .map(def => `${prefix}${def.name}`)
+  );
+}
+
+/**
+ * Return session tool names that are blocked in Explore/Safe mode.
+ */
+export function getSessionSafeBlockedToolNames(options?: SessionToolNameOptions): Set<string> {
+  const prefix = options?.prefix ?? '';
+  return new Set(
+    getSessionToolDefs(options)
+      .filter(def => def.safeMode === 'block')
+      .map(def => `${prefix}${def.name}`)
+  );
+}
+
 // ============================================================
 // Derived Lookups
 // ============================================================
@@ -513,6 +574,16 @@ export const SESSION_BACKEND_TOOL_NAMES = new Set(
 /** Session tool names that are always executable from the canonical registry. */
 export const SESSION_REGISTRY_TOOL_NAMES = new Set(
   SESSION_TOOL_DEFS.filter(d => d.executionMode === 'registry').map(d => d.name)
+);
+
+/** Session tool names allowed in Explore/Safe mode (unfiltered canonical set). */
+export const SESSION_SAFE_ALLOWED_TOOL_NAMES = new Set(
+  SESSION_TOOL_DEFS.filter(d => d.safeMode === 'allow').map(d => d.name)
+);
+
+/** Session tool names blocked in Explore/Safe mode (unfiltered canonical set). */
+export const SESSION_SAFE_BLOCKED_TOOL_NAMES = new Set(
+  SESSION_TOOL_DEFS.filter(d => d.safeMode === 'block').map(d => d.name)
 );
 
 /** Map from tool name → definition for O(1) lookup. */

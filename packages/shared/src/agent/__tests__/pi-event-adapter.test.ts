@@ -29,6 +29,7 @@ describe('PiEventAdapter', () => {
   });
 
   afterEach(() => {
+    toolMetadataStore._clearForTesting();
     rmSync(sessionDir, { recursive: true, force: true });
   });
 
@@ -576,6 +577,31 @@ describe('PiEventAdapter', () => {
         toolUseId: 'call_canonical',
         intent: 'Canonical intent',
         displayName: 'Canonical name',
+      });
+    });
+
+    it('should fallback to base id metadata when toolCallId includes a pipe suffix', () => {
+      collect(adapter.adaptEvent({ type: 'turn_start' } as any));
+
+      toolMetadataStore.set('call_base_id', {
+        intent: 'Stored base intent',
+        displayName: 'Stored base name',
+        timestamp: Date.now(),
+      });
+
+      const events = collect(adapter.adaptEvent({
+        type: 'tool_execution_start',
+        toolCallId: 'call_base_id|fc_123',
+        toolName: 'bash',
+        args: { command: 'npm test' },
+      } as any));
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        type: 'tool_start',
+        toolUseId: 'call_base_id|fc_123',
+        intent: 'Stored base intent',
+        displayName: 'Stored base name',
       });
     });
 

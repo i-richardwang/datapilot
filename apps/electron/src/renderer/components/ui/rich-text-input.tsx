@@ -18,6 +18,28 @@ import type { MentionItemType } from './mention-menu'
 /** Line count threshold for auto-converting pasted text to file attachment */
 const LONG_TEXT_LINE_THRESHOLD = 100
 
+export interface EscapeCompositionEventLike {
+  key?: string
+  isComposing?: boolean
+  nativeEvent?: {
+    isComposing?: boolean
+  }
+}
+
+/**
+ * Returns true when Escape is pressed while IME composition is active.
+ *
+ * Uses both local composition state and event-level composing flags for
+ * browser/runtime compatibility.
+ */
+export function isEscapeDuringComposition(
+  event: EscapeCompositionEventLike,
+  isComposingRefActive: boolean
+): boolean {
+  if (event.key !== 'Escape') return false
+  return Boolean(isComposingRefActive || event.isComposing || event.nativeEvent?.isComposing)
+}
+
 export interface RichTextInputProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'onChange' | 'onInput' | 'onPaste'> {
   /** Current text value */
   value: string
@@ -601,6 +623,15 @@ export const RichTextInput = React.forwardRef<RichTextInputHandle, RichTextInput
       handleInput()
     }, [handleInput])
 
+    const handleKeyDownInternal = React.useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (isEscapeDuringComposition(e, isComposing.current)) {
+        e.stopPropagation()
+        return
+      }
+
+      onKeyDown?.(e)
+    }, [onKeyDown])
+
     // Handle paste - delegate files to parent, manually insert plain text
     const handlePasteInternal = React.useCallback((e: React.ClipboardEvent) => {
       // Check if we have files - let parent handle that
@@ -755,7 +786,7 @@ export const RichTextInput = React.forwardRef<RichTextInputHandle, RichTextInput
           // Use inline style for line-height to override text-sm's built-in line-height
           style={{ lineHeight: 1.25 }}
           onInput={handleInput}
-          onKeyDown={onKeyDown}
+          onKeyDown={handleKeyDownInternal}
           onFocus={handleFocus}
           onBlur={handleBlur}
           onPaste={handlePasteInternal}

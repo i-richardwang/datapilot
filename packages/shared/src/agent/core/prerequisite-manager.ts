@@ -14,6 +14,7 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { expandPath } from './path-processor.ts';
+import { isBrowserToolNameOrAlias } from '../browser-tool-names.ts';
 
 // ============================================================
 // Types
@@ -97,7 +98,7 @@ const RULES: PrerequisiteRule[] = [
   // Browser tools and command wrapper: require browser-tools.md first
   {
     toolMatcher: (toolName: string) => {
-      return toolName.startsWith('browser_') || toolName.startsWith('mcp__session__browser_');
+      return isBrowserToolNameOrAlias(toolName);
     },
     resolveRequiredPath: () => {
       return existsSync(BROWSER_TOOLS_DOC_PATH) ? BROWSER_TOOLS_DOC_PATH : null;

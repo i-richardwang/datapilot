@@ -10,13 +10,18 @@ import { join, parse as parsePath, normalize, isAbsolute, sep } from 'path'
 import { existsSync, mkdirSync } from 'fs'
 import { realpath } from 'fs/promises'
 import { homedir, tmpdir } from 'os'
-import { BrowserView, BrowserWindow, Menu, app, ipcMain, nativeTheme, session, shell, type Session as ElectronSession } from 'electron'
+import { BrowserView, BrowserWindow, app, ipcMain, nativeTheme, session, shell, type Session as ElectronSession } from 'electron'
 import { mainLog } from './logger'
 import type { WindowManager } from './window-manager'
 import { BrowserCDP, type AccessibilitySnapshot, type ElementGeometry } from './browser-cdp'
-import type { BrowserEmptyStateLaunchPayload, BrowserEmptyStateLaunchResult, BrowserInstanceInfo } from '../shared/types'
+import {
+  type BrowserEmptyStateLaunchPayload,
+  type BrowserEmptyStateLaunchResult,
+  type BrowserInstanceInfo,
+} from '../shared/types'
 import { DEFAULT_THEME, loadAppTheme } from '@craft-agent/shared/config'
 import { getBrowserLiveFxCornerRadii } from '../shared/browser-live-fx'
+import type { IBrowserPaneManager } from '@craft-agent/server-core/handlers'
 
 export type { BrowserInstanceInfo }
 
@@ -103,13 +108,13 @@ const TOOLBAR_CHANNELS = {
   GO_FORWARD: 'browser-toolbar:go-forward',
   RELOAD: 'browser-toolbar:reload',
   STOP: 'browser-toolbar:stop',
-  OPEN_MENU: 'browser-toolbar:open-menu',
+  MENU_GEOMETRY: 'browser-toolbar:menu-geometry',
+  FORCE_CLOSE_MENU: 'browser-toolbar:force-close-menu',
   HIDE: 'browser-toolbar:hide',
   DESTROY: 'browser-toolbar:destroy',
   STATE_UPDATE: 'browser-toolbar:state-update',
   THEME_COLOR: 'browser-toolbar:theme-color',
 } as const
-
 const SESSION_PARTITION = 'persist:browser-pane'
 
 interface AgentControlState {
@@ -127,6 +132,7 @@ interface AgentControlLockState {
 interface BrowserInstance {
   id: string
   window: BrowserWindow
+  toolbarView: BrowserView
   pageView: BrowserView
   nativeOverlayView: BrowserView
   cdp: BrowserCDP
@@ -142,6 +148,9 @@ interface BrowserInstance {
   isVisible: boolean
   keepAliveOnWindowClose: boolean
   toolbarReady: boolean
+  toolbarMenuOpen: boolean
+  toolbarMenuHeight: number
+  toolbarMenuOverlayActive: boolean
   showOnCreate: boolean
   pendingShowOnReady: boolean
   pendingShowToken: number
@@ -299,7 +308,7 @@ interface LastBrowserAction {
 
 let instanceCounter = 0
 
-export class BrowserPaneManager {
+export class BrowserPaneManager implements IBrowserPaneManager {
   private instances: Map<string, BrowserInstance> = new Map()
   private destroyingIds: Set<string> = new Set()
   private stateChangeCallback: ((info: BrowserInstanceInfo) => void) | null = null
@@ -359,15 +368,25 @@ export class BrowserPaneManager {
       minHeight: 500,
       show: false, // Always hidden until toolbar is painted (ready-to-show)
       backgroundColor: bgColor,
-      // Fully chromeless — toolbar is rendered via React BrowserControls
+      // Fully chromeless — toolbar is rendered in a dedicated BrowserView
       frame: false,
+      webPreferences: {
+        partition: SESSION_PARTITION,
+        session: ses,
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    })
+
+    const toolbarView = new BrowserView({
       webPreferences: {
         preload: join(__dirname, 'browser-toolbar-preload.cjs'),
         partition: SESSION_PARTITION,
         session: ses,
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: false, // Required for preload script
+        sandbox: false,
       },
     })
 
@@ -396,7 +415,9 @@ export class BrowserPaneManager {
       },
     })
 
-    // Set pageView background to match theme so about:blank doesn't flash white
+    // Set BrowserView backgrounds to match theme so about:blank doesn't flash white
+    const toolbarWcWithBg = toolbarView.webContents as typeof toolbarView.webContents & { setBackgroundColor?: (color: string) => void }
+    toolbarWcWithBg.setBackgroundColor?.('#00000000')
     const pageWcWithBg = pageView.webContents as typeof pageView.webContents & { setBackgroundColor?: (color: string) => void }
     pageWcWithBg.setBackgroundColor?.(bgColor)
     const overlayWcWithBg = nativeOverlayView.webContents as typeof nativeOverlayView.webContents & { setBackgroundColor?: (color: string) => void }
@@ -407,6 +428,7 @@ export class BrowserPaneManager {
     const instance: BrowserInstance = {
       id: instanceId,
       window,
+      toolbarView,
       pageView,
       nativeOverlayView,
       cdp,
@@ -422,6 +444,9 @@ export class BrowserPaneManager {
       isVisible: false,
       keepAliveOnWindowClose: true,
       toolbarReady: false,
+      toolbarMenuOpen: false,
+      toolbarMenuHeight: 0,
+      toolbarMenuOverlayActive: false,
       showOnCreate: shouldShow,
       pendingShowOnReady: false,
       pendingShowToken: 0,
@@ -449,15 +474,11 @@ export class BrowserPaneManager {
 
     window.addBrowserView(pageView)
     window.addBrowserView(nativeOverlayView)
-    window.setTopBrowserView(nativeOverlayView)
+    window.addBrowserView(toolbarView)
+    window.setTopBrowserView(toolbarView)
     void this.loadNativeOverlayPage(instance)
 
-    this.layoutPageView(instance)
-
-    // Show window only after toolbar content has painted to prevent flash
-    window.once('ready-to-show', () => {
-      this.markToolbarReady(instance, 'ready-to-show')
-    })
+    this.layoutAllViews(instance)
 
     this.setupWindowListeners(instance)
     this.instances.set(instanceId, instance)
@@ -701,24 +722,13 @@ export class BrowserPaneManager {
     const win = instance.window
     if (win.isDestroyed()) return
 
-    // If toolbar hasn't painted yet, defer showing until ready-to-show fires.
+    // If toolbar hasn't painted yet, defer showing until markToolbarReady runs.
     // Token guard prevents stale deferred focus from showing after hide/destroy.
     if (!instance.toolbarReady) {
       if (instance.pendingShowOnReady) return
       instance.pendingShowOnReady = true
       const token = ++instance.pendingShowToken
       mainLog.info(`[browser-pane] focus deferred until ready id=${instance.id} token=${token}`)
-      win.once('ready-to-show', () => {
-        if (instance.pendingShowToken !== token) return
-        instance.pendingShowOnReady = false
-        if (!win.isDestroyed()) {
-          win.show()
-          win.focus()
-          instance.isVisible = true
-          this.emitStateChange(instance)
-          mainLog.info(`[browser-pane] focus deferred show completed id=${instance.id} token=${token}`)
-        }
-      })
       return
     }
 
@@ -742,6 +752,8 @@ export class BrowserPaneManager {
       instance.pendingShowOnReady = false
       instance.pendingShowToken += 1
     }
+
+    this.forceCloseToolbarMenu(instance, 'window-hide')
 
     win.hide()
 
@@ -1581,7 +1593,7 @@ export class BrowserPaneManager {
     const requestedViewportHeight = Math.max(240, Math.floor(height))
     instance.window.setContentSize(requestedViewportWidth, requestedViewportHeight + TOOLBAR_HEIGHT)
 
-    this.layoutPageView(instance)
+    this.layoutAllViews(instance)
 
     // Return effective viewport dimensions after OS/window min-size constraints are applied.
     const [appliedContentWidth, appliedContentHeight] = instance.window.getContentSize()
@@ -1595,6 +1607,77 @@ export class BrowserPaneManager {
     const instance = this.instances.get(id)
     if (!instance) throw new Error(`Browser instance not found: ${id}`)
     return instance.pageView.webContents.executeJavaScript(expression)
+  }
+
+  async detectSecurityChallenge(id: string): Promise<{ detected: boolean; provider: string; signals: string[] }> {
+    const instance = this.instances.get(id)
+    if (!instance) return { detected: false, provider: 'none', signals: [] }
+
+    const signals: string[] = []
+    const title = instance.title || ''
+    const url = instance.currentUrl || ''
+
+    // Title-based detection
+    if (/^Just a moment/i.test(title)) {
+      signals.push('title:just-a-moment')
+    }
+
+    // URL-based detection
+    if (url.includes('/cdn-cgi/challenge-platform/')) {
+      signals.push('url:cdn-cgi-challenge')
+    }
+
+    // DOM-based detection via JS evaluation
+    try {
+      const domSignals = await instance.pageView.webContents.executeJavaScript(`(() => {
+        const signals = [];
+        const bodyText = (document.body?.innerText || '').slice(0, 2000);
+        if (/Verify you are human/i.test(bodyText)) signals.push('text:verify-human');
+        if (/Checking (if the site connection is secure|your browser)/i.test(bodyText)) signals.push('text:checking-browser');
+        if (/Performing security verification/i.test(bodyText)) signals.push('text:security-verification');
+        if (document.querySelector('#challenge-form')) signals.push('dom:challenge-form');
+        if (document.querySelector('#turnstile-wrapper')) signals.push('dom:turnstile-wrapper');
+        if (document.querySelector('.cf-turnstile')) signals.push('dom:cf-turnstile');
+        if (document.querySelector('iframe[src*="challenges.cloudflare.com"]')) signals.push('dom:cf-challenge-iframe');
+        return signals;
+      })()`) as string[]
+
+      if (Array.isArray(domSignals)) {
+        signals.push(...domSignals)
+      }
+    } catch {
+      // JS evaluation can fail if page is in a weird state — don't block on it
+    }
+
+    try {
+      const snapshot = await instance.cdp.getAccessibilitySnapshot()
+      const actionableRoles = new Set([
+        'button', 'link', 'textbox', 'searchbox', 'combobox', 'checkbox', 'radio', 'switch',
+        'menuitem', 'menuitemcheckbox', 'menuitemradio', 'tab', 'option', 'slider', 'spinbutton', 'listbox',
+      ])
+      const actionableCount = snapshot.nodes.filter((node) => {
+        const role = (node.role || '').toLowerCase()
+        return actionableRoles.has(role) && !node.disabled
+      }).length
+
+      if (snapshot.nodes.length > 0 && actionableCount <= 2) {
+        signals.push(`ax:near-empty(${actionableCount}/${snapshot.nodes.length})`)
+      }
+    } catch {
+      // AX snapshot can fail transiently during navigation; ignore
+    }
+
+    const detected = signals.length > 0
+    const isCloudflare = signals.some(s =>
+      s.includes('cf-') || s.includes('challenge') || s.includes('turnstile') || s === 'title:just-a-moment'
+    )
+    const provider = detected ? (isCloudflare ? 'cloudflare' : 'unknown') : 'none'
+
+    if (detected) {
+      mainLog.info(`[browser-pane] security challenge detected id=${id} provider=${provider} signals=[${signals.join(', ')}]`)
+    }
+
+    return { detected, provider, signals }
   }
 
   async scroll(id: string, direction: 'up' | 'down' | 'left' | 'right', amount = 500): Promise<void> {
@@ -1821,13 +1904,32 @@ export class BrowserPaneManager {
     }
   }
 
+  private getToolbarEffectiveHeight(instance: BrowserInstance): number {
+    if (!instance.toolbarMenuOpen) return TOOLBAR_HEIGHT
+
+    const [, contentHeight] = instance.window.getContentSize()
+    return Math.max(TOOLBAR_HEIGHT, contentHeight)
+  }
+
+  private layoutToolbarView(instance: BrowserInstance): void {
+    const [width] = instance.window.getContentSize()
+    const toolbarHeight = this.getToolbarEffectiveHeight(instance)
+
+    instance.toolbarView.setBounds({ x: 0, y: 0, width, height: toolbarHeight })
+    instance.toolbarView.setAutoResize({ width: true, height: false })
+  }
+
   private updateNativeOverlayState(instance: BrowserInstance): void {
     const control = instance.agentControl
-    const active = !!control?.active
-    const shouldShow = active
+    const agentActive = !!control?.active
+    const menuActive = !!instance.toolbarMenuOverlayActive
+    const shouldShow = agentActive || menuActive
 
     if (!shouldShow || !instance.nativeOverlayReady || instance.window.isDestroyed()) {
       instance.nativeOverlayView.setBounds({ x: 0, y: 0, width: 0, height: 0 })
+      if (!instance.window.isDestroyed()) {
+        instance.window.setTopBrowserView(instance.toolbarView)
+      }
       return
     }
 
@@ -1835,23 +1937,42 @@ export class BrowserPaneManager {
     const overlayHeight = Math.max(100, height - TOOLBAR_HEIGHT)
     instance.nativeOverlayView.setBounds({ x: 0, y: TOOLBAR_HEIGHT, width, height: overlayHeight })
     instance.nativeOverlayView.setAutoResize({ width: true, height: true })
-    instance.window.setTopBrowserView(instance.nativeOverlayView)
+    instance.window.setTopBrowserView(instance.toolbarView)
 
-    const label = this.getAgentControlLabel(control)
-    const accent = this.getResolvedAccentColor()
+    if (agentActive) {
+      const label = this.getAgentControlLabel(control)
+      const accent = this.getResolvedAccentColor()
 
+      void instance.nativeOverlayView.webContents.executeJavaScript(`(() => {
+        const overlay = document.getElementById('overlay');
+        const chip = document.getElementById('chip');
+        const shield = document.getElementById('shield');
+        if (!overlay || !chip || !shield) return;
+
+        overlay.style.borderColor = ${JSON.stringify(accent)};
+        overlay.style.boxShadow = 'inset 0 0 0 1px color-mix(in oklab, ' + ${JSON.stringify(accent)} + ' 45%, transparent), inset 0 0 24px color-mix(in oklab, ' + ${JSON.stringify(accent)} + ' 28%, transparent)';
+        chip.textContent = ${JSON.stringify(label)};
+        chip.style.display = 'inline-flex';
+        shield.style.pointerEvents = 'auto';
+        shield.style.cursor = 'not-allowed';
+        shield.style.background = 'rgba(2, 6, 23, 0.03)';
+      })()`).catch(() => {})
+      return
+    }
+
+    // Menu mode: transparent full-page tap-catcher, no visuals
     void instance.nativeOverlayView.webContents.executeJavaScript(`(() => {
       const overlay = document.getElementById('overlay');
       const chip = document.getElementById('chip');
       const shield = document.getElementById('shield');
       if (!overlay || !chip || !shield) return;
 
-      overlay.style.borderColor = ${JSON.stringify(accent)};
-      overlay.style.boxShadow = 'inset 0 0 0 1px color-mix(in oklab, ' + ${JSON.stringify(accent)} + ' 45%, transparent), inset 0 0 24px color-mix(in oklab, ' + ${JSON.stringify(accent)} + ' 28%, transparent)';
-      chip.textContent = ${JSON.stringify(label)};
+      overlay.style.borderColor = 'transparent';
+      overlay.style.boxShadow = 'none';
+      chip.style.display = 'none';
       shield.style.pointerEvents = 'auto';
-      shield.style.cursor = 'not-allowed';
-      shield.style.background = 'rgba(2, 6, 23, 0.03)';
+      shield.style.cursor = 'default';
+      shield.style.background = 'rgba(0, 0, 0, 0.001)';
     })()`).catch(() => {})
   }
 
@@ -1911,6 +2032,29 @@ export class BrowserPaneManager {
     this.updateNativeOverlayState(instance)
   }
 
+  private layoutAllViews(instance: BrowserInstance): void {
+    this.layoutToolbarView(instance)
+    this.layoutPageView(instance)
+    if (!instance.window.isDestroyed()) {
+      instance.window.setTopBrowserView(instance.toolbarView)
+    }
+  }
+
+  private forceCloseToolbarMenu(instance: BrowserInstance, reason: string): void {
+    if (!instance.toolbarMenuOpen && instance.toolbarMenuHeight === 0 && !instance.toolbarMenuOverlayActive) {
+      return
+    }
+
+    instance.toolbarMenuOpen = false
+    instance.toolbarMenuHeight = 0
+    instance.toolbarMenuOverlayActive = false
+    this.layoutAllViews(instance)
+
+    if (!instance.window.isDestroyed() && !instance.toolbarView.webContents.isDestroyed()) {
+      instance.toolbarView.webContents.send(TOOLBAR_CHANNELS.FORCE_CLOSE_MENU, { reason })
+    }
+  }
+
   private isBrowserEmptyStateUrl(url: string): boolean {
     if (!url) return false
     return url.includes(`/${BROWSER_EMPTY_STATE_PAGE}`) || url.includes(`\\${BROWSER_EMPTY_STATE_PAGE}`)
@@ -1943,7 +2087,9 @@ export class BrowserPaneManager {
       }
 
       const { handleDeepLink } = await import('./deep-link')
-      const result = await handleDeepLink(url, this.windowManager)
+      const sink = this.windowManager.getRpcEventSink() ?? undefined
+      const resolver = (wcId: number) => this.windowManager?.getClientIdForWindow(wcId)
+      const result = await handleDeepLink(url, this.windowManager, sink, resolver)
       if (!result.success) {
         mainLog.warn(`[browser-pane] deep-link handling failed: ${result.error ?? 'unknown error'} url=${url}`)
       }
@@ -1998,9 +2144,9 @@ export class BrowserPaneManager {
     for (let attempt = 0; attempt <= TOOLBAR_LOAD_MAX_RETRIES; attempt++) {
       try {
         if (VITE_DEV_SERVER_URL) {
-          await instance.window.webContents.loadURL(`${VITE_DEV_SERVER_URL}/browser-toolbar.html?${query}`)
+          await instance.toolbarView.webContents.loadURL(`${VITE_DEV_SERVER_URL}/browser-toolbar.html?${query}`)
         } else {
-          await instance.window.webContents.loadFile(
+          await instance.toolbarView.webContents.loadFile(
             join(__dirname, 'renderer/browser-toolbar.html'),
             { query: { instanceId: instance.id } },
           )
@@ -2056,7 +2202,7 @@ export class BrowserPaneManager {
 </html>`
 
     try {
-      await instance.window.webContents.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`)
+      await instance.toolbarView.webContents.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`)
       mainLog.warn(`[browser-pane] Loaded toolbar fallback id=${instance.id}`)
     } catch (error) {
       mainLog.error(`[browser-pane] Failed to load toolbar fallback id=${instance.id}: ${error instanceof Error ? error.message : String(error)}`)
@@ -2068,7 +2214,7 @@ export class BrowserPaneManager {
   }
 
   private pushToolbarState(instance: BrowserInstance): void {
-    if (instance.window.isDestroyed()) return
+    if (instance.window.isDestroyed() || instance.toolbarView.webContents.isDestroyed()) return
     const state = {
       url: instance.currentUrl,
       title: instance.title,
@@ -2077,7 +2223,7 @@ export class BrowserPaneManager {
       canGoForward: instance.canGoForward,
       themeColor: instance.themeColor,
     }
-    instance.window.webContents.send(TOOLBAR_CHANNELS.STATE_UPDATE, state)
+    instance.toolbarView.webContents.send(TOOLBAR_CHANNELS.STATE_UPDATE, state)
   }
 
   /** Register IPC handlers for toolbar actions. Call once at app startup. */
@@ -2111,34 +2257,28 @@ export class BrowserPaneManager {
       if (inst) this.stop(inst.id)
     })
 
-    ipcMain.handle(TOOLBAR_CHANNELS.OPEN_MENU, async (event, instanceId: string, x?: number, y?: number) => {
+    ipcMain.handle(TOOLBAR_CHANNELS.MENU_GEOMETRY, async (_event, instanceId: string, open: boolean, height?: number) => {
       const inst = findInstance(instanceId)
-      const sourceWindow = BrowserWindow.fromWebContents(event.sender)
-      if (!inst || !sourceWindow || sourceWindow.isDestroyed()) {
-        mainLog.info(`[browser-pane] toolbar menu ignored instanceId=${instanceId} reason=${!inst ? 'instance_not_found' : 'invalid_source_window'}`)
+      if (!inst) return
+
+      const normalizedOpen = !!open
+      const normalizedHeight = Math.max(0, Math.ceil(Number(height ?? 0)))
+
+      if (!normalizedOpen) {
+        this.forceCloseToolbarMenu(inst, 'renderer-close')
         return
       }
 
-      mainLog.info(`[browser-pane] toolbar menu open instanceId=${instanceId} x=${x ?? -1} y=${y ?? -1}`)
+      const changed = !inst.toolbarMenuOpen
+        || inst.toolbarMenuHeight !== normalizedHeight
+        || !inst.toolbarMenuOverlayActive
 
-      const menu = Menu.buildFromTemplate([
-        {
-          label: 'Hide Window',
-          click: () => {
-            mainLog.info(`[browser-pane] toolbar menu click action=hide instanceId=${inst.id}`)
-            this.hide(inst.id)
-          },
-        },
-        {
-          label: 'Close Window Entirely',
-          click: () => {
-            mainLog.info(`[browser-pane] toolbar menu click action=destroy instanceId=${inst.id}`)
-            this.destroyInstance(inst.id)
-          },
-        },
-      ])
+      if (!changed) return
 
-      menu.popup({ window: sourceWindow, x, y })
+      inst.toolbarMenuOpen = true
+      inst.toolbarMenuHeight = normalizedHeight
+      inst.toolbarMenuOverlayActive = true
+      this.layoutAllViews(inst)
     })
 
     ipcMain.handle(TOOLBAR_CHANNELS.HIDE, async (_event, instanceId: string) => {
@@ -2162,12 +2302,20 @@ export class BrowserPaneManager {
     instance.toolbarReady = true
     mainLog.info(`[browser-pane] toolbar ready id=${instance.id} reason=${reason}`)
 
-    if (instance.showOnCreate) {
-      instance.window.show()
-      instance.window.focus()
-      instance.isVisible = true
-      this.emitStateChange(instance)
-    }
+    const shouldShowNow = instance.showOnCreate || instance.pendingShowOnReady
+    if (!shouldShowNow) return
+
+    const tokenAtReady = instance.pendingShowToken
+    instance.pendingShowOnReady = false
+
+    if (instance.window.isDestroyed()) return
+    if (instance.pendingShowToken !== tokenAtReady) return
+
+    instance.window.show()
+    instance.window.focus()
+    instance.isVisible = true
+    this.emitStateChange(instance)
+
   }
 
   // ---------------------------------------------------------------------------
@@ -2268,8 +2416,8 @@ export class BrowserPaneManager {
   private applyThemeColor(instance: BrowserInstance, color: string | null): void {
     if (instance.themeColor === color) return
     instance.themeColor = color
-    if (!instance.window.isDestroyed()) {
-      instance.window.webContents.send(TOOLBAR_CHANNELS.THEME_COLOR, color)
+    if (!instance.window.isDestroyed() && !instance.toolbarView.webContents.isDestroyed()) {
+      instance.toolbarView.webContents.send(TOOLBAR_CHANNELS.THEME_COLOR, color)
     }
     this.emitStateChange(instance)
   }
@@ -2685,9 +2833,22 @@ export class BrowserPaneManager {
     }
   }
 
+  private isToolbarUiDocumentUrl(url: string): boolean {
+    if (!url) return false
+    if (url.startsWith('data:text/html')) return true
+
+    try {
+      const parsed = new URL(url)
+      return parsed.pathname.toLowerCase().endsWith('/browser-toolbar.html')
+    } catch {
+      return /browser-toolbar\.html(?:$|[?#])/i.test(url)
+    }
+  }
+
   private setupWindowListeners(instance: BrowserInstance): void {
     const pageWc = instance.pageView.webContents
-    const toolbarWc = instance.window.webContents
+    const toolbarWc = instance.toolbarView.webContents
+    const overlayWc = instance.nativeOverlayView.webContents
 
     instance.window.on('close', (event) => {
       const explicitDestroy = this.destroyingIds.has(instance.id)
@@ -2696,15 +2857,22 @@ export class BrowserPaneManager {
 
       if (interceptToHide) {
         event.preventDefault()
-        instance.window.hide()
+        this.hide(instance.id)
       }
     })
 
     instance.window.on('resize', () => {
-      this.layoutPageView(instance)
+      this.layoutAllViews(instance)
     })
 
     toolbarWc.on('did-finish-load', () => {
+      const loadedUrl = typeof toolbarWc.getURL === 'function' ? toolbarWc.getURL() : ''
+      if (!this.isToolbarUiDocumentUrl(loadedUrl)) {
+        mainLog.info(`[browser-pane] toolbar did-finish-load ignored id=${instance.id} url=${loadedUrl || 'unknown'}`)
+        this.pushToolbarState(instance)
+        return
+      }
+
       this.markToolbarReady(instance, 'did-finish-load')
       this.pushToolbarState(instance)
     })
@@ -2747,6 +2915,16 @@ export class BrowserPaneManager {
     toolbarWc.on('before-input-event', (event) => {
       if (instance.lockState.active) {
         event.preventDefault()
+      }
+    })
+
+    overlayWc.on('before-input-event', (event, input) => {
+      if (!instance.toolbarMenuOverlayActive) return
+
+      const inputType = input.type || ''
+      if (inputType === 'mouseDown' || inputType === 'touchStart' || inputType === 'pointerDown') {
+        event.preventDefault()
+        this.forceCloseToolbarMenu(instance, 'overlay-tap')
       }
     })
 

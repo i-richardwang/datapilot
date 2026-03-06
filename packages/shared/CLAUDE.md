@@ -95,7 +95,7 @@ Tools available within agent sessions with callback registry:
 
 **Source management:** `source_test`, `source_oauth_trigger`, `source_google_oauth_trigger`, `source_credential_prompt`
 
-**Utilities:** `SubmitPlan`, `config_validate`
+**Utilities:** `SubmitPlan`, `config_validate`, `transform_data`, `script_sandbox`
 
 **Callbacks:** `onPlanSubmitted`, `onOAuthBrowserOpen`, `onOAuthSuccess`, `onOAuthError`, `onCredentialRequest`, `onSourcesChanged`, `onSourceActivated`
 

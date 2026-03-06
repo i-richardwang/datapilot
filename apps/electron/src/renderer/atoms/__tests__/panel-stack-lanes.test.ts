@@ -4,6 +4,7 @@ import {
   panelStackAtom,
   focusedPanelIdAtom,
   pushPanelAtom,
+  reconcilePanelStackAtom,
   updateFocusedPanelRouteAtom,
   type PanelStackEntry,
 } from '../panel-stack'
@@ -59,5 +60,52 @@ describe('panel stack single-lane behavior', () => {
     expect(stack[0].route).toBe('allSessions/session/s1')
     expect(stack[1].route).toBe('sources/source/linear')
     expect(stack[2].route).toBe('allSessions/session/s2')
+  })
+
+  it('reconcile focuses by focusedIndex first when duplicate routes exist', () => {
+    const store = createStore()
+
+    const changed = store.set(reconcilePanelStackAtom, {
+      entries: [
+        { route: 'allSessions/session/s1', proportion: 0.5 },
+        { route: 'allSessions/session/s1', proportion: 0.5 },
+      ],
+      focusedIndex: 1,
+    })
+
+    expect(changed).toBe(true)
+
+    const stack = getStack(store)
+    expect(stack).toHaveLength(2)
+    const focusedId = store.get(focusedPanelIdAtom)
+    expect(focusedId).toBe(stack[1].id)
+  })
+
+  it('reconcile no-op keeps focused index target with duplicate routes', () => {
+    const store = createStore()
+
+    store.set(reconcilePanelStackAtom, {
+      entries: [
+        { route: 'allSessions/session/s1', proportion: 0.5 },
+        { route: 'allSessions/session/s1', proportion: 0.5 },
+      ],
+      focusedIndex: 1,
+    })
+
+    const stack = getStack(store)
+    const firstId = stack[0].id
+    const secondId = stack[1].id
+    expect(firstId).not.toBe(secondId)
+
+    const changed = store.set(reconcilePanelStackAtom, {
+      entries: [
+        { route: 'allSessions/session/s1', proportion: 0.5 },
+        { route: 'allSessions/session/s1', proportion: 0.5 },
+      ],
+      focusedIndex: 1,
+    })
+
+    expect(changed).toBe(false)
+    expect(store.get(focusedPanelIdAtom)).toBe(secondId)
   })
 })

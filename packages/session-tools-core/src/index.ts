@@ -153,6 +153,8 @@ export {
   handleUpdatePreferences,
   // Transform Data
   handleTransformData,
+  // Script Sandbox
+  handleScriptSandbox,
   // Render Template
   handleRenderTemplate,
   // Send Developer Feedback
@@ -174,6 +176,7 @@ export type {
   CredentialPromptArgs,
   UpdatePreferencesArgs,
   TransformDataArgs,
+  ScriptSandboxArgs,
   RenderTemplateArgs,
   SendDeveloperFeedbackArgs,
   BatchOutputArgs,
@@ -192,6 +195,7 @@ export {
   CallLlmSchema,
   UpdatePreferencesSchema,
   TransformDataSchema,
+  ScriptSandboxSchema,
   RenderTemplateSchema,
   // Batch output schema
   BatchOutputSchema,
@@ -206,6 +210,8 @@ export {
   SESSION_TOOL_NAMES,
   SESSION_BACKEND_TOOL_NAMES,
   SESSION_REGISTRY_TOOL_NAMES,
+  SESSION_SAFE_ALLOWED_TOOL_NAMES,
+  SESSION_SAFE_BLOCKED_TOOL_NAMES,
   SESSION_TOOL_REGISTRY,
   // Filtered helper views
   getSessionToolDefs,
@@ -213,16 +219,20 @@ export {
   getSessionBackendToolNames,
   getSessionRegistryToolNames,
   getSessionToolRegistry,
+  getSessionSafeAllowedToolNames,
+  getSessionSafeBlockedToolNames,
   // JSON Schema converter
   getToolDefsAsJsonSchema,
 } from './tool-defs.ts';
 
 export type {
   SessionToolExecutionMode,
+  SessionToolSafeMode,
   SessionToolDef,
   RegistrySessionToolDef,
   BackendSessionToolDef,
   SessionToolHandler,
   JsonSchemaToolDef,
   SessionToolFilterOptions,
+  SessionToolNameOptions,
 } from './tool-defs.ts';

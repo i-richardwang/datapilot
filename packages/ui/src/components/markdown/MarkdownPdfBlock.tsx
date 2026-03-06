@@ -227,7 +227,7 @@ export function MarkdownPdfBlock({ code, className }: MarkdownPdfBlockProps) {
               className="absolute bottom-0 left-0 right-0 h-8 pointer-events-none"
               style={{
                 background: 'linear-gradient(to bottom, transparent, var(--muted))',
-                zIndex: 3,
+                zIndex: 'var(--z-local, 10)',
               }}
             />
           )}

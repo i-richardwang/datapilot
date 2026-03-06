@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'bun:test'
+import '../../../tests/setup/register-pi-model-resolver.ts'
 import {
   getDefaultModelsForConnection,
   getDefaultModelForConnection,

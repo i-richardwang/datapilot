@@ -2,7 +2,7 @@ import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { SessionStatusMenu } from "@/components/ui/session-status-menu"
-import { getStateColor, getStateIcon } from "@/config/session-status-config"
+import { getStateIcon, getStateIconStyle } from "@/config/session-status-config"
 import { useSessionListContext } from "@/context/SessionListContext"
 import type { SessionMeta } from "@/atoms/sessions"
 import { getSessionStatus } from "@/utils/session"
@@ -30,7 +30,7 @@ export function SessionStatusIcon({ item }: SessionStatusIconProps) {
             "hover:bg-foreground/5",
             "[&>svg]:w-full [&>svg]:h-full [&>img]:w-full [&>img]:h-full [&>span]:text-base",
           )}
-          style={{ color: getStateColor(status, ctx.sessionStatuses) ?? 'var(--foreground)' }}
+          style={getStateIconStyle(status, ctx.sessionStatuses)}
           role="button"
           aria-haspopup="menu"
           aria-expanded={open}

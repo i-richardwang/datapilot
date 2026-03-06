@@ -74,7 +74,7 @@ export function ItemNavigator({ items, activeIndex, onSelect, size = 'sm' }: Ite
             <span className="truncate max-w-[120px]">{displayLabel}</span>
           </button>
         </DropdownMenuTrigger>
-        <StyledDropdownMenuContent align="center" className="max-h-64 overflow-y-auto" style={{ zIndex: 400 }}>
+        <StyledDropdownMenuContent align="center" className="max-h-64 overflow-y-auto" style={{ zIndex: 'var(--z-floating-menu, 400)' }}>
           {items.map((item, idx) => (
             <StyledDropdownMenuItem
               key={idx}

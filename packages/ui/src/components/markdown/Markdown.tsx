@@ -249,15 +249,35 @@ function createComponents(
       // Comfortable paragraph spacing
       p: ({ children }) => <p className="my-2 leading-relaxed">{children}</p>,
       // Styled lists - ul uses tighter spacing, ol uses standard for number alignment
-      ul: ({ children }) => (
-        <ul className="my-2 space-y-1 ps-[16px] pe-2 list-disc marker:text-[var(--md-bullets)]">
+      ul: ({ children, className }) => (
+        <ul
+          className={cn(
+            'my-2 space-y-1 ps-[16px] pe-2 list-disc marker:text-[var(--md-bullets)]',
+            className?.includes('contains-task-list') && 'list-none ps-0 marker:content-none',
+          )}
+        >
           {children}
         </ul>
       ),
-      ol: ({ children }) => (
-        <ol className="my-2 space-y-1 pl-6 list-decimal">{children}</ol>
+      ol: ({ children, className }) => (
+        <ol className={cn('my-2 space-y-1 pl-6 list-decimal', className)}>{children}</ol>
       ),
-      li: ({ children }) => <li>{children}</li>,
+      li: ({ children, className }) => (
+        <li className={cn(className?.includes('task-list-item') && 'list-none')}>{children}</li>
+      ),
+      input: ({ type, checked }) => {
+        if (type === 'checkbox') {
+          return (
+            <input
+              type="checkbox"
+              checked={checked}
+              readOnly
+              className="mr-2 rounded border-muted-foreground align-middle"
+            />
+          )
+        }
+        return <input type={type} />
+      },
       // Clean tables
       table: ({ children }) => (
         <div className="my-3 overflow-x-auto">
@@ -348,15 +368,22 @@ function createComponents(
     // Rich paragraph spacing
     p: ({ children }) => <p className="my-3 leading-relaxed">{children}</p>,
     // Styled lists - ul uses tighter spacing, ol uses standard for number alignment
-    ul: ({ children }) => (
-      <ul className="my-3 space-y-1.5 ps-[16px] pe-2 list-disc marker:text-[var(--md-bullets)]">
+    ul: ({ children, className }) => (
+      <ul
+        className={cn(
+          'my-3 space-y-1.5 ps-[16px] pe-2 list-disc marker:text-[var(--md-bullets)]',
+          className?.includes('contains-task-list') && 'list-none ps-0 marker:content-none',
+        )}
+      >
         {children}
       </ul>
     ),
-    ol: ({ children }) => (
-      <ol className="my-3 space-y-1.5 pl-6 list-decimal">{children}</ol>
+    ol: ({ children, className }) => (
+      <ol className={cn('my-3 space-y-1.5 pl-6 list-decimal', className)}>{children}</ol>
     ),
-    li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+    li: ({ children, className }) => (
+      <li className={cn('leading-relaxed', className?.includes('task-list-item') && 'list-none')}>{children}</li>
+    ),
     // Beautiful tables
     table: ({ children }) => (
       <div className="my-4 overflow-x-auto rounded-md border">

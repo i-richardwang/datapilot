@@ -8,13 +8,19 @@
 import { describe, it, expect, beforeEach, mock } from 'bun:test'
 
 // Mock logger before import
-mock.module('../logger', () => ({
-  mainLog: {
-    info: () => {},
-    error: () => {},
-    warn: () => {},
-  },
-}))
+mock.module('../logger', () => {
+  const stubLog = { info: () => {}, error: () => {}, warn: () => {}, debug: () => {} }
+  return {
+    mainLog: stubLog,
+    sessionLog: stubLog,
+    handlerLog: stubLog,
+    windowLog: stubLog,
+    agentLog: stubLog,
+    searchLog: stubLog,
+    isDebugMode: false,
+    getLogFilePath: () => '/tmp/main.log',
+  }
+})
 
 const { BrowserCDP } = await import('../browser-cdp')
 
@@ -135,6 +141,43 @@ describe('BrowserCDP', () => {
 
       expect(snapshot.nodes[2].ref).toBe('@e3')
       expect(snapshot.nodes[2].role).toBe('link')
+    })
+
+    it('keeps refs stable for same backend nodes across reordered snapshots', async () => {
+      let snapshotCallCount = 0
+      const wc = createMockWebContents(async (method) => {
+        if (method === 'Accessibility.getFullAXTree') {
+          snapshotCallCount += 1
+
+          if (snapshotCallCount === 1) {
+            return {
+              nodes: [
+                { role: { value: 'combobox' }, name: { value: 'Sort' }, value: { value: 'created-oldest' }, backendDOMNodeId: 200 },
+                { role: { value: 'button' }, name: { value: 'Apply' }, backendDOMNodeId: 201 },
+              ],
+            }
+          }
+
+          return {
+            nodes: [
+              { role: { value: 'button' }, name: { value: 'Apply' }, backendDOMNodeId: 201 },
+              { role: { value: 'combobox' }, name: { value: 'Sort' }, value: { value: 'updated-newest' }, backendDOMNodeId: 200 },
+            ],
+          }
+        }
+        return {}
+      })
+
+      const cdp = new BrowserCDP(wc as any)
+      const first = await cdp.getAccessibilitySnapshot()
+      const second = await cdp.getAccessibilitySnapshot()
+
+      const firstSortRef = first.nodes.find((n) => n.name === 'Sort')?.ref
+      const secondSortRef = second.nodes.find((n) => n.name === 'Sort')?.ref
+
+      expect(firstSortRef).toBeDefined()
+      expect(secondSortRef).toBeDefined()
+      expect(firstSortRef).toBe(secondSortRef)
     })
 
     it('skips non-interactive, non-content nodes', async () => {

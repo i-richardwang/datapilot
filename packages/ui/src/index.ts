@@ -74,6 +74,7 @@ export {
   type RenderMode,
   TiptapMarkdownEditor,
   type TiptapMarkdownEditorProps,
+  type MarkdownEngine,
   type MarkdownDatatableBlockProps,
   type MarkdownSpreadsheetBlockProps,
   type MarkdownImageBlockProps,
@@ -101,6 +102,7 @@ export {
   BrowserShader,
   BrowserControls,
   BrowserEmptyStateCard,
+  FilterableSelectPopover,
   type SpinnerProps,
   type SimpleDropdownProps,
   type SimpleDropdownItemProps,
@@ -111,6 +113,8 @@ export {
   type BrowserControlsProps,
   type BrowserEmptyStateCardProps,
   type BrowserEmptyPromptSample,
+  type FilterableSelectPopoverProps,
+  type FilterableSelectRenderState,
 } from './components/ui'
 
 // Tooltip

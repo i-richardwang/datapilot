@@ -230,7 +230,8 @@ function readMetadataFileFromDir(dir: string): Record<string, ToolMetadata> {
     const filePath = join(dir, 'tool-metadata.json');
     const data = readFileSync(filePath, 'utf-8');
     return JSON.parse(data) as Record<string, ToolMetadata>;
-  } catch {
+  } catch (error) {
+    debugLog(`[toolMetadataStore.read] Failed for dir=${dir}: ${error instanceof Error ? error.message : String(error)}`);
     return {};
   }
 }
@@ -252,8 +253,9 @@ function writeMetadataFile(allMetadata: Record<string, ToolMetadata>): void {
     const tmpPath = filePath + '.tmp';
     writeFileSync(tmpPath, JSON.stringify(allMetadata));
     renameSync(tmpPath, filePath);
-  } catch {
-    // Ignore write errors — in-memory still works for same-process
+  } catch (error) {
+    // Keep non-throwing behavior, but log for diagnostics.
+    debugLog(`[toolMetadataStore.write] Failed for file=${filePath}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -271,7 +273,8 @@ function mergeAndWriteMetadata(
       updater(all);
       writeMetadataFile(all);
       return;
-    } catch {
+    } catch (error) {
+      debugLog(`[toolMetadataStore.merge] Attempt ${attempt + 1}/${retries + 1} failed: ${error instanceof Error ? error.message : String(error)}`);
       if (attempt === retries) return;
     }
   }
@@ -333,6 +336,11 @@ export const toolMetadataStore = {
 
   get size(): number {
     return _metadataMap.size;
+  },
+
+  /** Clear all in-memory entries. Used by tests to prevent cross-file state leaks. */
+  _clearForTesting(): void {
+    _metadataMap.clear();
   },
 };
 

@@ -10,6 +10,11 @@ import { shouldAllowToolInMode } from '../../agent/mode-manager.ts';
 const browserToolNames = [
   'browser_tool',
   'mcp__session__browser_tool',
+  // Legacy alias compatibility (older sessions/tests)
+  'browser_snapshot',
+  'browser_open',
+  'mcp__session__browser_snapshot',
+  'mcp__session__browser_open',
 ] as const;
 
 describe('browser tools permission mode handling', () => {

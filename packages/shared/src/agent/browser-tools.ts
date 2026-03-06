@@ -159,6 +159,7 @@ export interface BrowserPaneFns {
     boundSessionId: string | null;
     agentControlActive?: boolean;
   }>>;
+  detectChallenge: () => Promise<{ detected: boolean; provider: string; signals: string[] }>;
 }
 
 // ============================================================================

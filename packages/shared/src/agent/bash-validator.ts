@@ -50,6 +50,8 @@ export type BashValidationReason =
   | { type: 'redirect'; op: string; explanation: string }
   | { type: 'command_expansion'; explanation: string }
   | { type: 'process_substitution'; explanation: string }
+  | { type: 'parameter_expansion'; explanation: string }
+  | { type: 'env_assignment'; explanation: string }
   | { type: 'unsafe_command'; command: string; explanation: string }
   | { type: 'parse_error'; error: string }
   | { type: 'compound_partial_fail'; failedCommands: string[]; passedCommands: string[] }
@@ -227,9 +229,17 @@ function validateNode(
       return validateCompoundList(node as CompoundListNode, patterns, results);
 
     default:
-      // Unknown node type - log and allow (fail open for unknown constructs)
-      debug('[BashValidator] Unknown node type:', node.type);
-      return { allowed: true };
+      // Unknown node type — fail closed. bash-parser may produce node types
+      // we don't explicitly handle (If, While, For, Case, Function, etc.).
+      // Block them rather than silently allowing arbitrary constructs.
+      debug('[BashValidator] Unknown node type (blocked):', node.type);
+      return {
+        allowed: false,
+        reason: {
+          type: 'parse_error',
+          error: `Unsupported shell construct: "${node.type}". Only simple commands, pipelines, logical expressions (&&/||), and subshells are supported in Explore mode`,
+        },
+      };
   }
 }
 
@@ -303,6 +313,20 @@ function validateCommand(
             },
           };
         }
+      }
+
+      // Block environment variable assignments in command prefix.
+      // e.g., PATH=/evil ls, LD_PRELOAD=/evil/lib.so ls, FOO=bar cmd
+      // These modify the command's environment, potentially enabling
+      // PATH hijacking or library injection (LD_PRELOAD).
+      if (item.type === 'AssignmentWord') {
+        return {
+          allowed: false,
+          reason: {
+            type: 'env_assignment',
+            explanation: `Environment variable assignment "${(item as WordNode).text}" modifies command behavior (e.g., PATH hijacking, LD_PRELOAD injection)`,
+          },
+        };
       }
     }
   }
@@ -508,6 +532,16 @@ function checkWordForExpansions(word: WordNode): BashValidationReason | null {
       return {
         type: 'process_substitution',
         explanation: `Process substitution executes commands (found in: ${word.text})`,
+      };
+    }
+
+    // Parameter expansion ($VAR, ${VAR}, ${VAR:-default}) can make commands
+    // behave unpredictably based on environment state.
+    // e.g., `cat $HOME/.ssh/id_rsa` reads sensitive files via expansion.
+    if (exp.type === 'ParameterExpansion') {
+      return {
+        type: 'parameter_expansion',
+        explanation: `Variable expansion \${...} makes command behavior dependent on environment state (found in: ${word.text})`,
       };
     }
   }

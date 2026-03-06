@@ -15,6 +15,8 @@ import noDirectPlatformCheck from './eslint-rules/no-direct-platform-check.cjs'
 import noHardcodedPathSeparator from './eslint-rules/no-hardcoded-path-separator.cjs'
 import noDirectFileOpen from './eslint-rules/no-direct-file-open.cjs'
 import noInlineSourceAuthCheck from './eslint-rules/no-inline-source-auth-check.cjs'
+import noHardcodedZIndex from './eslint-rules/no-hardcoded-z-index.cjs'
+import noNonstandardShadows from './eslint-rules/no-nonstandard-shadows.cjs'
 
 export default [
   // Ignore patterns
@@ -76,6 +78,13 @@ export default [
           'no-inline-source-auth-check': noInlineSourceAuthCheck,
         },
       },
+      // Custom style rules
+      'craft-styles': {
+        rules: {
+          'no-hardcoded-z-index': noHardcodedZIndex,
+          'no-nonstandard-shadows': noNonstandardShadows,
+        },
+      },
     },
     settings: {
       react: {
@@ -103,6 +112,27 @@ export default [
       // Custom source auth check rule — use isSourceUsable() instead of inline checks
       'craft-sources/no-inline-source-auth-check': 'error',
 
+      // Custom style rule — use z-index token scale instead of hardcoded literals
+      'craft-styles/no-hardcoded-z-index': 'error',
+
+      // Custom style rule — enforce approved shadow classes/tokens only
+      'craft-styles/no-nonstandard-shadows': ['error', {
+        allowedClasses: [
+          'shadow-none',
+          'shadow-xs',
+          'shadow-minimal',
+          'shadow-tinted',
+          'shadow-thin',
+          'shadow-middle',
+          'shadow-strong',
+          'shadow-focused',
+          'shadow-modal-small',
+          'shadow-bottom-border',
+          'shadow-bottom-border-thin',
+        ],
+        allowInlineNone: true,
+      }],
+
       // Enforce centralized action registry for keyboard shortcuts
       'no-restricted-imports': ['error', {
         paths: [
@@ -112,6 +142,20 @@ export default [
           }
         ],
       }],
+    },
+  },
+
+  // Temporary exceptions for unresolved shadow migrations.
+  {
+    files: [
+      'src/renderer/components/ui/sortable-list.tsx',
+      'src/main/browser-pane-manager.ts',
+      'src/shared/browser-live-fx.ts',
+      'src/renderer/components/KeyboardShortcutsDialog.tsx',
+      'src/renderer/playground/**/*.{ts,tsx}',
+    ],
+    rules: {
+      'craft-styles/no-nonstandard-shadows': 'off',
     },
   },
 

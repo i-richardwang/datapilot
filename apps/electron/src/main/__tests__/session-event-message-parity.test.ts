@@ -290,14 +290,37 @@ describe('tool_result → tool Message update parity', () => {
 
     const mainUpdate = {
       toolResult: event.result,
-      toolStatus: 'completed' as const,
+      toolStatus: 'error' as const,
       isError: event.isError,
     }
 
     const rendererUpdate = {
       toolResult: event.result,
-      toolStatus: 'completed' as const,
+      toolStatus: 'error' as const,
       isError: event.isError,
+    }
+
+    expect(mainUpdate).toEqual(rendererUpdate)
+  })
+
+  it('infers error from [ERROR] prefix when isError is missing', () => {
+    const event: ToolResultEvent = {
+      toolUseId: 'tu-sandbox-1',
+      result: '[ERROR] sandbox failed',
+    }
+
+    const inferredIsError = /^\s*(\[ERROR\]|Error:|error:)/.test(event.result || '')
+
+    const mainUpdate = {
+      toolResult: event.result,
+      toolStatus: inferredIsError ? ('error' as const) : ('completed' as const),
+      isError: inferredIsError,
+    }
+
+    const rendererUpdate = {
+      toolResult: event.result,
+      toolStatus: inferredIsError ? ('error' as const) : ('completed' as const),
+      isError: inferredIsError,
     }
 
     expect(mainUpdate).toEqual(rendererUpdate)

@@ -178,6 +178,14 @@ export class PiAgent extends BaseAgent {
     reject: (error: Error) => void;
   }> = new Map();
 
+  // Metadata captured before PreToolUse stripping, keyed by toolCallId.
+  // This provides a deterministic bridge when side-channel metadata store misses.
+  private preToolMetadataByCallId: Map<string, {
+    intent?: string;
+    displayName?: string;
+    capturedAt: number;
+  }> = new Map();
+
   // Current user message (for context in summarization)
   private currentUserMessage: string = '';
 
@@ -383,6 +391,7 @@ export class PiAgent extends BaseAgent {
       authType: this.config.authType,
       workspaceId: this.config.workspace.id,
       piAuth,
+      baseUrl: runtime.baseUrl,
       // Branch params for Pi SDK session fork
       branchFromSdkSessionId: this.config.session?.branchFromSdkSessionId,
       branchFromSessionPath: this.config.session?.branchFromSessionPath,
@@ -654,6 +663,7 @@ export class PiAgent extends BaseAgent {
         this.handlePreToolUseRequest(msg as {
           requestId: string;
           toolName: string;
+          toolCallId?: string;
           input: Record<string, unknown>;
         });
         break;
@@ -762,6 +772,7 @@ export class PiAgent extends BaseAgent {
 
     // Detect session MCP tool completions (same pattern as in-process version)
     const eventType = event.type as string;
+    let adaptedEvent = event;
 
     if (eventType === 'tool_execution_start') {
       const toolName = event.toolName as string;
@@ -769,12 +780,38 @@ export class PiAgent extends BaseAgent {
         // Session tool tracking is handled by the subprocess; it sends
         // session_tool_completed events when appropriate.
       }
+
+      // Deterministic metadata bridge: if subprocess event lacks toolMetadata,
+      // inject metadata captured from pre_tool_use_request before stripping.
+      const toolCallId = event.toolCallId as string | undefined;
+      const existingMeta = event.toolMetadata as { intent?: string; displayName?: string } | undefined;
+      if (toolCallId && !existingMeta) {
+        const cached = this.preToolMetadataByCallId.get(toolCallId);
+        if (cached && (cached.intent || cached.displayName)) {
+          adaptedEvent = {
+            ...event,
+            toolMetadata: {
+              intent: cached.intent,
+              displayName: cached.displayName,
+              source: 'interceptor',
+            },
+          };
+          this.debug(`Injected pre-tool metadata for ${toolName} (${toolCallId}) from bridge cache`);
+        }
+      }
+    }
+
+    if (eventType === 'tool_execution_end') {
+      const toolCallId = event.toolCallId as string | undefined;
+      if (toolCallId) {
+        this.preToolMetadataByCallId.delete(toolCallId);
+      }
     }
 
     // Adapt event to CraftAgentEvents
     // The event adapter expects typed PiAgentEvent/AgentSessionEvent objects,
     // but since we're receiving plain JSON, we cast through unknown.
-    for (const agentEvent of this.adapter.adaptEvent(event as any)) {
+    for (const agentEvent of this.adapter.adaptEvent(adaptedEvent as any)) {
       // Track Read tool calls for prerequisite checking
       if (agentEvent.type === 'tool_start' && agentEvent.toolName === 'Read') {
         this.prerequisiteManager.trackReadTool(agentEvent.input as Record<string, unknown>);
@@ -813,10 +850,24 @@ export class PiAgent extends BaseAgent {
   private async handlePreToolUseRequest(req: {
     requestId: string;
     toolName: string;
+    toolCallId?: string;
     input: Record<string, unknown>;
   }): Promise<void> {
-    const { requestId, toolName, input } = req;
+    const { requestId, toolName, toolCallId, input } = req;
     this.debug(`PreToolUse request from subprocess: ${toolName} (${requestId})`);
+
+    // Capture metadata BEFORE centralized checks strip it out.
+    // This bridge is deterministic and avoids relying solely on side-channel store lookups.
+    const preIntent = typeof input._intent === 'string' ? input._intent : undefined;
+    const preDisplayName = typeof input._displayName === 'string' ? input._displayName : undefined;
+    if (toolCallId && (preIntent || preDisplayName)) {
+      this.preToolMetadataByCallId.set(toolCallId, {
+        intent: preIntent,
+        displayName: preDisplayName,
+        capturedAt: Date.now(),
+      });
+      this.debug(`Captured pre-tool metadata for ${toolName} (${toolCallId}): intent=${!!preIntent}, displayName=${!!preDisplayName}`);
+    }
 
     // Fire PreToolUse automation event — await so automations run before tool executes
     await this.emitAutomationEvent('PreToolUse', {
@@ -1342,6 +1393,9 @@ export class PiAgent extends BaseAgent {
       pending.reject(new Error('Pi subprocess exited'));
     }
     this.pendingToolExecutions.clear();
+
+    // Drop any cached pre-tool metadata for the dead subprocess.
+    this.preToolMetadataByCallId.clear();
   }
 
   /**
@@ -1705,6 +1759,9 @@ export class PiAgent extends BaseAgent {
     // Send abort to subprocess
     this.send({ type: 'abort' });
     this.eventQueue.complete();
+
+    // Clear bridge cache for this interrupted turn.
+    this.preToolMetadataByCallId.clear();
   }
 
   forceAbort(reason: AbortReason): void {
@@ -1728,6 +1785,9 @@ export class PiAgent extends BaseAgent {
 
     // Signal turn complete to wake up any waiting consumers
     this.eventQueue.complete();
+
+    // Clear bridge cache for aborted turn.
+    this.preToolMetadataByCallId.clear();
 
     // For PlanSubmitted and AuthRequest, just interrupt the turn
     if (reason === AbortReason.PlanSubmitted || reason === AbortReason.AuthRequest) {
@@ -1826,6 +1886,7 @@ export class PiAgent extends BaseAgent {
     this.subprocessReady = null;
     this.subprocessReadyResolve = null;
     this.callbackPort = 0;
+    this.preToolMetadataByCallId.clear();
   }
 
   // ============================================================

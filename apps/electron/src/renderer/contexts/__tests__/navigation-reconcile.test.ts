@@ -72,4 +72,36 @@ describe('normalizePanelRouteForReconcile', () => {
     expect(normalizePanelRouteForReconcile('settings', resolver)).toBe('settings/app')
     expect(normalizePanelRouteForReconcile('sources', resolver)).toBe('sources')
   })
+
+  it('keeps explicit detail route even if resolver tries to rewrite it', () => {
+    const resolver = (state: NavigationState): NavigationState => {
+      if ('details' in state) {
+        if (state.navigator === 'sessions') {
+          return { ...state, details: { type: 'session', sessionId: 'rewritten' } }
+        }
+        if (state.navigator === 'sources') {
+          return { ...state, details: { type: 'source', sourceSlug: 'rewritten' } }
+        }
+      }
+      return state
+    }
+
+    expect(normalizePanelRouteForReconcile('allSessions/session/s2', resolver)).toBe('allSessions/session/s2')
+    expect(normalizePanelRouteForReconcile('sources/source/github', resolver)).toBe('sources/source/github')
+  })
+
+  it('keeps explicit detail routes distinct across multiple panels', () => {
+    const resolver = (_state: NavigationState): NavigationState => {
+      return {
+        navigator: 'sessions',
+        filter: { kind: 'allSessions' },
+        details: { type: 'session', sessionId: 'same' },
+      }
+    }
+
+    const routes = ['allSessions/session/left', 'allSessions/session/right'] as const
+    const normalized = routes.map((route) => normalizePanelRouteForReconcile(route, resolver))
+
+    expect(normalized).toEqual(['allSessions/session/left', 'allSessions/session/right'])
+  })
 })

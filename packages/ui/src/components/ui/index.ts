@@ -35,3 +35,8 @@ export {
   type BrowserEmptyStateCardProps,
   type BrowserEmptyPromptSample,
 } from './BrowserEmptyStateCard'
+export {
+  FilterableSelectPopover,
+  type FilterableSelectPopoverProps,
+  type FilterableSelectRenderState,
+} from './FilterableSelectPopover'

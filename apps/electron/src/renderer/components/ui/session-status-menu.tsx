@@ -7,6 +7,7 @@ import {
   type SessionStatus,
   getStateIcon,
   getStateColor,
+  getStatusIconStyle,
 } from '@/config/session-status-config'
 
 // Re-export types for backwards compatibility
@@ -25,16 +26,9 @@ const MENU_ITEM_STYLE = 'flex cursor-pointer select-none items-center gap-3 roun
 // ============================================================================
 
 function StateItemContent({ state }: { state: SessionStatus }) {
-  // Only apply color styling if the icon is colorable (uses currentColor)
-  // Emojis and images should render at full opacity with their own colors
-  const applyColor = state.iconColorable
-
   return (
     <>
-      <span
-        className="shrink-0 flex items-center"
-        style={applyColor ? { color: state.resolvedColor } : undefined}
-      >
+      <span className="shrink-0 flex items-center" style={getStatusIconStyle(state)}>
         {state.icon}
       </span>
       <div className="flex-1 min-w-0">{state.label}</div>

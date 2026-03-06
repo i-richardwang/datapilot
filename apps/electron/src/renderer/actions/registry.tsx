@@ -143,10 +143,9 @@ function matchesHotkey(e: KeyboardEvent, hotkey: string): boolean {
   const needsAlt = parts.includes('alt')
 
   const modPressed = isMac ? e.metaKey : e.ctrlKey
-  const keyMatches = e.key.toLowerCase() === key ||
-                     e.code.toLowerCase() === `key${key}`
+  const logicalKeyMatches = e.key.toLowerCase() === key
 
-  // Handle special keys
+  // Handle special keys via physical code where logical values can vary by layout.
   const specialKeys: Record<string, string> = {
     '[': 'BracketLeft',
     ']': 'BracketRight',
@@ -160,9 +159,14 @@ function matchesHotkey(e: KeyboardEvent, hotkey: string): boolean {
     'tab': 'Tab',
   }
 
-  const codeMatches = specialKeys[key]
-    ? e.code === specialKeys[key]
-    : keyMatches
+  const specialCode = specialKeys[key]
+
+  // Important: for text shortcuts (A-Z/0-9), match logical key only.
+  // Mixing in physical code (e.g. KeyQ) causes AZERTY/QWERTZ collisions such as
+  // Cmd+A incorrectly matching a Cmd+Q binding.
+  const codeMatches = specialCode
+    ? e.code === specialCode
+    : logicalKeyMatches
 
   // Check modifier requirements
   const modCorrect = needsMod ? modPressed : !modPressed

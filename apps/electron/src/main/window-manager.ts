@@ -3,7 +3,7 @@ import { windowLog } from './logger'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { release } from 'os'
-import { IPC_CHANNELS } from '../shared/types'
+import { RPC_CHANNELS, type WindowCloseRequestSource } from '../shared/types'
 import type { SavedWindow } from './window-state'
 
 // Vite dev server URL for hot reload
@@ -54,7 +54,48 @@ export class WindowManager {
   private windows: Map<number, ManagedWindow> = new Map()  // webContents.id → ManagedWindow
   private focusedModeWindows: Set<number> = new Set()  // webContents.id of windows in focused mode
   private pendingCloseTimeouts: Map<number, NodeJS.Timeout> = new Map()  // Fallback timeouts for window close
+  private eventSink: ((channel: string, target: import('@craft-agent/shared/protocol').PushTarget, ...args: any[]) => void) | null = null
+  private clientResolver: ((wcId: number) => string | undefined) | null = null
+  private keyboardCloseIntents: Set<number> = new Set()  // webContents.id flagged by Cmd/Ctrl+W before close
+  private keyboardCloseIntentTimeouts: Map<number, NodeJS.Timeout> = new Map()  // Auto-clear stale keyboard-close intents
   private isAppQuitting = false  // Skip layered close interception during app quit
+
+  /**
+   * Set the event sink and client resolver for pushing events via the RPC server
+   * instead of webContents.send. Called after server creation.
+   */
+  setRpcEventSink(
+    sink: (channel: string, target: import('@craft-agent/shared/protocol').PushTarget, ...args: any[]) => void,
+    resolver: (wcId: number) => string | undefined
+  ): void {
+    this.eventSink = sink
+    this.clientResolver = resolver
+  }
+
+  /** Return current RPC event sink, if transport has been initialized. */
+  getRpcEventSink(): ((channel: string, target: import('@craft-agent/shared/protocol').PushTarget, ...args: any[]) => void) | null {
+    return this.eventSink
+  }
+
+  /** Resolve a window's current clientId from transport handshake state. */
+  getClientIdForWindow(webContentsId: number): string | undefined {
+    return this.clientResolver?.(webContentsId)
+  }
+
+  /** Push an event to a specific window via the RPC event sink. Falls back to webContents.send. */
+  private pushToWindow(window: BrowserWindow, channel: string, ...args: any[]): void {
+    if (this.eventSink && this.clientResolver) {
+      const clientId = this.clientResolver(window.webContents.id)
+      if (clientId) {
+        this.eventSink(channel, { to: 'client', clientId }, ...args)
+        return
+      }
+    }
+    // Fallback: direct webContents.send (used before WS handshake completes)
+    if (!window.isDestroyed() && !window.webContents.isDestroyed() && window.webContents.mainFrame) {
+      window.webContents.send(channel, ...args)
+    }
+  }
 
   /**
    * Create a new window for a workspace
@@ -122,14 +163,9 @@ export class WindowManager {
         autoHideMenuBar: true,
       }),
       webPreferences: {
-        preload: join(__dirname, 'preload.cjs'),
+        preload: join(__dirname, 'bootstrap-preload.cjs'),
         contextIsolation: true,
         nodeIntegration: false,
-        // SECURITY NOTE: Sandbox is disabled to allow preload script access to process.versions
-        // for the getVersions() API (returns node/chrome/electron versions).
-        // This is a minimal exposure since contextIsolation is enabled and nodeIntegration
-        // is disabled - the preload only exposes safe, read-only version data via IPC.
-        // If sandbox is re-enabled, process.versions becomes undefined.
         sandbox: false,
         webviewTag: false // Browser integration uses WebContentsView, not <webview>
       }
@@ -169,6 +205,16 @@ export class WindowManager {
           { label: 'Paste', role: 'paste', enabled: params.editFlags.canPaste },
         ]).popup()
       })
+    }
+
+    // Store the window mapping BEFORE loadURL — bootstrap preload uses
+    // __get-workspace-id (via sendSync) which reads this map during eval.
+    const webContentsId = window.webContents.id
+    this.windows.set(webContentsId, { window, workspaceId })
+
+    // Track focused mode state for persistence
+    if (focused) {
+      this.focusedModeWindows.add(webContentsId)
     }
 
     // Load the renderer - use restoreUrl if provided, otherwise build from options
@@ -245,51 +291,57 @@ export class WindowManager {
           if (target && (target.view || target.action)) {
             // Wait a bit for React to mount and register IPC listeners
             setTimeout(() => {
-              if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
-                window.webContents.send(IPC_CHANNELS.DEEP_LINK_NAVIGATE, {
-                  view: target.view,
-                  action: target.action,
-                  actionParams: target.actionParams,
-                })
-              }
+              this.pushToWindow(window, RPC_CHANNELS.deeplink.NAVIGATE, {
+                view: target.view,
+                action: target.action,
+                actionParams: target.actionParams,
+              })
             }, 100)
           }
         })
       })
     }
 
-    // Store the window mapping
-    const webContentsId = window.webContents.id
-    this.windows.set(webContentsId, { window, workspaceId })
-
-    // Track focused mode state for persistence
-    if (focused) {
-      this.focusedModeWindows.add(webContentsId)
-    }
-
     // Listen for system theme changes and notify this window's renderer
     const themeHandler = () => {
-      // Check mainFrame - it becomes null when render frame is disposed
-      if (!window.isDestroyed() && !window.webContents.isDestroyed() && window.webContents.mainFrame) {
-        window.webContents.send(IPC_CHANNELS.SYSTEM_THEME_CHANGED, nativeTheme.shouldUseDarkColors)
-      }
+      this.pushToWindow(window, RPC_CHANNELS.theme.SYSTEM_CHANGED, nativeTheme.shouldUseDarkColors)
     }
     nativeTheme.on('updated', themeHandler)
 
     // Handle focus/blur to broadcast window focus state
     window.on('focus', () => {
-      if (!window.isDestroyed() && !window.webContents.isDestroyed() && window.webContents.mainFrame) {
-        window.webContents.send(IPC_CHANNELS.WINDOW_FOCUS_STATE, true)
-      }
+      this.pushToWindow(window, RPC_CHANNELS.window.FOCUS_STATE, true)
     })
     window.on('blur', () => {
-      if (!window.isDestroyed() && !window.webContents.isDestroyed() && window.webContents.mainFrame) {
-        window.webContents.send(IPC_CHANNELS.WINDOW_FOCUS_STATE, false)
-      }
+      this.pushToWindow(window, RPC_CHANNELS.window.FOCUS_STATE, false)
     })
 
-    // Handle window close request (X button, Cmd+W) - intercept to allow modal closing first
-    // The renderer can respond via WINDOW_CONFIRM_CLOSE to actually close the window
+    // Detect Cmd/Ctrl+W before close events so renderer can distinguish close source.
+    // Intent is short-lived to avoid stale classification.
+    window.webContents.on('before-input-event', (_event, input) => {
+      if (!input || input.type !== 'keyDown') return
+      const key = input.key?.toLowerCase?.()
+      if (key !== 'w') return
+
+      const isCloseShortcut = process.platform === 'darwin'
+        ? !!input.meta
+        : !!input.control
+
+      if (!isCloseShortcut) return
+
+      const wcId = window.webContents.id
+      this.keyboardCloseIntents.add(wcId)
+      const existingTimeout = this.keyboardCloseIntentTimeouts.get(wcId)
+      if (existingTimeout) clearTimeout(existingTimeout)
+
+      this.keyboardCloseIntentTimeouts.set(wcId, setTimeout(() => {
+        this.keyboardCloseIntentTimeouts.delete(wcId)
+        this.keyboardCloseIntents.delete(wcId)
+      }, 500))
+    })
+
+    // Handle window close request (traffic-light button, menu close, Cmd/Ctrl+W)
+    // and send source metadata so renderer can decide layered dismiss vs direct close.
     window.on('close', (event) => {
       // During app quit, bypass layered close behavior and allow native close flow.
       // This preserves expected Cmd+Q semantics (quit app instead of closing overlays/panels first).
@@ -300,12 +352,23 @@ export class WindowManager {
       // Check if renderer is ready (mainFrame exists) - if not, allow close directly
       if (!window.webContents.isDestroyed() && window.webContents.mainFrame) {
         event.preventDefault()
-        // Send close request to renderer - it will either close a modal or confirm close
-        window.webContents.send(IPC_CHANNELS.WINDOW_CLOSE_REQUESTED)
+        const wcId = window.webContents.id
+        let source: WindowCloseRequestSource = 'window-button'
+        if (this.keyboardCloseIntents.has(wcId)) {
+          source = 'keyboard-shortcut'
+          this.keyboardCloseIntents.delete(wcId)
+          const keyboardIntentTimeout = this.keyboardCloseIntentTimeouts.get(wcId)
+          if (keyboardIntentTimeout) {
+            clearTimeout(keyboardIntentTimeout)
+            this.keyboardCloseIntentTimeouts.delete(wcId)
+          }
+        }
+
+        // Send close request to renderer - it will either close a modal/panel or confirm close.
+        this.pushToWindow(window, RPC_CHANNELS.window.CLOSE_REQUESTED, { source })
 
         // Fallback timeout: if IPC fails (e.g., on Hyprland/Wayland), force close after 3s.
         // Reset timeout on each attempt so active users closing modals aren't interrupted.
-        const wcId = window.webContents.id
         const existingTimeout = this.pendingCloseTimeouts.get(wcId)
         if (existingTimeout) clearTimeout(existingTimeout)
 
@@ -326,6 +389,14 @@ export class WindowManager {
         this.pendingCloseTimeouts.delete(webContentsId)
       }
 
+      // Clean up short-lived keyboard-close intent tracking.
+      const keyboardIntentTimeout = this.keyboardCloseIntentTimeouts.get(webContentsId)
+      if (keyboardIntentTimeout) {
+        clearTimeout(keyboardIntentTimeout)
+        this.keyboardCloseIntentTimeouts.delete(webContentsId)
+      }
+      this.keyboardCloseIntents.delete(webContentsId)
+
       nativeTheme.removeListener('updated', themeHandler)
       this.windows.delete(webContentsId)
       this.focusedModeWindows.delete(webContentsId)
@@ -334,6 +405,14 @@ export class WindowManager {
 
     windowLog.info(`Created window for workspace ${workspaceId} (focused: ${focused})`)
     return window
+  }
+
+  /**
+   * Get window by webContents.id (used by IPC handlers instead of BrowserWindow.fromId)
+   */
+  getWindowByWebContentsId(wcId: number): BrowserWindow | null {
+    const managed = this.windows.get(wcId)
+    return managed?.window ?? null
   }
 
   /**
@@ -543,20 +622,6 @@ export class WindowManager {
     }
 
     return null
-  }
-
-  /**
-   * Send IPC message to all windows
-   */
-  broadcastToAll(channel: string, ...args: unknown[]): void {
-    for (const managed of this.getAllWindows()) {
-      // Check mainFrame - it becomes null when render frame is disposed
-      if (!managed.window.isDestroyed() &&
-          !managed.window.webContents.isDestroyed() &&
-          managed.window.webContents.mainFrame) {
-        managed.window.webContents.send(channel, ...args)
-      }
-    }
   }
 
   /**

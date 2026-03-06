@@ -219,6 +219,29 @@ function describeActive(metrics: BrowserPageMetrics | null): string {
   return `${tag}${id}${role}${name}`;
 }
 
+const ACTIONABLE_AX_ROLES = new Set([
+  'button',
+  'link',
+  'textbox',
+  'searchbox',
+  'combobox',
+  'checkbox',
+  'radio',
+  'switch',
+  'menuitem',
+  'menuitemcheckbox',
+  'menuitemradio',
+  'tab',
+  'option',
+  'slider',
+  'spinbutton',
+  'listbox',
+]);
+
+function countActionableNodes(nodes: Array<{ role: string; disabled?: boolean }>): number {
+  return nodes.filter((node) => ACTIONABLE_AX_ROLES.has((node.role || '').toLowerCase()) && !node.disabled).length;
+}
+
 function summarizeWindows(windows: Awaited<ReturnType<BrowserPaneFns['listWindows']>>): string {
   const visible = windows.filter((w) => w.isVisible).length;
   const locked = windows.filter((w) => !!w.boundSessionId).length;
@@ -560,11 +583,20 @@ async function verifySelectResult(args: {
     }
 
     if (assertValue) {
-      assertValueMatched = !!selectedNode
+      const selectedNodeMatches = !!selectedNode
         && (
           includesNormalized(selectedNode.value, assertValue)
           || includesNormalized(selectedNode.name, assertValue)
+          || includesNormalized(selectedNode.description, assertValue)
         );
+
+      const anyNodeMatches = snapshot.nodes.some((n) =>
+        includesNormalized(n.value, assertValue)
+        || includesNormalized(n.name, assertValue)
+        || includesNormalized(n.description, assertValue)
+      );
+
+      assertValueMatched = selectedNodeMatches || anyNodeMatches;
     } else {
       assertValueMatched = true;
     }
@@ -717,6 +749,23 @@ async function executeSingleCommand(args: {
     const after = await getPageMetrics(fns);
     const failed = await fns.getNetworkLogs({ limit: 200, status: 'failed' });
 
+    // Check for security challenge after navigation
+    const challenge = await fns.detectChallenge();
+    if (challenge.detected) {
+      await fns.releaseControl();
+      return {
+        output: [
+          `Security verification detected (${challenge.provider}).`,
+          `Signals: ${challenge.signals.join(', ')}`,
+          `URL: ${result.url}`,
+          '',
+          'Browser shown — please complete the verification check.',
+          'After verification, run "snapshot" to continue.',
+        ].join('\n'),
+        appendReleaseHint: false,
+      };
+    }
+
     const lines = [
       `Navigated to: ${result.url}`,
       `Title: ${result.title}`,
@@ -760,10 +809,54 @@ async function executeSingleCommand(args: {
       lines.push(formatNodeLine(node));
     }
 
-    if (snapshot.nodes.length === 0) {
-      lines.push('');
-      lines.push('No accessibility elements were detected on this view.');
-      lines.push('This can happen on canvas-heavy/custom UIs. Try: evaluate <js>, click-at <x> <y>, type <text>, screenshot --annotated.');
+    const actionableCount = countActionableNodes(snapshot.nodes);
+    const nearEmpty = snapshot.nodes.length === 0 || actionableCount <= 2;
+
+    if (nearEmpty) {
+      // Check if sparse/empty snapshot is caused by a security challenge
+      const challenge = await fns.detectChallenge();
+      if (challenge.detected) {
+        await fns.releaseControl();
+
+        // Auto-take screenshot for visual confirmation
+        let screenshotImage: BrowserCommandImage | undefined;
+        try {
+          const screenshotResult = await fns.screenshot({ format: 'jpeg' });
+          const buf = screenshotResult.imageBuffer;
+          if (buf && buf.length > 0) {
+            screenshotImage = {
+              data: buf.toString('base64'),
+              mimeType: 'image/jpeg',
+              sizeBytes: buf.length,
+            };
+          }
+        } catch {
+          // Screenshot failure shouldn't block the challenge warning
+        }
+
+        const challengeLines = [
+          `Security verification detected (${challenge.provider}).`,
+          `Signals: ${challenge.signals.join(', ')}`,
+          `URL: ${snapshot.url}`,
+          '',
+          `Detected only ${actionableCount} actionable element(s) out of ${snapshot.nodes.length} accessibility nodes.`,
+          'This is consistent with a security challenge page blocking normal interaction.',
+          'Browser shown — please complete the verification check.',
+          'After verification, run "snapshot" to continue.',
+        ];
+
+        return {
+          output: challengeLines.join('\n'),
+          appendReleaseHint: false,
+          image: screenshotImage,
+        };
+      }
+
+      if (snapshot.nodes.length === 0) {
+        lines.push('');
+        lines.push('No accessibility elements were detected on this view.');
+        lines.push('This can happen on canvas-heavy/custom UIs. Try: evaluate <js>, click-at <x> <y>, type <text>, screenshot --annotated.');
+      }
     }
 
     return { output: lines.join('\n'), appendReleaseHint: true };
@@ -837,10 +930,29 @@ async function executeSingleCommand(args: {
     const elapsedMs = Date.now() - started;
     const after = await getPageMetrics(fns);
 
+    const urlChanged = before && after ? before.url !== after.url : false;
+
+    // Check challenge after click regardless of URL change (same-URL challenges are common)
+    const challenge = await fns.detectChallenge();
+    if (challenge.detected) {
+      await fns.releaseControl();
+      return {
+        output: [
+          `Clicked element ${ref} — security challenge detected (${challenge.provider}).`,
+          `URL changed: ${urlChanged}`,
+          `Signals: ${challenge.signals.join(', ')}`,
+          '',
+          'Browser shown — please complete the verification check.',
+          'After verification, run "snapshot" to continue.',
+        ].join('\n'),
+        appendReleaseHint: false,
+      };
+    }
+
     const lines = [
       `Clicked element ${ref}${waitFor ? ` (waitFor=${waitFor})` : ''}`,
       `Elapsed: ${elapsedMs}ms`,
-      `URL changed: ${before && after ? before.url !== after.url : 'unknown'}`,
+      `URL changed: ${urlChanged}`,
       `Active element: ${describeActive(after)}`,
     ];
     if (before && after) {

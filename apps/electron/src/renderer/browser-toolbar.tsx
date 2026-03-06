@@ -6,11 +6,17 @@
  * preload script (browser-toolbar preload).
  */
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import ReactDOM from 'react-dom/client'
-import { X } from 'lucide-react'
+import { EyeOff, X, XCircle } from 'lucide-react'
 import { BrowserControls } from '@craft-agent/ui'
 import { HeaderIconButton } from '@/components/ui/HeaderIconButton'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  StyledDropdownMenuContent,
+  StyledDropdownMenuItem,
+} from '@/components/ui/styled-dropdown'
 import './index.css'
 
 /* ------------------------------------------------------------------ */
@@ -35,11 +41,12 @@ declare global {
       goForward: () => Promise<void>
       reload: () => Promise<void>
       stop: () => Promise<void>
-      openWindowMenu: (x: number, y: number) => Promise<void>
+      setMenuGeometry: (open: boolean, height?: number) => Promise<void>
       hideWindow: () => Promise<void>
       closeWindowEntirely: () => Promise<void>
       onStateUpdate: (callback: (state: ToolbarState) => void) => () => void
       onThemeColor: (callback: (color: string | null) => void) => () => void
+      onForceCloseMenu: (callback: (payload: { reason?: string }) => void) => () => void
     }
   }
 }
@@ -57,6 +64,8 @@ function BrowserToolbarApp() {
     canGoForward: false,
   })
   const [themeColor, setThemeColor] = useState<string | null>(null)
+  const [windowMenuOpen, setWindowMenuOpen] = useState(false)
+  const menuContentRef = useRef<HTMLDivElement | null>(null)
 
   const api = window.browserToolbar
 
@@ -75,6 +84,45 @@ function BrowserToolbarApp() {
     if (!api) return
     return api.onThemeColor(setThemeColor)
   }, [api])
+
+  useEffect(() => {
+    if (!api) return
+    return api.onForceCloseMenu(() => {
+      setWindowMenuOpen(false)
+    })
+  }, [api])
+
+  useEffect(() => {
+    if (!api) return
+
+    if (!windowMenuOpen) {
+      void api.setMenuGeometry(false, 0)
+      return
+    }
+
+    // Prime expansion immediately to avoid a constrained first measurement.
+    void api.setMenuGeometry(true, 120)
+
+    const sendGeometry = () => {
+      const height = Math.ceil(menuContentRef.current?.getBoundingClientRect().height ?? 0)
+      void api.setMenuGeometry(true, height)
+    }
+
+    let frame = requestAnimationFrame(sendGeometry)
+    const observer = new ResizeObserver(() => {
+      sendGeometry()
+    })
+
+    if (menuContentRef.current) {
+      observer.observe(menuContentRef.current)
+    }
+
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+      void api.setMenuGeometry(false, 0)
+    }
+  }, [api, windowMenuOpen])
 
   const handleNavigate = useCallback((url: string) => {
     void api?.navigate(url)
@@ -96,37 +144,80 @@ function BrowserToolbarApp() {
     void api?.stop()
   }, [api])
 
-  const handleOpenWindowMenu = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    void api?.openWindowMenu(Math.round(rect.left), Math.round(rect.bottom))
+  const handleHideWindow = useCallback(() => {
+    setWindowMenuOpen(false)
+    void api?.hideWindow()
+  }, [api])
+
+  const handleCloseWindowEntirely = useCallback(() => {
+    setWindowMenuOpen(false)
+    void api?.closeWindowEntirely()
   }, [api])
 
   return (
-    <BrowserControls
-      url={state.url}
-      loading={state.isLoading}
-      canGoBack={state.canGoBack}
-      canGoForward={state.canGoForward}
-      onNavigate={handleNavigate}
-      onGoBack={handleGoBack}
-      onGoForward={handleGoForward}
-      onReload={handleReload}
-      onStop={handleStop}
-      trailingContent={(
-        <div className="ml-2 flex items-center gap-1.5">
-          <HeaderIconButton
-            icon={<X className="h-3.5 w-3.5" />}
-            aria-label="Browser window options"
-            className={themeColor ? '' : 'bg-background shadow-minimal hover:bg-foreground/5'}
-            style={themeColor ? { color: 'var(--tb-fg)' } : undefined}
-            onClick={handleOpenWindowMenu}
-          />
-        </div>
+    <>
+      {/*
+        Full-window outside-tap catcher while menu is open.
+        Critical for draggable titlebar windows (Windows) where outside-click
+        dismissal can be unreliable if events fall into app-region: drag zones.
+      */}
+      {windowMenuOpen && (
+        <div
+          className="fixed inset-0 z-[90] titlebar-no-drag bg-black/[0.0039215686]"
+          onPointerDown={(event) => {
+            event.preventDefault()
+            setWindowMenuOpen(false)
+          }}
+        />
       )}
-      themeColor={themeColor}
-      urlBarClassName="max-w-[600px]"
-      className="titlebar-drag-region"
-    />
+
+      <BrowserControls
+        url={state.url}
+        loading={state.isLoading}
+        canGoBack={state.canGoBack}
+        canGoForward={state.canGoForward}
+        onNavigate={handleNavigate}
+        onGoBack={handleGoBack}
+        onGoForward={handleGoForward}
+        onReload={handleReload}
+        onStop={handleStop}
+        trailingContent={(
+          <div className="ml-2 flex items-center gap-1.5 titlebar-no-drag">
+            <DropdownMenu open={windowMenuOpen} onOpenChange={setWindowMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <HeaderIconButton
+                  icon={<X className="h-3.5 w-3.5" />}
+                  aria-label="Browser window options"
+                  className={themeColor ? '' : 'bg-background shadow-minimal hover:bg-foreground/5'}
+                  style={themeColor ? { color: 'var(--tb-fg)' } : undefined}
+                />
+              </DropdownMenuTrigger>
+
+              <StyledDropdownMenuContent
+                ref={menuContentRef}
+                align="end"
+                side="bottom"
+                sideOffset={6}
+                minWidth="min-w-44"
+                className="titlebar-no-drag z-[110] max-h-none overflow-visible"
+              >
+                <StyledDropdownMenuItem onSelect={handleHideWindow}>
+                  <EyeOff className="h-3.5 w-3.5" />
+                  Hide Window
+                </StyledDropdownMenuItem>
+                <StyledDropdownMenuItem variant="destructive" onSelect={handleCloseWindowEntirely}>
+                  <XCircle className="h-3.5 w-3.5" />
+                  Close Window Entirely
+                </StyledDropdownMenuItem>
+              </StyledDropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+        themeColor={themeColor}
+        urlBarClassName="max-w-[600px]"
+        className="titlebar-drag-region bg-background"
+      />
+    </>
   )
 }
 

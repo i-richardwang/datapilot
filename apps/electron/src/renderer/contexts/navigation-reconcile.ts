@@ -18,6 +18,12 @@ export function normalizePanelRouteForReconcile(
   const navState = parseRouteToNavigationState(route)
   if (!navState) return route
 
+  // Preserve explicit detail routes exactly as encoded in URL.
+  // Reconciliation should only auto-select for filter/list routes.
+  if ('details' in navState && navState.details) {
+    return route
+  }
+
   const resolved = resolveAutoSelection(navState)
   return buildRouteFromNavigationState(resolved) as ViewRoute
 }

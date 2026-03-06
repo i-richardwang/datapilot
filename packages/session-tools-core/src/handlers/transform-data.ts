@@ -11,9 +11,12 @@ import type { SessionToolContext } from '../context.ts';
 import type { ToolResult } from '../types.ts';
 import { successResponse, errorResponse } from '../response.ts';
 import { spawn } from 'node:child_process';
-import { join, normalize, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { createScriptRuntimeEnv } from '../runtime/sandbox-env.ts';
+import { isPathWithinDirectory, isPathWithinDirectoryForCreation } from '../runtime/path-security.ts';
+import { resolveScriptRuntime } from '../runtime/resolve-script-runtime.ts';
 
 export interface TransformDataArgs {
   language: 'python3' | 'node' | 'bun';
@@ -21,25 +24,6 @@ export interface TransformDataArgs {
   inputFiles: string[];
   outputFile: string;
 }
-
-/**
- * Env vars stripped from subprocess to prevent credential leakage.
- * NOTE: This list is duplicated in packages/shared/src/mcp/client.ts (BLOCKED_ENV_VARS).
- * If you add a new entry here, update it there too.
- */
-const BLOCKED_ENV_VARS = [
-  'ANTHROPIC_API_KEY',
-  'CLAUDE_CODE_OAUTH_TOKEN',
-  'AWS_ACCESS_KEY_ID',
-  'AWS_SECRET_ACCESS_KEY',
-  'AWS_SESSION_TOKEN',
-  'GITHUB_TOKEN',
-  'GH_TOKEN',
-  'OPENAI_API_KEY',
-  'GOOGLE_API_KEY',
-  'STRIPE_SECRET_KEY',
-  'NPM_TOKEN',
-];
 
 const TRANSFORM_DATA_TIMEOUT_MS = 30_000;
 
@@ -64,7 +48,7 @@ export async function handleTransformData(
 
   // Validate outputFile doesn't escape data/ directory
   const resolvedOutput = resolve(dataDir, args.outputFile);
-  if (!resolvedOutput.startsWith(normalize(dataDir))) {
+  if (!isPathWithinDirectoryForCreation(resolvedOutput, dataDir)) {
     return errorResponse(
       `outputFile must be within the session data directory. Got: ${args.outputFile}`
     );
@@ -74,7 +58,7 @@ export async function handleTransformData(
   const resolvedInputs: string[] = [];
   for (const inputFile of args.inputFiles) {
     const resolvedInput = resolve(sessionDir, inputFile);
-    if (!resolvedInput.startsWith(normalize(sessionDir))) {
+    if (!isPathWithinDirectory(resolvedInput, sessionDir)) {
       return errorResponse(
         `inputFile must be within the session directory. Got: ${inputFile}`
       );
@@ -96,19 +80,16 @@ export async function handleTransformData(
   writeFileSync(tempScript, args.script, 'utf-8');
 
   try {
-    // Build command
-    // Use bundled uv for Python when available (ensures consistent Python 3.12 + deps)
-    const useUv = args.language === 'python3' && !!process.env.CRAFT_UV;
-    const cmd = useUv ? process.env.CRAFT_UV! : (args.language === 'python3' ? 'python3' : args.language);
-    const spawnArgs = useUv
-      ? ['run', '--python', '3.12', tempScript, ...resolvedInputs, resolvedOutput]
-      : [tempScript, ...resolvedInputs, resolvedOutput];
+    // Build command from shared runtime resolver
+    const runtime = resolveScriptRuntime(args.language);
+    const cmd = runtime.command;
+    const spawnArgs = [...runtime.argsPrefix, tempScript, ...resolvedInputs, resolvedOutput];
 
-    // Strip sensitive env vars
-    const env = { ...process.env };
-    for (const key of BLOCKED_ENV_VARS) {
-      delete env[key];
-    }
+    // Strip sensitive env vars + redirect runtime cache/temp paths to session data dir
+    const env = createScriptRuntimeEnv({
+      language: args.language,
+      dataDir,
+    });
 
     // Spawn subprocess with manual timeout that escalates to SIGKILL.
     // We can't rely on spawn()'s built-in `timeout` option because it only sends
@@ -163,6 +144,7 @@ export async function handleTransformData(
 
     // Return the absolute path for use in preview/table block "src" fields
     const lines = [`Output written to: ${resolvedOutput}`];
+    lines.push(`Runtime: ${cmd} (source: ${runtime.source})`);
     lines.push(`\nUse this absolute path as the "src" value in your datatable, spreadsheet, html-preview, pdf-preview, or image-preview block.`);
     if (result.stdout.trim()) {
       lines.push(`\nStdout:\n${result.stdout.slice(0, 500)}`);

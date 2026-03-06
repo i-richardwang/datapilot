@@ -56,52 +56,70 @@ describe('getMiniModel()', () => {
     expect(getMiniModel(conn)).toBe('anthropic/claude-haiku-4.5');
   });
 
-  // --- OpenAI providers ---
+  // --- Pi providers ---
 
-  it('finds mini for openai provider', () => {
-    const conn = makeConnection('openai', [
-      'gpt-5.2-codex',
-      'gpt-5.1-codex-mini',
+  it('finds mini for pi provider', () => {
+    const conn = makeConnection('pi', [
+      'pi/gpt-5.2-codex',
+      'pi/gpt-5.1-codex-mini',
     ]);
-    expect(getMiniModel(conn)).toBe('gpt-5.1-codex-mini');
+    expect(getMiniModel(conn)).toBe('pi/gpt-5.1-codex-mini');
   });
 
-  it('finds mini for openai_compat provider', () => {
-    const conn = makeConnection('openai_compat', [
+  it('skips denied codex-mini-latest alias for pi provider', () => {
+    const conn = makeConnection('pi', [
+      'pi/codex-mini-latest',
+      'pi/gpt-5.1-codex-mini',
+      'pi/gpt-5.2-codex',
+    ]);
+    expect(getMiniModel(conn)).toBe('pi/gpt-5.1-codex-mini');
+  });
+
+  it('skips denied pi/codex-mini-latest alias for pi provider', () => {
+    const conn = makeConnection('pi', [
+      'pi/codex-mini-latest',
+      'pi/gpt-5.1-codex-mini',
+      'pi/gpt-5.3-codex',
+    ]);
+    expect(getMiniModel(conn)).toBe('pi/gpt-5.1-codex-mini');
+  });
+
+  it('finds mini for pi_compat provider', () => {
+    const conn = makeConnection('pi_compat', [
       'openai/gpt-5.2-codex',
       'openai/gpt-5.1-codex-mini',
     ]);
     expect(getMiniModel(conn)).toBe('openai/gpt-5.1-codex-mini');
   });
 
-  // --- Copilot provider ---
+  // --- Pi fallback behavior ---
 
-  it('finds mini for copilot provider', () => {
-    const conn = makeConnection('copilot', [
-      'claude-sonnet-4.6',
-      'gpt-5',
-      'gpt-5-mini',
-      'o3',
+  it('finds mini for Pi list with mixed models', () => {
+    const conn = makeConnection('pi', [
+      'pi/claude-sonnet-4.6',
+      'pi/gpt-5',
+      'pi/gpt-5-mini',
+      'pi/o3',
     ]);
-    expect(getMiniModel(conn)).toBe('gpt-5-mini');
+    expect(getMiniModel(conn)).toBe('pi/gpt-5-mini');
   });
 
-  it('finds mini for copilot even when model name has "mini" in different position', () => {
-    const conn = makeConnection('copilot', [
-      'gpt-5',
-      'o4-mini',
-      'claude-sonnet-4.6',
+  it('finds mini even when model name has "mini" in different position', () => {
+    const conn = makeConnection('pi', [
+      'pi/gpt-5',
+      'pi/o4-mini',
+      'pi/claude-sonnet-4.6',
     ]);
-    expect(getMiniModel(conn)).toBe('o4-mini');
+    expect(getMiniModel(conn)).toBe('pi/o4-mini');
   });
 
-  it('falls back to last model when copilot has no mini model', () => {
-    const conn = makeConnection('copilot', [
-      'gpt-5',
-      'claude-sonnet-4.6',
-      'o3',
+  it('falls back to last model when Pi list has no mini/flash model', () => {
+    const conn = makeConnection('pi', [
+      'pi/gpt-5',
+      'pi/claude-sonnet-4.6',
+      'pi/o3',
     ]);
-    expect(getMiniModel(conn)).toBe('o3');
+    expect(getMiniModel(conn)).toBe('pi/o3');
   });
 
   // --- Edge cases ---
@@ -125,9 +143,18 @@ describe('getMiniModel()', () => {
     expect(getMiniModel(conn)).toBe('claude-sonnet-4-6');
   });
 
+  it('fallback ignores denied alias and returns last allowed model', () => {
+    const conn = makeConnection('pi', [
+      'pi/codex-mini-latest',
+      'pi/gpt-5',
+      'pi/claude-sonnet-4.6',
+    ]);
+    expect(getMiniModel(conn)).toBe('pi/claude-sonnet-4.6');
+  });
+
   it('handles single-model list', () => {
-    const conn = makeConnection('copilot', ['gpt-5']);
-    expect(getMiniModel(conn)).toBe('gpt-5');
+    const conn = makeConnection('pi', ['pi/gpt-5']);
+    expect(getMiniModel(conn)).toBe('pi/gpt-5');
   });
 });
 
@@ -137,10 +164,10 @@ describe('getMiniModel()', () => {
 
 describe('getSummarizationModel()', () => {
   it('returns same result as getMiniModel (shared implementation)', () => {
-    const conn = makeConnection('copilot', [
-      'gpt-5',
-      'gpt-5-mini',
-      'claude-sonnet-4.6',
+    const conn = makeConnection('pi', [
+      'pi/gpt-5',
+      'pi/gpt-5-mini',
+      'pi/claude-sonnet-4.6',
     ]);
     expect(getSummarizationModel(conn)).toBe(getMiniModel(conn));
   });

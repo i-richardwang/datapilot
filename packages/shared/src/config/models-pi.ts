@@ -53,7 +53,24 @@ const PI_EXCLUDED_MODELS: Set<string> = new Set([
   // Unsupported 2.0 models
   'gemini-2.0-flash',
   'gemini-2.0-flash-lite',
+
+  // Stale alias exposed by some SDK catalogs; fails at runtime in OpenAI API-key flow
+  'codex-mini-latest',
 ]);
+
+/**
+ * Prefixes to EXCLUDE from the Pi model list.
+ * Keep this list narrow and intentional.
+ */
+const PI_EXCLUDED_MODEL_PREFIXES: string[] = [
+  // Requested cleanup: hide legacy GPT-4 family variants (gpt-4, gpt-4.1, gpt-4o, ...)
+  'gpt-4',
+];
+
+function isExcludedPiModel(modelId: string): boolean {
+  if (PI_EXCLUDED_MODELS.has(modelId)) return true;
+  return PI_EXCLUDED_MODEL_PREFIXES.some(prefix => modelId.startsWith(prefix));
+}
 
 /**
  * Get Pi models for a specific auth provider directly from the Pi SDK.
@@ -63,7 +80,7 @@ export function getPiModelsForAuthProvider(piAuthProvider: string): ModelDefinit
     const models = getModels(piAuthProvider as KnownProvider);
     if (models.length > 0) {
       return models
-        .filter(m => !PI_EXCLUDED_MODELS.has(m.id))
+        .filter(m => !isExcludedPiModel(m.id))
         .map(piModelToDefinition);
     }
   } catch {
@@ -81,7 +98,7 @@ export function getAllPiModels(): ModelDefinition[] {
     try {
       const models = getModels(provider);
       allModels.push(...models
-        .filter(m => !PI_EXCLUDED_MODELS.has(m.id))
+        .filter(m => !isExcludedPiModel(m.id))
         .map(piModelToDefinition)
       );
     } catch {

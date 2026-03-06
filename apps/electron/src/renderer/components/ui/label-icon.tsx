@@ -88,7 +88,7 @@ export function LabelIcon({ label, size = 'sm', hasChildren, className }: LabelI
  *   - string → Type
  *
  * Returns null if the label has no valueType (boolean/presence-only labels).
- * Used in both SessionList and LabelBadge to indicate a typed label awaiting a value.
+ * Used in label badge rows and ActiveOptionBadges to indicate a typed label awaiting a value.
  */
 const VALUE_TYPE_ICONS = {
   number: Hash,

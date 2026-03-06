@@ -851,6 +851,10 @@ describe('isToolResultError', () => {
     expect(isToolResultError('error: command failed')).toBe(true)
   })
 
+  it('detects [ERROR] prefix', () => {
+    expect(isToolResultError('[ERROR] command failed')).toBe(true)
+  })
+
   it('detects is_error flag in object', () => {
     expect(isToolResultError({ is_error: true, message: 'fail' })).toBe(true)
   })

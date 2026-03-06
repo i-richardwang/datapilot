@@ -13,8 +13,12 @@
 /// <reference path="../types/incr-regex-package.d.ts" />
 
 import { homedir } from 'os';
+import { existsSync, realpathSync } from 'fs';
 import { debug } from '../utils/debug.ts';
-import { resolve } from 'path';
+import { dirname, isAbsolute, relative, resolve } from 'path';
+import { getSessionSafeAllowedToolNames } from '@craft-agent/session-tools-core';
+import { FEATURE_FLAGS } from '../feature-flags.ts';
+import { isBrowserToolNameOrAlias } from './browser-tool-names.ts';
 import type { PermissionsContext, MergedPermissionsConfig } from './permissions-config.ts';
 import {
   validateBashCommand,
@@ -157,6 +161,52 @@ function matchesAllowedWritePath(filePath: string, allowedPaths: string[]): bool
 function normalizeForComparison(path: string): string {
   const normalized = resolve(path).replace(/\\/g, '/');
   return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
+function isWithin(base: string, target: string): boolean {
+  const normalizedBase = normalizeForComparison(base);
+  const normalizedTarget = normalizeForComparison(target);
+  const rel = relative(normalizedBase, normalizedTarget);
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel));
+}
+
+/**
+ * Check whether targetPath is inside baseDir (or exactly equal to it).
+ *
+ * Uses path.relative semantics to avoid sibling-prefix bypasses and then
+ * re-validates using real paths to prevent symlink escapes.
+ */
+function isPathWithinDirectory(targetPath: string, baseDir: string): boolean {
+  const expandedTarget = expandHome(targetPath);
+  const expandedBase = expandHome(baseDir);
+
+  const resolvedTarget = resolve(expandedTarget);
+  const resolvedBase = resolve(expandedBase);
+  if (!isWithin(resolvedBase, resolvedTarget)) {
+    return false;
+  }
+
+  const realBase = existsSync(resolvedBase) ? realpathSync.native(resolvedBase) : resolvedBase;
+
+  if (existsSync(resolvedTarget)) {
+    const realTarget = realpathSync.native(resolvedTarget);
+    return isWithin(realBase, realTarget);
+  }
+
+  // Target may be a new file path. Validate using nearest existing ancestor
+  // to prevent symlink escapes while still allowing legitimate new files.
+  let current = dirname(resolvedTarget);
+  while (true) {
+    if (existsSync(current)) {
+      const realCurrent = realpathSync.native(current);
+      return isWithin(realBase, realCurrent);
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      return false;
+    }
+    current = parent;
+  }
 }
 
 // ============================================================
@@ -559,6 +609,8 @@ export type BashRejectionReason =
   | { type: 'redirect'; op: string; explanation: string }
   | { type: 'command_expansion'; explanation: string }
   | { type: 'process_substitution'; explanation: string }
+  | { type: 'parameter_expansion'; explanation: string }
+  | { type: 'env_assignment'; explanation: string }
   | { type: 'unsafe_command'; command: string; explanation: string }
   | { type: 'compound_partial_fail'; failedCommands: string[]; passedCommands: string[] };
 
@@ -1051,6 +1103,20 @@ export function getBashRejectionReason(command: string, config: ToolCheckConfig)
           explanation: reason.explanation,
         };
 
+      case 'parameter_expansion':
+        return {
+          type: 'dangerous_substitution',
+          pattern: '${} / $VAR',
+          explanation: reason.explanation,
+        };
+
+      case 'env_assignment':
+        return {
+          type: 'dangerous_substitution',
+          pattern: 'VAR=value',
+          explanation: reason.explanation,
+        };
+
       case 'unsafe_command': {
         // Find relevant patterns to help the agent understand what format is expected
         const relevantPatterns = findRelevantPatterns(reason.command, config.readOnlyBashPatterns);
@@ -1225,6 +1291,17 @@ function formatPermissionGuidance(config: ToolCheckConfig): string {
 }
 
 /**
+ * Detect known upstream bash-parser tokenizer bugs.
+ *
+ * bash-parser has longstanding edge cases around quoted `$` / `)` handling
+ * that can throw internal errors like `reducers.doubleQuoting`.
+ */
+function isKnownBashParserTokenizerBug(error: string): boolean {
+  const lower = error.toLowerCase();
+  return lower.includes('doublequoting') || lower.includes('reducers.doublequoting');
+}
+
+/**
  * Format a bash rejection reason into a user-friendly error message.
  * The message explains what was blocked and why, helping the agent understand the issue.
  * Includes actionable guidance on how to customize permissions.
@@ -1297,8 +1374,22 @@ export function formatBashRejectionMessage(reason: BashRejectionReason, config: 
     case 'dangerous_substitution':
       return `Bash command blocked: contains ${reason.pattern} syntax. ${reason.explanation}. ${modeSwitchHint}`;
 
-    case 'parse_error':
-      return `Bash command blocked: could not parse command safely (${reason.error}). ${modeSwitchHint}`;
+    case 'parse_error': {
+      const lines: string[] = [];
+      lines.push(`Bash command blocked: could not parse command safely (${reason.error}).`);
+
+      if (isKnownBashParserTokenizerBug(reason.error)) {
+        lines.push('');
+        lines.push('This looks like a known bash-parser tokenizer bug (not necessarily unsafe intent).');
+        lines.push('Try using single quotes for regex/text arguments instead of double quotes.');
+        lines.push('Problematic patterns often involve `$` (and sometimes `)`) inside double-quoted strings.');
+        lines.push('Example: `rg -n "a|b|$|c" ...` → `rg -n \'a|b|$|c\' ...`');
+      }
+
+      lines.push('');
+      lines.push(modeSwitchHint);
+      return lines.join('\n');
+    }
 
     case 'compound_partial_fail': {
       // Some commands in a compound expression failed
@@ -1336,6 +1427,12 @@ export function formatBashRejectionMessage(reason: BashRejectionReason, config: 
 
     case 'process_substitution':
       return `Bash command blocked: contains process substitution. ${reason.explanation}. ${modeSwitchHint}`;
+
+    case 'parameter_expansion':
+      return `Bash command blocked: contains variable expansion (\${} / $VAR). ${reason.explanation}. ${modeSwitchHint}`;
+
+    case 'env_assignment':
+      return `Bash command blocked: contains environment variable assignment. ${reason.explanation}. ${modeSwitchHint}`;
 
     case 'unsafe_command': {
       const lines: string[] = [];
@@ -1427,7 +1524,8 @@ export function extractBashWriteTarget(command: string): string | null {
   }
 
   // Pattern 3: Direct redirect - extract path after > or >>
-  const directRedirectMatch = command.match(/>{1,2}\s*([^\s;|&"'>]+)/);
+  // Guard against non-shell uses like JavaScript arrow functions (=>).
+  const directRedirectMatch = command.match(/(?:^|[^=<>])>{1,2}\s*([^\s;|&"'>=][^\s;|&"'>]*)/);
   if (directRedirectMatch?.[1] && directRedirectMatch[1] !== '/dev/null') {
     return directRedirectMatch[1];
   }
@@ -1479,7 +1577,11 @@ export function extractBashWriteTarget(command: string): string | null {
  * Used to provide better error messages when write detection fails.
  */
 export function looksLikePotentialWrite(command: string): boolean {
-  return /Out-File|Set-Content|Add-Content|>\s*[^&]|>>/i.test(command);
+  // Shell redirects at token boundaries (avoid matching JS arrows like =>)
+  const hasRedirectToken = /(?:^|[\s;|&()])\d*>>?(?![=>])/.test(command);
+  // Common PowerShell write cmdlets
+  const hasPowerShellWriteCmdlet = /(?:Out-File|Set-Content|Add-Content)\b/i.test(command);
+  return hasRedirectToken || hasPowerShellWriteCmdlet;
 }
 
 /**
@@ -1583,25 +1685,7 @@ const ALWAYS_ALLOWED_TOOLS = new Set([
   'TodoWrite',                      // Task tracking
   'SubmitPlan',                     // Plan submission
   'LSP',                            // Language server (read-only)
-  // Browser automation tools (stateful UI interactions, no direct local file mutation)
-  'browser_open',
-  'browser_navigate',
-  'browser_snapshot',
-  'browser_click',
-  'browser_fill',
-  'browser_select',
-  'browser_screenshot',
-  'browser_screenshot_region',
-  'browser_console',
-  'browser_window_resize',
-  'browser_network',
-  'browser_wait',
-  'browser_key',
-  'browser_downloads',
-  'browser_scroll',
-  'browser_back',
-  'browser_forward',
-  'browser_evaluate',
+  // Browser automation tool (canonical wrapper)
   'browser_tool',
 ]);
 
@@ -1667,6 +1751,12 @@ export function shouldAllowToolInMode(
     }
   }
 
+  // Browser tool aliases (legacy browser_open/browser_snapshot/...)
+  // are normalized centrally to avoid drift across permission checks.
+  if (isBrowserToolNameOrAlias(toolName)) {
+    return { allowed: true };
+  }
+
   // Handle Bash - check if command is read-only
   // Uses detailed rejection reasons to provide helpful error messages
   if (toolName === 'Bash') {
@@ -1682,32 +1772,24 @@ export function shouldAllowToolInMode(
       // Plans/data folder exception for bash/PowerShell writes.
       // Bash uses redirects: /bin/zsh -lc "cat <<'EOF' > /path/to/plans/file.md..."
       // PowerShell uses: @(...) | Out-File -FilePath 'C:\path\to\plans\file.md'
-      // Allow these if the write target is within the plans or data folder.
-      if (options?.plansFolderPath || options?.dataFolderPath) {
+      // Only run this branch for likely write attempts to avoid false positives.
+      const likelyWriteAttempt =
+        (rejection.type === 'dangerous_operator' && rejection.operatorType === 'redirect') ||
+        looksLikePotentialWrite(command);
+
+      if (likelyWriteAttempt && (options?.plansFolderPath || options?.dataFolderPath)) {
         const targetPath = extractBashWriteTarget(command) ?? extractPowerShellWriteTarget(command);
         if (targetPath) {
-          // Normalize path separators: replace backslashes with forward slashes, then collapse
-          // consecutive slashes. Codex JSON-RPC may send paths with \\\\ (double backslash)
-          // which becomes \\ in the actual string — each \\ → // → collapsed to /.
-          const normalizedTarget = targetPath.replace(/[\\/]+/g, '/');
-
-          // Check plans folder
-          if (options?.plansFolderPath) {
-            const normalizedPlansDir = options.plansFolderPath.replace(/[\\/]+/g, '/');
-            // Use case-insensitive comparison for Windows path compatibility
-            if (normalizedTarget.toLowerCase().startsWith(normalizedPlansDir.toLowerCase())) {
-              debug(`[Mode] Allowing write to plans folder: ${targetPath}`);
-              return { allowed: true };
-            }
+          // Check plans folder with robust path containment (prevents sibling-prefix bypasses)
+          if (options?.plansFolderPath && isPathWithinDirectory(targetPath, options.plansFolderPath)) {
+            debug(`[Mode] Allowing write to plans folder: ${targetPath}`);
+            return { allowed: true };
           }
 
-          // Check data folder
-          if (options?.dataFolderPath) {
-            const normalizedDataDir = options.dataFolderPath.replace(/[\\/]+/g, '/');
-            if (normalizedTarget.toLowerCase().startsWith(normalizedDataDir.toLowerCase())) {
-              debug(`[Mode] Allowing write to data folder: ${targetPath}`);
-              return { allowed: true };
-            }
+          // Check data folder with robust path containment
+          if (options?.dataFolderPath && isPathWithinDirectory(targetPath, options.dataFolderPath)) {
+            debug(`[Mode] Allowing write to data folder: ${targetPath}`);
+            return { allowed: true };
           }
 
           // Target path extracted but not in any allowed folder - give specific error with helpful hint
@@ -1761,28 +1843,19 @@ export function shouldAllowToolInMode(
     const filePath = (input?.file_path ?? input?.notebook_path) as string | undefined;
 
     if (filePath) {
-      const normalizedPath = filePath.replace(/\\/g, '/');
-
       // Check plans folder exception
       if (options?.plansFolderPath) {
-        const normalizedPlansDir = options.plansFolderPath.replace(/\\/g, '/');
-        debug(`[Mode] Checking plans folder exception: path="${normalizedPath}", plansDir="${normalizedPlansDir}"`);
-
-        // Use case-insensitive comparison for Windows path compatibility
-        // (paths from Codex may have inconsistent casing)
-        if (normalizedPath.toLowerCase().startsWith(normalizedPlansDir.toLowerCase())) {
+        debug(`[Mode] Checking plans folder exception: path="${filePath}", plansDir="${options.plansFolderPath}"`);
+        if (isPathWithinDirectory(filePath, options.plansFolderPath)) {
           debug(`[Mode] Allowing ${toolName} to plans folder`);
           return { allowed: true };
         }
       }
 
       // Check data folder exception
-      if (options?.dataFolderPath) {
-        const normalizedDataDir = options.dataFolderPath.replace(/\\/g, '/');
-        if (normalizedPath.toLowerCase().startsWith(normalizedDataDir.toLowerCase())) {
-          debug(`[Mode] Allowing ${toolName} to data folder`);
-          return { allowed: true };
-        }
+      if (options?.dataFolderPath && isPathWithinDirectory(filePath, options.dataFolderPath)) {
+        debug(`[Mode] Allowing ${toolName} to data folder`);
+        return { allowed: true };
       }
 
       // Check allowedWritePaths from permissions config
@@ -1842,45 +1915,18 @@ export function shouldAllowToolInMode(
       return { allowed: true };
     }
 
-    // Handle session-scoped tools - allow read-only, block mutations
+    // Handle session-scoped tools - derive safe-mode behavior from canonical session-tools-core metadata
     if (toolName.startsWith('mcp__session__')) {
-      // Read-only session tools - always allowed in Explore mode
-      // These tools don't modify state, they only read/validate/invoke secondary models
-      const readOnlySessionTools = [
-        'mcp__session__SubmitPlan',
-        'mcp__session__config_validate',
-        'mcp__session__skill_validate',
-        'mcp__session__mermaid_validate',
-        'mcp__session__source_test',
-        'mcp__session__transform_data',
-        'mcp__session__render_template',
-        'mcp__session__call_llm',
-        // Browser session tools (agent-safe browsing workflow)
-        'mcp__session__browser_open',
-        'mcp__session__browser_navigate',
-        'mcp__session__browser_snapshot',
-        'mcp__session__browser_click',
-        'mcp__session__browser_fill',
-        'mcp__session__browser_select',
-        'mcp__session__browser_screenshot',
-        'mcp__session__browser_screenshot_region',
-        'mcp__session__browser_console',
-        'mcp__session__browser_window_resize',
-        'mcp__session__browser_network',
-        'mcp__session__browser_wait',
-        'mcp__session__browser_key',
-        'mcp__session__browser_downloads',
-        'mcp__session__browser_scroll',
-        'mcp__session__browser_back',
-        'mcp__session__browser_forward',
-        'mcp__session__browser_evaluate',
-        'mcp__session__browser_tool',
-      ];
-      if (readOnlySessionTools.includes(toolName)) {
+      const safeAllowedSessionTools = getSessionSafeAllowedToolNames({
+        prefix: 'mcp__session__',
+        includeDeveloperFeedback: FEATURE_FLAGS.developerFeedback,
+      });
+
+      if (safeAllowedSessionTools.has(toolName)) {
         return { allowed: true };
       }
 
-      // Write/auth session tools - blocked in Explore mode (source_oauth_trigger, source_credential_prompt, etc.)
+      // Write/auth/admin session tools - blocked in Explore mode
       return {
         allowed: false,
         reason: `Session configuration changes are blocked in ${config.displayName}. Switch to Ask or Allow All mode (${config.shortcutHint}) to create, update, or delete sources and agents.`

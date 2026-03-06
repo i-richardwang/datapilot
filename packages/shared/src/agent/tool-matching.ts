@@ -319,8 +319,16 @@ function extractToolMetadata(toolBlock: ToolUseBlock, sessionDir?: string): { in
   // 1. Check the metadata store first (populated by SSE interceptor)
   // Pass sessionDir to ensure we read from the correct session's file even when
   // the singleton _sessionDir has been clobbered by a concurrent session.
-  const stored = toolMetadataStore.get(toolBlock.id, sessionDir);
-  if (stored) {
+  const idCandidates = new Set<string>([toolBlock.id]);
+  if (toolBlock.id.includes('|')) {
+    const [base] = toolBlock.id.split('|');
+    if (base) idCandidates.add(base);
+  }
+
+  for (const candidate of idCandidates) {
+    const stored = toolMetadataStore.get(candidate, sessionDir);
+    if (!stored) continue;
+
     let intent = stored.intent;
     const displayName = stored.displayName;
 
@@ -333,7 +341,11 @@ function extractToolMetadata(toolBlock: ToolUseBlock, sessionDir?: string): { in
   }
 
   // Log when metadata store misses — helps diagnose cross-process sync issues
-  log.debug(`extractToolMetadata: store miss for ${toolBlock.name} (${toolBlock.id})`);
+  const argsHasIntent = typeof toolBlock.input._intent === 'string';
+  const argsHasDisplayName = typeof toolBlock.input._displayName === 'string';
+  log.debug(
+    `extractToolMetadata: store miss for ${toolBlock.name} (${toolBlock.id}); candidates=${Array.from(idCandidates).join(' -> ')}; argsIntent=${argsHasIntent}; argsDisplayName=${argsHasDisplayName}`,
+  );
 
   // 2. Fallback: read directly from tool input (Codex backend, non-streaming, etc.)
   let intent = toolBlock.input._intent as string | undefined;
@@ -362,7 +374,7 @@ export function serializeResult(value: unknown): string {
 export function isToolResultError(result: unknown): boolean {
   if (typeof result === 'string') {
     // Check for common error patterns
-    return result.startsWith('Error:') || result.startsWith('error:');
+    return /^\s*(\[ERROR\]|Error:|error:)/.test(result);
   }
   if (result && typeof result === 'object') {
     // Check for error flag in result object

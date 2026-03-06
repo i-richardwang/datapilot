@@ -199,7 +199,7 @@ export function SortableList<T extends SortableItemData>({
       {showOverlay && (
         <DragOverlay
           dropAnimation={dropAnimationConfig}
-          style={{ zIndex: 9999 }}
+          style={{ zIndex: 'var(--z-floating-menu, 400)' }}
         >
           {activeItem ? (
             <div
