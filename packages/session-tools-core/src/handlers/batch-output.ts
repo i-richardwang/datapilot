@@ -10,6 +10,7 @@
 
 import { dirname } from 'node:path';
 import { appendFileSync, mkdirSync, existsSync } from 'node:fs';
+import Ajv from 'ajv';
 import type { SessionToolContext } from '../context.ts';
 import type { ToolResult } from '../types.ts';
 import { successResponse, errorResponse } from '../response.ts';
@@ -18,69 +19,35 @@ export interface BatchOutputArgs {
   data: Record<string, unknown> | string;
 }
 
+const ajv = new Ajv({ allErrors: true });
+
 /**
- * Validate data against a JSON Schema (lightweight, object-level only).
+ * Validate data against a JSON Schema using ajv.
  *
- * Checks required fields and basic type constraints from the schema's
- * `properties` and `required` arrays. This is intentionally minimal —
- * full JSON Schema validation would require a heavy dependency (ajv).
+ * Adds `additionalProperties: false` when the schema defines `properties`
+ * but omits an explicit `additionalProperties` setting, so unexpected
+ * fields are flagged automatically.
  */
 function validateOutputSchema(
   data: Record<string, unknown>,
   schema: Record<string, unknown>,
 ): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
+  // Default to strict properties if the schema doesn't specify
+  const effective = schema.properties && !('additionalProperties' in schema)
+    ? { ...schema, additionalProperties: false }
+    : schema;
 
-  // Check required fields
-  const required = schema.required as string[] | undefined;
-  if (required && Array.isArray(required)) {
-    for (const field of required) {
-      if (!(field in data) || data[field] === undefined || data[field] === null) {
-        errors.push(`Missing required field: "${field}"`);
-      }
-    }
-  }
+  const validate = ajv.compile(effective);
+  const valid = validate(data);
 
-  // Check property types (basic type validation)
-  const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
-  if (properties) {
-    for (const [key, propSchema] of Object.entries(properties)) {
-      if (!(key in data)) continue;
+  if (valid) return { valid: true, errors: [] };
 
-      const value = data[key];
-      const expectedType = propSchema.type as string | undefined;
+  const errors = (validate.errors ?? []).map(err => {
+    const path = err.instancePath ? `"${err.instancePath.slice(1)}"` : 'root';
+    return `${path}: ${err.message}`;
+  });
 
-      if (expectedType && value !== null && value !== undefined) {
-        const actualType = Array.isArray(value) ? 'array' : typeof value;
-        if (expectedType === 'integer') {
-          if (typeof value !== 'number' || !Number.isInteger(value)) {
-            errors.push(`Field "${key}" must be an integer, got ${typeof value}`);
-          }
-        } else if (actualType !== expectedType) {
-          errors.push(`Field "${key}" must be type "${expectedType}", got "${actualType}"`);
-        }
-      }
-
-      // Check enum constraints
-      const enumValues = propSchema.enum as unknown[] | undefined;
-      if (enumValues && Array.isArray(enumValues) && value !== null && value !== undefined) {
-        if (!enumValues.includes(value)) {
-          errors.push(`Field "${key}" must be one of: ${enumValues.map(v => JSON.stringify(v)).join(', ')}`);
-        }
-      }
-    }
-  }
-
-  // Warn about extra fields not in schema
-  if (properties) {
-    for (const key of Object.keys(data)) {
-      if (!(key in properties)) {
-        errors.push(`Unexpected field: "${key}" (not defined in output schema)`);
-      }
-    }
-  }
-
-  return { valid: errors.length === 0, errors };
+  return { valid: false, errors };
 }
 
 /**

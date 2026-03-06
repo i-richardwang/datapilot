@@ -267,6 +267,71 @@ describe('handleBatchOutput', () => {
     expect(result.content[0]!.text).toContain('JSON object')
   })
 
+  it('should accept nullable type with non-null value', async () => {
+    const outputPath = join(tempDir, 'output.jsonl')
+    const ctx = createTestContext({
+      batchId: 'batch-1',
+      itemId: 'item-1',
+      outputPath,
+      outputSchema: {
+        type: 'object',
+        properties: {
+          count: { type: ['number', 'null'] },
+          label: { type: 'string' },
+        },
+        required: ['count', 'label'],
+      },
+    })
+
+    const result = await handleBatchOutput(ctx, {
+      data: { count: 280, label: 'test' },
+    })
+    expect(result.isError).toBeFalsy()
+  })
+
+  it('should accept nullable type with null value', async () => {
+    const outputPath = join(tempDir, 'output.jsonl')
+    const ctx = createTestContext({
+      batchId: 'batch-1',
+      itemId: 'item-1',
+      outputPath,
+      outputSchema: {
+        type: 'object',
+        properties: {
+          count: { type: ['number', 'null'] },
+        },
+        required: ['count'],
+      },
+    })
+
+    const result = await handleBatchOutput(ctx, {
+      data: { count: null },
+    })
+    expect(result.isError).toBeFalsy()
+  })
+
+  it('should reject null for non-nullable required field', async () => {
+    const outputPath = join(tempDir, 'output.jsonl')
+    const ctx = createTestContext({
+      batchId: 'batch-1',
+      itemId: 'item-1',
+      outputPath,
+      outputSchema: {
+        type: 'object',
+        properties: {
+          count: { type: 'number' },
+        },
+        required: ['count'],
+      },
+    })
+
+    const result = await handleBatchOutput(ctx, {
+      data: { count: null },
+    })
+    expect(result.isError).toBe(true)
+    expect(result.content[0]!.text).toContain('count')
+  })
+
   it('should allow output without schema (freeform)', async () => {
     const outputPath = join(tempDir, 'output.jsonl')
     const ctx = createTestContext({

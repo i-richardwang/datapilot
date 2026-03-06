@@ -12,10 +12,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "ajv": "^8.18.0",
     "beautiful-mermaid": "*",
+    "gray-matter": "^4.0.3",
     "zod": "^3.23.0",
-    "zod-to-json-schema": "^3.25.0",
-    "gray-matter": "^4.0.3"
+    "zod-to-json-schema": "^3.25.0"
   },
   "devDependencies": {
     "typescript": "^5.8.2"
