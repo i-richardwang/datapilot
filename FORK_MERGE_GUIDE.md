@@ -4,7 +4,7 @@
 > Its purpose is to serve as a reference when merging upstream updates, helping to identify conflict zones,
 > understand the intent of each change, and make informed resolution decisions.
 >
-> **Last updated after:** v0.7.0 merge + post-merge batch refinements
+> **Last updated after:** v0.7.1 merge + batch session naming adaptation
 
 ## Overview
 
@@ -55,6 +55,14 @@ Upstream v0.7.0 introduced a major architectural refactoring. Key changes releva
 - Our `batch_output` tool includes `safeMode: 'allow'`
 - Upstream added `script_sandbox` tool
 
+### Session Naming & `triggeredBy` (v0.7.1+)
+- **New:** `executePromptAutomation()` accepts `automationName?: string` parameter
+- **New:** Sessions created by automations get `triggeredBy: { automationName, timestamp }` metadata persisted in JSONL header
+- **New:** `sendMessage()` skips AI title generation when `managed.triggeredBy` is set — the session name from `createSession()` is used directly
+- **New:** `session_created` event is broadcast immediately after session creation to prevent "New chat" flash in renderer
+- **Our adaptation:** Batch processor passes `automationName: "Batch: <name> — <itemId>"` so batch sessions get meaningful titles and participate in the `triggeredBy` pattern
+- **Upstream naming flow:** `deriveAutomationName()` (in `automations/name-utils.ts`) → `PendingPrompt.automationName` → `executePromptAutomation(automationName)`. Our batch equivalent: `config.name` + `itemId` → `BatchExecutePromptParams.automationName` → same `executePromptAutomation(automationName)`.
+
 ---
 
 ## Part 1: New Files (Low Conflict Risk)
@@ -65,7 +73,7 @@ These files are entirely new. They won't conflict unless upstream adds a similar
 
 | File | Purpose |
 |------|---------|
-| `types.ts` | All TypeScript types: `BatchConfig`, `BatchState`, `BatchItemState`, `BatchProgress`, `BatchSystemOptions`, etc. |
+| `types.ts` | All TypeScript types: `BatchConfig`, `BatchState`, `BatchItemState`, `BatchProgress`, `BatchSystemOptions`, `BatchExecutePromptParams` (includes `automationName` for session naming), etc. |
 | `constants.ts` | Constants: `BATCHES_CONFIG_FILE = 'batches.json'`, `BATCH_STATE_FILE_PREFIX`, `DEFAULT_MAX_CONCURRENCY = 3`, `BATCH_ITEM_ENV_PREFIX` |
 | `schemas.ts` | Zod schemas for `batches.json` validation; `zodErrorToIssues()` helper (same pattern as `automations/schemas.ts`) |
 | `data-source.ts` | CSV/JSON/JSONL parser with `loadBatchItems()`, idField validation, uniqueness checks |
@@ -349,8 +357,9 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 - Added imports: `registerSessionBatchContext`, `BatchProcessor`
 - Added `batchProcessors: Map<string, BatchProcessor>` to SessionManager
 - In workspace init block: created `BatchProcessor` per workspace with callbacks for `onExecutePrompt`, `onProgress`, `onBatchComplete`, `onError`; called `ensureConfigIds()`
+- `onExecutePrompt` callback passes `params.automationName` (e.g. `"Batch: <name> — <itemId>"`) to `executePromptAutomation()` for session naming and `triggeredBy` metadata
 - Added `onBatchesConfigChange` callback in ConfigWatcher init: reloads batch processor config, broadcasts change event
-- Modified `executePromptAutomation()`: added `hidden` and `batchContext` parameters
+- Modified `executePromptAutomation()`: added `hidden` and `batchContext` parameters (upstream v0.7.1 added `automationName` — both coexist)
 - In session creation: passes `hidden` flag, registers batch context via `registerSessionBatchContext()`
 - In session completion handler: notifies all batch processors via `onSessionComplete()`
 - Added `broadcastBatchesChanged()` method using `eventSink` pattern
@@ -359,7 +368,7 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **Why:** SessionManager owns batch processor lifecycle, similar to how it owns automation systems.
 
-**Pattern followed:** Mirrors the automationSystems management pattern exactly (per-workspace Map, init in workspace block, dispose, broadcast).
+**Pattern followed:** Mirrors the automationSystems management pattern exactly (per-workspace Map, init in workspace block, dispose, broadcast). The `automationName` passthrough follows the same pattern as upstream's automation scheduler path.
 
 **Conflict likelihood:** HIGH — SessionManager is a large, frequently-changed file. The workspace init block, `executePromptAutomation()`, session completion handler, and `dispose()` are all hot zones.
 
@@ -367,11 +376,11 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 
 **What we changed:**
 - Added `getBatchProcessor?()` method returning `BatchProcessor | undefined`
-- Extended `executePromptAutomation()` signature with `hidden` and `batchContext` parameters
+- Extended `executePromptAutomation()` signature with `hidden` and `batchContext` parameters (upstream v0.7.1 added `automationName` — all three coexist)
 
 **Pattern followed:** Optional method pattern for batch processor access.
 
-**Conflict likelihood:** MEDIUM — if upstream changes the interface signature.
+**Conflict likelihood:** MEDIUM — this was a 3-way conflict in v0.7.1 merge (our `hidden`/`batchContext` vs upstream's `automationName`). Future upstream signature changes will conflict again.
 
 ### 2.23 `packages/shared/src/protocol/channels.ts`
 
@@ -525,7 +534,7 @@ These are the upstream interfaces/functions our batch code depends on. If upstre
 | `ConfigFileDetection` | `config/validators.ts` | `'batch-config'` variant |
 | `SessionToolFilterOptions` | `session-tools-core/tool-defs.ts` | `includeBatchOutput?: boolean` |
 | `ContextBlockOptions` | `agent/core/types.ts` | `batchOutputSchema?: Record<string, unknown>` |
-| `ISessionManager` | `server-core/handlers/session-manager-interface.ts` | `getBatchProcessor?()`, `batchContext` param |
+| `ISessionManager` | `server-core/handlers/session-manager-interface.ts` | `getBatchProcessor?()`, `hidden` + `batchContext` params (coexist with upstream's `automationName`) |
 | `SessionEvent` | `shared/protocol/dto.ts` | `batch_progress`, `batch_complete` |
 | `RPC_CHANNELS` | `shared/protocol/channels.ts` | `batches.*` namespace |
 | `BroadcastEventMap` | `shared/protocol/events.ts` | `batches.CHANGED` entry |
@@ -551,7 +560,7 @@ These are the upstream interfaces/functions our batch code depends on. If upstre
 | `buildTextPrompt()` | `agent/claude-agent.ts` | Read batch context, pass `batchOutputSchema` to `buildContextParts()` |
 | `buildTextPrompt()` | `agent/pi-agent.ts` | Same as ClaudeAgent |
 | `getSessionSafeAllowedToolNames()` call | `agent/mode-manager.ts` | Added `includeBatchOutput: true` |
-| `executePromptAutomation()` | `server-core sessions/SessionManager.ts` | Added `hidden` + `batchContext` params |
+| `executePromptAutomation()` | `server-core sessions/SessionManager.ts` | Added `hidden` + `batchContext` params; batch processor also passes `automationName` for session naming |
 | Session completion handler | `server-core sessions/SessionManager.ts` | Notify batch processors |
 | `dispose()` | `server-core sessions/SessionManager.ts` | Clean up batch processors |
 | `broadcastBatchesChanged()` | `server-core sessions/SessionManager.ts` | Uses `eventSink` pattern |
@@ -592,7 +601,8 @@ When merging upstream updates:
 6. **If upstream restructures RPC handlers**: check our `packages/server-core/src/handlers/rpc/batches.ts` follows the new pattern
 7. **If upstream changes protocol layer**: ensure `RPC_CHANNELS.batches.*`, `SessionEvent` batch variants, and `BroadcastEventMap` batch entry are present
 8. **If upstream changes transport layer**: ensure `channel-map.ts` has our 10 batch method mappings
-9. **After merge, run tests**: `bun test packages/shared/src/batches/` and `bun test packages/session-tools-core/`
+9. **If upstream changes `executePromptAutomation()` signature or `triggeredBy` metadata**: ensure our `hidden`, `batchContext`, and `automationName` passthrough still works in the batch processor `onExecutePrompt` callback
+10. **After merge, run tests**: `bun test packages/shared/src/batches/` and `bun test packages/session-tools-core/`
 
 ---
 
@@ -602,3 +612,4 @@ When merging upstream updates:
 |-----------------|------|-----------|-------|
 | v0.7.0 | 2026-03-06 | 9 (2 modify/delete + 7 content) | Major RPC/transport refactoring. Ported batch IPC handlers → `rpc/batches.ts`, preload methods → `channel-map.ts`, types → protocol layer. |
 | post-merge | 2026-03-06 | — | Batch refinements: LLM string coercion in batch_output, safe mode allowlist fix, ajv schema validation, one-shot menu simplification (removed enable/disable + restart), output instructions moved from user prompt to context injection. |
+| v0.7.1 | 2026-03-06 | 3 (`bun.lock`, `session-manager-interface.ts`, `SessionManager.ts`) | Version bump + session naming. Merged our `hidden`/`batchContext` with upstream's `automationName` param. Adapted batch processor to pass `automationName` for session titles and `triggeredBy` metadata. Upstream also added auth retry refactoring, spawn ENOENT recovery, PiAgent global token mutex, branch preflight timeout. |
