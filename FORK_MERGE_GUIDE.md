@@ -4,7 +4,7 @@
 > Its purpose is to serve as a reference when merging upstream updates, helping to identify conflict zones,
 > understand the intent of each change, and make informed resolution decisions.
 >
-> **Last updated after:** v0.7.1 merge + batch session naming adaptation
+> **Last updated after:** v0.7.1 merge + batch session naming adaptation + Pi SDK batch_output fix
 
 ## Overview
 
@@ -198,12 +198,26 @@ For each file, we document: what we changed, why, and which upstream pattern we 
 **What we changed:**
 - Added import: `getSessionBatchContext` from `session-scoped-tools.ts`
 - In prompt building: reads batch context and passes `batchOutputSchema` to `buildContextParts()`
+- In `setupTools()`: derives `isBatchSession` from batch context, passes `{ includeBatchOutput: isBatchSession }` to `getSessionToolProxyDefs()` so `batch_output` tool is registered for Pi SDK sessions
+- In `createSessionToolContext()`: passes `batchContext: getSessionBatchContext(sessionId)` to the context object so `batch_output` handler can access batch metadata
 
-**Why:** Ensures batch output instructions are injected as hidden context for PiAgent-backed sessions (non-Claude LLMs).
+**Why:** Ensures batch output instructions are injected as hidden context for PiAgent-backed sessions (non-Claude LLMs). Also ensures the `batch_output` tool is actually registered and functional in Pi SDK sessions (without the tool proxy def, the LLM cannot call it; without `batchContext` in the tool context, the handler rejects calls).
 
-**Pattern followed:** Same as how `sourceManager.formatSourceState()` is passed to `buildContextParts()`.
+**Pattern followed:** Same as how `sourceManager.formatSourceState()` is passed to `buildContextParts()`. The `includeBatchOutput` flag follows the `includeDeveloperFeedback` pattern in `getSessionToolProxyDefs()`. The `batchContext` passthrough mirrors how `onAuthRequest` is passed to `SessionToolContext`.
 
-**Conflict likelihood:** MEDIUM — if upstream changes PiAgent's prompt building flow.
+**Conflict likelihood:** MEDIUM — if upstream changes PiAgent's `setupTools()`, `createSessionToolContext()`, or prompt building flow.
+
+### 2.5a `packages/shared/src/agent/backend/pi/session-tool-defs.ts`
+
+**What we changed:**
+- Extended `getSessionToolProxyDefs()` signature: added optional `opts?: { includeBatchOutput?: boolean }` parameter
+- Passes `includeBatchOutput` through to `getToolDefsAsJsonSchema()`
+
+**Why:** Pi SDK sessions proxy session tools via JSON Schema definitions sent to the external LLM. Without this, `batch_output` was always excluded from the proxy tool list, making it invisible to Pi SDK-backed batch sessions.
+
+**Pattern followed:** Same as how `includeDeveloperFeedback` is already passed to `getToolDefsAsJsonSchema()` in this function.
+
+**Conflict likelihood:** LOW — small additive change, but in a file upstream may touch if adding new tool filter options.
 
 ### 2.6 `packages/shared/src/agent/core/prompt-builder.ts`
 
@@ -559,6 +573,9 @@ These are the upstream interfaces/functions our batch code depends on. If upstre
 | `buildContextParts()` | `agent/core/prompt-builder.ts` | Inject `<batch_output_instructions>` when `batchOutputSchema` present |
 | `buildTextPrompt()` | `agent/claude-agent.ts` | Read batch context, pass `batchOutputSchema` to `buildContextParts()` |
 | `buildTextPrompt()` | `agent/pi-agent.ts` | Same as ClaudeAgent |
+| `setupTools()` | `agent/pi-agent.ts` | Pass `includeBatchOutput` to `getSessionToolProxyDefs()` for batch sessions |
+| `createSessionToolContext()` | `agent/pi-agent.ts` | Pass `batchContext` to `SessionToolContext` |
+| `getSessionToolProxyDefs()` | `agent/backend/pi/session-tool-defs.ts` | Accept and propagate `includeBatchOutput` option |
 | `getSessionSafeAllowedToolNames()` call | `agent/mode-manager.ts` | Added `includeBatchOutput: true` |
 | `executePromptAutomation()` | `server-core sessions/SessionManager.ts` | Added `hidden` + `batchContext` params; batch processor also passes `automationName` for session naming |
 | Session completion handler | `server-core sessions/SessionManager.ts` | Notify batch processors |
