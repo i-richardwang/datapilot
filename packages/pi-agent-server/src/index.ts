@@ -152,6 +152,9 @@ let unsubscribeEvents: (() => void) | null = null;
 // Init config (set on 'init' message)
 let initConfig: Extract<InboundMessage, { type: 'init' }> | null = null;
 
+// Custom baseUrl override for a known provider (set on 'init' when user provides a custom endpoint)
+let customBaseUrlOverride: { provider: string; baseUrl: string } | null = null;
+
 // Mutable state
 let currentUserMessage = '';
 
@@ -347,7 +350,27 @@ function createAuthenticatedRegistry(): {
     authStorage.set('anthropic', { type: 'api_key', key: initConfig.apiKey });
     debugLog('Injected API key into auth storage (legacy fallback)');
   }
-  return { authStorage, modelRegistry: new PiModelRegistry(authStorage) };
+  const modelRegistry = new PiModelRegistry(authStorage);
+
+  // Apply custom baseUrl override if the user configured a custom endpoint for a known provider.
+  // This uses the Pi SDK's registerProvider override-only mode (no models array) to update
+  // the baseUrl of all existing models for this provider.
+  if (customBaseUrlOverride) {
+    modelRegistry.registerProvider(customBaseUrlOverride.provider, {
+      baseUrl: customBaseUrlOverride.baseUrl,
+    });
+    // Disable features that custom endpoints may not support (e.g. the 'developer' role).
+    // Pi SDK auto-detects supportsDeveloperRole=true for known provider URLs, but a custom
+    // proxy/endpoint likely only supports 'user' and 'assistant' roles.
+    for (const model of modelRegistry.models) {
+      if (model.provider === customBaseUrlOverride.provider) {
+        model.compat = { ...model.compat, supportsDeveloperRole: false };
+      }
+    }
+    debugLog(`Applied baseUrl override for provider ${customBaseUrlOverride.provider}: ${customBaseUrlOverride.baseUrl}`);
+  }
+
+  return { authStorage, modelRegistry };
 }
 
 async function ensureSession(): Promise<AgentSession> {
@@ -970,6 +993,17 @@ async function handleInit(msg: Extract<InboundMessage, { type: 'init' }>): Promi
   if (msg.piAuth?.provider === 'azure-openai-responses' && msg.baseUrl) {
     process.env.AZURE_OPENAI_BASE_URL = msg.baseUrl;
     debugLog(`Set AZURE_OPENAI_BASE_URL=${msg.baseUrl}`);
+  }
+
+  // Custom baseUrl override: when the user provides a custom endpoint for a known
+  // provider (e.g. OpenRouter with a proxy URL), apply it as a provider-level
+  // baseUrl override in the model registry. This updates all models for that
+  // provider to use the custom endpoint instead of the built-in default.
+  if (msg.baseUrl?.trim() && msg.piAuth?.provider && msg.piAuth.provider !== 'azure-openai-responses') {
+    customBaseUrlOverride = { provider: msg.piAuth.provider, baseUrl: msg.baseUrl.trim() };
+    debugLog(`Custom baseUrl override for provider ${msg.piAuth.provider}: ${msg.baseUrl.trim()}`);
+  } else {
+    customBaseUrlOverride = null;
   }
 
   // Start callback server for call_llm (idempotent — skips if already running)
