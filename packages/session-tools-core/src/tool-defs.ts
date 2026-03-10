@@ -476,7 +476,7 @@ export const SESSION_TOOL_DEFS: SessionToolDef[] = [
   { name: 'browser_tool', description: TOOL_DESCRIPTIONS.browser_tool, inputSchema: BrowserToolSchema, executionMode: 'backend', safeMode: 'allow', handler: null },
 ];
 
-/** Tools excluded in lite mode (OAuth, browser, and validation tools not needed) */
+/** Tools excluded in lite mode (OAuth, browser, validation, and template tools not needed) */
 export const LITE_EXCLUDED_TOOLS = new Set([
   'source_oauth_trigger',
   'source_google_oauth_trigger',
@@ -485,6 +485,7 @@ export const LITE_EXCLUDED_TOOLS = new Set([
   'browser_tool',
   'mermaid_validate',
   'skill_validate',
+  'render_template',
 ]);
 
 export interface SessionToolFilterOptions {

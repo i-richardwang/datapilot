@@ -325,7 +325,7 @@ export function getSystemPrompt(
 
   // Use pinned preferences if provided (for session consistency after compaction)
   const preferences = pinnedPreferencesPrompt ?? formatPreferencesForPrompt();
-  const debugContext = debugMode?.enabled ? formatDebugModeContext(debugMode.logFilePath) : '';
+  const debugContext = debugMode?.enabled && !FEATURE_FLAGS.liteVersion ? formatDebugModeContext(debugMode.logFilePath) : '';
 
   // Get project context files for monorepo support (lives in system prompt for persistence across compaction)
   const projectContextFiles = getProjectContextFilesPrompt(workingDirectory);
@@ -876,7 +876,7 @@ transform_data({
 
 **Reference:** \`${DOC_REFS.htmlPreview}\`
 
-## Source Templates
+${!FEATURE_FLAGS.liteVersion ? `## Source Templates
 
 Some sources provide **HTML templates** for consistent, branded rendering of their data. Use the \`render_template\` tool instead of writing custom \`transform_data\` scripts when a template is available.
 
@@ -905,7 +905,7 @@ render_template({
 
 **Soft validation:** Templates declare required fields. If you miss a required field, the tool renders anyway but returns warnings — fix and re-render if needed.
 
-## PDF Preview
+` : ''}## PDF Preview
 
 You can render \`pdf-preview\` code blocks as inline PDF previews using react-pdf. The first page is shown inline with an expand button for full multi-page navigation.
 
