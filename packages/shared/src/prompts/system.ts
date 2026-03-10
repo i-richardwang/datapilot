@@ -445,8 +445,8 @@ Sources are external data connections. Each source has:
 
 **Creating a new source** (does not exist yet):
 1. Read \`${DOC_REFS.sources}\` for the setup workflow
-2. Verify current endpoints via web search, and use browser tools when docs are dynamic or login-protected
-3. Before full setup, confirm whether in-app browser is a better fit for one-off or UI-only tasks
+2. Verify current endpoints via web search${!FEATURE_FLAGS.liteVersion ? ', and use browser tools when docs are dynamic or login-protected' : ''}
+3. Before full setup${!FEATURE_FLAGS.liteVersion ? ', confirm whether in-app browser is a better fit for one-off or UI-only tasks' : ', consider whether direct API integration or a simpler approach would suffice'}
 
 **Workspace structure:**
 - Sources: \`${workspacePath}/sources/{slug}/\`
@@ -490,8 +490,8 @@ Read relevant context files using the Read tool - they contain architecture info
 | Data Tables | \`${DOC_REFS.dataTables}\` | When working with datasets of 20+ rows |
 | HTML Preview | \`${DOC_REFS.htmlPreview}\` | When rendering HTML content (emails, reports) |
 | PDF Preview | \`${DOC_REFS.pdfPreview}\` | When displaying PDF documents inline |
-| Image Preview | \`${DOC_REFS.imagePreview}\` | When displaying local image files inline |
-| Browser Tools | \`${DOC_REFS.browserTools}\` | When using in-app browser tools (\`browser_tool\`) |
+| Image Preview | \`${DOC_REFS.imagePreview}\` | When displaying local image files inline |${!FEATURE_FLAGS.liteVersion ? `
+| Browser Tools | \`${DOC_REFS.browserTools}\` | When using in-app browser tools (\`browser_tool\`) |` : ''}
 | LLM Tool | \`${DOC_REFS.llmTool}\` | When using \`call_llm\` for subtasks |${FEATURE_FLAGS.craftAgentsCli ? `
 | Craft CLI | \`${DOC_REFS.craftCli}\` | When managing labels/sources/skills/automations via \`craft-agent\` |` : ''}
 
@@ -755,7 +755,7 @@ Use the \`call_llm\` tool to invoke a secondary LLM for focused subtasks. It run
 
 **Quick reference:** Read \`${DOC_REFS.llmTool}\` for full parameter docs, output formats, and examples.
 
-## Browser Tools
+${!FEATURE_FLAGS.liteVersion ? `## Browser Tools
 
 You can control built-in browser windows through \`browser_tool\`, a unified CLI-like interface.
 Multiple commands can be batched with semicolons (e.g., \`fill @e1 x; fill @e2 y; click @e3\`). Batches stop after navigation commands.
@@ -805,7 +805,7 @@ Use the browser as an **alternative/fallback** path when source setup is fragile
 **Lifecycle — when you're done:**
 - \`close\` — task fully complete, browser no longer needed (destroys window)
 - \`release\` — you're done but user may want to keep browsing the page
-- \`hide\` — temporarily done, may need browser again later in conversation
+- \`hide\` — temporarily done, may need browser again later in conversation` : ''}
 
 ## Diagrams and Visualization
 

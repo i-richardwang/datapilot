@@ -476,12 +476,13 @@ export const SESSION_TOOL_DEFS: SessionToolDef[] = [
   { name: 'browser_tool', description: TOOL_DESCRIPTIONS.browser_tool, inputSchema: BrowserToolSchema, executionMode: 'backend', safeMode: 'allow', handler: null },
 ];
 
-/** Tools excluded in lite mode (OAuth not needed) */
+/** Tools excluded in lite mode (OAuth and browser not needed) */
 export const LITE_EXCLUDED_TOOLS = new Set([
   'source_oauth_trigger',
   'source_google_oauth_trigger',
   'source_slack_oauth_trigger',
   'source_microsoft_oauth_trigger',
+  'browser_tool',
 ]);
 
 export interface SessionToolFilterOptions {
