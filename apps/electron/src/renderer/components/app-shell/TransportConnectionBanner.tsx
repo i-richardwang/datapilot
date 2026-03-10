@@ -65,8 +65,8 @@ function getFailureReason(state: TransportConnectionState): string {
   if (err) {
     if (err.kind === 'auth') return 'Authentication failed. Verify CRAFT_SERVER_TOKEN.'
     if (err.kind === 'protocol') return 'Protocol mismatch between client and server versions.'
-    if (err.kind === 'timeout') return 'Connection timed out. Server may be unreachable.'
-    if (err.kind === 'network') return 'Network connection failed. Check host, port, and firewall.'
+    if (err.kind === 'timeout') return `Connection to ${state.url} timed out. Server may be unreachable.`
+    if (err.kind === 'network') return `Could not connect to ${state.url}. Is the remote server running?`
     return err.message
   }
 

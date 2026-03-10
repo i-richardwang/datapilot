@@ -28,6 +28,14 @@ export type {
   MessageAttachment,
   StoredAttachment,
   ContentBadge,
+  AnnotationAuthor,
+  AnnotationBody,
+  AnnotationIntent,
+  AnnotationStatus,
+  AnnotationBlockType,
+  AnnotationSelector,
+  AnnotationTarget,
+  AnnotationV1,
   Message,
   StoredMessage,
   TokenUsage,
@@ -42,4 +50,7 @@ export type {
   AuthStatus,
 } from './message.ts';
 export { generateMessageId } from './message.ts';
+
+// Message persistence mappers
+export { messageToStored, storedToMessage } from './message-mapper.ts';
 

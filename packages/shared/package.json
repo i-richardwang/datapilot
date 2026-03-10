@@ -1,6 +1,6 @@
 {
   "name": "@craft-agent/shared",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "license": "Apache-2.0",
   "description": "Shared business logic for Craft Agents - agent, auth, config, credentials, MCP integration",
   "type": "module",
@@ -8,7 +8,8 @@
   "types": "src/index.ts",
   "scripts": {
     "test": "bun test",
-    "test:watch": "bun test --watch"
+    "test:watch": "bun test --watch",
+    "sync:craft-agent-bash-patterns": "bun run src/config/sync-craft-agent-bash-patterns.ts"
   },
   "exports": {
     ".": "./src/index.ts",
@@ -29,6 +30,7 @@
     "./sessions": "./src/sessions/index.ts",
     "./sources": "./src/sources/index.ts",
     "./sources/types": "./src/sources/types.ts",
+    "./skills": "./src/skills/index.ts",
     "./workspaces": "./src/workspaces/index.ts",
     "./utils": "./src/utils/index.ts",
     "./utils/toolNames": "./src/utils/toolNames.ts",
@@ -43,6 +45,7 @@
     "./labels": "./src/labels/index.ts",
     "./labels/auto": "./src/labels/auto/index.ts",
     "./labels/storage": "./src/labels/storage.ts",
+    "./labels/crud": "./src/labels/crud.ts",
     "./views": "./src/views/index.ts",
     "./views/storage": "./src/views/storage.ts",
     "./validation": "./src/validation/index.ts",
@@ -68,7 +71,9 @@
     "croner": "^10.0.1",
     "filtrex": "^3.1.0",
     "incr-regex-package": "^1.0.4",
-    "shell-quote": "^1.8.3"
+    "shell-quote": "^1.8.3",
+    "@mariozechner/pi-ai": "0.56.2",
+    "glob": "^13.0.0"
   },
   "peerDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.19",

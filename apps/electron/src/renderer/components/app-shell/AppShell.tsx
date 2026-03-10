@@ -2092,7 +2092,7 @@ function AppShellContent({
       return 'All Skills'
     }
 
-    // Tasks navigator
+    // Automations navigator
     if (isAutomationsNavigation(navState)) {
       if (!automationFilter) return 'All Automations'
       switch (automationFilter.automationType) {
@@ -2222,7 +2222,7 @@ function AppShellContent({
       {/* === OUTER LAYOUT: Unified Panel Stack | Right Sidebar === */}
       <div
         className="flex items-stretch relative"
-        style={{ height: 'calc(100% - 48px)', marginTop: 48, paddingRight: PANEL_EDGE_INSET, paddingBottom: PANEL_EDGE_INSET, paddingLeft: 0, gap: PANEL_GAP }}
+        style={{ height: '100%', paddingRight: PANEL_EDGE_INSET, paddingBottom: PANEL_EDGE_INSET, paddingLeft: 0, gap: PANEL_GAP }}
       >
         <PanelStackContainer
           sidebarSlot={
@@ -3125,7 +3125,7 @@ function AppShellContent({
                       {...getEditConfig('add-skill', activeWorkspace.rootPath)}
                     />
                   )}
-                  {/* Add Automation button (only for tasks mode) */}
+                  {/* Add Automation button (only for automations mode) */}
                   {isAutomationsNavigation(navState) && activeWorkspace && (
                     <EditPopover
                       trigger={
@@ -3470,7 +3470,7 @@ function AppShellContent({
             align="start"
             {...getEditConfig('add-skill', activeWorkspace.rootPath)}
           />
-          {/* Add Automation EditPopover - triggered from "Add Automation" context menu on tasks */}
+          {/* Add Automation EditPopover - triggered from "Add Automation" context menu in automations */}
           <EditPopover
             open={editPopoverOpen === 'automation-config'}
             onOpenChange={(isOpen) => setEditPopoverOpen(isOpen ? 'automation-config' : null)}

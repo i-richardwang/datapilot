@@ -16,6 +16,7 @@ import { SplashScreen } from '@/components/SplashScreen'
 import { TooltipProvider } from '@craft-agent/ui'
 import { FocusProvider } from '@/context/FocusContext'
 import { ModalProvider } from '@/context/ModalContext'
+import { DismissibleLayerProvider } from '@/context/DismissibleLayerContext'
 import { useWindowCloseHandler } from '@/hooks/useWindowCloseHandler'
 import { useOnboarding } from '@/hooks/useOnboarding'
 import { useNotifications } from '@/hooks/useNotifications'
@@ -1527,18 +1528,20 @@ export default function App() {
   // ModalProvider + WindowCloseHandler ensures X button works on Windows
   if (appState === 'reauth') {
     return (
-      <ModalProvider>
-        <WindowCloseHandler />
-        <ReauthScreen
-          onLogin={handleReauthLogin}
-          onReset={handleReauthReset}
-        />
-        <ResetConfirmationDialog
-          open={showResetDialog}
-          onConfirm={executeReset}
-          onCancel={() => setShowResetDialog(false)}
-        />
-      </ModalProvider>
+      <DismissibleLayerProvider>
+        <ModalProvider>
+          <WindowCloseHandler />
+          <ReauthScreen
+            onLogin={handleReauthLogin}
+            onReset={handleReauthReset}
+          />
+          <ResetConfirmationDialog
+            open={showResetDialog}
+            onConfirm={executeReset}
+            onCancel={() => setShowResetDialog(false)}
+          />
+        </ModalProvider>
+      </DismissibleLayerProvider>
     )
   }
 
@@ -1547,28 +1550,30 @@ export default function App() {
   // (without this, the close IPC message has no listener and window stays open)
   if (appState === 'onboarding') {
     return (
-      <ModalProvider>
-        <WindowCloseHandler />
-        <OnboardingWizard
-          state={onboarding.state}
-          onContinue={onboarding.handleContinue}
-          onBack={onboarding.handleBack}
-          onSelectProvider={onboarding.handleSelectProvider}
-          onSelectApiSetupMethod={onboarding.handleSelectApiSetupMethod}
-          onSubmitCredential={onboarding.handleSubmitCredential}
-          onSubmitLocalModel={onboarding.handleSubmitLocalModel}
-          onStartOAuth={onboarding.handleStartOAuth}
-          onFinish={onboarding.handleFinish}
-          isWaitingForCode={onboarding.isWaitingForCode}
-          onSubmitAuthCode={onboarding.handleSubmitAuthCode}
-          onCancelOAuth={onboarding.handleCancelOAuth}
-          copilotDeviceCode={onboarding.copilotDeviceCode}
-          onBrowseGitBash={onboarding.handleBrowseGitBash}
-          onUseGitBashPath={onboarding.handleUseGitBashPath}
-          onRecheckGitBash={onboarding.handleRecheckGitBash}
-          onClearError={onboarding.handleClearError}
-        />
-      </ModalProvider>
+      <DismissibleLayerProvider>
+        <ModalProvider>
+          <WindowCloseHandler />
+          <OnboardingWizard
+            state={onboarding.state}
+            onContinue={onboarding.handleContinue}
+            onBack={onboarding.handleBack}
+            onSelectProvider={onboarding.handleSelectProvider}
+            onSelectApiSetupMethod={onboarding.handleSelectApiSetupMethod}
+            onSubmitCredential={onboarding.handleSubmitCredential}
+            onSubmitLocalModel={onboarding.handleSubmitLocalModel}
+            onStartOAuth={onboarding.handleStartOAuth}
+            onFinish={onboarding.handleFinish}
+            isWaitingForCode={onboarding.isWaitingForCode}
+            onSubmitAuthCode={onboarding.handleSubmitAuthCode}
+            onCancelOAuth={onboarding.handleCancelOAuth}
+            copilotDeviceCode={onboarding.copilotDeviceCode}
+            onBrowseGitBash={onboarding.handleBrowseGitBash}
+            onUseGitBashPath={onboarding.handleUseGitBashPath}
+            onRecheckGitBash={onboarding.handleRecheckGitBash}
+            onClearError={onboarding.handleClearError}
+          />
+        </ModalProvider>
+      </DismissibleLayerProvider>
     )
   }
 
@@ -1581,6 +1586,7 @@ export default function App() {
     <ShikiThemeProvider shikiTheme={shikiTheme}>
       <ActionRegistryProvider>
       <FocusProvider>
+        <DismissibleLayerProvider>
         <ModalProvider>
         <TooltipProvider delayDuration={0}>
         <NavigationProvider
@@ -1606,7 +1612,7 @@ export default function App() {
           )}
 
           {/* Main UI - always rendered, splash fades away to reveal it */}
-          <div className="h-full flex flex-col text-foreground">
+          <div className="h-full flex flex-col pt-[48px] text-foreground">
             {showTransportConnectionBanner && transportConnectionState && (
               <TransportConnectionBanner
                 state={transportConnectionState}
@@ -1642,6 +1648,7 @@ export default function App() {
         </NavigationProvider>
         </TooltipProvider>
         </ModalProvider>
+        </DismissibleLayerProvider>
       </FocusProvider>
       </ActionRegistryProvider>
     </ShikiThemeProvider>

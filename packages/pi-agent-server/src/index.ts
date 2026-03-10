@@ -70,6 +70,7 @@ type InboundMessage =
   | { type: 'mini_completion'; id: string; prompt: string }
   | { type: 'ensure_session_ready'; id: string }
   | { type: 'set_model'; model: string }
+  | { type: 'set_thinking_level'; level: string }
   | { type: 'compact'; id: string; customInstructions?: string }
   | { type: 'set_auto_compaction'; id: string; enabled: boolean }
   | { type: 'steer'; message: string }
@@ -1246,6 +1247,34 @@ async function handleSetModel(msg: Extract<InboundMessage, { type: 'set_model' }
   }
 }
 
+async function handleSetThinkingLevel(msg: Extract<InboundMessage, { type: 'set_thinking_level' }>): Promise<void> {
+  debugLog(`[set_thinking_level] Received: ${msg.level}`);
+
+  if (!piSession) {
+    debugLog('[set_thinking_level] No active session, ignoring');
+    return;
+  }
+
+  if (msg.level !== 'off' && msg.level !== 'think' && msg.level !== 'max') {
+    debugLog(`[set_thinking_level] Invalid level: ${msg.level}`);
+    return;
+  }
+
+  const piLevel = THINKING_TO_PI[msg.level];
+  if (!piLevel) {
+    debugLog(`[set_thinking_level] No Pi mapping for level: ${msg.level}`);
+    return;
+  }
+
+  try {
+    piSession.setThinkingLevel(piLevel);
+    debugLog(`[set_thinking_level] Thinking level changed to: ${msg.level} (mapped: ${piLevel})`);
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    debugLog(`[set_thinking_level] Failed to set thinking level: ${errorMsg}`);
+  }
+}
+
 function handleShutdown(): void {
   debugLog('Shutdown requested');
 
@@ -1318,6 +1347,10 @@ async function processMessage(msg: InboundMessage): Promise<void> {
 
     case 'set_model':
       await handleSetModel(msg);
+      break;
+
+    case 'set_thinking_level':
+      await handleSetThinkingLevel(msg);
       break;
 
     case 'compact':

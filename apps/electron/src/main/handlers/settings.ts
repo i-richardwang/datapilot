@@ -95,44 +95,51 @@ export function registerSettingsHandlers(server: RpcServer, deps: HandlerDeps): 
   // Update a workspace setting
   // Valid keys: 'name', 'model', 'enabledSourceSlugs', 'permissionMode', 'cyclablePermissionModes', 'thinkingLevel', 'workingDirectory', 'localMcpEnabled', 'defaultLlmConnection'
   server.handle(RPC_CHANNELS.workspace.SETTINGS_UPDATE, async (_ctx, workspaceId: string, key: string, value: unknown) => {
-    const workspace = getWorkspaceOrThrow(workspaceId)
+    try {
+      deps.platform.logger.info(`Workspace setting update requested: workspace=${workspaceId}, key=${key}, value=${JSON.stringify(value)}`)
 
-    // Validate key is a known workspace setting
-    const validKeys = ['name', 'model', 'enabledSourceSlugs', 'permissionMode', 'cyclablePermissionModes', 'thinkingLevel', 'workingDirectory', 'localMcpEnabled', 'defaultLlmConnection']
-    if (!validKeys.includes(key)) {
-      throw new Error(`Invalid workspace setting key: ${key}. Valid keys: ${validKeys.join(', ')}`)
-    }
+      const workspace = getWorkspaceOrThrow(workspaceId)
 
-    // Validate defaultLlmConnection exists before saving
-    if (key === 'defaultLlmConnection' && value !== undefined && value !== null) {
-      const { getLlmConnection } = await import('@craft-agent/shared/config/storage')
-      if (!getLlmConnection(value as string)) {
-        throw new Error(`LLM connection "${value}" not found`)
+      // Validate key is a known workspace setting
+      const validKeys = ['name', 'model', 'enabledSourceSlugs', 'permissionMode', 'cyclablePermissionModes', 'thinkingLevel', 'workingDirectory', 'localMcpEnabled', 'defaultLlmConnection']
+      if (!validKeys.includes(key)) {
+        throw new Error(`Invalid workspace setting key: ${key}. Valid keys: ${validKeys.join(', ')}`)
       }
-    }
 
-    const { loadWorkspaceConfig, saveWorkspaceConfig } = await import('@craft-agent/shared/workspaces')
-    const config = loadWorkspaceConfig(workspace.rootPath)
-    if (!config) {
-      throw new Error(`Failed to load workspace config: ${workspaceId}`)
-    }
+      // Validate defaultLlmConnection exists before saving
+      if (key === 'defaultLlmConnection' && value !== undefined && value !== null) {
+        const { getLlmConnection } = await import('@craft-agent/shared/config/storage')
+        if (!getLlmConnection(value as string)) {
+          throw new Error(`LLM connection "${value}" not found`)
+        }
+      }
 
-    // Handle 'name' specially - it's a top-level config property, not in defaults
-    if (key === 'name') {
-      config.name = String(value).trim()
-    } else if (key === 'localMcpEnabled') {
-      // Store in localMcpServers.enabled (top-level, not in defaults)
-      config.localMcpServers = config.localMcpServers || { enabled: true }
-      config.localMcpServers.enabled = Boolean(value)
-    } else {
-      // Update the setting in defaults
-      config.defaults = config.defaults || {}
-      ;(config.defaults as Record<string, unknown>)[key] = value
-    }
+      const { loadWorkspaceConfig, saveWorkspaceConfig } = await import('@craft-agent/shared/workspaces')
+      const config = loadWorkspaceConfig(workspace.rootPath)
+      if (!config) {
+        throw new Error(`Failed to load workspace config: ${workspaceId}`)
+      }
 
-    // Save the config
-    saveWorkspaceConfig(workspace.rootPath, config)
-    deps.platform.logger.info(`Workspace setting updated: ${key} = ${JSON.stringify(value)}`)
+      // Handle 'name' specially - it's a top-level config property, not in defaults
+      if (key === 'name') {
+        config.name = String(value).trim()
+      } else if (key === 'localMcpEnabled') {
+        // Store in localMcpServers.enabled (top-level, not in defaults)
+        config.localMcpServers = config.localMcpServers || { enabled: true }
+        config.localMcpServers.enabled = Boolean(value)
+      } else {
+        // Update the setting in defaults
+        config.defaults = config.defaults || {}
+        ;(config.defaults as Record<string, unknown>)[key] = value
+      }
+
+      // Save the config
+      saveWorkspaceConfig(workspace.rootPath, config)
+      deps.platform.logger.info(`Workspace setting updated: ${key} = ${JSON.stringify(value)}`)
+    } catch (error) {
+      deps.platform.logger.error(`Failed to update workspace setting: workspace=${workspaceId}, key=${key}`, error)
+      throw error
+    }
   })
 
   // ============================================================

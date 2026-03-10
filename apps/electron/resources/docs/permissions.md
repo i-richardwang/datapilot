@@ -2,6 +2,10 @@
 
 This guide explains how to configure custom permission rules for Explore mode.
 
+> **CLI-first workflow (recommended):** Use `craft-agent permission ...` commands instead of editing JSON directly.
+> - `craft-agent permission --help`
+> - Canonical command reference: [craft-cli.md](./craft-cli.md)
+
 ## Overview
 
 Explore mode is a read-only mode that blocks potentially destructive operations.
@@ -47,6 +51,23 @@ The system converts it to `mcp__<sourceSlug>__.*list` internally. This means:
   "allowedWritePaths": [
     "/tmp/**",
     "~/.craft-agent/**"
+  ],
+  "blockedCommandHints": [
+    {
+      "command": "printf",
+      "reason": "printf is not in the default Explore-mode allowlist.",
+      "context": "Explore mode keeps a narrow read-only command set.",
+      "tryInstead": [
+        "Use echo for simple output",
+        "Switch to Ask mode for this command"
+      ],
+      "example": "echo '--- separator ---'"
+    },
+    {
+      "command": "sed",
+      "reason": "Only print-only sed is allowed by default.",
+      "whenNotMatching": "^sed\\s+-n\\b"
+    }
   ]
 }
 ```
@@ -128,6 +149,41 @@ Glob patterns for directories where writes are allowed.
   ]
 }
 ```
+
+### blockedCommandHints
+
+Command-specific guidance shown when a Bash command is blocked in Explore mode.
+This provides deterministic explanations for known commands instead of relying only on closest-pattern heuristics.
+
+```json
+{
+  "blockedCommandHints": [
+    {
+      "command": "printf",
+      "reason": "printf is not in the default Explore-mode allowlist.",
+      "context": "Explore mode keeps a narrow read-only command set.",
+      "tryInstead": [
+        "Use echo for simple output",
+        "Switch to Ask mode for this command"
+      ],
+      "example": "echo '--- separator ---'"
+    },
+    {
+      "command": "sed",
+      "reason": "Only print-only sed is allowed by default.",
+      "whenNotMatching": "^sed\\s+-n\\b"
+    }
+  ]
+}
+```
+
+Fields:
+- `command` (required): Base command name (e.g. `printf`, `sed`)
+- `reason` (required): Primary explanation shown to the user
+- `context` (optional): Additional policy/risk context
+- `tryInstead` (optional): Suggested alternatives
+- `example` (optional): Example command
+- `whenNotMatching` (optional): Regex condition; hint applies only when command does **not** match this pattern
 
 ## Default Behavior in Explore Mode
 

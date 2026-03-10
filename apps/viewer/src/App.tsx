@@ -10,6 +10,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
+import { FileText } from 'lucide-react'
 import type { StoredSession } from '@craft-agent/core'
 import {
   SessionViewer,
@@ -291,7 +292,7 @@ export function App() {
           onClose={handleCloseOverlay}
           content={overlayData.content}
           filePath={overlayData.filePath}
-          typeBadge={{ label: overlayData.toolName, variant: 'default' }}
+          typeBadge={{ icon: FileText, label: overlayData.toolName, variant: 'default' }}
           onOpenUrl={platformActions.onOpenUrl}
           error={overlayData.error}
         />

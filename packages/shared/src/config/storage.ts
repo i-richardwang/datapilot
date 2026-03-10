@@ -18,6 +18,9 @@ import { CONFIG_DIR } from './paths.ts';
 import type { StoredAttachment, StoredMessage } from '@craft-agent/core/types';
 import type { Plan } from '../agent/plan-types.ts';
 import type { PermissionMode } from '../agent/mode-manager.ts';
+import type { ThinkingLevel } from '../agent/thinking-levels.ts';
+import { isValidThinkingLevel } from '../agent/thinking-levels.ts';
+import { parsePermissionMode, PERMISSION_MODE_ORDER } from '../agent/mode-types.ts';
 import { type ConfigDefaults } from './config-defaults-schema.ts';
 import { isValidThemeFile } from './validators.ts';
 
@@ -47,6 +50,7 @@ export interface StoredConfig {
   // LLM Connections (authoritative source for auth and model config)
   llmConnections?: LlmConnection[];
   defaultLlmConnection?: string;  // Slug of default connection for new sessions
+  defaultThinkingLevel?: ThinkingLevel;  // App-level default thinking level for new sessions
 
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
@@ -110,10 +114,36 @@ function syncConfigDefaults(): void {
  * This file is synced from bundled assets on every launch.
  */
 export function loadConfigDefaults(): ConfigDefaults {
-  if (existsSync(CONFIG_DEFAULTS_FILE)) {
-    return readJsonFileSync<ConfigDefaults>(CONFIG_DEFAULTS_FILE);
+  if (!existsSync(CONFIG_DEFAULTS_FILE)) {
+    throw new Error('config-defaults.json not found at ' + CONFIG_DEFAULTS_FILE + '. Ensure ensureConfigDir() was called at startup.');
   }
-  throw new Error('config-defaults.json not found at ' + CONFIG_DEFAULTS_FILE + '. Ensure ensureConfigDir() was called at startup.');
+
+  const defaults = readJsonFileSync<ConfigDefaults>(CONFIG_DEFAULTS_FILE);
+
+  const parsedPermissionMode =
+    typeof defaults.workspaceDefaults?.permissionMode === 'string'
+      ? parsePermissionMode(defaults.workspaceDefaults.permissionMode)
+      : null;
+  defaults.workspaceDefaults.permissionMode = parsedPermissionMode ?? 'ask';
+
+  const rawCyclable = Array.isArray(defaults.workspaceDefaults?.cyclablePermissionModes)
+    ? defaults.workspaceDefaults.cyclablePermissionModes
+    : [];
+
+  const normalizedCyclable: PermissionMode[] = [];
+  for (const mode of rawCyclable) {
+    if (typeof mode !== 'string') continue;
+    const parsed = parsePermissionMode(mode);
+    if (!parsed) continue;
+    if (!normalizedCyclable.includes(parsed)) {
+      normalizedCyclable.push(parsed);
+    }
+  }
+
+  defaults.workspaceDefaults.cyclablePermissionModes =
+    normalizedCyclable.length >= 2 ? normalizedCyclable : [...PERMISSION_MODE_ORDER];
+
+  return defaults;
 }
 
 /**
@@ -885,6 +915,13 @@ import { readdirSync } from 'fs';
 
 const APP_THEME_FILE = join(CONFIG_DIR, 'theme.json');
 const APP_THEMES_DIR = join(CONFIG_DIR, 'themes');
+
+/**
+ * Get the path to the app-level theme override file (~/.craft-agent/theme.json).
+ */
+export function getAppThemePath(): string {
+  return APP_THEME_FILE;
+}
 
 // Track if preset themes have been synced this session (prevents re-init on hot reload)
 let presetsInitialized = false;
@@ -2248,6 +2285,32 @@ export function setDefaultLlmConnection(slug: string): boolean {
   }
 
   config.defaultLlmConnection = slug;
+  saveConfig(config);
+  return true;
+}
+
+/**
+ * Get the app-level default thinking level for new sessions.
+ * Falls back to bundled config-defaults when unset.
+ */
+export function getDefaultThinkingLevel(): ThinkingLevel {
+  const config = loadStoredConfig();
+  if (config?.defaultThinkingLevel && isValidThinkingLevel(config.defaultThinkingLevel)) {
+    return config.defaultThinkingLevel;
+  }
+  const defaults = loadConfigDefaults();
+  return defaults.workspaceDefaults.thinkingLevel;
+}
+
+/**
+ * Set the app-level default thinking level for new sessions.
+ * @returns true if persisted, false if config could not be loaded
+ */
+export function setDefaultThinkingLevel(level: ThinkingLevel): boolean {
+  const config = loadStoredConfig();
+  if (!config) return false;
+
+  config.defaultThinkingLevel = level;
   saveConfig(config);
   return true;
 }

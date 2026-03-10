@@ -125,7 +125,7 @@ export default [
           'shadow-thin',
           'shadow-middle',
           'shadow-strong',
-          'shadow-focused',
+          'shadow-panel-focused',
           'shadow-modal-small',
           'shadow-bottom-border',
           'shadow-bottom-border-thin',

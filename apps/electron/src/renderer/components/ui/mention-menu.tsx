@@ -65,20 +65,46 @@ function getParentDir(relativePath: string): string {
   return relativePath.slice(0, lastSlash + 1)
 }
 
+/** Check if query characters appear in order within target.
+ *  Returns true if all characters of query are found sequentially in target.
+ *  Note: comparison is literal — pass lowercased inputs for case-insensitive matching. */
+function subsequenceMatch(target: string, query: string): boolean {
+  let qi = 0
+  for (let ti = 0; ti < target.length && qi < query.length; ti++) {
+    if (target[ti] === query[qi]) qi++
+  }
+  return qi === query.length
+}
+
 /** Filter cached FileSearchResults by query and convert to MentionItems.
- *  Used for instant client-side filtering without waiting for IPC. */
+ *  Uses substring matching first (score 2), then subsequence matching as
+ *  fallback (score 1) so queries like "appav" find "app availability.md". */
 function filterCacheResults(cache: FileSearchResult[], query: string): MentionItem[] {
   const lowerQuery = query.toLowerCase()
-  return cache
-    .filter(f => f.name.toLowerCase().includes(lowerQuery) || f.relativePath.toLowerCase().includes(lowerQuery))
+
+  const scored = cache
+    .map(f => {
+      const name = f.name.toLowerCase()
+      const path = f.relativePath.toLowerCase()
+      let score = 0
+      if (name.includes(lowerQuery) || path.includes(lowerQuery)) {
+        score = 2
+      } else if (subsequenceMatch(name, lowerQuery) || subsequenceMatch(path, lowerQuery)) {
+        score = 1
+      }
+      return { f, score }
+    })
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score)
     .slice(0, 20)
-    .map(f => ({
-      id: f.path,
-      type: f.type === 'directory' ? 'folder' as const : 'file' as const,
-      label: f.name,
-      description: f.relativePath,
-      file: { path: f.path, type: f.type, relativePath: f.relativePath },
-    }))
+
+  return scored.map(({ f }) => ({
+    id: f.path,
+    type: f.type === 'directory' ? 'folder' as const : 'file' as const,
+    label: f.name,
+    description: f.relativePath,
+    file: { path: f.path, type: f.type, relativePath: f.relativePath },
+  }))
 }
 
 // ============================================================================
@@ -630,26 +656,28 @@ export function useInlineMention({
       const before = currentValue.slice(0, atStart)
       const after = currentValue.slice(cursorPosition)
 
+      const buildMentionText = (kind: 'skill' | 'source' | 'file' | 'folder', value: string): string =>
+        '[' + kind + ':' + value + '] '
+
       // Build the mention text based on type using bracket syntax.
       // Skills use fully-qualified names (workspaceId:slug) because the SDK's
       // Skill tool requires this format to resolve workspace-scoped skills.
       let mentionText: string
       if (item.type === 'skill') {
-        // Use fully-qualified name for skills: [skill:pluginName:slug]
         // Plugin name depends on which tier the skill came from:
         //   workspace → workspaceId, project/global → ".agents"
         const pluginName = item.skill?.source === 'workspace' ? workspaceId : AGENTS_PLUGIN_NAME
         const qualifiedName = pluginName ? `${pluginName}:${item.id}` : item.id
-        mentionText = `[skill:${qualifiedName}] `
+        mentionText = buildMentionText('skill', qualifiedName)
       } else if (item.type === 'source') {
-        mentionText = `[source:${item.id}] `
+        mentionText = buildMentionText('source', item.id)
       } else if (item.type === 'file') {
         // Use relative path for file mentions
-        mentionText = `[file:${item.file?.relativePath || item.id}] `
+        mentionText = buildMentionText('file', item.file?.relativePath || item.id)
       } else if (item.type === 'folder') {
-        mentionText = `[folder:${item.file?.relativePath || item.id}] `
+        mentionText = buildMentionText('folder', item.file?.relativePath || item.id)
       } else {
-        mentionText = `[skill:${item.id}] `
+        mentionText = buildMentionText('skill', item.id)
       }
 
       result = before + mentionText + after

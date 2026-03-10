@@ -9,6 +9,7 @@ import { createLogger } from '../../utils/debug.ts';
 import type { EventBus, BaseEventPayload } from '../event-bus.ts';
 import type { AutomationHandler, PromptHandlerOptions, AutomationsConfigProvider } from './types.ts';
 import { APP_EVENTS, type AutomationEvent, type PromptAction, type PendingPrompt, type AppEvent } from '../types.ts';
+import type { PermissionMode } from '../../agent/mode-types.ts';
 import { matcherMatches, buildEnvFromPayload, expandEnvVars, parsePromptReferences } from '../utils.ts';
 import { deriveAutomationName } from '../name-utils.ts';
 
@@ -55,13 +56,13 @@ export class PromptHandler implements AutomationHandler {
     const matcherPrompts: Array<{
       matcherId: string | undefined;
       automationName: string;
-      prompts: Array<{ prompt: PromptAction; labels?: string[]; permissionMode?: 'safe' | 'ask' | 'allow-all' }>;
+      prompts: Array<{ prompt: PromptAction; labels?: string[]; permissionMode?: PermissionMode }>;
     }> = [];
 
     for (const matcher of matchers) {
       if (!matcherMatches(matcher, event, payload as unknown as Record<string, unknown>)) continue;
 
-      const prompts: Array<{ prompt: PromptAction; labels?: string[]; permissionMode?: 'safe' | 'ask' | 'allow-all' }> = [];
+      const prompts: Array<{ prompt: PromptAction; labels?: string[]; permissionMode?: PermissionMode }> = [];
       for (const action of matcher.actions) {
         if (action.type === 'prompt') {
           prompts.push({ prompt: action, labels: matcher.labels, permissionMode: matcher.permissionMode });

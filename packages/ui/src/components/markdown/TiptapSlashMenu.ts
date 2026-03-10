@@ -299,8 +299,10 @@ export function createSlashCommandItems(_editor: Editor): SlashCommandItem[] {
       icon: 'text-quote',
       group: 'Blocks',
       aliases: ['blockquote', 'quote', 'callout'],
-      run: (e) => {
-        e.chain().focus().toggleBlockquote().run()
+      run: (e, insertPos) => {
+        const chain = e.chain().focus()
+        if (typeof insertPos === 'number') chain.setTextSelection(insertPos)
+        chain.setBlockquote().run()
       },
     },
     {
@@ -515,7 +517,7 @@ export const TiptapSlashMenu = Extension.create({
           return true
         },
         command: ({ editor, range, props }) => {
-          editor.chain().focus().deleteRange(range).run()
+          editor.chain().focus().deleteRange(range).setTextSelection(range.from).run()
           props.run(editor, range.from)
         },
         render: () => {

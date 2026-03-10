@@ -287,11 +287,17 @@ export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): 
         return sessionManager.setSessionConnection(sessionId, command.connectionSlug)
       // Pending plan execution (Accept & Compact flow)
       case 'setPendingPlanExecution':
-        return sessionManager.setPendingPlanExecution(sessionId, command.planPath)
+        return sessionManager.setPendingPlanExecution(sessionId, command.planPath, command.draftInputSnapshot)
       case 'markCompactionComplete':
         return sessionManager.markCompactionComplete(sessionId)
       case 'clearPendingPlanExecution':
         return sessionManager.clearPendingPlanExecution(sessionId)
+      case 'addAnnotation':
+        return sessionManager.addMessageAnnotation(sessionId, command.messageId, command.annotation)
+      case 'removeAnnotation':
+        return sessionManager.removeMessageAnnotation(sessionId, command.messageId, command.annotationId)
+      case 'updateAnnotation':
+        return sessionManager.updateMessageAnnotation(sessionId, command.messageId, command.annotationId, command.patch)
       default: {
         const _exhaustive: never = command
         throw new Error(`Unknown session command: ${JSON.stringify(command)}`)

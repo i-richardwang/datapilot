@@ -5,7 +5,9 @@ import { validateAnthropicConnection } from '../../../../config/llm-validation.t
 export const anthropicDriver: ProviderDriver = {
   provider: 'anthropic',
   initializeHostRuntime: ({ hostRuntime, resolvedPaths }) => {
-    applyAnthropicRuntimeBootstrap(hostRuntime, resolvedPaths);
+    // Set paths opportunistically — don't throw on missing.
+    // Missing paths will be caught at session start (prepareRuntime).
+    applyAnthropicRuntimeBootstrap(hostRuntime, resolvedPaths, { strict: false });
   },
   prepareRuntime: ({ hostRuntime, resolvedPaths }) => {
     applyAnthropicRuntimeBootstrap(hostRuntime, resolvedPaths);

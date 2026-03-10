@@ -1,6 +1,10 @@
-# CLAUDE.md
+# CLAUDE.md — `@craft-agent/shared`
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this package.
+## Purpose
+Core business logic package for Craft Agent:
+- Agent backends and session-scoped tools
+- Sources, credentials, sessions, and config
+- Permission modes and validation
 
 **Important:** Keep this file and the root `CLAUDE.md` up-to-date whenever functionality changes.
 
@@ -198,7 +202,22 @@ Sources are external data connections (MCP servers, APIs, local filesystems). St
 
 ## Type Checking
 
+## Commands
+From repo root:
 ```bash
-# From monorepo root
 cd packages/shared && bun run tsc --noEmit
 ```
+
+## Hard rules
+- Permission modes are fixed: `safe`, `ask`, `allow-all`.
+- Source types are fixed: `mcp`, `api`, `local`.
+- Keep credential handling in `src/credentials/` pathways (no ad-hoc secret storage).
+- Keep user-facing tool contracts backward-compatible where possible.
+
+## Notes
+- `ClaudeAgent` is the primary class in `src/agent/claude-agent.ts`.
+- Backward alias export (`CraftAgent`) exists for compatibility.
+
+## Source of truth
+- Package exports: `packages/shared/src/index.ts` and subpath export entries.
+- Agent exports: `packages/shared/src/agent/index.ts`

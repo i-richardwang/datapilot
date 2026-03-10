@@ -10,6 +10,11 @@ const workspace = {
 let idCounter = 0
 const storedById = new Map<string, any>()
 const deletedIds: string[] = []
+let mockedProvider: 'anthropic' | 'pi' = 'anthropic'
+
+// Partial-mock baseline: import real modules via file paths (avoids recursive mock imports)
+const actualSharedAgentModule = await import('../../../../../packages/shared/src/agent/index.ts')
+const actualSharedAgentBackendModule = await import('../../../../../packages/shared/src/agent/backend/index.ts')
 
 mock.module('electron', () => ({
   app: {
@@ -65,6 +70,7 @@ mock.module('@craft-agent/shared/config', () => ({
   resolveAuthEnvVars: () => ({}),
   getToolIconsDir: () => '/tmp/tool-icons',
   getMiniModel: () => 'claude-haiku-4-5-20251001',
+  getDefaultThinkingLevel: () => 'medium',
   ConfigWatcher: class ConfigWatcher {
     constructor(..._args: unknown[]) {}
     start() {}
@@ -114,14 +120,11 @@ mock.module('@craft-agent/shared/workspaces', () => ({
 }))
 
 mock.module('@craft-agent/shared/agent', () => ({
+  ...actualSharedAgentModule,
   setPermissionMode: () => {},
   getPermissionModeDiagnostics: () => ({ mode: 'ask', source: 'test' }),
   unregisterSessionScopedToolCallbacks: () => {},
   mergeSessionScopedToolCallbacks: () => {},
-  AbortReason: {
-    USER_REQUEST: 'user_request',
-  },
-  // Targeted stubs: prevent SyntaxError in tests that import these from the barrel
   hydratePreviousPermissionMode: () => {},
   initializeModeState: () => {},
   cleanupModeState: () => {},
@@ -129,36 +132,35 @@ mock.module('@craft-agent/shared/agent', () => ({
   registerSessionScopedToolCallbacks: () => {},
   cleanupSessionScopedTools: () => {},
   getSessionScopedTools: () => [],
+  normalizeCanonicalBrowserToolName: (name: string) => name,
 }))
 
 mock.module('@craft-agent/shared/agent/backend', () => ({
+  ...actualSharedAgentBackendModule,
   resolveSessionConnection: () => null,
   createBackendFromConnection: () => {
     throw new Error('not used in this test')
   },
   resolveBackendContext: () => ({
-    provider: 'anthropic',
-    resolvedModel: 'claude-sonnet-4-20250514',
-    connection: { providerType: 'anthropic' },
+    provider: mockedProvider,
+    resolvedModel: mockedProvider === 'anthropic' ? 'claude-sonnet-4-20250514' : 'pi/gpt-5',
+    connection: { providerType: mockedProvider === 'anthropic' ? 'anthropic' : 'pi' },
   }),
   createBackendFromResolvedContext: () => {
     throw new Error('not used in this test')
   },
   cleanupSourceRuntimeArtifacts: async () => {},
   providerTypeToAgentProvider: () => 'anthropic',
-  // Targeted stubs: prevent SyntaxError in tests that import these from the barrel
   fetchBackendModels: async () => ({ models: [] }),
   initializeBackendHostRuntime: () => {},
+  resolveBackendHostTooling: () => ({
+    sourceCredentialManager: null,
+    sourceServerBuilder: null,
+    sourcePoolFactory: null,
+    sourcePoolServerFactory: null,
+  }),
   testBackendConnection: async () => ({ success: false, error: 'stub' }),
   validateStoredBackendConnection: async () => ({ success: false, error: 'stub' }),
-  createBackend: () => { throw new Error('stub') },
-  createAgent: () => { throw new Error('stub') },
-  detectProvider: () => 'anthropic',
-  getAvailableProviders: () => ['anthropic'],
-  isProviderAvailable: () => true,
-  connectionTypeToProvider: () => 'anthropic',
-  connectionAuthTypeToBackendAuthType: () => 'api_key',
-  resolveSetupTestConnectionHint: () => ({}),
 }))
 
 mock.module('@craft-agent/shared/sources', () => ({
@@ -260,6 +262,7 @@ const { SessionManager } = await import('@craft-agent/server-core/sessions')
 
 describe('session branch rollback on preflight failure', () => {
   beforeEach(() => {
+    mockedProvider = 'anthropic'
     idCounter = 0
     storedById.clear()
     deletedIds.length = 0
@@ -312,5 +315,55 @@ describe('session branch rollback on preflight failure', () => {
     expect((manager as any).sessions.has('child-1')).toBe(false)
     expect(destroyCalled).toBe(true)
     expect(poolStopCalled).toBe(true)
+  })
+
+  it('fails branch creation when parent claude sdk session id is missing', async () => {
+    const source = storedById.get('source-1')
+    source.sdkSessionId = undefined
+    storedById.set('source-1', source)
+
+    const manager = new SessionManager()
+
+    await expect(
+      manager.createSession('ws-1', {
+        branchFromSessionId: 'source-1',
+        branchFromMessageId: 'm1',
+      } as any)
+    ).rejects.toThrow('parent session SDK context is not initialized')
+
+    expect(deletedIds).toEqual([])
+    expect(storedById.has('child-1')).toBe(false)
+  })
+
+  it('runs backend preflight for pi branches and rolls back on failure', async () => {
+    mockedProvider = 'pi'
+
+    const manager = new SessionManager()
+    let getOrCreateAgentCalled = false
+
+    ;(manager as any).ensureMessagesLoaded = async (_managed: any) => {}
+    ;(manager as any).getOrCreateAgent = async (managed: any) => {
+      getOrCreateAgentCalled = true
+      managed.poolServer = { stop: () => {} }
+      managed.agent = {
+        supportsBranching: true,
+        ensureBranchReady: async () => {
+          throw new Error('pi preflight boom')
+        },
+        destroy: () => {},
+      }
+      return managed.agent
+    }
+
+    await expect(
+      manager.createSession('ws-1', {
+        branchFromSessionId: 'source-1',
+        branchFromMessageId: 'm1',
+      } as any)
+    ).rejects.toThrow('Could not create branch: pi preflight boom')
+
+    expect(getOrCreateAgentCalled).toBe(true)
+    expect(deletedIds).toEqual(['child-1'])
+    expect(storedById.has('child-1')).toBe(false)
   })
 })

@@ -36,19 +36,17 @@ export function ToolbarStatusSlot({
 }: ToolbarStatusSlotProps) {
   const browserInstances = useAtomValue(browserInstancesAtom)
 
-  // Find the browser instance bound to this session with active agent control.
-  // If multiple match, prefer visible; tie-break to the most recently updated entry.
+  // Find the visible browser instance bound to this session with active agent control.
+  // Hidden instances are intentionally excluded so the status slot mirrors actual visibility.
   const browserInstance = React.useMemo(() => {
     if (!sessionId) return null
 
-    const candidates = browserInstances.filter(
-      i => i.boundSessionId === sessionId && i.agentControlActive
+    const visibleCandidates = browserInstances.filter(
+      i => i.boundSessionId === sessionId && i.agentControlActive && i.isVisible
     )
-    if (candidates.length === 0) return null
+    if (visibleCandidates.length === 0) return null
 
-    const visible = candidates.filter(i => i.isVisible)
-    const selected = (visible.length > 0 ? visible : candidates).at(-1)
-    return selected ?? null
+    return visibleCandidates.at(-1) ?? null
   }, [browserInstances, sessionId])
 
   // Priority resolution: escape interrupt > browser status

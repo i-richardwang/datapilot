@@ -66,11 +66,20 @@ function validateBranchLikeSessionManager(args: {
       throw new Error(`Invalid branch request: message ${request.branchFromMessageId} not found in source session`)
     }
 
+    const branchContextStrategy: 'sdk-fork' | 'seeded-fresh-session' = 'sdk-fork'
+
+    const branchFromSdkSessionId = sourceManagedSdkSessionId || sourceSession.sdkSessionId
+
+    if (!branchFromSdkSessionId) {
+      throw new Error('Cannot create branch yet: parent session SDK context is not initialized. Send one message in the parent session and try again.')
+    }
+
     return {
       sourceSessionId: request.branchFromSessionId,
       sourceMessageId: request.branchFromMessageId,
       copiedMessages: sourceSession.messages.slice(0, branchIdx + 1),
-      branchFromSdkSessionId: sourceManagedSdkSessionId || sourceSession.sdkSessionId,
+      branchContextStrategy,
+      branchFromSdkSessionId,
     }
   }
 
@@ -93,7 +102,30 @@ describe('session branching validation semantics', () => {
 
     expect(result).toBeDefined()
     expect(result?.copiedMessages.map(m => m.id)).toEqual(['m1', 'm2'])
+    expect(result?.branchContextStrategy).toBe('sdk-fork')
     expect(result?.branchFromSdkSessionId).toBe('sdk-parent')
+  })
+
+  it('rejects branch when parent sdk session id is missing', () => {
+    expect(() => validateBranchLikeSessionManager({
+      request: { branchFromSessionId: 'source-1', branchFromMessageId: 'm1' },
+      targetWorkspaceRootPath: '/ws-a',
+      targetProvider: 'anthropic',
+      sourceProvider: 'anthropic',
+      sourceManagedWorkspaceRootPath: '/ws-a',
+      sourceSession: { messages: [{ id: 'm1' }] },
+    })).toThrow('parent session SDK context is not initialized')
+  })
+
+  it('rejects pi branch when parent sdk session id is missing', () => {
+    expect(() => validateBranchLikeSessionManager({
+      request: { branchFromSessionId: 'source-1', branchFromMessageId: 'm1' },
+      targetWorkspaceRootPath: '/ws-a',
+      targetProvider: 'pi',
+      sourceProvider: 'pi',
+      sourceManagedWorkspaceRootPath: '/ws-a',
+      sourceSession: { messages: [{ id: 'm1' }] },
+    })).toThrow('parent session SDK context is not initialized')
   })
 
   it('rejects cross-workspace branch request', () => {
@@ -130,6 +162,7 @@ describe('session branching validation semantics', () => {
     })
 
     expect(result).toBeDefined()
+    expect(result?.branchContextStrategy).toBe('sdk-fork')
     expect(result?.branchFromSdkSessionId).toBe('pi-parent')
   })
 

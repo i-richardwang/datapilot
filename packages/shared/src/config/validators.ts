@@ -91,6 +91,7 @@ export const StoredConfigSchema = z.object({
   activeSessionId: z.string().nullable(),
   llmConnections: z.array(LlmConnectionSchema).optional(),
   defaultLlmConnection: z.string().optional(),
+  defaultThinkingLevel: z.enum(['off', 'think', 'max']).optional(),
   // Note: tokenDisplay, showCost, cumulativeUsage, defaultPermissionMode removed
   // Permission mode and cyclable modes are now per-workspace in workspace config.json
 });
@@ -876,9 +877,10 @@ const STATUS_CONFIG_FILE = 'statuses/config.json';
 const REQUIRED_FIXED_STATUS_IDS = ['todo', 'done', 'cancelled'] as const;
 
 /**
- * Status icons are simple strings: emoji characters (e.g., "✅") or URLs.
- * Local icon files (statuses/icons/{id}.svg) are auto-discovered at runtime,
- * not referenced in the config.
+ * Status icons are simple strings: emoji characters, URLs, or local filenames
+ * such as "in-progress.svg" which resolve to statuses/icons/in-progress.svg.
+ * When icon is omitted, local icon files (statuses/icons/{id}.svg) are still
+ * auto-discovered at runtime.
  */
 const StatusIconSchema = z.string();
 
@@ -1497,6 +1499,56 @@ export function isValidPermissionsFile(filePath: string): boolean {
 
 const CSSColorSchema = z.string().min(1);
 
+const ThemeDarkOverrideSchema = z.object({
+  background: CSSColorSchema.optional(),
+  foreground: CSSColorSchema.optional(),
+  accent: CSSColorSchema.optional(),
+  info: CSSColorSchema.optional(),
+  success: CSSColorSchema.optional(),
+  destructive: CSSColorSchema.optional(),
+  paper: CSSColorSchema.optional(),
+  navigator: CSSColorSchema.optional(),
+  input: CSSColorSchema.optional(),
+  popover: CSSColorSchema.optional(),
+  popoverSolid: CSSColorSchema.optional(),
+}).strict();
+
+/**
+ * Zod schema for app-level theme override files (~/.craft-agent/theme.json).
+ * Allows partial overrides but rejects unknown keys.
+ */
+export const ThemeOverrideSchema = z.object({
+  // Semantic colors
+  background: CSSColorSchema.optional(),
+  foreground: CSSColorSchema.optional(),
+  accent: CSSColorSchema.optional(),
+  info: CSSColorSchema.optional(),
+  success: CSSColorSchema.optional(),
+  destructive: CSSColorSchema.optional(),
+  // Surface colors
+  paper: CSSColorSchema.optional(),
+  navigator: CSSColorSchema.optional(),
+  input: CSSColorSchema.optional(),
+  popover: CSSColorSchema.optional(),
+  popoverSolid: CSSColorSchema.optional(),
+  // Scenic mode
+  mode: z.enum(['solid', 'scenic']).optional(),
+  backgroundImage: z.string().optional(),
+  // Dark mode overrides
+  dark: ThemeDarkOverrideSchema.optional(),
+}).strict()
+  .refine(
+    (data) => {
+      const keys = Object.keys(data);
+      return keys.length > 0;
+    },
+    { message: 'Theme override must include at least one supported field' }
+  )
+  .refine(
+    (data) => data.mode !== 'scenic' || Boolean(data.backgroundImage),
+    { message: 'backgroundImage is required when mode is scenic', path: ['backgroundImage'] }
+  );
+
 /**
  * Zod schema for preset theme files.
  * Validates theme structure and requires at least one color property.
@@ -1565,6 +1617,44 @@ export function validateThemeContent(jsonString: string, displayFile: string = '
 
   // Validate schema
   const result = PresetThemeSchema.safeParse(content);
+  if (!result.success) {
+    errors.push(...zodErrorToIssues(result.error, displayFile));
+    return { valid: false, errors, warnings: [] };
+  }
+
+  return {
+    valid: true,
+    errors: [],
+    warnings: [],
+  };
+}
+
+/**
+ * Validate app-level theme override content from a JSON string (no disk reads).
+ * Unlike preset validation, this accepts partial ThemeOverrides objects and rejects unknown keys.
+ */
+export function validateThemeOverrideContent(jsonString: string, displayFile: string = 'theme.json'): ValidationResult {
+  const errors: ValidationIssue[] = [];
+
+  // Parse JSON
+  let content: unknown;
+  try {
+    content = safeJsonParse(jsonString);
+  } catch (e) {
+    return {
+      valid: false,
+      errors: [{
+        file: displayFile,
+        path: '',
+        message: `Invalid JSON: ${e instanceof Error ? e.message : 'Unknown error'}`,
+        severity: 'error',
+      }],
+      warnings: [],
+    };
+  }
+
+  // Validate schema
+  const result = ThemeOverrideSchema.safeParse(content);
   if (!result.success) {
     errors.push(...zodErrorToIssues(result.error, displayFile));
     return { valid: false, errors, warnings: [] };

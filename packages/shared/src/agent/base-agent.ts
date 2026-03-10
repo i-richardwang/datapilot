@@ -39,6 +39,7 @@ import type {
   BackendConfig,
   PostInitResult,
   BridgeUpdateContext,
+  RecoveryMessage,
 } from './backend/types.ts';
 import { AbortReason } from './backend/types.ts';
 import type { AuthRequest } from './session-scoped-tools.ts';
@@ -93,7 +94,7 @@ export interface SpawnSessionRequest {
   llmConnection?: string;
   model?: string;
   enabledSourceSlugs?: string[];
-  permissionMode?: 'safe' | 'ask' | 'allow-all';
+  permissionMode?: PermissionMode;
   labels?: string[];
   workingDirectory?: string;
   attachments?: Array<{ path: string; name?: string }>;
@@ -743,6 +744,35 @@ Please continue the conversation naturally from where we left off.
   }
 
   /**
+   * Build one-time branch seed context for sessions branched from an earlier message.
+   * Ensures the first turn in the new branch only sees transcript up to the selected branch point.
+   */
+  protected buildBranchSeedContext(messages?: RecoveryMessage[]): string | null {
+    if (!messages || messages.length === 0) return null;
+
+    // Keep seed payload bounded to avoid oversized first-turn prompts.
+    const bounded = messages.slice(-24);
+
+    const formattedMessages = bounded
+      .map((m) => {
+        const role = m.type === 'user' ? 'User' : 'Assistant';
+        const content =
+          m.content.length > 1200
+            ? m.content.slice(0, 1200) + '...[truncated]'
+            : m.content;
+        return `[${role}]: ${content}`;
+      })
+      .join('\n\n');
+
+    return `<branch_seed_context>
+This is a branched conversation. The context below is the parent transcript up to the selected branch point.
+Ignore and do not assume any parent messages that came after this cutoff.
+
+${formattedMessages}
+</branch_seed_context>`;
+  }
+
+  /**
    * Clear session ID and notify callbacks.
    * Called when session resume fails and we need to start fresh.
    */
@@ -937,11 +967,16 @@ Please continue the conversation naturally from where we left off.
       this.prerequisiteManager.registerSkillPrerequisites([...skillPaths.values()]);
     }
 
+    // Prepend branch seed context (for seeded branch sessions) and skill directive.
+    const branchSeedContext = this.buildBranchSeedContext(this.config.getBranchSeedMessages?.());
+    if (branchSeedContext) {
+      this.config.markBranchSeedApplied?.();
+    }
+
     // Prepend read directive to the message so the model reads SKILL.md first.
     const directive = this.formatSkillDirective(skillPaths);
-    const effectiveMessage = directive
-      ? `${directive}\n\n${cleanMessage}`
-      : cleanMessage;
+    const messageParts = [branchSeedContext, directive, cleanMessage].filter(Boolean);
+    const effectiveMessage = messageParts.join('\n\n');
 
     yield* this.chatImpl(effectiveMessage, attachments, options);
   }

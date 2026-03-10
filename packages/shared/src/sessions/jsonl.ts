@@ -9,6 +9,8 @@ import { openSync, readSync, closeSync, readFileSync, writeFileSync, renameSync,
 import { open, readFile } from 'fs/promises';
 import { dirname } from 'path';
 import type { SessionHeader, StoredSession, StoredMessage, SessionTokenUsage } from './types.ts';
+import type { PermissionMode } from '../agent/mode-types.ts';
+import { parsePermissionMode } from '../agent/mode-types.ts';
 import { toPortablePath, expandPath, normalizePath } from '../utils/paths.ts';
 import { debug } from '../utils/debug.ts';
 import { safeJsonParse } from '../utils/files.ts';
@@ -47,6 +49,30 @@ export function expandSessionPath(jsonLine: string, sessionDir: string): string 
   return jsonLine.replaceAll(SESSION_PATH_TOKEN, normalizePath(sessionDir));
 }
 
+function normalizePermissionMode(value: unknown): PermissionMode | undefined {
+  if (typeof value !== 'string') return undefined;
+  return parsePermissionMode(value) ?? undefined;
+}
+
+function normalizeHeaderPermissionModes<T extends SessionHeader>(header: T): T {
+  const permissionMode = normalizePermissionMode(header.permissionMode);
+  const previousPermissionMode = normalizePermissionMode(header.previousPermissionMode);
+
+  if (permissionMode) {
+    header.permissionMode = permissionMode;
+  } else {
+    delete (header as Partial<SessionHeader>).permissionMode;
+  }
+
+  if (previousPermissionMode) {
+    header.previousPermissionMode = previousPermissionMode;
+  } else {
+    delete (header as Partial<SessionHeader>).previousPermissionMode;
+  }
+
+  return header;
+}
+
 /**
  * Read only the header (first line) from a session.jsonl file.
  * Uses low-level fs to read minimal bytes for fast list loading.
@@ -62,7 +88,8 @@ export function readSessionHeader(sessionFile: string): SessionHeader | null {
     const firstNewline = content.indexOf('\n');
     const firstLine = firstNewline > 0 ? content.slice(0, firstNewline) : content;
 
-    return safeJsonParse(expandSessionPath(firstLine, dirname(sessionFile))) as SessionHeader;
+    const parsed = safeJsonParse(expandSessionPath(firstLine, dirname(sessionFile))) as SessionHeader;
+    return normalizeHeaderPermissionModes(parsed);
   } catch (error) {
     debug('[jsonl] Failed to read session header:', sessionFile, error);
     return null;
@@ -82,7 +109,9 @@ export function readSessionJsonl(sessionFile: string): StoredSession | null {
     if (!firstLine) return null;
 
     const sessionDir = dirname(sessionFile);
-    const header = safeJsonParse(expandSessionPath(firstLine, sessionDir)) as SessionHeader;
+    const header = normalizeHeaderPermissionModes(
+      safeJsonParse(expandSessionPath(firstLine, sessionDir)) as SessionHeader
+    );
     // Parse messages resiliently: skip lines that fail to parse (e.g. truncated by crash)
     // rather than losing the entire session's messages.
     // Expand session path tokens before parsing so embedded paths resolve correctly.
@@ -221,7 +250,8 @@ export async function readSessionHeaderAsync(sessionFile: string): Promise<Sessi
       const content = buffer.toString('utf-8', 0, bytesRead);
       const firstNewline = content.indexOf('\n');
       const firstLine = firstNewline > 0 ? content.slice(0, firstNewline) : content;
-      return safeJsonParse(expandSessionPath(firstLine, dirname(sessionFile))) as SessionHeader;
+      const parsed = safeJsonParse(expandSessionPath(firstLine, dirname(sessionFile))) as SessionHeader;
+      return normalizeHeaderPermissionModes(parsed);
     } finally {
       await handle.close();
     }

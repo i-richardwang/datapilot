@@ -39,10 +39,14 @@ import {
   type ModeConfig,
   type CompiledApiEndpointRule,
   type CompiledBashPattern,
+  type CompiledBlockedCommandHint,
   type MismatchAnalysis,
   PERMISSION_MODE_ORDER,
   PERMISSION_MODE_CONFIG,
   SAFE_MODE_CONFIG,
+  type PermissionModeCanonical,
+  toCanonicalPermissionMode,
+  parsePermissionMode,
 } from './mode-types.ts';
 
 // Import incr-regex-package for smart pattern mismatch diagnostics
@@ -52,13 +56,17 @@ import { IREGEX, DONE, MORE, FAILED } from 'incr-regex-package';
 // Re-export types and config from mode-types (single source of truth)
 export {
   type PermissionMode,
+  type PermissionModeCanonical,
   type ModeConfig,
   type CompiledApiEndpointRule,
   type CompiledBashPattern,
+  type CompiledBlockedCommandHint,
   type MismatchAnalysis,
   PERMISSION_MODE_ORDER,
   PERMISSION_MODE_CONFIG,
   SAFE_MODE_CONFIG,
+  toCanonicalPermissionMode,
+  parsePermissionMode,
 };
 
 // Re-export PowerShell validator types
@@ -87,6 +95,8 @@ export interface ModeState {
   lastChangedAt: string;
   /** Actor that initiated the last mode change */
   lastChangedBy: PermissionModeChangedBy;
+  /** Last user-mode modeVersion for which one-turn signal has been consumed */
+  lastUserSignalConsumedModeVersion?: number;
   /** Callback when mode state changes */
   onStateChange?: (state: ModeState) => void;
 }
@@ -302,6 +312,27 @@ class ModeManager {
   }
 
   /**
+   * Mark the current user-origin mode change signal as consumed.
+   * No-op unless the latest mode change was user-initiated.
+   */
+  consumeUserModeSignal(sessionId: string): void {
+    const existing = this.getState(sessionId);
+    if (existing.lastChangedBy !== 'user') {
+      return;
+    }
+
+    if (existing.lastUserSignalConsumedModeVersion === existing.modeVersion) {
+      return;
+    }
+
+    const newState: ModeState = {
+      ...existing,
+      lastUserSignalConsumedModeVersion: existing.modeVersion,
+    };
+    this.states.set(sessionId, newState);
+  }
+
+  /**
    * Register callbacks for a session
    */
   registerCallbacks(sessionId: string, callbacks: ModeCallbacks): void {
@@ -368,6 +399,13 @@ export function setPermissionMode(
 }
 
 /**
+ * Consume one-turn user mode-change signal for the current modeVersion.
+ */
+export function consumeUserModeSignal(sessionId: string): void {
+  modeManager.consumeUserModeSignal(sessionId);
+}
+
+/**
  * Cycle to the next permission mode (for SHIFT+TAB)
  * @param sessionId - The session to cycle mode for
  * @param enabledModes - Optional list of enabled modes to cycle through (defaults to all 3)
@@ -428,11 +466,16 @@ export function getPermissionModeDiagnostics(sessionId: string): {
   modeVersion: number;
   lastChangedAt: string;
   lastChangedBy: PermissionModeChangedBy;
+  userModeSignalPending: boolean;
 } {
   const state = modeManager.getState(sessionId);
   const transitionDisplay = state.previousPermissionMode
     ? `${PERMISSION_MODE_CONFIG[state.previousPermissionMode].displayName} -> ${PERMISSION_MODE_CONFIG[state.permissionMode].displayName}`
     : undefined;
+  const userModeSignalPending =
+    state.lastChangedBy === 'user' &&
+    state.modeVersion > 0 &&
+    state.lastUserSignalConsumedModeVersion !== state.modeVersion;
 
   return {
     permissionMode: state.permissionMode,
@@ -441,6 +484,7 @@ export function getPermissionModeDiagnostics(sessionId: string): {
     modeVersion: state.modeVersion,
     lastChangedAt: state.lastChangedAt,
     lastChangedBy: state.lastChangedBy,
+    userModeSignalPending,
   };
 }
 
@@ -600,7 +644,7 @@ export interface RelevantPatternInfo {
  */
 export type BashRejectionReason =
   | { type: 'control_char'; char: string; charCode: number; explanation: string }
-  | { type: 'no_safe_pattern'; command: string; relevantPatterns: RelevantPatternInfo[]; mismatchAnalysis?: MismatchAnalysis }
+  | { type: 'no_safe_pattern'; command: string; relevantPatterns: RelevantPatternInfo[]; mismatchAnalysis?: MismatchAnalysis; commandHint?: CompiledBlockedCommandHint }
   | { type: 'dangerous_operator'; operator: string; operatorType: 'chain' | 'redirect'; explanation: string }
   | { type: 'dangerous_substitution'; pattern: string; explanation: string }
   | { type: 'parse_error'; error: string }
@@ -734,6 +778,32 @@ function findRelevantPatterns(command: string, patterns: CompiledBashPattern[]):
 
   // Limit to top 3 most relevant patterns to avoid overwhelming the agent
   return relevant.slice(0, 3);
+}
+
+/**
+ * Resolve command-specific hint for blocked bash commands.
+ * Uses exact base-command match and optional whenNotMatching condition.
+ */
+function findBlockedCommandHint(command: string, config: ToolCheckConfig): CompiledBlockedCommandHint | undefined {
+  const hints = config.blockedCommandHints ?? [];
+  if (hints.length === 0) return undefined;
+
+  const firstToken = command.trim().split(/\s+/)[0]?.toLowerCase();
+  if (!firstToken) return undefined;
+  const baseCommand = firstToken.split('/').pop() ?? firstToken;
+
+  for (const hint of hints) {
+    if (hint.command !== baseCommand) continue;
+
+    // If a condition is provided, hint applies only when command does NOT match it
+    if (hint.whenNotMatchingRegex && hint.whenNotMatchingRegex.test(command)) {
+      continue;
+    }
+
+    return hint;
+  }
+
+  return undefined;
 }
 
 /**
@@ -1121,12 +1191,14 @@ export function getBashRejectionReason(command: string, config: ToolCheckConfig)
         // Find relevant patterns to help the agent understand what format is expected
         const relevantPatterns = findRelevantPatterns(reason.command, config.readOnlyBashPatterns);
         const mismatchAnalysis = analyzePatternMismatch(reason.command, config.readOnlyBashPatterns);
+        const commandHint = findBlockedCommandHint(reason.command, config);
 
         return {
           type: 'no_safe_pattern',
           command: reason.command,
           relevantPatterns,
           mismatchAnalysis: mismatchAnalysis ?? undefined,
+          commandHint,
         };
       }
 
@@ -1156,6 +1228,7 @@ export function getBashRejectionReason(command: string, config: ToolCheckConfig)
     command: trimmedCommand,
     relevantPatterns: [],
     mismatchAnalysis: undefined,
+    commandHint: findBlockedCommandHint(trimmedCommand, config),
   };
 }
 
@@ -1248,12 +1321,14 @@ function getPowerShellRejectionReason(command: string, config: ToolCheckConfig):
       case 'unsafe_command': {
         const relevantPatterns = findRelevantPatterns(reason.command, config.readOnlyBashPatterns);
         const mismatchAnalysis = analyzePatternMismatch(reason.command, config.readOnlyBashPatterns);
+        const commandHint = findBlockedCommandHint(reason.command, config);
 
         return {
           type: 'no_safe_pattern',
           command: reason.command,
           relevantPatterns,
           mismatchAnalysis: mismatchAnalysis ?? undefined,
+          commandHint,
         };
       }
     }
@@ -1266,6 +1341,7 @@ function getPowerShellRejectionReason(command: string, config: ToolCheckConfig):
     command: command,
     relevantPatterns: [],
     mismatchAnalysis: undefined,
+    commandHint: findBlockedCommandHint(command, config),
   };
 }
 
@@ -1319,7 +1395,25 @@ export function formatBashRejectionMessage(reason: BashRejectionReason, config: 
       const lines: string[] = [];
       lines.push(`Bash command \`${reason.command}\` is not in the read-only allowlist.`);
 
-      // If we have mismatch analysis, show detailed diagnostics first (most helpful)
+      // Prefer deterministic per-command guidance over fuzzy regex diagnostics.
+      if (reason.commandHint) {
+        lines.push('');
+        lines.push(`Why: ${reason.commandHint.reason}`);
+        if (reason.commandHint.context) {
+          lines.push(`Context: ${reason.commandHint.context}`);
+        }
+        if (reason.commandHint.tryInstead && reason.commandHint.tryInstead.length > 0) {
+          lines.push('Try instead:');
+          for (const item of reason.commandHint.tryInstead) {
+            lines.push(`  • ${item}`);
+          }
+        }
+        if (reason.commandHint.example) {
+          lines.push(`Example: \`${reason.commandHint.example}\``);
+        }
+      }
+
+      // If we have mismatch analysis, show detailed diagnostics as heuristic guidance.
       if (reason.mismatchAnalysis) {
         const analysis = reason.mismatchAnalysis;
         lines.push('');
@@ -1338,15 +1432,15 @@ export function formatBashRejectionMessage(reason: BashRejectionReason, config: 
           lines.push(analysis.suggestion);
         }
 
-        // Show which pattern was closest to matching
+        // Show which pattern was closest to matching (heuristic only)
         if (analysis.bestMatchPattern?.comment) {
           lines.push('');
-          lines.push(`Pattern: ${analysis.bestMatchPattern.comment}`);
+          lines.push(`Closest allowlist hint (heuristic): ${analysis.bestMatchPattern.comment}`);
         }
       } else if (reason.relevantPatterns.length > 0) {
         // Fall back to showing relevant patterns if no mismatch analysis
         lines.push('');
-        lines.push('Relevant pattern(s) that might match:');
+        lines.push('Heuristic relevant pattern(s):');
         for (const pattern of reason.relevantPatterns) {
           // Show the pattern regex (simplified for readability)
           const patternDisplay = pattern.source.length > 80
@@ -1358,7 +1452,7 @@ export function formatBashRejectionMessage(reason: BashRejectionReason, config: 
           }
         }
         lines.push('');
-        lines.push('The command must match the pattern exactly from the start.');
+        lines.push('The command must match an allowlist pattern exactly from the start.');
       }
 
       // Add permission guidance for pattern-based rejections
@@ -2036,12 +2130,12 @@ export function getSessionState(sessionId: string): { permissionMode: Permission
  */
 export function formatSessionState(
   sessionId: string,
-  options?: { plansFolderPath?: string; dataFolderPath?: string }
+  options?: { plansFolderPath?: string; dataFolderPath?: string; consumeModeChangeUserSignal?: boolean }
 ): string {
   const diagnostics = getPermissionModeDiagnostics(sessionId);
 
-  // Use the display name (lowercased) so the agent sees "explore" instead of internal key "safe"
-  const modeName = PERMISSION_MODE_CONFIG[diagnostics.permissionMode].displayName.toLowerCase();
+  // Use canonical user-facing mode tokens to avoid terminology drift.
+  const modeName = toCanonicalPermissionMode(diagnostics.permissionMode);
   let result = `<session_state>\nsessionId: ${sessionId}\npermissionMode: ${modeName}`;
 
   if (diagnostics.transitionDisplay) {
@@ -2050,6 +2144,17 @@ export function formatSessionState(
   result += `\nmodeChangedBy: ${diagnostics.lastChangedBy}`;
   result += `\nmodeChangedAt: ${diagnostics.lastChangedAt}`;
   result += `\nmodeVersion: ${diagnostics.modeVersion}`;
+
+  const transitionLabel = diagnostics.transitionDisplay ?? `Unknown -> ${PERMISSION_MODE_CONFIG[diagnostics.permissionMode].displayName}`;
+  result += `\nmodeChangeSummary: Last mode change by ${diagnostics.lastChangedBy} at ${diagnostics.lastChangedAt} (${transitionLabel}, modeVersion=${diagnostics.modeVersion})`;
+
+  if (diagnostics.userModeSignalPending) {
+    result += '\nmodeChangeUserSignal: The user changed mode manually. Apply this mode immediately for this turn.';
+
+    if (options?.consumeModeChangeUserSignal) {
+      consumeUserModeSignal(sessionId);
+    }
+  }
 
   // Always include plans folder path so agent knows where plans are stored
   if (options?.plansFolderPath) {

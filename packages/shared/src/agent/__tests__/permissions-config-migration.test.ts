@@ -30,6 +30,9 @@ describe('ensureDefaultPermissions migration', () => {
         allowedMcpPatterns: ['search'],
         allowedApiEndpoints: [],
         allowedWritePaths: [],
+        blockedCommandHints: [
+          { command: 'printf', reason: 'printf blocked by default' },
+        ],
       }, null, 2)
     );
 
@@ -46,6 +49,9 @@ describe('ensureDefaultPermissions migration', () => {
         allowedMcpPatterns: ['list'],
         allowedApiEndpoints: [],
         allowedWritePaths: [],
+        blockedCommandHints: [
+          { command: 'sed', reason: 'sed print-only policy', whenNotMatching: '^sed\\s+-n\\b' },
+        ],
       }, null, 2)
     );
 
@@ -70,6 +76,10 @@ describe('ensureDefaultPermissions migration', () => {
     const mcpPatterns = merged.allowedMcpPatterns as string[];
     expect(mcpPatterns).toContain('list');
     expect(mcpPatterns).toContain('search');
+
+    const blockedCommandHints = merged.blockedCommandHints as Array<{ command: string; reason: string }>;
+    expect(blockedCommandHints.some(h => h.command === 'printf')).toBe(true);
+    expect(blockedCommandHints.some(h => h.command === 'sed')).toBe(true);
 
     rmSync(tempRoot, { recursive: true, force: true });
     rmSync(tempConfig, { recursive: true, force: true });

@@ -27,6 +27,7 @@ import { useFocusContext } from "@/context/FocusContext"
 import type { SessionMeta } from "@/atoms/sessions"
 import type { ViewConfig } from "@craft-agent/shared/views"
 import type { SessionStatusId, SessionStatus } from "@/config/session-status-config"
+import { buildCollapsedGroupsScopeSuffix } from "@/utils/session-list-collapse"
 
 export interface SessionListRow {
   item: SessionMeta
@@ -159,14 +160,55 @@ export function SessionList({
   const [renameName, setRenameName] = useState("")
   // Track if search input has actual DOM focus (for proper keyboard navigation gating)
   const [isSearchInputFocused, setIsSearchInputFocused] = useState(false)
-  // Collapsed group keys (for collapsible group headers) — persisted to localStorage
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
-    const stored = storage.get<string[]>(KEYS.collapsedSessionGroups, [])
-    return new Set(stored)
-  })
+
+  // Collapsed group keys (for collapsible group headers) — persisted per workspace/filter/grouping context
+  const collapseScopeSuffix = useMemo(() => {
+    return buildCollapsedGroupsScopeSuffix({
+      workspaceId,
+      currentFilter,
+      groupingMode,
+    })
+  }, [
+    workspaceId,
+    groupingMode,
+    currentFilter?.kind,
+    currentFilter && 'stateId' in currentFilter ? currentFilter.stateId : undefined,
+    currentFilter && 'labelId' in currentFilter ? currentFilter.labelId : undefined,
+    currentFilter && 'viewId' in currentFilter ? currentFilter.viewId : undefined,
+  ])
+
+  const readCollapsedGroupsForScope = useCallback((scopeSuffix: string): Set<string> => {
+    const scopedRaw = storage.getRaw(KEYS.collapsedSessionGroups, scopeSuffix)
+    if (scopedRaw !== null) {
+      try {
+        const parsed = JSON.parse(scopedRaw)
+        return new Set(Array.isArray(parsed) ? parsed : [])
+      } catch {
+        return new Set()
+      }
+    }
+
+    // Legacy fallback: previous versions used a single global key with no scope suffix.
+    // Use as migration source only when this scope has never been written.
+    const legacy = storage.get<string[]>(KEYS.collapsedSessionGroups, [])
+    return new Set(legacy)
+  }, [])
+
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => readCollapsedGroupsForScope(collapseScopeSuffix))
+  const collapseScopeRef = useRef(collapseScopeSuffix)
+
   useEffect(() => {
-    storage.set(KEYS.collapsedSessionGroups, Array.from(collapsedGroups))
-  }, [collapsedGroups])
+    if (collapseScopeRef.current === collapseScopeSuffix) return
+    setCollapsedGroups(readCollapsedGroupsForScope(collapseScopeSuffix))
+    collapseScopeRef.current = collapseScopeSuffix
+  }, [collapseScopeSuffix, readCollapsedGroupsForScope])
+
+  useEffect(() => {
+    // Avoid writing stale groups from a previous scope during context switches.
+    if (collapseScopeRef.current !== collapseScopeSuffix) return
+    storage.set(KEYS.collapsedSessionGroups, Array.from(collapsedGroups), collapseScopeSuffix)
+  }, [collapsedGroups, collapseScopeSuffix])
+
   const toggleGroupCollapse = useCallback((groupKey: string) => {
     setCollapsedGroups(prev => {
       const next = new Set(prev)

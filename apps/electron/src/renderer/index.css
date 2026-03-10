@@ -1,9 +1,17 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
 @plugin "@tailwindcss/typography";
 
 /* Tell Tailwind where to scan for utility classes */
-@source "../**/*.{tsx,ts,jsx,js}";
-@source "../../../../packages/ui/src/**/*.{tsx,ts,jsx,js}";
+@source "../renderer/App.tsx";
+@source "../renderer/main.tsx";
+@source "../renderer/components/**/*.{ts,tsx,jsx}";
+@source "../renderer/contexts/**/*.{ts,tsx,jsx}";
+@source "../renderer/hooks/**/*.{ts,tsx,jsx}";
+@source "../renderer/pages/**/*.{ts,tsx,jsx}";
+@source "../renderer/tabs/**/*.{ts,tsx,jsx}";
+@source "../renderer/playground/**/*.{ts,tsx,jsx}";
+@source "../../../../packages/ui/src/components/**/*.{ts,tsx,jsx}";
+@source "../../../../packages/ui/src/lib/**/*.{ts,tsx,jsx}";
 
 /* =============================================================================
    ANIMATABLE CSS CUSTOM PROPERTIES
@@ -197,6 +205,9 @@
      fullscreen         350     Fullscreen content viewers (above app chrome)
      floating-backdrop  390     Backdrop for floating menus
      floating-menu      400     Floating menus above modals
+     island-overlay     390     Backdrop for annotation island interactions
+     island             400     Annotation island menu surface
+     island-popover     410     Popovers/dropdowns opened from island content
      splash             600     Splash screen, workspace creation
   */
   --z-base: 0;
@@ -211,6 +222,9 @@
   --z-fullscreen: 350;
   --z-floating-backdrop: 390;
   --z-floating-menu: 400;
+  --z-island-overlay: 390;
+  --z-island: 400;
+  --z-island-popover: 410;
   --z-splash: 600;
 
 }
@@ -425,6 +439,9 @@ html[data-font="inter"] {
   --z-index-fullscreen: var(--z-fullscreen);
   --z-index-floating-backdrop: var(--z-floating-backdrop);
   --z-index-floating-menu: var(--z-floating-menu);
+  --z-index-island-overlay: var(--z-island-overlay);
+  --z-index-island: var(--z-island);
+  --z-index-island-popover: var(--z-island-popover);
   --z-index-splash: var(--z-splash);
 
   --shadow-2xs: var(--shadow-2xs);
@@ -610,7 +627,7 @@ html[data-font="inter"] {
       rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 24px 24px -12px;
   }
 
-  .shadow-focused {
+  .shadow-panel-focused {
     position: relative;
     box-shadow:
       rgba(0, 0, 0, 0) 0px 0px 0px 0px,
@@ -624,7 +641,7 @@ html[data-font="inter"] {
   }
 
   /* Gradient border: lighter at top, stronger at bottom */
-  .shadow-focused::before {
+  .shadow-panel-focused::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -645,7 +662,7 @@ html[data-font="inter"] {
   }
 
   /* Ensure content sits above the ::before pseudo-element */
-  .shadow-focused > * {
+  .shadow-panel-focused > * {
     position: relative;
     z-index: 2;
   }
@@ -1099,6 +1116,7 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 
 /* Description (subtitle) at 70% opacity */
 [data-sonner-toast] [data-description] {
+  color: inherit !important;
   opacity: 0.7 !important;
 }
 
@@ -1120,21 +1138,34 @@ html.dark[data-scenic] .fullscreen-overlay-background {
   left: unset !important;
   right: -14px !important;
   opacity: 0 !important;
-  transition: opacity 0.15s ease !important;
+  transition: opacity 0.15s ease, color 0.15s ease !important;
   background-color: var(--background) !important;
+  color: oklch(from var(--foreground) l c h / 0.7) !important;
   border: none !important;
   box-shadow:
-    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
     rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
-    rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 1px 1px -0.5px,
-    rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 3px 3px -1.5px,
-    rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 6px 6px -3px !important;
+    var(--shadow-minimal) !important;
 }
 
 [data-sonner-toast].group:hover [data-close-button],
 [data-sonner-toast]:hover [data-close-button] {
   opacity: 1 !important;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+  color: var(--foreground) !important;
+}
+
+[data-sonner-toast]:focus-visible {
+  box-shadow:
+    var(--shadow-modal-small),
+    0 0 0 2px rgba(var(--foreground-rgb), 0.18) !important;
+}
+
+[data-sonner-toast] [data-close-button]:focus-visible {
+  box-shadow:
+    var(--shadow-minimal),
+    0 0 0 2px rgba(var(--foreground-rgb), 0.18) !important;
 }
 
 /* Tinted backgrounds for toast states - use linear-gradient to layer

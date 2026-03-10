@@ -5,24 +5,11 @@
  * parentToolUseId passes through unconditionally, and the persistence
  * pipeline filters the correct message types.
  *
- * Mirrors sessions.ts logic inline (no Electron imports needed).
+ * Uses centralized core mappers (single source of truth, no Electron imports needed).
  */
 import { describe, it, expect, beforeEach } from 'bun:test'
+import { messageToStored, storedToMessage } from '@craft-agent/core'
 import type { Message, StoredMessage, MessageRole } from '@craft-agent/core'
-
-// ============================================================================
-// Mirror: messageToStored / storedToMessage from sessions.ts (spread pattern)
-// ============================================================================
-
-function messageToStored(msg: Message): StoredMessage {
-  const { role, isStreaming, isPending, ...rest } = msg
-  return { ...rest, type: role } as StoredMessage
-}
-
-function storedToMessage(stored: StoredMessage): Message {
-  const { type, ...rest } = stored
-  return { ...rest, role: type, timestamp: stored.timestamp ?? Date.now() } as Message
-}
 
 // ============================================================================
 // Test Helpers
@@ -52,10 +39,26 @@ function createFullMessage(): Message {
     isError: false,
     attachments: [{ id: 'att-1', type: 'text', name: 'file.txt', mimeType: 'text/plain', size: 100, storedPath: '/path' }],
     badges: [{ type: 'source', label: 'Linear', rawText: '@linear', start: 0, end: 7 }],
+    annotations: [{
+      id: 'ann-1',
+      schemaVersion: 1,
+      createdAt: 1700000000100,
+      intent: 'highlight',
+      body: [{ type: 'highlight' }],
+      target: {
+        source: { sessionId: 'session-1', messageId: 'msg-full-test' },
+        selectors: [
+          { type: 'text-position', start: 0, end: 4 },
+          { type: 'text-quote', exact: 'Tool', prefix: '', suffix: ' output' },
+        ],
+      },
+      style: { color: 'yellow' },
+    }],
     isStreaming: false,
     isPending: false,
     isIntermediate: false,
     turnId: 'turn-abc',
+    infoLevel: 'warning',
     errorCode: 'network_error',
     errorTitle: 'Connection Failed',
     errorDetails: ['DNS lookup failed'],
@@ -115,8 +118,8 @@ describe('messageToStored/storedToMessage round-trip', () => {
       'toolDuration', 'toolIntent', 'toolDisplayName', 'toolDisplayMeta',
       'parentToolUseId',
       'taskId', 'shellId', 'elapsedSeconds', 'isBackground',
-      'isError', 'attachments', 'badges',
-      'isIntermediate', 'turnId',
+      'isError', 'attachments', 'badges', 'annotations',
+      'isIntermediate', 'turnId', 'infoLevel',
       'errorCode', 'errorTitle', 'errorDetails', 'errorOriginal', 'errorCanRetry',
       'planPath',
       'authRequestId', 'authRequestType', 'authSourceSlug', 'authSourceName',
@@ -157,8 +160,10 @@ describe('messageToStored/storedToMessage round-trip', () => {
     expect(restored.isError).toBe(original.isError)
     expect(restored.attachments).toEqual(original.attachments)
     expect(restored.badges).toEqual(original.badges)
+    expect(restored.annotations).toEqual(original.annotations)
     expect(restored.isIntermediate).toBe(original.isIntermediate)
     expect(restored.turnId).toBe(original.turnId)
+    expect(restored.infoLevel).toBe(original.infoLevel)
     expect(restored.errorCode).toBe(original.errorCode)
     expect(restored.errorTitle).toBe(original.errorTitle)
     expect(restored.errorDetails).toEqual(original.errorDetails)
@@ -204,15 +209,14 @@ describe('messageToStored/storedToMessage round-trip', () => {
     // These are intentionally transient — NOT persisted
     expect(stored).not.toHaveProperty('isStreaming')
     expect(stored).not.toHaveProperty('isPending')
-    expect(stored).not.toHaveProperty('infoLevel')
 
-    // statusType IS persisted (for compaction_complete messages)
-    // but is on StoredMessage — check it's not on the output since
-    // createFullMessage doesn't set it
+    // infoLevel IS persisted for info-message severity restoration after reload
+    expect(stored.infoLevel).toBe(msg.infoLevel)
+
     const storedKeys = Object.keys(stored)
     expect(storedKeys).not.toContain('isStreaming')
     expect(storedKeys).not.toContain('isPending')
-    expect(storedKeys).not.toContain('infoLevel')
+    expect(storedKeys).toContain('infoLevel')
   })
 
   it('minimal message round-trips cleanly', () => {

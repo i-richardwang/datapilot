@@ -7,7 +7,7 @@
  */
 
 import type { Workspace } from '@craft-agent/core/types'
-import type { StoredAttachment } from '@craft-agent/core/types'
+import type { StoredAttachment, AnnotationV1 } from '@craft-agent/core/types'
 import type { PermissionMode } from '@craft-agent/shared/agent/mode-types'
 import type { ThinkingLevel } from '@craft-agent/shared/agent/thinking-levels'
 import type { AuthResult } from '@craft-agent/shared/agent'
@@ -88,6 +88,14 @@ export interface ISessionManager {
   cancelProcessing(sessionId: string, silent?: boolean): Promise<void>
   killShell(sessionId: string, shellId: string): Promise<{ success: boolean; error?: string }>
   getTaskOutput(taskId: string): Promise<string | null>
+  addMessageAnnotation(sessionId: string, messageId: string, annotation: AnnotationV1): void
+  removeMessageAnnotation(sessionId: string, messageId: string, annotationId: string): void
+  updateMessageAnnotation(
+    sessionId: string,
+    messageId: string,
+    annotationId: string,
+    patch: Partial<AnnotationV1>,
+  ): void
 
   // ---------------------------------------------------------------------------
   // Permissions & credentials
@@ -107,9 +115,9 @@ export interface ISessionManager {
   // Plans
   // ---------------------------------------------------------------------------
 
-  setPendingPlanExecution(sessionId: string, planPath: string): Promise<void>
+  setPendingPlanExecution(sessionId: string, planPath: string, draftInputSnapshot?: string): Promise<void>
   clearPendingPlanExecution(sessionId: string): Promise<void>
-  getPendingPlanExecution(sessionId: string): { planPath: string; awaitingCompaction: boolean } | null
+  getPendingPlanExecution(sessionId: string): { planPath: string; draftInputSnapshot?: string; awaitingCompaction: boolean } | null
   markCompactionComplete(sessionId: string): Promise<void>
 
   // ---------------------------------------------------------------------------
@@ -147,7 +155,7 @@ export interface ISessionManager {
     workspaceRootPath: string,
     prompt: string,
     labels?: string[],
-    permissionMode?: 'safe' | 'ask' | 'allow-all',
+    permissionMode?: PermissionMode,
     mentions?: string[],
     llmConnection?: string,
     model?: string,

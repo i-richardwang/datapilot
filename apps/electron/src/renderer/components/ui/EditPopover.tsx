@@ -367,7 +367,7 @@ const EDIT_CONFIGS: Record<EditContextKey, (location: string) => EditConfig> = {
         'The user wants to customize session statuses (workflow states). ' +
         'Statuses are stored in statuses/config.json with fields: id, label, icon, category (open/closed), order, isFixed, isDefault. ' +
         'Fixed statuses (todo, done, cancelled) cannot be deleted but can be reordered or have their label changed. ' +
-        'Icon can be { type: "file", value: "name.svg" } for custom icons in statuses/icons/ or { type: "lucide", value: "icon-name" } for Lucide icons. ' +
+        'Icon can be an emoji, an https URL, or a local filename like "name.svg" that maps to statuses/icons/name.svg. ' +
         'Category "open" shows in inbox, "closed" shows in archive. ' +
         'After editing, call config_validate with target "statuses" to verify the changes. ' +
         'Confirm clearly when done.',
@@ -554,8 +554,8 @@ export interface EditPopoverProps {
   example?: string
   /** Context passed to the new chat session */
   context: EditContext
-  /** Permission mode for the new session (default: 'allow-all' for fast execution) */
-  permissionMode?: 'safe' | 'ask' | 'allow-all'
+  /** Permission mode for the new session (default: 'allow-all' / canonical: execute for fast execution) */
+  permissionMode?: CreateSessionOptions['permissionMode']
   /**
    * Working directory for the new session:
    * - 'none' (default): No working directory (session folder only) - best for config edits

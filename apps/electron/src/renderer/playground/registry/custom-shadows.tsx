@@ -205,7 +205,86 @@ function CustomShadowsAudit() {
   )
 }
 
+interface AllowedShadowVariant {
+  className: string
+  note: string
+}
+
+const allowedShadowVariants: AllowedShadowVariant[] = [
+  { className: 'shadow-none', note: 'No shadow — explicit opt-out.' },
+  { className: 'shadow-xs', note: 'Very subtle elevation from base Tailwind token.' },
+  { className: 'shadow-minimal', note: 'Design-system default panel elevation.' },
+  { className: 'shadow-tinted', note: 'Tinted elevation using --shadow-color (semantic/accent contexts).' },
+  { className: 'shadow-thin', note: 'Thin border + light blur stack.' },
+  { className: 'shadow-middle', note: 'Mid-depth layered elevation for larger surfaces.' },
+  { className: 'shadow-strong', note: 'High-elevation layered shadow.' },
+  { className: 'shadow-panel-focused', note: 'Focus-like elevated treatment with emphasis ring.' },
+  { className: 'shadow-modal-small', note: 'Modal/dropdown depth profile.' },
+  { className: 'shadow-bottom-border', note: 'Inset bottom separator (1.5px).' },
+  { className: 'shadow-bottom-border-thin', note: 'Inset bottom separator (1px).' },
+]
+
+function VariantPreview({ variant }: { variant: AllowedShadowVariant }) {
+  if (variant.className === 'shadow-bottom-border' || variant.className === 'shadow-bottom-border-thin') {
+    return (
+      <div className="rounded-[8px] border border-border bg-background overflow-hidden">
+        <div className={cn('px-3 py-2 text-sm', variant.className)}>Row 1</div>
+        <div className={cn('px-3 py-2 text-sm', variant.className)}>Row 2</div>
+        <div className="px-3 py-2 text-sm">Last row (no separator)</div>
+      </div>
+    )
+  }
+
+  const style: React.CSSProperties | undefined = variant.className === 'shadow-tinted'
+    ? { ['--shadow-color' as any]: 'var(--accent-rgb)' }
+    : undefined
+
+  return (
+    <div className="rounded-[8px] bg-foreground/2 p-4">
+      <div className={cn('rounded-[8px] bg-background px-3 py-2 text-sm', variant.className)} style={style}>
+        Preview surface
+      </div>
+    </div>
+  )
+}
+
+function ShadowShowcase() {
+  return (
+    <div className="w-full max-w-[1200px] p-6 space-y-6">
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold">Shadow Showcase</h2>
+        <p className="text-sm text-foreground/70">
+          Canonical visual gallery of approved shadow variants for the Electron renderer.
+          Use these classes instead of arbitrary shadow values or inline boxShadow.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        {allowedShadowVariants.map((variant) => (
+          <div key={variant.className} className="rounded-[10px] border border-border bg-background p-3 space-y-2">
+            <div className="space-y-1">
+              <div className="text-sm font-medium">{variant.className}</div>
+              <div className="text-[11px] text-foreground/60">{variant.note}</div>
+            </div>
+            <VariantPreview variant={variant} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export const customShadowsComponents: ComponentEntry[] = [
+  {
+    id: 'shadow-showcase',
+    name: 'Shadow Showcase',
+    category: 'Custom Shadows',
+    description: 'Canonical gallery of all approved shadow variants in the design system.',
+    component: ShadowShowcase,
+    props: [],
+    variants: [],
+    layout: 'top',
+  },
   {
     id: 'custom-shadows-audit',
     name: 'Custom Shadows Audit',

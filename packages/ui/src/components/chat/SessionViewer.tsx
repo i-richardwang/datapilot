@@ -215,6 +215,7 @@ export function SessionViewer({
                       : undefined
                     }
                     sessionFolderPath={sessionFolderPath}
+                    annotationInteractionMode={mode === 'readonly' ? 'tooltip-only' : 'interactive'}
                   />
                 )
               }

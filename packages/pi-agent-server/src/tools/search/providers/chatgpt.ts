@@ -16,7 +16,7 @@ import { parseResponsesApiResults, type ResponsesApiResponse } from './responses
  * Codex backend request contract (search path):
  * - model: gpt-5.3-codex
  * - store: false
- * - stream: false (we parse JSON, not SSE)
+ * - stream: true (backend may return JSON or SSE)
  * - instructions + tool_choice + text.verbosity
  * - OpenAI-Beta: responses=experimental header
  *
@@ -94,6 +94,9 @@ export class ChatGPTBackendSearchProvider implements WebSearchProvider {
         ],
       };
 
+      const requestFingerprint = buildRequestFingerprint(requestBody);
+      const hasMoreAttempts = attempt !== SEARCH_ATTEMPTS[SEARCH_ATTEMPTS.length - 1];
+
       const response = await fetch(`${API_BASE}/responses`, {
         method: 'POST',
         headers: {
@@ -106,20 +109,34 @@ export class ChatGPTBackendSearchProvider implements WebSearchProvider {
         signal: AbortSignal.timeout(30_000),
       });
 
+      const contentType = response.headers.get('content-type') || 'unknown';
+
       if (response.ok) {
-        const data = await parseResponsePayload(response);
-        return parseResponsesApiResults(data, query, count);
+        try {
+          const data = await parseResponsePayload(response);
+          return parseResponsesApiResults(data, query, count);
+        } catch (parseError) {
+          const parseMessage = parseError instanceof Error ? parseError.message : String(parseError);
+          attemptErrors.push(
+            `${attempt.label} parse failed [${requestFingerprint}, content-type=${contentType}]: ${compactErrorText(parseMessage)}`,
+          );
+
+          if (hasMoreAttempts) {
+            continue;
+          }
+
+          throw new Error(`ChatGPT search failed: ${attemptErrors.join('; ')}`);
+        }
       }
 
       const errorText = await response.text();
       const compactError = compactErrorText(errorText);
-      const requestFingerprint = buildRequestFingerprint(requestBody);
-      const attemptError = `${attempt.label} failed (HTTP ${response.status}) [${requestFingerprint}]: ${compactError}`;
-      attemptErrors.push(attemptError);
+      attemptErrors.push(
+        `${attempt.label} failed (HTTP ${response.status}) [${requestFingerprint}, content-type=${contentType}]: ${compactError}`,
+      );
 
       // Retry only for likely schema/tool incompatibility (400).
       const canRetry = response.status === 400;
-      const hasMoreAttempts = attempt !== SEARCH_ATTEMPTS[SEARCH_ATTEMPTS.length - 1];
       if (!(canRetry && hasMoreAttempts)) {
         throw new Error(`ChatGPT search failed: ${attemptErrors.join('; ')}`);
       }

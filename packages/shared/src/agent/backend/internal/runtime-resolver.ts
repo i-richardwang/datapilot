@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import type { BackendHostRuntimeContext } from '../types.ts';
 import {
@@ -6,6 +7,13 @@ import {
   setInterceptorPath,
   setPathToClaudeCodeExecutable,
 } from '../../options.ts';
+
+/**
+ * When set, the resolver walks further up from the .app bundle to find SDK,
+ * interceptor, and bun in the monorepo / on the system PATH.
+ * Intended for local `electron:dist:mac` builds that skip `build-dmg.sh`.
+ */
+const IS_DEV_RUNTIME = !!process.env.CRAFT_DEV_RUNTIME;
 
 export interface ResolvedBackendRuntimePaths {
   claudeCliPath?: string;
@@ -52,23 +60,47 @@ function resolveBundledRuntimePath(hostRuntime: BackendHostRuntimeContext): stri
     ? (hostRuntime.resourcesPath || hostRuntime.appRootPath)
     : hostRuntime.appRootPath;
   const bunPath = join(bunBasePath, 'vendor', 'bun', bunBinary);
-  return existsSync(bunPath) ? bunPath : undefined;
+  if (existsSync(bunPath)) return bunPath;
+
+  // Dev runtime: fall back to system bun
+  if (IS_DEV_RUNTIME) {
+    try {
+      const whichCmd = process.platform === 'win32' ? 'where' : 'which';
+      const systemBun = execFileSync(whichCmd, ['bun'], { encoding: 'utf-8' }).trim();
+      if (systemBun && existsSync(systemBun)) return systemBun;
+    } catch { /* system bun not found */ }
+  }
+  return undefined;
 }
 
 function resolveClaudeCliPath(hostRuntime: BackendHostRuntimeContext): string | undefined {
   const sdkRelative = join('node_modules', '@anthropic-ai', 'claude-agent-sdk', 'cli.js');
-  return firstExistingPath([
+  const result = firstExistingPath([
     join(hostRuntime.appRootPath, sdkRelative),
     join(hostRuntime.appRootPath, '..', '..', sdkRelative),
   ]);
+  if (result) return result;
+
+  // Dev runtime: walk further up from .app bundle to reach monorepo root
+  if (IS_DEV_RUNTIME) {
+    return resolveUpwards(hostRuntime.appRootPath, sdkRelative, 10);
+  }
+  return undefined;
 }
 
 function resolveClaudeInterceptorPath(hostRuntime: BackendHostRuntimeContext): string | undefined {
   const interceptorRelative = join('packages', 'shared', 'src', 'unified-network-interceptor.ts');
-  return firstExistingPath([
+  const result = firstExistingPath([
     join(hostRuntime.appRootPath, interceptorRelative),
     join(hostRuntime.appRootPath, '..', '..', interceptorRelative),
   ]);
+  if (result) return result;
+
+  // Dev runtime: walk further up from .app bundle to reach monorepo root
+  if (IS_DEV_RUNTIME) {
+    return resolveUpwards(hostRuntime.appRootPath, interceptorRelative, 10);
+  }
+  return undefined;
 }
 
 function resolveInterceptorBundlePath(hostRuntime: BackendHostRuntimeContext): string | undefined {
@@ -167,26 +199,35 @@ export function resolveBackendHostTooling(hostRuntime: BackendHostRuntimeContext
 /**
  * Configure anthropic-sdk globals from host runtime context.
  * This mirrors previous Electron bootstrap behavior but keeps it behind backend internals.
+ *
+ * When `strict` is true (default), throws on missing SDK, interceptor, or bundled runtime.
+ * When `strict` is false, sets paths opportunistically — missing paths are silently skipped.
  */
 export function applyAnthropicRuntimeBootstrap(
   hostRuntime: BackendHostRuntimeContext,
   paths: ResolvedBackendRuntimePaths,
+  options?: { strict?: boolean },
 ): void {
-  if (!paths.claudeCliPath) {
+  const strict = options?.strict ?? true;
+
+  if (paths.claudeCliPath) {
+    setPathToClaudeCodeExecutable(paths.claudeCliPath);
+  } else if (strict) {
     throw new Error('Claude Code SDK not found. The app package may be corrupted.');
   }
-  setPathToClaudeCodeExecutable(paths.claudeCliPath);
 
-  if (!paths.claudeInterceptorPath) {
+  if (paths.claudeInterceptorPath) {
+    setInterceptorPath(paths.claudeInterceptorPath);
+  } else if (strict) {
     throw new Error('Network interceptor not found. The app package may be corrupted.');
   }
-  setInterceptorPath(paths.claudeInterceptorPath);
 
   if (hostRuntime.isPackaged) {
-    if (!paths.bundledRuntimePath) {
+    if (paths.bundledRuntimePath) {
+      setExecutable(paths.bundledRuntimePath);
+    } else if (strict) {
       throw new Error('Bundled Bun runtime not found. The app package may be corrupted.');
     }
-    setExecutable(paths.bundledRuntimePath);
   }
 }
 

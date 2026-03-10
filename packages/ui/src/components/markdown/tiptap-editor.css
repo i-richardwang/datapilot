@@ -4,6 +4,7 @@
   --tiptap-bubble-z: var(--z-floating-menu, 400);
   --tiptap-image-selection-width: 1.5px;
   --tiptap-image-selection-color: color-mix(in oklch, var(--accent) 45%, transparent);
+  --tiptap-list-indent: 1.5rem;
 }
 
 .tiptap-editor .tiptap-prose {
@@ -73,13 +74,13 @@
 /* Lists */
 .tiptap-editor .tiptap-prose ul {
   list-style-type: disc;
-  padding-inline-start: 16px;
+  padding-inline-start: var(--tiptap-list-indent);
   margin: 0.5rem 0;
 }
 
 .tiptap-editor .tiptap-prose ol {
   list-style-type: decimal;
-  padding-left: 1.5rem;
+  padding-inline-start: var(--tiptap-list-indent);
   margin: 0.5rem 0;
 }
 
@@ -268,59 +269,7 @@
   }
 }
 
-/* Task lists */
-.tiptap-editor .tiptap-prose ul[data-type="taskList"] {
-  list-style: none;
-  padding-inline-start: 0;
-}
-
-.tiptap-editor .tiptap-prose ul[data-type="taskList"] li {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
-.tiptap-editor .tiptap-prose ul[data-type="taskList"] li > label {
-  margin-top: 0;
-  block-size: 1lh;
-  display: inline-grid;
-  place-items: center;
-}
-
-.tiptap-editor .tiptap-prose ul[data-type="taskList"] li > div {
-  flex: 1;
-  min-width: 0;
-}
-
-.tiptap-editor .tiptap-prose ul[data-type="taskList"] li > div > p {
-  margin: 0;
-}
-
-.tiptap-editor .tiptap-prose ul[data-type="taskList"] li > label input[type='checkbox'] {
-  appearance: none;
-  -webkit-appearance: none;
-  margin: 0;
-  inline-size: 0.84rem;
-  block-size: 0.84rem;
-  border-radius: 0.2rem;
-  border: 1.5px solid color-mix(in oklch, var(--foreground) 34%, transparent);
-  background-color: transparent;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 0.52rem 0.4rem;
-  transition: background-color 0.12s ease, border-color 0.12s ease;
-}
-
-.tiptap-editor .tiptap-prose ul[data-type="taskList"] li[data-checked='false'] > label input[type='checkbox'] {
-  background-color: transparent;
-  border-color: color-mix(in oklch, var(--foreground) 34%, transparent);
-}
-
-.tiptap-editor .tiptap-prose ul[data-type="taskList"] li[data-checked='true'] > label input[type='checkbox'] {
-  background-color: var(--accent);
-  border-color: var(--accent);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 12'%3E%3Cpath d='M1.5 6.5l3.2 3.2L14.5 1.9' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-}
+/* Task list visual styling moved to ./extensions/animated-task-item.css */
 
 /* ── Shiki dual-theme ── */
 /* Light mode is default. Dark mode switches via CSS variables set by Shiki. */

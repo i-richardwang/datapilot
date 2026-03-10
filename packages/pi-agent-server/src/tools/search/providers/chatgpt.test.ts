@@ -209,6 +209,128 @@ describe('ChatGPTBackendSearchProvider', () => {
     expect(results[0]?.url).toBe('https://retry.example');
   });
 
+  it('retries with web_search_preview when first attempt returns 200 with non-JSON body', async () => {
+    const attempts: Array<{ tools: unknown }> = [];
+
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : null;
+      attempts.push({ tools: body?.tools });
+
+      if (attempts.length === 1) {
+        return new Response('Bad Request', {
+          status: 200,
+          headers: { 'Content-Type': 'text/plain' },
+        });
+      }
+
+      return new Response(
+        JSON.stringify({
+          output: [
+            {
+              type: 'message',
+              content: [
+                {
+                  type: 'output_text',
+                  text: 'Recovered from parse failure.',
+                  annotations: [
+                    { type: 'url_citation', url: 'https://parse-retry.example', title: 'Parse Retry Result' },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }) as typeof fetch;
+
+    const provider = new ChatGPTBackendSearchProvider('token', 'acc_123');
+    const results = await provider.search('parse retry query', 3);
+
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0]?.tools).toEqual([{ type: 'web_search' }]);
+    expect(attempts[1]?.tools).toEqual([{ type: 'web_search_preview' }]);
+    expect(results[0]?.url).toBe('https://parse-retry.example');
+  });
+
+  it('retries with web_search_preview when first attempt returns invalid SSE payload', async () => {
+    const attempts: Array<{ tools: unknown }> = [];
+
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : null;
+      attempts.push({ tools: body?.tools });
+
+      if (attempts.length === 1) {
+        const invalidSse = [
+          'event: response.created',
+          'data: {"type":"response.created","response":{"id":"resp_1"}}',
+          '',
+          'event: ping',
+          'data: {"type":"response.in_progress"}',
+          '',
+        ].join('\n');
+
+        return new Response(invalidSse, {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        });
+      }
+
+      return new Response(
+        JSON.stringify({
+          output: [
+            {
+              type: 'message',
+              content: [
+                {
+                  type: 'output_text',
+                  text: 'Recovered from SSE parse failure.',
+                  annotations: [
+                    { type: 'url_citation', url: 'https://sse-retry.example', title: 'SSE Retry Result' },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    }) as typeof fetch;
+
+    const provider = new ChatGPTBackendSearchProvider('token', 'acc_123');
+    const results = await provider.search('invalid sse query', 3);
+
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0]?.tools).toEqual([{ type: 'web_search' }]);
+    expect(attempts[1]?.tools).toEqual([{ type: 'web_search_preview' }]);
+    expect(results[0]?.url).toBe('https://sse-retry.example');
+  });
+
+  it('aggregates parse failures when both attempts fail to parse', async () => {
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : null;
+      const toolType = body?.tools?.[0]?.type;
+      return new Response(`Bad Request from ${toolType}`, {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain' },
+      });
+    }) as typeof fetch;
+
+    const provider = new ChatGPTBackendSearchProvider('token', 'acc_123');
+
+    let message = '';
+    try {
+      await provider.search('always parse fail', 5);
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(message).toContain('ChatGPT search failed');
+    expect(message).toContain('web_search parse failed');
+    expect(message).toContain('web_search_preview parse failed');
+    expect(message).toContain('content-type=text/plain');
+  });
+
   it('throws immediately on non-400 errors (no retry) with request fingerprint', async () => {
     let callCount = 0;
 

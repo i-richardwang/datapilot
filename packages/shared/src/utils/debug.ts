@@ -2,6 +2,10 @@
 // Guard against browser/renderer contexts where process is undefined
 let debugEnabled = typeof process !== 'undefined' && process.env?.CRAFT_DEBUG === '1';
 
+function isCliJsonOnlyMode(): boolean {
+  return typeof process !== 'undefined' && process.env?.CRAFT_CLI_JSON_ONLY === '1';
+}
+
 /**
  * Runtime environment detection
  */
@@ -54,6 +58,7 @@ export function enableDebug(): void {
  * Check if debug mode is enabled.
  */
 export function isDebugEnabled(): boolean {
+  if (isCliJsonOnlyMode()) return false;
   return debugEnabled;
 }
 
@@ -131,7 +136,7 @@ function output(formatted: string): void {
  * debug('User data', { id: 123 })
  */
 export function debug(message: string, ...args: unknown[]): void {
-  if (!debugEnabled) return;
+  if (!isDebugEnabled()) return;
   output(formatMessage(undefined, message, args));
 }
 
@@ -147,7 +152,7 @@ export function debug(message: string, ...args: unknown[]): void {
  */
 export function createLogger(scope: string) {
   const logWithLevel = (level: string, message: string, args: unknown[]) => {
-    if (!debugEnabled) return;
+    if (!isDebugEnabled()) return;
     const levelStr = level.toUpperCase().padEnd(5);
     output(formatMessage(scope, `${levelStr} ${message}`, args));
   };

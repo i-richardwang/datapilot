@@ -31,8 +31,8 @@ function createMockEditor() {
       calls.push('toggleTaskList')
       return chainApi
     },
-    toggleBlockquote: () => {
-      calls.push('toggleBlockquote')
+    setBlockquote: () => {
+      calls.push('setBlockquote')
       return chainApi
     },
     setHorizontalRule: () => {
@@ -128,6 +128,11 @@ describe('tiptap slash menu', () => {
     const taskList = items.find((item) => item.id === 'task-list')
     taskList?.run(editor)
     expect(calls.slice(-3)).toEqual(['focus', 'toggleTaskList', 'run'])
+
+    const quote = items.find((item) => item.id === 'blockquote')
+    quote?.run(editor, 5)
+    expect(calls.slice(-4)).toEqual(['focus', 'setTextSelection:5', 'setBlockquote', 'run'])
+    expect(calls).not.toContain('toggleBlockquote')
 
     const mermaid = items.find((item) => item.id === 'mermaid-code-block')
     mermaid?.run(editor, 5)

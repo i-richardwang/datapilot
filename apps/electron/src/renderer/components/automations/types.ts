@@ -11,6 +11,7 @@
  */
 
 import { computeNextRuns } from './utils'
+import type { PermissionMode } from '../../../shared/types'
 
 // ============================================================================
 // Automation System Types (mirrored from packages/shared/src/automations/types.ts)
@@ -85,7 +86,7 @@ export interface AutomationListItem {
   /** IANA timezone for cron */
   timezone?: string
   /** Permission mode */
-  permissionMode?: 'safe' | 'ask' | 'allow-all'
+  permissionMode?: PermissionMode
   /** Labels for prompt sessions */
   labels?: string[]
   /** The actions this automation performs */
@@ -183,14 +184,14 @@ export function getEventDisplayName(event: AutomationTrigger): string {
 }
 
 /** Maps permission mode values to user-friendly labels */
-export const PERMISSION_DISPLAY_NAMES: Record<string, string> = {
-  'safe':      'Safe Mode',
-  'ask':       'Ask First',
-  'allow-all': 'Allow All',
+export const PERMISSION_DISPLAY_NAMES: Record<PermissionMode, string> = {
+  'safe':      'Explore',
+  'ask':       'Ask',
+  'allow-all': 'Execute',
 }
 
-export function getPermissionDisplayName(mode?: string): string {
-  if (!mode) return 'Safe Mode'
+export function getPermissionDisplayName(mode?: PermissionMode): string {
+  if (!mode) return 'Explore'
   return PERMISSION_DISPLAY_NAMES[mode] ?? mode
 }
 
@@ -226,7 +227,7 @@ interface AutomationsConfigMatcher {
   matcher?: string
   cron?: string
   timezone?: string
-  permissionMode?: 'safe' | 'ask' | 'allow-all'
+  permissionMode?: PermissionMode
   labels?: string[]
   enabled?: boolean
   actions?: ({ type: 'prompt'; prompt: string })[]

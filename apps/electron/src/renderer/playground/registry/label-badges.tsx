@@ -99,10 +99,10 @@ function LabelBadgeRowPlayground({ showValues, labelCount }: LabelBadgeRowPlaygr
 
 export const labelBadgeComponents: ComponentEntry[] = [
   {
-    id: 'label-badge-row',
-    name: 'Label Badge Row',
+    id: 'label-badge-row-standalone',
+    name: 'LabelBadgeRow (Standalone)',
     category: 'Chat Inputs',
-    description: 'Row of label value badges with edit/remove popovers, rendered above the input area.',
+    description: 'Standalone label badge row primitive. Note: this is not the stacked ActiveOptionBadges label rendering used by ChatInputZone.',
     component: LabelBadgeRowPlayground,
     props: [
       {

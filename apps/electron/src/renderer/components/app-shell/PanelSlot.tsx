@@ -91,7 +91,7 @@ export function PanelSlot({
         onPointerDown={handlePointerDown}
         className={cn(
           'h-full overflow-hidden relative',
-          !isOnly && isFocusedPanel ? 'shadow-focused z-[1]' : 'shadow-middle z-0',
+          !isOnly && isFocusedPanel ? 'shadow-panel-focused z-[1]' : 'shadow-middle z-0',
           'bg-foreground-2',
         )}
         style={{

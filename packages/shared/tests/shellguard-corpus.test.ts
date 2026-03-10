@@ -99,6 +99,15 @@ const TEST_MODE_CONFIG = {
       comment: 'npm read operations',
     },
 
+    // craft-agent CLI read-only
+    { regex: /^craft-agent\s+label\s+(list|get)\b/, source: '^craft-agent\\s+label\\s+(list|get)\\b', comment: 'craft-agent label read-only operations' },
+    { regex: /^craft-agent\s+source\s+(list|get|validate|test)\b/, source: '^craft-agent\\s+source\\s+(list|get|validate|test)\\b', comment: 'craft-agent source read-only operations' },
+    { regex: /^craft-agent\s+skill\s+(list|get|validate|where)\b/, source: '^craft-agent\\s+skill\\s+(list|get|validate|where)\\b', comment: 'craft-agent skill read-only operations' },
+    { regex: /^craft-agent\s+automation\s+(list|get|validate|history|last-executed|test|lint)\b/, source: '^craft-agent\\s+automation\\s+(list|get|validate|history|last-executed|test|lint)\\b', comment: 'craft-agent automation read-only operations' },
+    { regex: /^craft-agent\s*$/, source: '^craft-agent\\s*$', comment: 'craft-agent bare invocation' },
+    { regex: /^craft-agent\s+(label|source|skill|automation)\s+--help\b/, source: '^craft-agent\\s+(label|source|skill|automation)\\s+--help\\b', comment: 'craft-agent entity help flags' },
+    { regex: /^craft-agent\s+--(help|version|discover)\b/, source: '^craft-agent\\s+--(help|version|discover)\\b', comment: 'craft-agent global flags' },
+
     // Version checks
     { regex: /^node\s+(--version|-v)\b/, source: 'node version', comment: 'Node.js version' },
     { regex: /^python3?\s+(--version|-V)\b/, source: 'python version', comment: 'Python version' },
@@ -817,6 +826,71 @@ describe('ShellGuard corpus: resource exhaustion', () => {
     'yes',
     'yes y',
   ];
+
+  for (const cmd of shouldBlock) {
+    it(`blocks: ${cmd}`, () => {
+      expect(isReadOnlyBashCommandWithConfig(cmd, TEST_MODE_CONFIG)).toBe(false);
+    });
+  }
+});
+
+// ============================================================
+// Group 27: craft-agent CLI allowlist
+// ============================================================
+
+describe('ShellGuard corpus: craft-agent CLI allowlist', () => {
+  const shouldAllow = [
+    'craft-agent',
+    'craft-agent --help',
+    'craft-agent --version',
+    'craft-agent --discover',
+    'craft-agent label --help',
+    'craft-agent label list',
+    'craft-agent label get bug',
+    'craft-agent source --help',
+    'craft-agent source list',
+    'craft-agent source get linear',
+    'craft-agent source validate linear',
+    'craft-agent source test linear',
+    'craft-agent skill --help',
+    'craft-agent skill list',
+    'craft-agent skill get commit-helper',
+    'craft-agent skill where commit-helper',
+    'craft-agent skill validate commit-helper',
+    'craft-agent automation list',
+    'craft-agent automation get abc123',
+    'craft-agent automation validate',
+    'craft-agent automation history abc123 --limit 5',
+    'craft-agent automation last-executed abc123',
+    'craft-agent automation test abc123 --match "x"',
+    'craft-agent automation lint',
+  ];
+
+  const shouldBlock = [
+    'craft-agent label create --name Bug',
+    'craft-agent label update bug --name "Bug Report"',
+    'craft-agent label delete bug',
+    'craft-agent label move bug --parent root',
+    'craft-agent label reorder --parent root a b c',
+    'craft-agent source create --name Linear --provider linear --type mcp',
+    'craft-agent source update linear --json "{\"enabled\":false}"',
+    'craft-agent source delete linear',
+    'craft-agent skill create --name "Review" --description "x"',
+    'craft-agent skill update review --json "{\"description\":\"y\"}"',
+    'craft-agent skill delete review',
+    'craft-agent automation create --event UserPromptSubmit --prompt "x"',
+    'craft-agent automation update abc123 --json "{\"enabled\":false}"',
+    'craft-agent automation delete abc123',
+    'craft-agent automation enable abc123',
+    'craft-agent automation disable abc123',
+    'craft-agent automation duplicate abc123',
+  ];
+
+  for (const cmd of shouldAllow) {
+    it(`allows: ${cmd}`, () => {
+      expect(isReadOnlyBashCommandWithConfig(cmd, TEST_MODE_CONFIG)).toBe(true);
+    });
+  }
 
   for (const cmd of shouldBlock) {
     it(`blocks: ${cmd}`, () => {

@@ -2,6 +2,10 @@
 
 Labels are additive tags that can be applied to sessions. Unlike statuses (which are exclusive — one per session), labels are multi-select (many per session). They support hierarchical organization via nested JSON trees.
 
+> **CLI-first workflow (recommended):** Use `craft-agent label ...` commands instead of editing JSON directly.
+> - `craft-agent label --help`
+> - Canonical command reference: [craft-cli.md](./craft-cli.md)
+
 ## Storage Locations
 
 - Config: `~/.craft-agent/workspaces/{id}/labels/config.json`
@@ -135,41 +139,18 @@ The optional `valueType` in config is a hint only — the parser always infers f
 
 ## Adding Labels
 
-Edit the workspace's `labels/config.json`:
+Prefer `craft-agent` commands:
 
-```json
-{
-  "version": 1,
-  "labels": [
-    {
-      "id": "bug",
-      "name": "Bug",
-      "color": "destructive"
-    },
-    {
-      "id": "priority",
-      "name": "Priority",
-      "color": "accent",
-      "valueType": "number"
-    },
-    {
-      "id": "due",
-      "name": "Due Date",
-      "color": "info",
-      "valueType": "date"
-    },
-    {
-      "id": "project",
-      "name": "Project",
-      "color": "foreground/60",
-      "children": [
-        { "id": "alpha", "name": "Alpha", "color": "info" },
-        { "id": "beta", "name": "Beta", "color": "success" }
-      ]
-    }
-  ]
-}
+```bash
+craft-agent label create --name "Bug" --color "destructive"
+craft-agent label create --name "Priority" --color "accent" --value-type number
+craft-agent label create --name "Due Date" --color "info" --value-type date
+craft-agent label create --name "Project" --color "foreground/60"
+craft-agent label create --name "Alpha" --color "info" --parent-id project
+craft-agent label create --name "Beta" --color "success" --parent-id project
 ```
+
+Use direct JSON edits only for bulk/manual operations where CLI is not sufficient.
 
 ## Color Conventions
 

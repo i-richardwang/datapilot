@@ -35,6 +35,12 @@ export {
   SystemMessage,
   FileTypeIcon,
   getFileTypeLabel,
+  asRecord,
+  getAnnotationNoteText,
+  getAnnotationFollowUpState,
+  isAnnotationFollowUpSent,
+  extractAnnotationSelectedText,
+  normalizeFollowUpText,
   // Inline execution for EditPopover
   InlineExecution,
   mapToolEventToActivity,
@@ -103,6 +109,10 @@ export {
   BrowserControls,
   BrowserEmptyStateCard,
   FilterableSelectPopover,
+  Island,
+  IslandContentView,
+  IslandFollowUpContentView,
+  useIslandNavigation,
   type SpinnerProps,
   type SimpleDropdownProps,
   type SimpleDropdownItemProps,
@@ -115,6 +125,17 @@ export {
   type BrowserEmptyPromptSample,
   type FilterableSelectPopoverProps,
   type FilterableSelectRenderState,
+  type IslandProps,
+  type IslandContentViewProps,
+  type IslandTransitionConfig,
+  type IslandActiveViewSize,
+  type IslandMorphTarget,
+  type IslandFollowUpContentViewProps,
+  type IslandFollowUpMode,
+  type IslandNavigation,
+  type IslandDialogBehavior,
+  type AnchorX,
+  type AnchorY,
 } from './components/ui'
 
 // Tooltip
@@ -211,6 +232,14 @@ export {
 
 // Utilities
 export { cn } from './lib/utils'
+export {
+  setDismissibleLayerBridge,
+  getDismissibleLayerBridge,
+  type DismissibleLayerBridge,
+  type DismissibleLayerRegistration,
+  type DismissibleLayerSnapshot,
+  type DismissibleLayerType,
+} from './lib/dismissible-layer-bridge'
 
 // Layout constants and hooks
 export {

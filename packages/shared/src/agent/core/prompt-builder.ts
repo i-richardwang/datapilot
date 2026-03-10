@@ -79,7 +79,11 @@ export class PromptBuilder {
       getSessionPlansPath(this.workspaceRootPath, sessionId);
     const dataFolderPath = options.dataFolderPath ??
       getSessionDataPath(this.workspaceRootPath, sessionId);
-    parts.push(formatSessionState(sessionId, { plansFolderPath, dataFolderPath }));
+    parts.push(formatSessionState(sessionId, {
+      plansFolderPath,
+      dataFolderPath,
+      consumeModeChangeUserSignal: true,
+    }));
 
     // Add source state if provided
     if (sourceStateBlock) {

@@ -102,6 +102,10 @@ export function ComponentPreview({ component, props }: ComponentPreviewProps) {
     }
   }, [])
 
+  const previewOverflowClass = component.previewOverflow
+    ? (component.previewOverflow === 'visible' ? 'overflow-visible' : component.previewOverflow === 'hidden' ? 'overflow-hidden' : 'overflow-auto')
+    : (component.layout === 'full' ? 'overflow-hidden' : 'overflow-auto')
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
@@ -145,7 +149,7 @@ export function ComponentPreview({ component, props }: ComponentPreviewProps) {
           <div
             className={cn(
               'w-full h-full rounded-lg border border-border',
-              component.layout === 'full' ? 'overflow-hidden' : 'overflow-auto',
+              previewOverflowClass,
               component.layout === 'centered' || !component.layout ? 'flex items-center justify-center' : '',
               'bg-background'
             )}

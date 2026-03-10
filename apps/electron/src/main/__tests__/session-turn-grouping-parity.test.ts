@@ -2,28 +2,15 @@
  * Tests for turn grouping stability across persist → reload.
  *
  * Verifies that messages run through the persistence pipeline
- * (messageToStored → filter intermediate → storedToMessage)
+ * (centralized messageToStored → filter intermediate → centralized storedToMessage)
  * produce the same turn structure when grouped.
  *
  * Imports groupMessagesByTurn (pure function) from turn-utils.
  */
 import { describe, it, expect, beforeEach } from 'bun:test'
 import { groupMessagesByTurn, type AssistantTurn } from '@craft-agent/ui/chat/turn-utils'
-import type { Message, StoredMessage, MessageRole } from '@craft-agent/core'
-
-// ============================================================================
-// Mirror: messageToStored / storedToMessage from sessions.ts (spread pattern)
-// ============================================================================
-
-function messageToStored(msg: Message): StoredMessage {
-  const { role, isStreaming, isPending, ...rest } = msg
-  return { ...rest, type: role } as StoredMessage
-}
-
-function storedToMessage(stored: StoredMessage): Message {
-  const { type, ...rest } = stored
-  return { ...rest, role: type, timestamp: stored.timestamp ?? Date.now() } as Message
-}
+import { messageToStored, storedToMessage } from '@craft-agent/core'
+import type { Message, MessageRole } from '@craft-agent/core'
 
 // ============================================================================
 // Mirror: persistence pipeline (two-stage filter)

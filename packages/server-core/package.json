@@ -1,6 +1,6 @@
 {
   "name": "@craft-agent/server-core",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "description": "Reusable headless server infrastructure for Craft Agent",
   "type": "module",
   "main": "src/index.ts",
@@ -25,7 +25,8 @@
     "@craft-agent/core": "workspace:*",
     "@craft-agent/shared": "workspace:*",
     "ws": "^8.19.0",
-    "sharp": "0.34.5"
+    "sharp": "0.34.5",
+    "@mariozechner/pi-ai": "0.56.2"
   },
   "devDependencies": {
     "typescript": "^5.8.2",

@@ -11,6 +11,7 @@ import type {
   TypedError,
   ContentBadge,
   ToolDisplayMeta,
+  AnnotationV1,
   PermissionRequest as BasePermissionRequest,
 } from '@craft-agent/core/types'
 import type { PermissionMode } from '../agent/mode-types'
@@ -119,7 +120,12 @@ export interface CreateSessionOptions {
   labels?: string[]
   isFlagged?: boolean
   enabledSourceSlugs?: string[]
+  /**
+   * Message ID to branch from. This is a hard context cutoff:
+   * the new session must not include model context from later parent messages.
+   */
   branchFromMessageId?: string
+  /** Parent session ID used together with branchFromMessageId. */
   branchFromSessionId?: string
 }
 
@@ -182,6 +188,7 @@ export type SessionEvent =
   // Batch processing events
   | { type: 'batch_progress' } & import('../batches/types').BatchProgress
   | { type: 'batch_complete'; batchId: string; status: import('../batches/types').BatchStatus }
+  | { type: 'message_annotations_updated'; sessionId: string; messageId: string; annotations: AnnotationV1[] }
 
 export interface SendMessageOptions {
   skillSlugs?: string[]
@@ -215,9 +222,12 @@ export type SessionCommand =
   | { type: 'revokeShare' }
   | { type: 'refreshTitle' }
   | { type: 'setConnection'; connectionSlug: string }
-  | { type: 'setPendingPlanExecution'; planPath: string }
+  | { type: 'setPendingPlanExecution'; planPath: string; draftInputSnapshot?: string }
   | { type: 'markCompactionComplete' }
   | { type: 'clearPendingPlanExecution' }
+  | { type: 'addAnnotation'; messageId: string; annotation: AnnotationV1 }
+  | { type: 'removeAnnotation'; messageId: string; annotationId: string }
+  | { type: 'updateAnnotation'; messageId: string; annotationId: string; patch: Partial<AnnotationV1> }
 
 export interface NewChatActionParams {
   input?: string
@@ -462,7 +472,7 @@ export interface TestAutomationPayload {
   automationId?: string
   automationName?: string
   actions: Array<{ type: 'prompt'; prompt: string; llmConnection?: string; model?: string }>
-  permissionMode?: 'safe' | 'ask' | 'allow-all'
+  permissionMode?: PermissionMode
   labels?: string[]
 }
 

@@ -2,6 +2,10 @@
 
 This guide explains how to configure sources (MCP servers, APIs, local filesystems) in Craft Agent.
 
+> **CLI-first workflow (recommended):** Use `craft-agent source ...` commands instead of editing source config files directly.
+> - `craft-agent source --help`
+> - Canonical command reference: [craft-cli.md](./craft-cli.md)
+
 ## Source Setup Process
 
 When a user wants to add a new source, follow this conversational setup process to create a tailored, well-documented integration.
@@ -75,11 +79,11 @@ Use available tools to learn about the service:
 
 Based on research and user intent, create `config.json` with **ALL required fields**:
 
-**Required fields:**
+**Core fields:**
 - `id` - **REQUIRED**: Unique identifier string. Format: `{slug}_{random}` (e.g., `linear_a1b2c3d4`). Generate the random part with any method (e.g., 8 hex chars).
 - `name`, `slug`, `provider`, `type` - Basic identification
-- `icon` - **REQUIRED**: URL to the service's favicon, logo, or app icon. Search the web to find an appropriate icon that looks like an app icon. The icon is auto-downloaded and cached locally. Use an emoji as fallback.
-- `tagline` - **REQUIRED**: Short description for agent context (e.g., "Issue tracking, sprint planning, and project management")
+- `icon` - **RECOMMENDED**: URL to the service's favicon, logo, or app icon. The icon is auto-downloaded and cached locally. Use an emoji as fallback.
+- `tagline` - **RECOMMENDED**: Short description for agent context (e.g., "Issue tracking, sprint planning, and project management")
 - Type-specific config (`mcp`, `api`, or `local`)
 - Authentication method appropriate for the service
 
@@ -256,7 +260,7 @@ Each source folder contains:
   "provider": "provider-name",
   "type": "mcp" | "api" | "local",
 
-  // REQUIRED: Icon and tagline for UI and agent context
+  // RECOMMENDED: Icon and tagline for better UI and agent context
   "icon": "https://example.com/favicon.ico",  // URL (auto-downloaded) or emoji
   "tagline": "Brief description for agent context",
 

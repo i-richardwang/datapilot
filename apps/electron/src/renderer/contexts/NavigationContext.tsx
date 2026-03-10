@@ -47,6 +47,7 @@ import {
   type ParsedRoute,
 } from '../../shared/route-parser'
 import { routes, type Route, type ViewRoute } from '../../shared/routes'
+import { parsePermissionMode } from '@craft-agent/shared/agent/mode-types'
 import { NAVIGATE_EVENT, type NavigateOptions } from '../lib/navigate'
 import { normalizePanelRouteForReconcile } from './navigation-reconcile'
 import { buildSemanticHistoryKey, canRunInitialRestore } from './navigation-history'
@@ -670,8 +671,11 @@ export function NavigationProvider({
       switch (parsed.name) {
         case 'new-session': {
           const createOptions: import('../../shared/types').CreateSessionOptions = {}
-          if (parsed.params.mode && ['safe', 'ask', 'allow-all'].includes(parsed.params.mode)) {
-            createOptions.permissionMode = parsed.params.mode as 'safe' | 'ask' | 'allow-all'
+          if (parsed.params.mode) {
+            const parsedMode = parsePermissionMode(parsed.params.mode)
+            if (parsedMode) {
+              createOptions.permissionMode = parsedMode
+            }
           }
           if (parsed.params.workdir) {
             createOptions.workingDirectory = parsed.params.workdir as 'user_default' | 'none' | string
@@ -797,9 +801,14 @@ export function NavigationProvider({
 
         case 'set-mode':
           if (parsed.id && parsed.params.mode) {
+            const parsedMode = parsePermissionMode(parsed.params.mode)
+            if (!parsedMode) {
+              console.warn('[Navigation] Invalid permission mode:', parsed.params.mode)
+              break
+            }
             await window.electronAPI.sessionCommand(
               parsed.id,
-              { type: 'setPermissionMode', mode: parsed.params.mode as 'safe' | 'ask' | 'allow-all' }
+              { type: 'setPermissionMode', mode: parsedMode }
             )
           }
           break

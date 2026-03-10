@@ -49,7 +49,7 @@ import {
   PERMISSION_MODE_CONFIG,
   SAFE_MODE_CONFIG,
 } from './mode-manager.ts';
-import { getSessionPlansPath, getSessionPath } from '../sessions/storage.ts';
+import { getSessionDataPath, getSessionPlansPath, getSessionPath } from '../sessions/storage.ts';
 import { extractWorkspaceSlug } from '../utils/workspace.ts';
 import {
   ConfigWatcher,
@@ -883,7 +883,7 @@ export class ClaudeAgent extends BaseAgent {
 
               // Get current permission mode (single source of truth)
               const permissionMode = getPermissionMode(sessionId);
-              this.onDebug?.(`PreToolUse hook: ${input.tool_name} (permissionMode=${permissionMode})`);
+              this.onDebug?.(`PreToolUse hook: ${input.tool_name} (sessionId=${sessionId}, permissionMode=${permissionMode})`);
 
               const toolInput = input.tool_input as Record<string, unknown>;
 
@@ -896,6 +896,7 @@ export class ClaudeAgent extends BaseAgent {
                 workspaceRootPath: this.workspaceRootPath,
                 workspaceId: extractWorkspaceSlug(this.workspaceRootPath, this.config.workspace.id),
                 plansFolderPath: sessionId ? getSessionPlansPath(this.workspaceRootPath, sessionId) : undefined,
+                dataFolderPath: sessionId ? getSessionDataPath(this.workspaceRootPath, sessionId) : undefined,
                 workingDirectory: this.config.session?.workingDirectory,
                 activeSourceSlugs: Array.from(this.sourceManager.getActiveSlugs()),
                 allSourceSlugs: this.sourceManager.getAllSources().map(s => s.config.slug),
@@ -1677,6 +1678,11 @@ export class ClaudeAgent extends BaseAgent {
     // Add context parts using centralized PromptBuilder
     // This includes: date/time, session state (with plansFolderPath),
     // workspace capabilities, working directory context, and batch output instructions
+    const textPromptDiagnostics = getPermissionModeDiagnostics(this.modeSessionId)
+    this.debug(
+      `[ModeSnapshot] sessionId=${this.modeSessionId} buildTextPrompt mode=${textPromptDiagnostics.permissionMode} ` +
+      `modeVersion=${textPromptDiagnostics.modeVersion} changedBy=${textPromptDiagnostics.lastChangedBy} changedAt=${textPromptDiagnostics.lastChangedAt}`
+    )
     const batchCtx = getSessionBatchContext(this.modeSessionId);
     const contextParts = this.promptBuilder.buildContextParts(
       {
@@ -1722,6 +1728,11 @@ export class ClaudeAgent extends BaseAgent {
     // Add context parts using centralized PromptBuilder
     // This includes: date/time, session state (with plansFolderPath),
     // workspace capabilities, working directory context, and batch output instructions
+    const sdkPromptDiagnostics = getPermissionModeDiagnostics(this.modeSessionId)
+    this.debug(
+      `[ModeSnapshot] sessionId=${this.modeSessionId} buildSDKUserMessage mode=${sdkPromptDiagnostics.permissionMode} ` +
+      `modeVersion=${sdkPromptDiagnostics.modeVersion} changedBy=${sdkPromptDiagnostics.lastChangedBy} changedAt=${sdkPromptDiagnostics.lastChangedAt}`
+    )
     const batchCtx = getSessionBatchContext(this.modeSessionId);
     const contextParts = this.promptBuilder.buildContextParts(
       {
@@ -2273,8 +2284,16 @@ export class ClaudeAgent extends BaseAgent {
    * backend session context is only attempted later on first user message.
    */
   override async ensureBranchReady(): Promise<void> {
-    // Nothing to preflight for non-branched sessions or already-initialized sessions.
-    if (this.sessionId || !this.branchFromSdkSessionId) return;
+    const isBranchedSession = !!this.config.session?.branchFromMessageId;
+
+    // Already initialized sessions are ready.
+    if (this.sessionId) return;
+    // Nothing to preflight for non-branched sessions.
+    if (!isBranchedSession) return;
+    // Branched Claude sessions must carry parent SDK session metadata for strict forking.
+    if (!this.branchFromSdkSessionId) {
+      throw new Error('Claude branch preflight failed: missing parent SDK session ID');
+    }
 
     const options: Options = {
       ...getDefaultOptions(this.config.envOverrides),
@@ -2295,7 +2314,8 @@ export class ClaudeAgent extends BaseAgent {
     let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      preflightQuery = query({ prompt: ' ', options });
+      // Anthropic rejects whitespace-only text blocks. Use a minimal non-whitespace prompt.
+      preflightQuery = query({ prompt: '.', options });
 
       capturedSessionId = await Promise.race([
         (async () => {

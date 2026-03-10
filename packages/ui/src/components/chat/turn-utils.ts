@@ -5,7 +5,10 @@
  * Converts the flat Message[] array into grouped turns for email-like display.
  */
 
-import type { Message, StoredMessage, MessageRole } from '@craft-agent/core'
+import { storedToMessage } from '@craft-agent/core'
+import type { Message } from '@craft-agent/core'
+
+export { storedToMessage }
 import type { ActivityItem, ActivityStatus, ActivityType, ResponseContent, TodoItem } from './TurnCard'
 
 // Re-export ActivityItem for consumers
@@ -29,55 +32,6 @@ function stripErrorTags(content: string | undefined): string | undefined {
     .replace(/<\/?tool_use_error>/gi, '')
     .replace(/^\[ERROR]\s*/i, '')
     .trim()
-}
-
-/** Convert StoredMessage to Message format for turn processing */
-export function storedToMessage(stored: StoredMessage): Message {
-  return {
-    id: stored.id,
-    role: stored.type,
-    content: stored.content,
-    timestamp: stored.timestamp ?? Date.now(),
-    toolName: stored.toolName,
-    toolUseId: stored.toolUseId,
-    toolInput: stored.toolInput,
-    toolResult: stored.toolResult,
-    toolStatus: stored.toolStatus,
-    toolDuration: stored.toolDuration,
-    toolIntent: stored.toolIntent,
-    toolDisplayName: stored.toolDisplayName,
-    toolDisplayMeta: stored.toolDisplayMeta,  // Includes base64 icon for viewer
-    parentToolUseId: stored.parentToolUseId,
-    taskId: stored.taskId,
-    shellId: stored.shellId,
-    elapsedSeconds: stored.elapsedSeconds,
-    isBackground: stored.isBackground,
-    attachments: stored.attachments,
-    badges: stored.badges,
-    isError: stored.isError,
-    isIntermediate: stored.isIntermediate,
-    turnId: stored.turnId,
-    errorCode: stored.errorCode,
-    errorTitle: stored.errorTitle,
-    errorDetails: stored.errorDetails,
-    errorOriginal: stored.errorOriginal,
-    errorCanRetry: stored.errorCanRetry,
-    planPath: stored.planPath,
-    // Auth-request fields
-    authRequestId: stored.authRequestId,
-    authRequestType: stored.authRequestType,
-    authSourceSlug: stored.authSourceSlug,
-    authSourceName: stored.authSourceName,
-    authStatus: stored.authStatus,
-    authCredentialMode: stored.authCredentialMode,
-    authHeaderName: stored.authHeaderName,
-    authLabels: stored.authLabels,
-    authDescription: stored.authDescription,
-    authHint: stored.authHint,
-    authError: stored.authError,
-    authEmail: stored.authEmail,
-    authWorkspace: stored.authWorkspace,
-  }
 }
 
 // ============================================================================
@@ -554,6 +508,8 @@ export function groupMessagesByTurn(messages: Message[]): Turn[] {
         type: 'plan' as ActivityType,
         status: 'completed',
         content: message.content,
+        messageId: message.id,
+        annotations: message.annotations,
         displayName: 'Plan',
         timestamp: message.timestamp,
       })
@@ -655,6 +611,7 @@ export function groupMessagesByTurn(messages: Message[]): Turn[] {
         isStreaming: !!message.isStreaming,
         streamStartTime: message.isStreaming ? message.timestamp : undefined,
         messageId: message.id,
+        annotations: message.annotations,
       }
       currentTurn.isStreaming = !!message.isStreaming
       currentTurn.isComplete = !message.isStreaming
