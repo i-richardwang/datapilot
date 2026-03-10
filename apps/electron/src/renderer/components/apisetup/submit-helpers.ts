@@ -18,10 +18,9 @@ export function resolvePiAuthProviderForSubmit(
 export function resolvePresetStateForBaseUrlChange(params: {
   matchedPreset: PresetKey
   activePreset: PresetKey
-  activePresetHasEmptyUrl: boolean
   lastNonCustomPreset: PresetKey | null
 }): { activePreset: PresetKey; lastNonCustomPreset: PresetKey | null } {
-  const { matchedPreset, activePreset, activePresetHasEmptyUrl, lastNonCustomPreset } = params
+  const { matchedPreset, activePreset, lastNonCustomPreset } = params
 
   if (matchedPreset !== 'custom') {
     return {
@@ -30,15 +29,11 @@ export function resolvePresetStateForBaseUrlChange(params: {
     }
   }
 
-  if (activePresetHasEmptyUrl) {
-    return {
-      activePreset,
-      lastNonCustomPreset,
-    }
-  }
-
+  // When URL doesn't match any known preset, keep the current preset.
+  // Switching to 'custom' would drop piAuthProvider routing metadata
+  // (e.g. editing the OpenRouter URL to a proxy would lose the 'openrouter' provider hint).
   return {
-    activePreset: 'custom',
+    activePreset,
     lastNonCustomPreset,
   }
 }

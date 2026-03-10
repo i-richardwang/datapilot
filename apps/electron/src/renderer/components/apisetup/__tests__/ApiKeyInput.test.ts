@@ -65,8 +65,18 @@ describe('resolvePresetStateForBaseUrlChange', () => {
     expect(resolvePresetStateForBaseUrlChange({
       matchedPreset: 'openrouter',
       activePreset: 'custom',
-      activePresetHasEmptyUrl: true,
       lastNonCustomPreset: 'anthropic',
+    })).toEqual({
+      activePreset: 'openrouter',
+      lastNonCustomPreset: 'openrouter',
+    })
+  })
+
+  it('preserves provider routing when editing a provider URL to a custom endpoint', () => {
+    expect(resolvePresetStateForBaseUrlChange({
+      matchedPreset: 'custom',
+      activePreset: 'openrouter',
+      lastNonCustomPreset: 'openrouter',
     })).toEqual({
       activePreset: 'openrouter',
       lastNonCustomPreset: 'openrouter',
@@ -77,23 +87,10 @@ describe('resolvePresetStateForBaseUrlChange', () => {
     expect(resolvePresetStateForBaseUrlChange({
       matchedPreset: 'custom',
       activePreset: 'azure-openai-responses',
-      activePresetHasEmptyUrl: true,
       lastNonCustomPreset: 'azure-openai-responses',
     })).toEqual({
       activePreset: 'azure-openai-responses',
       lastNonCustomPreset: 'azure-openai-responses',
-    })
-  })
-
-  it('falls back to custom while keeping the most recent matched provider', () => {
-    expect(resolvePresetStateForBaseUrlChange({
-      matchedPreset: 'custom',
-      activePreset: 'openrouter',
-      activePresetHasEmptyUrl: false,
-      lastNonCustomPreset: 'openrouter',
-    })).toEqual({
-      activePreset: 'custom',
-      lastNonCustomPreset: 'openrouter',
     })
   })
 })

@@ -259,11 +259,9 @@ export function ApiKeyInput({
   const handleBaseUrlChange = (value: string) => {
     setBaseUrl(value)
     const presetKey = getPresetForUrl(value, presets)
-    const currentPresetObj = presets.find(p => p.key === activePreset)
     const nextPresetState = resolvePresetStateForBaseUrlChange({
       matchedPreset: presetKey,
       activePreset,
-      activePresetHasEmptyUrl: currentPresetObj?.url === '',
       lastNonCustomPreset,
     })
     setActivePreset(nextPresetState.activePreset)
