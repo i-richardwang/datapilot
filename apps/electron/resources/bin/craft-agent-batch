@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "${CRAFT_BUN:-bun}" run "${CRAFT_BATCH_CLI_ENTRY}" "$@"
