@@ -93,6 +93,7 @@ import { useLabels } from "@/hooks/useLabels"
 import { useViews } from "@/hooks/useViews"
 import { LabelIcon, LabelValueTypeIcon } from "@/components/ui/label-icon"
 import { filterItems as filterLabelMenuItems, filterSessionStatuses as filterLabelMenuStates, type LabelMenuItem } from "@/components/ui/label-menu"
+import { FEATURE_FLAGS } from "@craft-agent/shared/feature-flags"
 import { buildLabelTree, getDescendantIds, getLabelDisplayName, flattenLabels, extractLabelId, findLabelById } from "@craft-agent/shared/labels"
 import type { LabelConfig, LabelTreeNode } from "@craft-agent/shared/labels"
 import { resolveEntityColor } from "@craft-agent/shared/colors"
@@ -2498,7 +2499,7 @@ function AppShellContent({
                       onClick: () => handleSettingsClick('app'),
                     },
                     // --- What's New ---
-                    {
+                    ...(!FEATURE_FLAGS.liteVersion ? [{
                       id: "nav:whats-new",
                       title: "What's New",
                       icon: hasUnseenReleaseNotes ? (
@@ -2509,7 +2510,7 @@ function AppShellContent({
                       ) : Cake,
                       variant: "ghost" as const,
                       onClick: handleWhatsNewClick,
-                    },
+                    }] : []),
                   ]}
                 />
                 {/* Agent Tree: Hierarchical list of agents */}

@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils"
 import { Key, Monitor } from "lucide-react"
 import { CraftAgentsSymbol } from "@/components/icons/CraftAgentsSymbol"
+import { FEATURE_FLAGS } from "@craft-agent/shared/feature-flags"
 import { StepFormLayout } from "./primitives"
 
 import claudeIcon from "@/assets/provider-icons/claude.svg"
@@ -20,7 +21,10 @@ interface ProviderOption {
   icon: React.ReactNode
 }
 
-const PROVIDER_OPTIONS: ProviderOption[] = [
+/** Provider IDs hidden in lite version */
+const LITE_HIDDEN_PROVIDERS: Set<ProviderChoice> = new Set(['claude', 'chatgpt', 'copilot', 'local'])
+
+const ALL_PROVIDER_OPTIONS: ProviderOption[] = [
   {
     id: 'claude',
     name: 'Claude Pro / Max',
@@ -52,6 +56,10 @@ const PROVIDER_OPTIONS: ProviderOption[] = [
     icon: <Monitor className="size-5" />,
   },
 ]
+
+const PROVIDER_OPTIONS: ProviderOption[] = FEATURE_FLAGS.liteVersion
+  ? ALL_PROVIDER_OPTIONS.filter(opt => !LITE_HIDDEN_PROVIDERS.has(opt.id))
+  : ALL_PROVIDER_OPTIONS
 
 interface ProviderSelectStepProps {
   /** Called when the user selects a provider */

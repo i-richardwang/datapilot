@@ -42,6 +42,19 @@ export function isCraftAgentsCliEnabled(): boolean {
   return false;
 }
 
+/**
+ * Build-time check for lite version.
+ *
+ * When enabled, hides non-essential UI elements (What's New, Help menu,
+ * subscription providers, extra statuses) for a streamlined experience.
+ * Set CRAFT_LITE_VERSION=1 at build time to enable.
+ */
+export function isLiteVersion(): boolean {
+  const override = parseBooleanEnv(process.env.CRAFT_LITE_VERSION);
+  if (override !== undefined) return override;
+  return false;
+}
+
 export const FEATURE_FLAGS = {
   /** Enable Opus 4.6 fast mode (speed:"fast" + beta header). 6x pricing. */
   fastMode: false,
@@ -61,5 +74,13 @@ export const FEATURE_FLAGS = {
    */
   get craftAgentsCli(): boolean {
     return isCraftAgentsCliEnabled();
+  },
+  /**
+   * Lite version — hides non-essential UI elements.
+   *
+   * Defaults to disabled. Set CRAFT_LITE_VERSION=1 at build time to enable.
+   */
+  get liteVersion(): boolean {
+    return isLiteVersion();
   },
 } as const;

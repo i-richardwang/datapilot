@@ -33,6 +33,9 @@ export default defineConfig({
     //   },
     // }),
   ],
+  define: {
+    'process.env.CRAFT_LITE_VERSION': JSON.stringify(process.env.CRAFT_LITE_VERSION || ''),
+  },
   root: resolve(__dirname, 'src/renderer'),
   base: './',
   build: {

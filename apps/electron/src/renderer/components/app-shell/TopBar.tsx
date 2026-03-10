@@ -40,6 +40,7 @@ import { BrowserTabStrip } from "../browser/BrowserTabStrip"
 import type { Workspace } from "../../../shared/types"
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher"
 import { getDocUrl } from "@craft-agent/shared/docs/doc-links"
+import { FEATURE_FLAGS } from "@craft-agent/shared/feature-flags"
 
 // --- Menu rendering (moved from AppMenu) ---
 
@@ -422,6 +423,7 @@ export function TopBar({
         </DropdownMenu>
 
         {/* Help button */}
+        {!FEATURE_FLAGS.liteVersion && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <TopBarButton aria-label="Help & Documentation" className="h-[26px] w-[26px] rounded-lg">
@@ -461,6 +463,7 @@ export function TopBar({
             </StyledDropdownMenuItem>
           </StyledDropdownMenuContent>
         </DropdownMenu>
+        )}
       </div>
       </div>
     </div>

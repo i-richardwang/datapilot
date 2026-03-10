@@ -24,6 +24,7 @@ import {
 } from '../utils/icon.ts';
 import { migrateStatusColors } from '../colors/migrate.ts';
 import { debug } from '../utils/debug.ts';
+import { FEATURE_FLAGS } from '../feature-flags.ts';
 
 const STATUS_CONFIG_DIR = 'statuses';
 const STATUS_CONFIG_FILE = 'statuses/config.json';
@@ -42,50 +43,52 @@ export function getDefaultStatusConfig(): WorkspaceStatusConfig {
   // - cancelled: foreground/50 (muted, inactive)
   //
   // Note: icon is omitted - auto-discovered from statuses/icons/{id}.svg
+  const lite = FEATURE_FLAGS.liteVersion;
+  const statuses: StatusConfig[] = [
+    ...(!lite ? [{
+      id: 'backlog',
+      label: 'Backlog',
+      category: 'open' as StatusCategory,
+      isFixed: false,
+      isDefault: true,
+      order: 0,
+    }] : []),
+    {
+      id: 'todo',
+      label: 'Todo',
+      category: 'open' as StatusCategory,
+      isFixed: true,
+      isDefault: false,
+      order: lite ? 0 : 1,
+    },
+    ...(!lite ? [{
+      id: 'needs-review',
+      label: 'Needs Review',
+      category: 'open' as StatusCategory,
+      isFixed: false,
+      isDefault: true,
+      order: 2,
+    }] : []),
+    {
+      id: 'done',
+      label: 'Done',
+      category: 'closed' as StatusCategory,
+      isFixed: true,
+      isDefault: false,
+      order: lite ? 1 : 3,
+    },
+    {
+      id: 'cancelled',
+      label: 'Cancelled',
+      category: 'closed' as StatusCategory,
+      isFixed: true,
+      isDefault: false,
+      order: lite ? 2 : 4,
+    },
+  ];
   return {
     version: 1,
-    statuses: [
-      {
-        id: 'backlog',
-        label: 'Backlog',
-        category: 'open',
-        isFixed: false,
-        isDefault: true,
-        order: 0,
-      },
-      {
-        id: 'todo',
-        label: 'Todo',
-        category: 'open',
-        isFixed: true,
-        isDefault: false,
-        order: 1,
-      },
-      {
-        id: 'needs-review',
-        label: 'Needs Review',
-        category: 'open',
-        isFixed: false,
-        isDefault: true,
-        order: 2,
-      },
-      {
-        id: 'done',
-        label: 'Done',
-        category: 'closed',
-        isFixed: true,
-        isDefault: false,
-        order: 3,
-      },
-      {
-        id: 'cancelled',
-        label: 'Cancelled',
-        category: 'closed',
-        isFixed: true,
-        isDefault: false,
-        order: 4,
-      },
-    ],
+    statuses,
     defaultStatusId: 'todo',
   };
 }
