@@ -350,6 +350,7 @@ export function getSessionScopedTools(
   const tools = getSessionToolDefs({
     includeDeveloperFeedback: FEATURE_FLAGS.developerFeedback,
     includeBatchOutput: isBatchSession,
+    liteMode: FEATURE_FLAGS.liteVersion,
   })
     .filter(def => def.handler !== null) // Skip backend-specific tools (call_llm)
     .map(def => registryTool(def.name, def.inputSchema.shape));

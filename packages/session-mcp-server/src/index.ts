@@ -32,7 +32,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { isDeveloperFeedbackEnabled } from '@craft-agent/shared/feature-flags';
+import { isDeveloperFeedbackEnabled, FEATURE_FLAGS } from '@craft-agent/shared/feature-flags';
 // Import from session-tools-core
 import {
   type SessionToolContext,
@@ -261,6 +261,7 @@ function createCodexContext(config: SessionConfig): SessionToolContext {
 function createSessionTools(includeDeveloperFeedback: boolean): Tool[] {
   return getToolDefsAsJsonSchema({
     includeDeveloperFeedback,
+    liteMode: FEATURE_FLAGS.liteVersion,
   }).map(def => ({
     name: def.name,
     description: def.description,
@@ -506,7 +507,7 @@ async function main() {
   const ctx = createCodexContext(config);
 
   const includeDeveloperFeedback = isDeveloperFeedbackEnabled();
-  const sessionToolRegistry = getSessionToolRegistry({ includeDeveloperFeedback });
+  const sessionToolRegistry = getSessionToolRegistry({ includeDeveloperFeedback, liteMode: FEATURE_FLAGS.liteVersion });
 
   // Create MCP server
   const server = new Server(

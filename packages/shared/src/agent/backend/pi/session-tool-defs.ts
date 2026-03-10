@@ -21,5 +21,6 @@ export function getSessionToolProxyDefs(opts?: { includeBatchOutput?: boolean })
     prefix: 'mcp__session__',
     includeDeveloperFeedback: FEATURE_FLAGS.developerFeedback,
     includeBatchOutput: opts?.includeBatchOutput,
+    liteMode: FEATURE_FLAGS.liteVersion,
   });
 }

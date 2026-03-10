@@ -476,11 +476,21 @@ export const SESSION_TOOL_DEFS: SessionToolDef[] = [
   { name: 'browser_tool', description: TOOL_DESCRIPTIONS.browser_tool, inputSchema: BrowserToolSchema, executionMode: 'backend', safeMode: 'allow', handler: null },
 ];
 
+/** Tools excluded in lite mode (OAuth not needed) */
+export const LITE_EXCLUDED_TOOLS = new Set([
+  'source_oauth_trigger',
+  'source_google_oauth_trigger',
+  'source_slack_oauth_trigger',
+  'source_microsoft_oauth_trigger',
+]);
+
 export interface SessionToolFilterOptions {
   /** Include the experimental send_developer_feedback tool. */
   includeDeveloperFeedback?: boolean;
   /** Include batch_output tool (only for batch-spawned sessions). Defaults to false. */
   includeBatchOutput?: boolean;
+  /** Exclude provider-specific OAuth tools for lite builds. Defaults to false. */
+  liteMode?: boolean;
 }
 
 /**
@@ -492,12 +502,16 @@ export interface SessionToolFilterOptions {
 export function getSessionToolDefs(options?: SessionToolFilterOptions): SessionToolDef[] {
   const includeDeveloperFeedback = options?.includeDeveloperFeedback ?? true;
   const includeBatchOutput = options?.includeBatchOutput ?? false;
+  const liteMode = options?.liteMode ?? false;
 
   return SESSION_TOOL_DEFS.filter(def => {
     if (!includeDeveloperFeedback && def.name === 'send_developer_feedback') {
       return false;
     }
     if (!includeBatchOutput && def.name === 'batch_output') {
+      return false;
+    }
+    if (liteMode && LITE_EXCLUDED_TOOLS.has(def.name)) {
       return false;
     }
     return true;
@@ -613,11 +627,13 @@ export function getToolDefsAsJsonSchema(opts?: {
   prefix?: string;
   includeDeveloperFeedback?: boolean;
   includeBatchOutput?: boolean;
+  liteMode?: boolean;
 }): JsonSchemaToolDef[] {
   const prefix = opts?.prefix || '';
   const defs = getSessionToolDefs({
     includeDeveloperFeedback: opts?.includeDeveloperFeedback,
     includeBatchOutput: opts?.includeBatchOutput,
+    liteMode: opts?.liteMode,
   });
 
   return defs.map(def => {

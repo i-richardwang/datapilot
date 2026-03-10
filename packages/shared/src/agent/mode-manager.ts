@@ -2015,6 +2015,7 @@ export function shouldAllowToolInMode(
         prefix: 'mcp__session__',
         includeDeveloperFeedback: FEATURE_FLAGS.developerFeedback,
         includeBatchOutput: true,
+        liteMode: FEATURE_FLAGS.liteVersion,
       });
 
       if (safeAllowedSessionTools.has(toolName)) {
