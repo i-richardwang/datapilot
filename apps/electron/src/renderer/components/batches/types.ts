@@ -6,6 +6,7 @@
 
 import type { BadgeColor } from '@/components/info/Info_Badge'
 import type { BatchConfig, BatchProgress, BatchStatus } from '@craft-agent/shared/batches'
+import type { PermissionMode } from '../../../shared/types'
 
 // ============================================================================
 // List Item
@@ -67,13 +68,13 @@ export const BATCH_STATUS_BADGE_COLOR: Record<BatchStatus, BadgeColor> = {
 // Permission Display (shared with automations)
 // ============================================================================
 
-const PERMISSION_DISPLAY_NAMES: Record<string, string> = {
-  'safe': 'Safe Mode',
-  'ask': 'Ask First',
-  'allow-all': 'Allow All',
+const PERMISSION_DISPLAY_NAMES: Record<PermissionMode, string> = {
+  'safe':      'Explore',
+  'ask':       'Ask',
+  'allow-all': 'Execute',
 }
 
-export function getPermissionDisplayName(mode?: string): string {
-  if (!mode) return 'Safe Mode'
+export function getPermissionDisplayName(mode?: PermissionMode): string {
+  if (!mode) return 'Explore'
   return PERMISSION_DISPLAY_NAMES[mode] ?? mode
 }

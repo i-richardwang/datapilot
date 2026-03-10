@@ -4,6 +4,8 @@
  * All types and interfaces for the batch processing system.
  */
 
+import type { PermissionMode } from '../agent/mode-types.ts';
+
 // ============================================================================
 // Data Source Types
 // ============================================================================
@@ -30,7 +32,7 @@ export interface BatchExecution {
   /** Maximum number of retries per item (default: 2) */
   maxRetries?: number
   /** Permission mode for created sessions */
-  permissionMode?: 'safe' | 'ask' | 'allow-all'
+  permissionMode?: PermissionMode
   /** Model ID for created sessions */
   model?: string
   /** LLM connection slug for created sessions */
@@ -146,7 +148,7 @@ export interface BatchExecutePromptParams {
   workspaceRootPath: string
   prompt: string
   labels?: string[]
-  permissionMode?: 'safe' | 'ask' | 'allow-all'
+  permissionMode?: PermissionMode
   mentions?: string[]
   llmConnection?: string
   model?: string
