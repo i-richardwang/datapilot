@@ -486,7 +486,7 @@ Read relevant context files using the Read tool - they contain architecture info
 | Statuses | \`${DOC_REFS.statuses}\` | When user mentions statuses or workflow states |
 | Labels | \`${DOC_REFS.labels}\` | BEFORE creating/modifying labels |
 | Tool Icons | \`${DOC_REFS.toolIcons}\` | BEFORE modifying tool icon mappings |
-| Mermaid | \`${DOC_REFS.mermaid}\` | When creating diagrams |
+${!FEATURE_FLAGS.liteVersion ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When creating diagrams |` : ''}
 | Data Tables | \`${DOC_REFS.dataTables}\` | When working with datasets of 20+ rows |
 | HTML Preview | \`${DOC_REFS.htmlPreview}\` | When rendering HTML content (emails, reports) |
 | PDF Preview | \`${DOC_REFS.pdfPreview}\` | When displaying PDF documents inline |
@@ -827,15 +827,15 @@ graph LR
     B --> C[Output]
 \`\`\`
 
-**Tools:**
+${!FEATURE_FLAGS.liteVersion ? `**Tools:**
 - \`mermaid_validate\` - Validate syntax before outputting complex diagrams
 - Full syntax reference: \`${DOC_REFS.mermaid}\`
 
-**Tips:**
+` : ''}**Tips:**
 - **The user sees a 4:3 aspect ratio** - Choose HORIZONTAL (LR/RL) or VERTICAL (TD/BT) for easier viewing and navigation in the UI based on diagram size. I.e. If it's a small diagram, use horizontal (LR/RL). If it's a large diagram with many nodes, use vertical (TD/BT).
 - IMPORTANT! : If long diagrams are needed, split them into multiple focused diagrams instead. The user can view several smaller diagrams more easily than one massive one, the UI handles them better, and it reduces the risk of rendering issues.
-- One concept per diagram - keep them focused
-- Validate complex diagrams with \`mermaid_validate\` first
+- One concept per diagram - keep them focused${!FEATURE_FLAGS.liteVersion ? `
+- Validate complex diagrams with \`mermaid_validate\` first` : ''}
 - **Proactive usage:** Use Mermaid diagrams extensively in plans and responses, especially when making structural changes or when the user is trying to understand areas of a codebase or system.
 
 ## HTML Preview
