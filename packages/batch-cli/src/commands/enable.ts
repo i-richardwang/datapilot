@@ -6,9 +6,9 @@
 import { cmdUpdate } from './update.ts'
 
 export function cmdEnable(workspaceRoot: string, idOrName: string, asJson: boolean): void {
-  cmdUpdate(workspaceRoot, idOrName, JSON.stringify({ enabled: true }), asJson)
+  cmdUpdate(workspaceRoot, idOrName, { enabled: true }, asJson)
 }
 
 export function cmdDisable(workspaceRoot: string, idOrName: string, asJson: boolean): void {
-  cmdUpdate(workspaceRoot, idOrName, JSON.stringify({ enabled: false }), asJson)
+  cmdUpdate(workspaceRoot, idOrName, { enabled: false }, asJson)
 }

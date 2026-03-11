@@ -13,11 +13,11 @@ import { cmdGet } from './commands/get.ts'
 import { cmdValidate } from './commands/validate.ts'
 import { cmdStatus } from './commands/status.ts'
 import { cmdCreate } from './commands/create.ts'
-import { cmdUpdate } from './commands/update.ts'
+import { cmdUpdate, type UpdateOptions } from './commands/update.ts'
 import { cmdEnable, cmdDisable } from './commands/enable.ts'
 import { cmdDelete } from './commands/delete.ts'
 
-const VERSION = '0.7.2'
+const VERSION = '0.7.3'
 
 const HELP = `
 craft-agent-batch — Batch processing CLI
@@ -30,9 +30,8 @@ COMMANDS
   get <id>                      Show full config for a batch
   validate                      Validate batches.json
   status <id> [--items]         Show progress for a batch
-  create --name ... --source ... --id-field ... --prompt ...
-                                Create a new batch
-  update <id> --json <json>     Patch an existing batch
+  create [flags]                Create a new batch (see: create --help)
+  update <id> [flags]           Update a batch (see: update --help)
   enable <id>                   Enable a batch
   disable <id>                  Disable a batch
   delete <id>                   Delete a batch
@@ -48,8 +47,9 @@ EXAMPLES
   craft-agent-batch get abc123
   craft-agent-batch validate
   craft-agent-batch status abc123 --items
-  craft-agent-batch create --name "My batch" --source data.csv --id-field id --prompt "Process \$BATCH_ITEM_id"
-  craft-agent-batch update abc123 --json '{"enabled":false}'
+  craft-agent-batch create --name "My batch" --source data.csv --id-field id --prompt "Process \$BATCH_ITEM_ID"
+  craft-agent-batch update abc123 --name "Renamed" --concurrency 5
+  craft-agent-batch update abc123 --enabled false
   craft-agent-batch enable abc123
   craft-agent-batch disable abc123
   craft-agent-batch delete abc123
@@ -65,7 +65,7 @@ REQUIRED
   --name <name>                 Display name for the batch
   --source <path>               Path to data source file (.csv, .json, .jsonl)
   --id-field <field>            Field name to use as unique item identifier
-  --prompt <template>           Prompt template (use \$BATCH_ITEM_<field> placeholders)
+  --prompt <template>           Prompt template (use \$BATCH_ITEM_<FIELD> placeholders)
 
 OPTIONAL
   --concurrency <n>             Max concurrent sessions (default: 3)
@@ -73,7 +73,50 @@ OPTIONAL
   --connection <slug>           LLM connection slug
   --permission-mode <mode>      safe | ask | allow-all
   --label <label>               Label to apply (repeatable)
+  --output-path <path>          Output file path (.jsonl) for structured results
+  --output-schema <json>        JSON Schema for output validation
+  --patch <json>                Raw JSON merged into the batch config (advanced)
   --json                        Output created batch as JSON
+
+EXAMPLES
+  craft-agent-batch create --name "User Analysis" --source data/users.csv --id-field user_id \\
+    --prompt "Analyse user \$BATCH_ITEM_USER_ID"
+
+  craft-agent-batch create --name "Reports" --source reports.json --id-field report_id \\
+    --prompt "Generate report for \$BATCH_ITEM_REPORT_ID" --concurrency 5 --permission-mode safe
+
+  craft-agent-batch create --name "Extraction" --source data.csv --id-field id \\
+    --prompt "Extract from \$BATCH_ITEM_ID" --output-path output/results.jsonl \\
+    --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
+`.trim()
+
+const UPDATE_HELP = `
+craft-agent-batch update — Update an existing batch
+
+USAGE
+  craft-agent-batch update <id> [options]
+
+FLAGS (all optional, same as create)
+  --name <name>                 Display name
+  --prompt <template>           Prompt template
+  --source <path>               Data source file path
+  --id-field <field>            Unique item identifier field
+  --concurrency <n>             Max concurrent sessions
+  --model <id>                  Model ID
+  --connection <slug>           LLM connection slug
+  --permission-mode <mode>      safe | ask | allow-all
+  --label <label>               Labels (repeatable, replaces existing)
+  --enabled true|false          Enable or disable the batch
+  --output-path <path>          Output file path (.jsonl)
+  --output-schema <json>        JSON Schema for output validation
+  --patch <json>                Raw JSON patch (flags override --patch values)
+  --json                        Output updated batch as JSON
+
+EXAMPLES
+  craft-agent-batch update abc123 --name "Renamed Batch" --concurrency 10
+  craft-agent-batch update abc123 --enabled false
+  craft-agent-batch update abc123 --output-path output/new.jsonl
+  craft-agent-batch update abc123 --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
 `.trim()
 
 function parseArgs(argv: string[]): {
@@ -123,6 +166,79 @@ function parseArgs(argv: string[]): {
   return { subcommand, args: rest, flags }
 }
 
+/** Parse --enabled flag as boolean. Returns undefined if not present. */
+function parseEnabledFlag(flags: Record<string, string | boolean | string[]>): boolean | undefined {
+  const val = flags['enabled']
+  if (val === undefined) return undefined
+  if (val === true || val === 'true') return true
+  if (val === 'false') return false
+  console.error('Invalid --enabled value (must be true or false)')
+  process.exit(1)
+}
+
+/** Parse a string flag, returning undefined if not present or not a string. */
+function strFlag(flags: Record<string, string | boolean | string[]>, key: string): string | undefined {
+  const val = flags[key]
+  return typeof val === 'string' ? val : undefined
+}
+
+/** Parse --concurrency as integer. Returns undefined if not present. */
+function parseConcurrency(flags: Record<string, string | boolean | string[]>): number | undefined {
+  const raw = flags['concurrency']
+  if (raw === undefined || typeof raw !== 'string') return undefined
+  const n = parseInt(raw, 10)
+  if (isNaN(n)) {
+    console.error('Invalid --concurrency value (must be a number)')
+    process.exit(1)
+  }
+  return n
+}
+
+/** Parse --permission-mode, validating against allowed values. */
+function parsePermissionMode(flags: Record<string, string | boolean | string[]>): 'safe' | 'ask' | 'allow-all' | undefined {
+  const raw = flags['permission-mode']
+  if (raw === undefined || typeof raw !== 'string') return undefined
+  const validModes = ['safe', 'ask', 'allow-all'] as const
+  if (!validModes.includes(raw as typeof validModes[number])) {
+    console.error(`Invalid --permission-mode (must be one of: ${validModes.join(', ')})`)
+    process.exit(1)
+  }
+  return raw as typeof validModes[number]
+}
+
+/** Parse --label flag (repeatable). Returns undefined if not present. */
+function parseLabels(flags: Record<string, string | boolean | string[]>): string[] | undefined {
+  const val = flags['label']
+  if (val === undefined) return undefined
+  if (Array.isArray(val)) return val
+  if (typeof val === 'string') return [val]
+  return undefined
+}
+
+/** Build UpdateOptions from parsed flags. */
+function buildUpdateOptions(flags: Record<string, string | boolean | string[]>): UpdateOptions {
+  return {
+    name: strFlag(flags, 'name'),
+    prompt: strFlag(flags, 'prompt'),
+    source: strFlag(flags, 'source'),
+    idField: strFlag(flags, 'id-field'),
+    concurrency: parseConcurrency(flags),
+    model: strFlag(flags, 'model'),
+    connection: strFlag(flags, 'connection'),
+    permissionMode: parsePermissionMode(flags),
+    labels: parseLabels(flags),
+    enabled: parseEnabledFlag(flags),
+    outputPath: strFlag(flags, 'output-path'),
+    outputSchema: strFlag(flags, 'output-schema'),
+    patch: strFlag(flags, 'patch'),
+  }
+}
+
+/** Check if any update option was provided. */
+function hasUpdateOptions(opts: UpdateOptions): boolean {
+  return Object.values(opts).some(v => v !== undefined)
+}
+
 function main(): void {
   const rawArgs = process.argv.slice(2)
   const { subcommand, args, flags } = parseArgs(rawArgs)
@@ -133,7 +249,14 @@ function main(): void {
     return
   }
 
-  if (!subcommand || flags['help']) {
+  if (!subcommand) {
+    console.log(HELP)
+    return
+  }
+
+  // Show main help for --help without a subcommand (handled above).
+  // Subcommand-specific --help is handled in each case branch below.
+  if (flags['help'] && !['create', 'update'].includes(subcommand)) {
     console.log(HELP)
     return
   }
@@ -154,7 +277,7 @@ function main(): void {
         console.error('Usage: craft-agent-batch get <id>')
         process.exit(1)
       }
-      cmdGet(workspaceRoot, id, asJson)
+      cmdGet(workspaceRoot, id)
       break
     }
 
@@ -178,54 +301,50 @@ function main(): void {
         console.log(CREATE_HELP)
         break
       }
-      const name = flags['name']
-      const source = flags['source']
-      const idField = flags['id-field']
-      const prompt = flags['prompt']
-      if (!name || !source || !idField || !prompt ||
-          typeof name !== 'string' || typeof source !== 'string' ||
-          typeof idField !== 'string' || typeof prompt !== 'string') {
+      const name = strFlag(flags, 'name')
+      const source = strFlag(flags, 'source')
+      const idField = strFlag(flags, 'id-field')
+      const prompt = strFlag(flags, 'prompt')
+      if (!name || !source || !idField || !prompt) {
         console.error('Missing required flags: --name, --source, --id-field, --prompt')
         console.error('Run: craft-agent-batch create --help')
         process.exit(1)
       }
-
-      const concurrencyRaw = flags['concurrency']
-      const concurrency = typeof concurrencyRaw === 'string' ? parseInt(concurrencyRaw, 10) : undefined
-
-      const permModeRaw = flags['permission-mode']
-      const validModes = ['safe', 'ask', 'allow-all'] as const
-      type PermMode = typeof validModes[number]
-      const permissionMode = (typeof permModeRaw === 'string' && validModes.includes(permModeRaw as PermMode))
-        ? permModeRaw as PermMode
-        : undefined
-
-      const labelFlag = flags['label']
-      const labels = Array.isArray(labelFlag) ? labelFlag : (typeof labelFlag === 'string' ? [labelFlag] : undefined)
 
       cmdCreate(workspaceRoot, {
         name,
         source,
         idField,
         prompt,
-        concurrency,
-        model: typeof flags['model'] === 'string' ? flags['model'] : undefined,
-        connection: typeof flags['connection'] === 'string' ? flags['connection'] : undefined,
-        permissionMode,
-        labels,
+        concurrency: parseConcurrency(flags),
+        model: strFlag(flags, 'model'),
+        connection: strFlag(flags, 'connection'),
+        permissionMode: parsePermissionMode(flags),
+        labels: parseLabels(flags),
+        outputPath: strFlag(flags, 'output-path'),
+        outputSchema: strFlag(flags, 'output-schema'),
+        patch: strFlag(flags, 'patch'),
       }, asJson)
       break
     }
 
     case 'update': {
+      if (flags['help']) {
+        console.log(UPDATE_HELP)
+        break
+      }
       const id = args[0]
-      const json = flags['json']
-      if (!id || typeof json !== 'string') {
-        console.error('Usage: craft-agent-batch update <id> --json <json>')
+      if (!id) {
+        console.error('Usage: craft-agent-batch update <id> [flags]')
+        console.error('Run: craft-agent-batch update --help')
         process.exit(1)
       }
-      // Temporarily clear asJson since --json is used for the patch payload here
-      cmdUpdate(workspaceRoot, id, json, false)
+      const opts = buildUpdateOptions(flags)
+      if (!hasUpdateOptions(opts)) {
+        console.error('No update flags provided. Use --help to see available flags.')
+        process.exit(1)
+      }
+      cmdUpdate(workspaceRoot, id, opts, asJson)
       break
     }
 

@@ -382,24 +382,28 @@ Manage batch processing jobs stored in `batches.json`.
 - `craft-agent-batch validate`
 - `craft-agent-batch status <id> [--items]`
 - `craft-agent-batch create` (see flags below)
-- `craft-agent-batch update <id> --json '{...}'`
+- `craft-agent-batch update <id>` (same flags as create, all optional)
 - `craft-agent-batch enable <id>`
 - `craft-agent-batch disable <id>`
 - `craft-agent-batch delete <id>`
 
-### Flags for `batch create`
+### Flags for `batch create` / `update`
 
 | Flag | Description |
 |------|-------------|
-| `--name "<name>"` | **(required)** Display name for the batch |
-| `--source <path>` | **(required)** Path to data source file (`.csv`, `.json`, or `.jsonl`) |
-| `--id-field <field>` | **(required)** Field name used as the unique item identifier |
-| `--prompt "..."` | **(required)** Prompt template with `$BATCH_ITEM_<FIELD>` placeholders |
+| `--name "<name>"` | **(required for create)** Display name for the batch |
+| `--source <path>` | **(required for create)** Path to data source file (`.csv`, `.json`, or `.jsonl`) |
+| `--id-field <field>` | **(required for create)** Field name used as the unique item identifier |
+| `--prompt "..."` | **(required for create)** Prompt template with `$BATCH_ITEM_<FIELD>` placeholders |
 | `--concurrency <n>` | Max concurrent sessions (default: 3) |
 | `--model "<model-id>"` | Model ID for created sessions |
 | `--connection "<slug>"` | LLM connection slug |
 | `--permission-mode safe\|ask\|allow-all` | Permission level for created sessions |
 | `--label "<label>"` | Label to apply to created sessions (repeatable) |
+| `--enabled true\|false` | Enable/disable the batch (update only) |
+| `--output-path <path>` | Output file path (`.jsonl`) for structured results |
+| `--output-schema <json>` | JSON Schema for output validation |
+| `--patch <json>` | Raw JSON patch for advanced fields (flags override `--patch` values) |
 
 ### Global flags
 - `--workspace-root <path>` — Override workspace root (default: auto-detected)
@@ -416,11 +420,16 @@ craft-agent-batch validate
 craft-agent-batch status abc123
 craft-agent-batch status abc123 --items
 
-# Write operations
+# Create with flat flags
 craft-agent-batch create --name "User Analysis" --source data/users.csv --id-field user_id --prompt "Analyse user $BATCH_ITEM_USER_ID"
 craft-agent-batch create --name "Reports" --source reports.json --id-field report_id --prompt "Generate report for $BATCH_ITEM_REPORT_ID" --concurrency 5 --permission-mode safe
-craft-agent-batch update abc123 --json '{"enabled":false}'
-craft-agent-batch update abc123 --json '{"execution":{"maxConcurrency":10}}'
+# Create with structured output
+craft-agent-batch create --name "Extraction" --source data.csv --id-field id --prompt "Extract from $BATCH_ITEM_ID" --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
+# Update with flat flags
+craft-agent-batch update abc123 --name "Renamed Batch" --concurrency 10
+craft-agent-batch update abc123 --enabled false
+# Update with --patch for complex changes
+craft-agent-batch update abc123 --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
 craft-agent-batch enable abc123
 craft-agent-batch disable abc123
 craft-agent-batch delete abc123
@@ -429,7 +438,7 @@ craft-agent-batch delete abc123
 ### Notes
 - `list` shows batch id, name, enabled state, status, and item progress counts.
 - `status` displays a progress bar; `--items` adds a per-item breakdown table.
-- `update` performs a deep-merge patch — only specified fields are changed.
+- `update` accepts flags and/or `--patch`. Flags override `--patch` values. The result is deep-merged into the existing config.
 - `delete` removes the batch from `batches.json` and cleans up its `batch-state-{id}.json` file.
 - `create` infers source type from the file extension (`.csv` → `csv`, `.json` → `json`, `.jsonl` → `jsonl`).
 - Workspace root is auto-detected by walking up from CWD looking for `batches.json` or `.craft-agent/`.

@@ -1,12 +1,10 @@
-# Batch Processing Configuration Guide
+# Batch Processing Guide
 
-This guide explains how to configure batch processing in Craft Agent to run actions across large lists of items.
+This guide explains batch processing in Craft Agent — running actions across large lists of items.
 
-> **CLI-first workflow (recommended):** Use `craft-agent-batch` commands instead of editing JSON directly.
-> - `craft-agent-batch --help`
-> - Canonical command reference: [craft-cli.md](./craft-cli.md)
+> **Always use CLI commands** to manage batches. See [craft-cli.md](./craft-cli.md) for the full command reference.
 
-## Recommended CLI Commands
+## CLI Commands
 
 ```bash
 craft-agent-batch list
@@ -15,7 +13,10 @@ craft-agent-batch validate
 craft-agent-batch status <id>
 craft-agent-batch status <id> --items
 craft-agent-batch create --name "My batch" --source data.csv --id-field id --prompt "Process $BATCH_ITEM_ID"
-craft-agent-batch update <id> --json '{"enabled":false}'
+craft-agent-batch create --name "Extraction" --source data.csv --id-field id --prompt "Extract $BATCH_ITEM_ID" --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
+craft-agent-batch update <id> --name "Renamed" --concurrency 5
+craft-agent-batch update <id> --enabled false
+craft-agent-batch update <id> --patch '{"execution":{"retryOnFailure":true}}'
 craft-agent-batch enable <id>
 craft-agent-batch disable <id>
 craft-agent-batch delete <id>
@@ -29,61 +30,11 @@ Batches allow you to process a list of items from a data file (CSV, JSON, or JSO
 - Retry failed items automatically
 - Pause, resume, and monitor batch progress
 
-## batches.json Location
-
-Batches are configured in `batches.json` at the root of your workspace:
-
-```
-~/.craft-agent/workspaces/{workspaceId}/batches.json
-```
-
-## Basic Structure
-
-```json
-{
-  "version": 1,
-  "batches": [
-    {
-      "name": "Process user list",
-      "source": {
-        "type": "csv",
-        "path": "data/users.csv",
-        "idField": "user_id"
-      },
-      "action": {
-        "type": "prompt",
-        "prompt": "Look up user $BATCH_ITEM_USER_ID and summarise their account status"
-      }
-    }
-  ]
-}
-```
-
-## Batch Configuration Fields
-
-Each batch in the `batches` array has the following fields:
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `id` | string | No | Unique batch ID (auto-generated if omitted) |
-| `name` | string | Yes | Display name for the batch |
-| `enabled` | boolean | No | Whether this batch is enabled |
-| `source` | object | Yes | Data source configuration |
-| `execution` | object | No | Execution settings (concurrency, retries, etc.) |
-| `action` | object | Yes | Action to perform for each item |
-| `output` | object | No | Structured output collection (writes results to JSONL) |
-
 ## Data Sources
 
-The `source` object defines where items are loaded from.
+The `--source` flag points to a data file. Source type is inferred from the file extension.
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `type` | `"csv"` \| `"json"` \| `"jsonl"` | Yes | File format |
-| `path` | string | Yes | Path to the data file (relative to workspace root or absolute) |
-| `idField` | string | Yes | Field name used as the unique identifier for each item |
-
-The `idField` must exist in every item and its values must be unique. It is used to track per-item progress and retry state.
+The `--id-field` must name a field that exists in every item with unique values. It is used to track per-item progress and retry state.
 
 ### CSV
 
@@ -117,75 +68,44 @@ One JSON object per line.
 
 ## Prompt Templates
 
-Use `$BATCH_ITEM_{FIELDNAME}` variables in your prompt to inject item fields. Field names are uppercased.
+Use `$BATCH_ITEM_{FIELDNAME}` placeholders in `--prompt` to inject item fields. Field names are uppercased.
 
 For a CSV with columns `user_id`, `name`, `email`:
 
-```json
-{
-  "type": "prompt",
-  "prompt": "Create a welcome email for $BATCH_ITEM_NAME at $BATCH_ITEM_EMAIL (account $BATCH_ITEM_USER_ID)"
-}
+```
+--prompt "Create a welcome email for $BATCH_ITEM_NAME at $BATCH_ITEM_EMAIL (account $BATCH_ITEM_USER_ID)"
 ```
 
-The action object also supports optional fields:
+Additional action fields (set via `--patch`):
+- `mentions` (string[]) — @mentions to resolve (sources/skills), e.g. `--patch '{"action":{"mentions":["project-docs"]}}'`
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `type` | `"prompt"` | Required | Action type |
-| `prompt` | string | Required | Prompt template with `$BATCH_ITEM_*` placeholders |
-| `labels` | string[] | None | Labels to apply to created sessions |
-| `mentions` | string[] | None | @mentions to resolve (sources/skills) |
+## Execution Settings
 
-## Execution Configuration
+These fields control how items are processed. Common ones have dedicated flags; others can be set via `--patch`.
 
-The optional `execution` object controls how items are processed.
+| Field | CLI flag | Default | Description |
+|-------|----------|---------|-------------|
+| `maxConcurrency` | `--concurrency <n>` | 3 | Max concurrent sessions (1-50) |
+| `model` | `--model <id>` | Workspace default | Model ID for created sessions |
+| `llmConnection` | `--connection <slug>` | Workspace default | LLM connection slug |
+| `permissionMode` | `--permission-mode` | Workspace default | `safe` \| `ask` \| `allow-all` |
+| `retryOnFailure` | `--patch` only | false | Whether to retry failed items |
+| `maxRetries` | `--patch` only | 2 | Max retry attempts per item (0-10) |
 
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `maxConcurrency` | number (1-50) | 3 | Maximum number of concurrent sessions |
-| `retryOnFailure` | boolean | false | Whether to retry failed items |
-| `maxRetries` | number (0-10) | 2 | Maximum retry attempts per item |
-| `permissionMode` | `"safe"` \| `"ask"` \| `"allow-all"` | Workspace default | Permission mode for created sessions |
-| `model` | string | Workspace default | Model ID for created sessions |
-| `llmConnection` | string | Workspace default | LLM connection slug (configured in AI Settings) |
+Example using `--patch` for fields without dedicated flags:
 
-```json
-{
-  "execution": {
-    "maxConcurrency": 5,
-    "retryOnFailure": true,
-    "maxRetries": 3,
-    "permissionMode": "allow-all",
-    "llmConnection": "my-copilot-connection",
-    "model": "claude-sonnet-4-20250514"
-  }
-}
+```bash
+craft-agent-batch update <id> --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
 ```
 
 ## Output Configuration
 
-The optional `output` object enables structured result collection. When configured, each batch session receives the `batch_output` tool and prompt instructions to record a structured result. All results are appended to a shared JSONL file.
-
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| `path` | string | Yes | Output file path relative to workspace root (should be `.jsonl`) |
-| `schema` | object | No | JSON Schema defining the expected structure of each output record |
-
-### Schema Definition
-
-The `schema` object follows standard JSON Schema format with `type: "object"`:
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `type` | `"object"` | Must be `"object"` |
-| `properties` | object | Field definitions with `type`, `description`, and optional `enum` |
-| `required` | string[] | List of required field names |
+Use `--output-path` and `--output-schema` to collect structured results from each batch session. When configured, the `batch_output` tool is automatically available in each session.
 
 ### How It Works
 
-1. When a batch has `output` configured, the `batch_output` tool is automatically made available in each session
-2. The prompt is automatically appended with structured output instructions and the schema definition
+1. The `batch_output` tool is made available in each session
+2. The prompt is automatically appended with structured output instructions and the schema
 3. The agent calls `batch_output` with a `data` parameter containing the result fields
 4. Each record is validated against the schema (if provided) before being written
 5. Metadata fields `_item_id` and `_timestamp` are injected automatically
@@ -203,143 +123,70 @@ Each line in the output file is a JSON object:
 - `_timestamp` — When the output was recorded (auto-injected)
 - All other fields are the agent's structured result
 
-### Example
+### Schema for `--output-schema`
 
-```json
-{
-  "output": {
-    "path": "output/user-analysis.jsonl",
-    "schema": {
-      "type": "object",
-      "properties": {
-        "summary": { "type": "string", "description": "One-sentence summary" },
-        "risk_level": { "type": "string", "enum": ["low", "medium", "high"] },
-        "score": { "type": "number", "description": "Risk score 0-100" },
-        "recommendations": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Actionable recommendations"
-        }
-      },
-      "required": ["summary", "risk_level"]
-    }
-  }
-}
+The `--output-schema` flag takes a JSON Schema string with `type: "object"`:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `type` | `"object"` | Must be `"object"` |
+| `properties` | object | Field definitions with `type`, `description`, and optional `enum` |
+| `required` | string[] | List of required field names |
+
+Example:
+
+```bash
+craft-agent-batch create --name "User Analysis" --source data/users.csv --id-field user_id \
+  --prompt "Analyse user $BATCH_ITEM_USER_ID" \
+  --output-path output/user-analysis.jsonl \
+  --output-schema '{"type":"object","properties":{"summary":{"type":"string","description":"One-sentence summary"},"risk_level":{"type":"string","enum":["low","medium","high"]},"score":{"type":"number","description":"Risk score 0-100"}},"required":["summary","risk_level"]}'
 ```
 
-Without a schema, the agent can output any JSON object (freeform mode):
-
-```json
-{
-  "output": {
-    "path": "output/results.jsonl"
-  }
-}
-```
+Without `--output-schema`, the agent can output any JSON object (freeform mode).
 
 ## Complete Examples
 
-### CSV User Processing
+### CSV User Processing with Structured Output
 
-Process a list of users from a CSV file, generating an onboarding summary for each with structured output.
-
-```json
-{
-  "version": 1,
-  "batches": [
-    {
-      "name": "User Onboarding Summaries",
-      "source": {
-        "type": "csv",
-        "path": "data/new-users.csv",
-        "idField": "user_id"
-      },
-      "execution": {
-        "maxConcurrency": 5,
-        "retryOnFailure": true,
-        "maxRetries": 2,
-        "permissionMode": "safe"
-      },
-      "action": {
-        "type": "prompt",
-        "prompt": "Generate an onboarding summary for user $BATCH_ITEM_NAME ($BATCH_ITEM_EMAIL). Their role is $BATCH_ITEM_ROLE and they joined on $BATCH_ITEM_START_DATE.",
-        "labels": ["Batch", "onboarding"]
-      },
-      "output": {
-        "path": "output/onboarding-summaries.jsonl",
-        "schema": {
-          "type": "object",
-          "properties": {
-            "summary": { "type": "string", "description": "Onboarding summary" },
-            "priority_actions": { "type": "array", "items": { "type": "string" } },
-            "onboarding_risk": { "type": "string", "enum": ["low", "medium", "high"] }
-          },
-          "required": ["summary", "onboarding_risk"]
-        }
-      }
-    }
-  ]
-}
+```bash
+craft-agent-batch create \
+  --name "User Onboarding Summaries" \
+  --source data/new-users.csv \
+  --id-field user_id \
+  --prompt "Generate an onboarding summary for user $BATCH_ITEM_NAME ($BATCH_ITEM_EMAIL). Their role is $BATCH_ITEM_ROLE and they joined on $BATCH_ITEM_START_DATE." \
+  --concurrency 5 \
+  --permission-mode safe \
+  --label "Batch" --label "onboarding" \
+  --output-path output/onboarding-summaries.jsonl \
+  --output-schema '{"type":"object","properties":{"summary":{"type":"string"},"priority_actions":{"type":"array","items":{"type":"string"}},"onboarding_risk":{"type":"string","enum":["low","medium","high"]}},"required":["summary","onboarding_risk"]}' \
+  --patch '{"execution":{"retryOnFailure":true,"maxRetries":2}}'
 ```
 
 ### JSON Report Generation
 
-Generate reports from a JSON array of project records.
-
-```json
-{
-  "version": 1,
-  "batches": [
-    {
-      "name": "Quarterly Report Generation",
-      "source": {
-        "type": "json",
-        "path": "data/projects.json",
-        "idField": "project_id"
-      },
-      "execution": {
-        "maxConcurrency": 3,
-        "permissionMode": "allow-all"
-      },
-      "action": {
-        "type": "prompt",
-        "prompt": "Generate a quarterly status report for project $BATCH_ITEM_PROJECT_ID ($BATCH_ITEM_TITLE) in the $BATCH_ITEM_REGION region. Include budget analysis and key milestones.",
-        "labels": ["Batch", "reports"],
-        "mentions": ["project-docs"]
-      }
-    }
-  ]
-}
+```bash
+craft-agent-batch create \
+  --name "Quarterly Report Generation" \
+  --source data/projects.json \
+  --id-field project_id \
+  --prompt "Generate a quarterly status report for project $BATCH_ITEM_PROJECT_ID ($BATCH_ITEM_TITLE) in the $BATCH_ITEM_REGION region. Include budget analysis and key milestones." \
+  --concurrency 3 \
+  --permission-mode allow-all \
+  --label "Batch" --label "reports" \
+  --patch '{"action":{"mentions":["project-docs"]}}'
 ```
 
 ### JSONL Content Translation
 
-Translate content items from a JSONL file into target languages.
-
-```json
-{
-  "version": 1,
-  "batches": [
-    {
-      "name": "Content Translation",
-      "source": {
-        "type": "jsonl",
-        "path": "data/content-to-translate.jsonl",
-        "idField": "content_id"
-      },
-      "execution": {
-        "maxConcurrency": 10,
-        "retryOnFailure": true,
-        "maxRetries": 3
-      },
-      "action": {
-        "type": "prompt",
-        "prompt": "Translate the following text to $BATCH_ITEM_TARGET_LANG. Preserve formatting and tone.\n\nText: $BATCH_ITEM_TEXT",
-        "labels": ["Batch", "translation"]
-      }
-    }
-  ]
-}
+```bash
+craft-agent-batch create \
+  --name "Content Translation" \
+  --source data/content-to-translate.jsonl \
+  --id-field content_id \
+  --concurrency 10 \
+  --prompt "Translate the following text to $BATCH_ITEM_TARGET_LANG. Preserve formatting and tone.\n\nText: $BATCH_ITEM_TEXT" \
+  --label "Batch" --label "translation" \
+  --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
 ```
 
 ## Lifecycle
@@ -364,27 +211,17 @@ Individual items within a batch have their own status:
 | `failed` | Item processing failed (may be retried if configured) |
 | `skipped` | Item was skipped |
 
-Batch state is persisted in `batch-state-{batchId}.json` alongside `batches.json`, so progress survives restarts.
-
 ## Validation
 
-Batches are validated using Zod schemas when:
-1. The workspace is loaded
-2. You edit batches.json
-3. You run `config_validate` with target `batches` or `all`
+The CLI validates configuration automatically on `create` and `update`. You can also run validation explicitly:
 
-**Using config_validate:**
-
-Ask Craft Agent to validate your batches configuration:
-
-```
-Validate my batches configuration
+```bash
+craft-agent-batch validate
 ```
 
-Or use the `config_validate` tool directly with `target: "batches"`.
+Or use the `config_validate` tool with `target: "batches"`.
 
 **Common validation errors:**
-- Invalid JSON syntax
 - Missing required fields (`name`, `source`, `action`)
 - Empty `source.path` or `source.idField`
 - Empty `action.prompt`

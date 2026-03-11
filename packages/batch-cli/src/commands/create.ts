@@ -9,9 +9,10 @@ import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { BatchesFileConfigSchema, validateBatchesContent } from '@craft-agent/shared/batches'
 import type { BatchConfig } from '@craft-agent/shared/batches'
+import { deepMerge } from './update.ts'
 import { colors as c } from '../format.ts'
 
-interface CreateOptions {
+export interface CreateOptions {
   name: string
   source: string
   idField: string
@@ -21,6 +22,9 @@ interface CreateOptions {
   connection?: string
   permissionMode?: 'safe' | 'ask' | 'allow-all'
   labels?: string[]
+  outputPath?: string
+  outputSchema?: string
+  patch?: string
 }
 
 export function cmdCreate(workspaceRoot: string, opts: CreateOptions, asJson: boolean): void {
@@ -68,7 +72,37 @@ export function cmdCreate(workspaceRoot: string, opts: CreateOptions, asJson: bo
     }
   }
 
-  const updated = { ...existing, batches: [...existing.batches, newBatch] }
+  // Output configuration
+  if (opts.outputSchema && !opts.outputPath) {
+    console.error('--output-schema requires --output-path')
+    process.exit(1)
+  }
+  if (opts.outputPath) {
+    newBatch.output = { path: opts.outputPath }
+    if (opts.outputSchema) {
+      try {
+        newBatch.output.schema = JSON.parse(opts.outputSchema)
+      } catch {
+        console.error('Invalid --output-schema JSON:', opts.outputSchema)
+        process.exit(1)
+      }
+    }
+  }
+
+  // Apply --patch first, then overlay flag-built config (flags win)
+  let finalBatch: Record<string, unknown> = newBatch as unknown as Record<string, unknown>
+  if (opts.patch) {
+    let patchObj: Record<string, unknown>
+    try {
+      patchObj = JSON.parse(opts.patch)
+    } catch {
+      console.error('Invalid --patch JSON:', opts.patch)
+      process.exit(1)
+    }
+    finalBatch = deepMerge(patchObj, finalBatch)
+  }
+
+  const updated = { ...existing, batches: [...existing.batches, finalBatch as BatchConfig] }
   const json = JSON.stringify(updated, null, 2)
 
   const validation = validateBatchesContent(json)
@@ -83,7 +117,7 @@ export function cmdCreate(workspaceRoot: string, opts: CreateOptions, asJson: bo
   writeFileSync(configPath, json + '\n', 'utf-8')
 
   if (asJson) {
-    console.log(JSON.stringify(newBatch, null, 2))
+    console.log(JSON.stringify(finalBatch, null, 2))
   } else {
     console.log(c.green + `✓ Created batch "${opts.name}" (id: ${id})` + c.reset)
   }

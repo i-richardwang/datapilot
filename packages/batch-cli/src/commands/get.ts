@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { BatchesFileConfigSchema } from '@craft-agent/shared/batches'
 import type { BatchConfig } from '@craft-agent/shared/batches'
 
-export function cmdGet(workspaceRoot: string, idOrName: string, asJson: boolean): void {
+export function cmdGet(workspaceRoot: string, idOrName: string): void {
   const configPath = join(workspaceRoot, 'batches.json')
   if (!existsSync(configPath)) {
     console.error('No batches.json found in workspace.')
