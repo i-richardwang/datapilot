@@ -312,7 +312,7 @@ export async function saveSession(session: StoredSession): Promise<void> {
  * Multiple rapid calls are coalesced into a single write.
  * Use this during active sessions to avoid blocking the main thread.
  */
-export { sessionPersistenceQueue } from './persistence-queue.js'
+export { sessionPersistenceQueue, getHeaderMetadataSignature } from './persistence-queue.js'
 
 /**
  * Load session by ID

@@ -215,6 +215,14 @@ class SessionPersistenceQueue {
   }
 
   /**
+   * Get the metadata signature of the last header we wrote for a session.
+   * Used by ConfigWatcher to suppress self-triggered metadata change events.
+   */
+  getLastWrittenSignature(sessionId: string): string | undefined {
+    return this.lastWrittenHeaderSignature.get(sessionId)
+  }
+
+  /**
    * Get count of pending writes.
    */
   get pendingCount(): number {

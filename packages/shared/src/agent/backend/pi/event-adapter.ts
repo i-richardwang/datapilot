@@ -182,6 +182,7 @@ export class PiEventAdapter extends BaseEventAdapter {
         // Pi SDK emits message_end for ALL messages (user, assistant, toolResult).
         // Only process assistant messages — skip user prompts and tool results.
         const msg = event.message as { role?: string; stopReason?: string; errorMessage?: string; usage?: { input: number; output: number; cacheRead: number; cacheWrite: number; totalTokens: number; cost: { total: number } } } | undefined;
+        const sdkTurnAnchor = (event as { sdkTurnAnchor?: string }).sdkTurnAnchor;
         if (msg?.role !== 'assistant') break;
 
         // Surface API errors — Pi SDK sets stopReason: 'error' and errorMessage on failures
@@ -214,6 +215,7 @@ export class PiEventAdapter extends BaseEventAdapter {
             text: textContent,
             isIntermediate,
             turnId: mTurnId,
+            sdkTurnAnchor,
           };
           this.hasStreamedDeltas = false;
         }

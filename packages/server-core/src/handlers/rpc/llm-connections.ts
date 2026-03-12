@@ -7,7 +7,7 @@ import {
   validateStoredBackendConnection,
 } from '@craft-agent/shared/agent/backend'
 import { getModelRefreshService } from '@craft-agent/server-core/model-fetchers'
-import { parseTestConnectionError, createBuiltInConnection, validateModelList, piAuthProviderDisplayName, validateSetupTestInput } from '@craft-agent/server-core/domain'
+import { parseTestConnectionError, createBuiltInConnection, validateModelList, piAuthProviderDisplayName, validateSetupTestInput, setupTestRequiresApiKey } from '@craft-agent/server-core/domain'
 import { getWorkspaceOrThrow, buildBackendHostRuntimeContext } from '@craft-agent/server-core/handlers'
 import { pushTyped, type RpcServer } from '@craft-agent/server-core/transport'
 import type { HandlerDeps } from '../handler-deps'
@@ -69,16 +69,16 @@ export function registerLlmConnectionsHandlers(server: RpcServer, deps: HandlerD
       }
 
       const updates: Partial<LlmConnection> = {}
-      const hasCustomEndpoint = !!setup.baseUrl
+      const hasConfiguredBaseUrl = !!setup.baseUrl?.trim()
       if (setup.baseUrl !== undefined) {
-        updates.baseUrl = setup.baseUrl ?? undefined
+        updates.baseUrl = setup.baseUrl?.trim() || undefined
 
         // Only mutate providerType for API key connections (not OAuth connections)
         if (isAnthropicProvider(connection.providerType) && connection.authType !== 'oauth') {
-          const pt = hasCustomEndpoint ? 'anthropic_compat' as const : 'anthropic' as const
+          const pt = hasConfiguredBaseUrl ? 'anthropic_compat' as const : 'anthropic' as const
           updates.providerType = pt
-          updates.authType = hasCustomEndpoint ? 'api_key_with_endpoint' : 'api_key'
-          if (!hasCustomEndpoint) {
+          updates.authType = hasConfiguredBaseUrl ? 'api_key_with_endpoint' : 'api_key'
+          if (!hasConfiguredBaseUrl) {
             updates.models = getDefaultModelsForConnection(pt)
             updates.defaultModel = getDefaultModelForConnection(pt)
           }
@@ -99,6 +99,42 @@ export function registerLlmConnectionsHandlers(server: RpcServer, deps: HandlerD
         updates.modelSelectionMode = setup.modelSelectionMode
       }
 
+      const customEndpoint = hasConfiguredBaseUrl ? setup.customEndpoint : undefined
+      const isCustomEndpointCompat = !!customEndpoint
+      if (customEndpoint) {
+        updates.customEndpoint = customEndpoint
+        // Route custom OpenAI/Anthropic-compatible endpoints through PiAgent.
+        updates.providerType = 'pi_compat'
+        updates.authType = 'api_key_with_endpoint'
+        // Keep provider hint in lockstep with selected protocol toggle.
+        updates.piAuthProvider = customEndpoint.api === 'anthropic-messages' ? 'anthropic' : 'openai'
+      } else if (setup.baseUrl !== undefined) {
+        // Base URL was explicitly updated without custom protocol config.
+        // Treat this as non-custom mode and clear stale custom endpoint metadata.
+        updates.customEndpoint = undefined
+        if (connection.providerType === 'pi_compat' && connection.authType !== 'oauth') {
+          updates.providerType = 'pi'
+          updates.authType = 'api_key'
+        }
+      }
+
+      // Pi API key flow: set piAuthProvider from setup data (e.g. 'anthropic', 'google', 'openai').
+      // Skip when custom endpoint protocol is driving routing.
+      if (setup.piAuthProvider && !isCustomEndpointCompat) {
+        updates.piAuthProvider = setup.piAuthProvider
+        // Update connection name to show the actual provider (e.g. "DataPilot Backend (Google AI Studio)")
+        const providerName = piAuthProviderDisplayName(setup.piAuthProvider)
+        if (providerName) {
+          updates.name = `DataPilot Backend (${providerName})`
+        }
+        // Only set default models when using standard Pi provider AND user didn't pick explicit models
+        if (!hasConfiguredBaseUrl && !setup.models?.length) {
+          updates.models = getDefaultModelsForConnection('pi', setup.piAuthProvider)
+          updates.defaultModel = getDefaultModelForConnection('pi', setup.piAuthProvider)
+          updates.modelSelectionMode ??= 'automaticallySyncedFromProvider'
+        }
+      }
+
       const effectiveProviderType = updates.providerType ?? connection.providerType
       if (effectiveProviderType === 'pi') {
         const toPiModelId = (id: string) => id.startsWith('pi/') ? id : `pi/${id}`
@@ -107,22 +143,6 @@ export function registerLlmConnectionsHandlers(server: RpcServer, deps: HandlerD
         }
         if (updates.defaultModel) {
           updates.defaultModel = toPiModelId(updates.defaultModel)
-        }
-      }
-
-      // Pi API key flow: set piAuthProvider from setup data (e.g. 'anthropic', 'google', 'openai')
-      if (setup.piAuthProvider) {
-        updates.piAuthProvider = setup.piAuthProvider
-        // Update connection name to show the actual provider (e.g. "DataPilot Backend (Google AI Studio)")
-        const providerName = piAuthProviderDisplayName(setup.piAuthProvider)
-        if (providerName) {
-          updates.name = `DataPilot Backend (${providerName})`
-        }
-        // Only set default models when using standard Pi provider AND user didn't pick explicit models
-        if (!hasCustomEndpoint && !setup.models?.length) {
-          updates.models = getDefaultModelsForConnection('pi', setup.piAuthProvider)
-          updates.defaultModel = getDefaultModelForConnection('pi', setup.piAuthProvider)
-          updates.modelSelectionMode ??= 'automaticallySyncedFromProvider'
         }
       }
 
@@ -227,10 +247,11 @@ export function registerLlmConnectionsHandlers(server: RpcServer, deps: HandlerD
   // Unified connection test — uses the agent factory to spawn a real agent subprocess
   // and validate credentials via runMiniCompletion(). Same code path as actual chat.
   server.handle(RPC_CHANNELS.settings.TEST_LLM_CONNECTION_SETUP, async (_ctx, params: import('@craft-agent/shared/protocol').TestLlmConnectionParams): Promise<import('@craft-agent/shared/protocol').TestLlmConnectionResult> => {
-    const { provider, apiKey, baseUrl, model, piAuthProvider } = params
-    const trimmedKey = apiKey?.trim()
+    const { provider, apiKey, baseUrl, model, piAuthProvider, customEndpoint } = params
+    const trimmedKey = apiKey?.trim() ?? ''
+    const allowEmptyApiKey = !setupTestRequiresApiKey(baseUrl)
 
-    if (!trimmedKey) {
+    if (!trimmedKey && !allowEmptyApiKey) {
       return { success: false, error: 'API key is required' }
     }
 
@@ -246,11 +267,12 @@ export function registerLlmConnectionsHandlers(server: RpcServer, deps: HandlerD
       const result = await testBackendConnection({
         provider,
         apiKey: trimmedKey,
+        allowEmptyApiKey,
         model: testModel,
         baseUrl,
         timeoutMs: 20000,
         hostRuntime: buildBackendHostRuntimeContext(deps.platform),
-        connection: resolveSetupTestConnectionHint({ provider, baseUrl, piAuthProvider }),
+        connection: resolveSetupTestConnectionHint({ provider, baseUrl, piAuthProvider, customEndpoint }),
       })
 
       if (!result.success) {

@@ -46,6 +46,8 @@ export const SESSION_PERSISTENT_FIELDS = [
   'branchFromMessageId',
   'branchFromSdkSessionId',
   'branchFromSessionPath',
+  'branchFromSdkCwd',
+  'branchFromSdkTurnId',
   // Automation origin
   'triggeredBy',
 ] as const;
@@ -172,6 +174,18 @@ export interface SessionConfig {
    * Parent session's storage path (optional, only when provider-level forking needs parent session files).
    */
   branchFromSessionPath?: string;
+  /**
+   * Parent session's sdkCwd (optional). SDK session files are stored per-CWD
+   * (`~/.claude/projects/{cwd-hash}/`), so forking requires the child subprocess
+   * to use the parent's CWD to locate the parent's session file.
+   */
+  branchFromSdkCwd?: string;
+  /**
+   * Provider-native branch anchor at the branch point.
+   * - Claude: assistant message UUID (used as `resumeSessionAt`)
+   * - Pi: session entry ID (used with SessionManager.branch(anchor))
+   */
+  branchFromSdkTurnId?: string;
   /** Metadata for sessions created by automations */
   triggeredBy?: { automationName?: string; event?: string; timestamp?: number };
 }

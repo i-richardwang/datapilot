@@ -671,14 +671,18 @@ async function cmdValidate(args: CliArgs): Promise<void> {
   let server: LocalServer | undefined
   let client: CliRpcClient
 
+  // Use a generous timeout for validation steps — source creation and MCP
+  // server startup can be slow on Windows.
+  const validateArgs = { ...args, timeout: Math.max(args.timeout, 30_000) }
+
   if (args.url) {
     client = new CliRpcClient(args.url, {
       token: args.token || undefined,
-      requestTimeout: args.timeout,
-      connectTimeout: args.timeout,
+      requestTimeout: validateArgs.timeout,
+      connectTimeout: validateArgs.timeout,
     })
   } else {
-    server = await spawnLocalServer(args, { quiet: !args.verbose })
+    server = await spawnLocalServer(validateArgs, { quiet: !args.verbose })
     client = server.client
   }
 

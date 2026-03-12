@@ -77,6 +77,8 @@ export {
   getMostRecentPlanFile,
   // Async persistence queue
   sessionPersistenceQueue,
+  // Header metadata signature (for self-triggered event suppression)
+  getHeaderMetadataSignature,
 } from './storage.ts';
 
 // JSONL helpers (for direct access if needed)

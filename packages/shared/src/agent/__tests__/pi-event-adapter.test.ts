@@ -162,6 +162,22 @@ describe('PiEventAdapter', () => {
       });
     });
 
+    it('should forward sdkTurnAnchor from message_end into text_complete', () => {
+      collect(adapter.adaptEvent({ type: 'turn_start' } as any));
+      const events = collect(adapter.adaptEvent({
+        type: 'message_end',
+        sdkTurnAnchor: 'entry_abc123',
+        message: { role: 'assistant', stopReason: 'stop', content: 'Anchored output' },
+      } as any));
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        type: 'text_complete',
+        text: 'Anchored output',
+        sdkTurnAnchor: 'entry_abc123',
+      });
+    });
+
     it('should skip non-assistant message_end', () => {
       const events = collect(adapter.adaptEvent({
         type: 'message_end',

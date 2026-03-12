@@ -7,6 +7,7 @@ import { LocalModelStep, type LocalModelSubmitData } from "./LocalModelStep"
 import { CompletionStep } from "./CompletionStep"
 import { GitBashWarning, type GitBashStatus } from "./GitBashWarning"
 import type { ApiKeySubmitData } from "../apisetup"
+import type { CustomEndpointApi } from '@config/llm-connections'
 
 export type OnboardingStep =
   | 'welcome'
@@ -70,6 +71,7 @@ interface OnboardingWizardProps {
     connectionDefaultModel?: string
     activePreset?: string
     models?: string[]
+    customApi?: CustomEndpointApi
   }
 
   className?: string

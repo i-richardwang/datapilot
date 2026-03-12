@@ -50,6 +50,7 @@ import {
   getSessionAttachmentsPath,
   getSessionPath as getSessionStoragePath,
   sessionPersistenceQueue,
+  getHeaderMetadataSignature,
   type StoredSession,
   type StoredMessage,
   type SessionMetadata,
@@ -67,7 +68,7 @@ import { getCredentialManager } from '@craft-agent/shared/credentials'
 import { CraftMcpClient, McpClientPool, McpPoolServer } from '@craft-agent/shared/mcp'
 import { type Session, type SessionEvent, type FileAttachment, type SendMessageOptions, type UnreadSummary, RPC_CHANNELS, generateMessageId } from '@craft-agent/shared/protocol'
 import { messageToStored, storedToMessage, type Message, type StoredAttachment, type ToolDisplayMeta } from '@craft-agent/core/types'
-import { formatPathsToRelative, formatToolInputPaths, perf, encodeIconToDataUrlAsync, getEmojiIcon, resetSummarizationClient, resolveToolIcon, readFileAttachment, selectSpreadMessages } from '@craft-agent/shared/utils'
+import { formatPathsToRelative, formatToolInputPaths, perf, encodeIconToDataUrlAsync, getEmojiIcon, resetSummarizationClient, resolveToolIcon, readFileAttachment, selectSpreadMessages, normalizePath } from '@craft-agent/shared/utils'
 import { loadAllSkills, loadSkillBySlug, type LoadedSkill } from '@craft-agent/shared/skills'
 import { getToolIconsDir, getMiniModel } from '@craft-agent/shared/config'
 import type { SummarizeCallback } from '@craft-agent/shared/sources'
@@ -201,6 +202,140 @@ async function validateSpawnAttachmentPath(filePath: string): Promise<string> {
   }
 
   return realFilePath
+}
+
+const PI_TURN_ANCHORS_VERSION = 1
+const PI_TURN_ANCHORS_FILE = 'pi-turn-anchors.json'
+
+interface PiTurnAnchorsIndex {
+  version: number
+  anchors: Record<string, string>
+}
+
+function getPiTurnAnchorsPath(sessionPath: string): string {
+  return join(sessionPath, 'meta', PI_TURN_ANCHORS_FILE)
+}
+
+async function loadPiTurnAnchors(sessionPath: string): Promise<PiTurnAnchorsIndex> {
+  const filePath = getPiTurnAnchorsPath(sessionPath)
+  try {
+    const raw = await readFile(filePath, 'utf-8')
+    const parsed = JSON.parse(raw) as Partial<PiTurnAnchorsIndex>
+    const anchors = (parsed.anchors && typeof parsed.anchors === 'object') ? parsed.anchors : {}
+    const normalized: Record<string, string> = {}
+    for (const [messageId, anchor] of Object.entries(anchors)) {
+      if (typeof messageId === 'string' && typeof anchor === 'string' && messageId && anchor) {
+        normalized[messageId] = anchor
+      }
+    }
+    return {
+      version: PI_TURN_ANCHORS_VERSION,
+      anchors: normalized,
+    }
+  } catch {
+    return {
+      version: PI_TURN_ANCHORS_VERSION,
+      anchors: {},
+    }
+  }
+}
+
+async function getPiTurnAnchor(sessionPath: string, messageId: string): Promise<string | undefined> {
+  if (!messageId) return undefined
+  const index = await loadPiTurnAnchors(sessionPath)
+  return index.anchors[messageId]
+}
+
+async function savePiTurnAnchor(sessionPath: string, messageId: string, anchorId: string): Promise<void> {
+  if (!messageId || !anchorId) return
+
+  const index = await loadPiTurnAnchors(sessionPath)
+  if (index.anchors[messageId] === anchorId) return
+
+  index.anchors[messageId] = anchorId
+
+  const filePath = getPiTurnAnchorsPath(sessionPath)
+  await mkdir(join(sessionPath, 'meta'), { recursive: true })
+  await writeFile(filePath, JSON.stringify(index), 'utf-8')
+}
+
+const CLAUDE_TURN_ANCHORS_VERSION = 1
+const CLAUDE_TURN_ANCHORS_FILE = 'claude-turn-anchors.json'
+
+interface ClaudeTurnAnchorRecord {
+  sdkSessionId: string
+  sdkMessageUuid: string
+}
+
+interface ClaudeTurnAnchorsIndex {
+  version: number
+  anchors: Record<string, ClaudeTurnAnchorRecord>
+}
+
+function getClaudeTurnAnchorsPath(sessionPath: string): string {
+  return join(sessionPath, 'meta', CLAUDE_TURN_ANCHORS_FILE)
+}
+
+function isClaudeMessageUuid(turnId: string): boolean {
+  return /^msg_[A-Za-z0-9]+$/.test(turnId)
+}
+
+async function loadClaudeTurnAnchors(sessionPath: string): Promise<ClaudeTurnAnchorsIndex> {
+  const filePath = getClaudeTurnAnchorsPath(sessionPath)
+  try {
+    const raw = await readFile(filePath, 'utf-8')
+    const parsed = JSON.parse(raw) as Partial<ClaudeTurnAnchorsIndex>
+    const anchors = (parsed.anchors && typeof parsed.anchors === 'object') ? parsed.anchors : {}
+    const normalized: Record<string, ClaudeTurnAnchorRecord> = {}
+
+    for (const [messageId, value] of Object.entries(anchors)) {
+      if (!messageId || typeof messageId !== 'string') continue
+      if (!value || typeof value !== 'object') continue
+      const sdkSessionId = (value as { sdkSessionId?: unknown }).sdkSessionId
+      const sdkMessageUuid = (value as { sdkMessageUuid?: unknown }).sdkMessageUuid
+      if (typeof sdkSessionId === 'string' && sdkSessionId && typeof sdkMessageUuid === 'string' && sdkMessageUuid) {
+        normalized[messageId] = { sdkSessionId, sdkMessageUuid }
+      }
+    }
+
+    return {
+      version: CLAUDE_TURN_ANCHORS_VERSION,
+      anchors: normalized,
+    }
+  } catch {
+    return {
+      version: CLAUDE_TURN_ANCHORS_VERSION,
+      anchors: {},
+    }
+  }
+}
+
+async function getClaudeTurnAnchor(sessionPath: string, messageId: string): Promise<ClaudeTurnAnchorRecord | undefined> {
+  if (!messageId) return undefined
+  const index = await loadClaudeTurnAnchors(sessionPath)
+  return index.anchors[messageId]
+}
+
+async function saveClaudeTurnAnchor(
+  sessionPath: string,
+  messageId: string,
+  sdkSessionId: string,
+  sdkMessageUuid: string,
+): Promise<void> {
+  if (!messageId || !sdkSessionId || !sdkMessageUuid) return
+
+  const index = await loadClaudeTurnAnchors(sessionPath)
+  const previous = index.anchors[messageId]
+  if (previous && previous.sdkSessionId === sdkSessionId && previous.sdkMessageUuid === sdkMessageUuid) return
+
+  index.anchors[messageId] = {
+    sdkSessionId,
+    sdkMessageUuid,
+  }
+
+  const filePath = getClaudeTurnAnchorsPath(sessionPath)
+  await mkdir(join(sessionPath, 'meta'), { recursive: true })
+  await writeFile(filePath, JSON.stringify(index), 'utf-8')
 }
 
 /**
@@ -729,6 +864,12 @@ interface ManagedSession {
   branchFromSdkSessionId?: string
   // Parent session's storage path (used only when branchContextStrategy === 'sdk-fork')
   branchFromSessionPath?: string
+  // Parent session's sdkCwd — needed so the fork subprocess uses the correct
+  // ~/.claude/projects/{cwd-hash}/ directory to find the parent's session file.
+  branchFromSdkCwd?: string
+  // SDK assistant message UUID at the branch point — used as resumeSessionAt
+  // to trim the forked conversation at the branch point.
+  branchFromSdkTurnId?: string
   // One-shot flag for seeded branch mode - set true after first turn seed injection.
   branchSeedApplied?: boolean
   // Token refresh manager for OAuth token refresh with rate limiting
@@ -1028,20 +1169,6 @@ export class SessionManager implements ISessionManager {
       this.persistSession(managed)
     }
 
-    // Update session metadata via AutomationSystem (handles diffing and event emission internally)
-    const automationSystem = this.automationSystems.get(managed.workspace.rootPath)
-    if (automationSystem) {
-      automationSystem.updateSessionMetadata(sessionId, {
-        permissionMode: header.permissionMode,
-        labels: header.labels,
-        isFlagged: header.isFlagged,
-        sessionStatus: header.sessionStatus,
-        sessionName: header.name,
-      }).catch((error) => {
-        sessionLog.error(`[Automations] Failed to update session metadata:`, error)
-      })
-    }
-
     return changed
   }
 
@@ -1146,20 +1273,46 @@ export class SessionManager implements ISessionManager {
         this.broadcastSkillsChanged(workspaceId, skills)
       },
 
-      // Session metadata changes (external edits to session.jsonl headers).
-      // Detects label/flag/name/sessionStatus changes made by other instances or scripts.
-      // If a session is actively processing, defer applying metadata until processing stops.
+      // Session metadata changes (edits to session.jsonl headers).
+      // Detects changes from both internal writes (self) and external sources
+      // (other instances, scripts, manual edits).
       onSessionMetadataChange: (sessionId, header) => {
         const managed = this.sessions.get(sessionId)
         if (!managed) return
 
-        if (managed.isProcessing) {
-          managed.pendingExternalMetadata = header
-          sessionLog.info(`Deferred external metadata update for session ${sessionId} (processing active)`)
-          return
+        // Check if this is our own write echoing back via fs.watch().
+        // Self-writes don't need in-memory sync (already up to date), but
+        // still need to notify the automation system for event matching.
+        const incomingSignature = getHeaderMetadataSignature(header)
+        const lastWrittenSignature = sessionPersistenceQueue.getLastWrittenSignature(sessionId)
+        const isSelfWrite = !!(lastWrittenSignature && incomingSignature === lastWrittenSignature)
+
+        // For external writes: sync in-memory state + emit UI events.
+        // Skip for self-writes to avoid feedback loops (especially on Windows
+        // where fs.watch fires aggressively: unlink + rename = 2+ events).
+        if (!isSelfWrite) {
+          if (managed.isProcessing) {
+            managed.pendingExternalMetadata = header
+            sessionLog.info(`Deferred external metadata update for session ${sessionId} (processing active)`)
+          } else {
+            this.applyExternalSessionMetadata(managed, header)
+          }
         }
 
-        this.applyExternalSessionMetadata(managed, header)
+        // Always notify automation system — it does its own diffing and needs
+        // to see both self-writes and external changes for event matching.
+        const automationSystem = this.automationSystems.get(managed.workspace.rootPath)
+        if (automationSystem) {
+          automationSystem.updateSessionMetadata(sessionId, {
+            permissionMode: header.permissionMode,
+            labels: header.labels,
+            isFlagged: header.isFlagged,
+            sessionStatus: header.sessionStatus,
+            sessionName: header.name,
+          }).catch((error) => {
+            sessionLog.error(`[Automations] Failed to update session metadata:`, error)
+          })
+        }
       },
     }
 
@@ -2018,6 +2171,8 @@ export class SessionManager implements ISessionManager {
       branchContextStrategy: 'sdk-fork' | 'seeded-fresh-session'
       branchFromSdkSessionId?: string
       branchFromSessionPath?: string
+      branchFromSdkCwd?: string
+      branchFromSdkTurnId?: string
     } | undefined
 
     if (options?.branchFromSessionId || options?.branchFromMessageId) {
@@ -2104,6 +2259,62 @@ export class SessionManager implements ISessionManager {
       const branchFromSessionPath = branchContextStrategy === 'sdk-fork'
         ? getSessionStoragePath(workspaceRootPath, options.branchFromSessionId)
         : undefined
+      // Capture parent's sdkCwd so the child SDK subprocess can find the parent's
+      // session file (stored under ~/.claude/projects/{cwd-hash}/).
+      const branchFromSdkCwd = branchContextStrategy === 'sdk-fork'
+        ? (sourceManaged?.sdkCwd || sourceSession.sdkCwd)
+        : undefined
+
+      // Provider-native branch anchor at branch point.
+      // - Claude: assistant message UUID (resumeSessionAt), but only when anchor lineage
+      //   matches the parent SDK session being resumed.
+      // - Pi: session entry ID loaded from sidecar (pi-turn-anchors.json)
+      const branchMessage = sourceSession.messages[branchIdx]
+      let branchFromSdkTurnId: string | undefined
+      if (branchContextStrategy === 'sdk-fork') {
+        if (sourceBackendContext.provider === 'pi') {
+          if (branchFromSessionPath) {
+            branchFromSdkTurnId = await getPiTurnAnchor(branchFromSessionPath, options.branchFromMessageId)
+            if (!branchFromSdkTurnId) {
+              sessionLog.warn('Pi branch anchor missing: falling back to full-history fork for this branch', {
+                workspaceId,
+                branchFromSessionId: options.branchFromSessionId,
+                branchFromMessageId: options.branchFromMessageId,
+              })
+            }
+          }
+        } else if (sourceBackendContext.provider === 'anthropic') {
+          if (branchFromSessionPath && branchFromSdkSessionId) {
+            const anchor = await getClaudeTurnAnchor(branchFromSessionPath, options.branchFromMessageId)
+            if (!anchor) {
+              sessionLog.warn('Claude branch anchor missing: falling back to full-history fork for this branch', {
+                workspaceId,
+                branchFromSessionId: options.branchFromSessionId,
+                branchFromMessageId: options.branchFromMessageId,
+              })
+            } else if (!anchor.sdkMessageUuid || !isClaudeMessageUuid(anchor.sdkMessageUuid)) {
+              sessionLog.warn('Claude branch anchor malformed: falling back to full-history fork for this branch', {
+                workspaceId,
+                branchFromSessionId: options.branchFromSessionId,
+                branchFromMessageId: options.branchFromMessageId,
+                anchorSdkSessionId: anchor.sdkSessionId,
+              })
+            } else if (anchor.sdkSessionId !== branchFromSdkSessionId) {
+              sessionLog.warn('Claude branch anchor lineage mismatch: falling back to full-history fork for this branch', {
+                workspaceId,
+                branchFromSessionId: options.branchFromSessionId,
+                branchFromMessageId: options.branchFromMessageId,
+                anchorSdkSessionId: anchor.sdkSessionId,
+                parentSdkSessionId: branchFromSdkSessionId,
+              })
+            } else {
+              branchFromSdkTurnId = anchor.sdkMessageUuid
+            }
+          }
+        } else {
+          branchFromSdkTurnId = branchMessage?.turnId
+        }
+      }
 
       if (branchContextStrategy === 'sdk-fork' && !branchFromSdkSessionId) {
         sessionLog.warn('Branch validation failed: sdk-fork requires parent SDK session ID', {
@@ -2123,6 +2334,8 @@ export class SessionManager implements ISessionManager {
         branchContextStrategy,
         branchFromSdkSessionId,
         branchFromSessionPath,
+        branchFromSdkCwd,
+        branchFromSdkTurnId,
       }
 
       sessionLog.info('Branch validation succeeded', {
@@ -2153,14 +2366,35 @@ export class SessionManager implements ISessionManager {
         throw new Error(`Failed to load newly created session ${storedSession.id} for branch copy`)
       }
 
-      branchedStored.messages = validatedBranch.sourceSession.messages.slice(0, validatedBranch.branchIdx + 1)
+      const sourceMessages = validatedBranch.sourceSession.messages.slice(0, validatedBranch.branchIdx + 1)
+
+      // Re-map embedded paths: source messages were loaded with expandSessionPath(sourceDir),
+      // so they contain absolute paths to the *source* session directory. When saved to the
+      // branch session, makeSessionPathPortable uses the *branch* dir — which won't match.
+      // Fix: replace source dir paths with branch dir paths so tokenization works on save.
+      const sourceDir = normalizePath(getSessionStoragePath(workspaceRootPath, validatedBranch.sourceSessionId))
+      const branchDir = normalizePath(getSessionStoragePath(workspaceRootPath, storedSession.id))
+      if (sourceDir !== branchDir) {
+        branchedStored.messages = sourceMessages.map(m => {
+          const json = JSON.stringify(m)
+          if (!json.includes(sourceDir)) return m
+          return JSON.parse(json.replaceAll(sourceDir, branchDir)) as StoredMessage
+        })
+      } else {
+        branchedStored.messages = sourceMessages
+      }
+
       branchedStored.branchFromMessageId = validatedBranch.sourceMessageId
       if (validatedBranch.branchContextStrategy === 'sdk-fork') {
         branchedStored.branchFromSdkSessionId = validatedBranch.branchFromSdkSessionId
         branchedStored.branchFromSessionPath = validatedBranch.branchFromSessionPath
+        branchedStored.branchFromSdkCwd = validatedBranch.branchFromSdkCwd
+        branchedStored.branchFromSdkTurnId = validatedBranch.branchFromSdkTurnId
       } else {
         delete branchedStored.branchFromSdkSessionId
         delete branchedStored.branchFromSessionPath
+        delete branchedStored.branchFromSdkCwd
+        delete branchedStored.branchFromSdkTurnId
       }
       await saveStoredSession(branchedStored)
     }
@@ -2189,6 +2423,8 @@ export class SessionManager implements ISessionManager {
       branchContextStrategy: validatedBranch?.branchContextStrategy,
       branchFromSdkSessionId: validatedBranch?.branchFromSdkSessionId,
       branchFromSessionPath: validatedBranch?.branchFromSessionPath,
+      branchFromSdkCwd: validatedBranch?.branchFromSdkCwd,
+      branchFromSdkTurnId: validatedBranch?.branchFromSdkTurnId,
       branchSeedApplied: validatedBranch ? validatedBranch.branchContextStrategy === 'sdk-fork' : undefined,
       messagesLoaded: !isBranch,  // Branched sessions: lazy-load messages from JSONL
     })
@@ -2355,6 +2591,8 @@ export class SessionManager implements ISessionManager {
         sdkSessionId: managed.sdkSessionId,
         branchFromSdkSessionId: managed.branchContextStrategy === 'sdk-fork' ? managed.branchFromSdkSessionId : undefined,
         branchFromSessionPath: managed.branchContextStrategy === 'sdk-fork' ? managed.branchFromSessionPath : undefined,
+        branchFromSdkCwd: managed.branchContextStrategy === 'sdk-fork' ? managed.branchFromSdkCwd : undefined,
+        branchFromSdkTurnId: managed.branchContextStrategy === 'sdk-fork' ? managed.branchFromSdkTurnId : undefined,
         branchFromMessageId: managed.branchFromMessageId,
         createdAt: managed.lastMessageAt,
         lastUsedAt: managed.lastMessageAt,
@@ -2368,7 +2606,15 @@ export class SessionManager implements ISessionManager {
 
       const onSdkSessionIdUpdate = (sdkSessionId: string) => {
         managed.sdkSessionId = sdkSessionId
-        sessionLog.info(`SDK session ID captured for ${managed.id}: ${sdkSessionId}`)
+        // Retire branch-only fork metadata now that child session is established
+        if (managed.branchFromSdkSessionId) {
+          sessionLog.info(`Branch fork established for ${managed.id}: child=${sdkSessionId}, retiring parent fork metadata (parent=${managed.branchFromSdkSessionId})`)
+          managed.branchFromSdkSessionId = undefined
+          managed.branchFromSdkCwd = undefined
+          managed.branchFromSdkTurnId = undefined
+        } else {
+          sessionLog.info(`SDK session ID captured for ${managed.id}: ${sdkSessionId}`)
+        }
         this.persistSession(managed)
         sessionPersistenceQueue.flush(managed.id)
       }
@@ -3097,6 +3343,11 @@ export class SessionManager implements ISessionManager {
           if (attachments.length > 0) fileAttachments = attachments
         }
 
+        // Notify renderer to hydrate full session metadata (including name)
+        // before streaming events arrive. Without this, the renderer creates
+        // a synthetic empty session and shows "New Chat" in the sidebar.
+        this.sendEvent({ type: 'session_created', sessionId: session.id }, managed.workspace.id)
+
         // Fire and forget — send the message but don't await completion
         this.sendMessage(session.id, request.prompt, fileAttachments).catch(err => {
           sessionLog.error(`Failed to send message to spawned session ${session.id}:`, err)
@@ -3231,6 +3482,11 @@ export class SessionManager implements ISessionManager {
       await this.flushSession(managed.id)
       // Notify all windows for this workspace
       this.sendEvent({ type: 'session_flagged', sessionId }, managed.workspace.id)
+      // Workaround: Bun's fs.watch({ recursive: true }) on Linux doesn't track
+      // directories created after the watcher started.
+      // https://github.com/oven-sh/bun/issues/15939
+      const watcher = this.configWatchers.get(managed.workspace.rootPath)
+      watcher?.notifyFileChange(`sessions/${sessionId}/session.jsonl`)
     }
   }
 
@@ -3243,6 +3499,11 @@ export class SessionManager implements ISessionManager {
       await this.flushSession(managed.id)
       // Notify all windows for this workspace
       this.sendEvent({ type: 'session_unflagged', sessionId }, managed.workspace.id)
+      // Workaround: Bun's fs.watch({ recursive: true }) on Linux doesn't track
+      // directories created after the watcher started.
+      // https://github.com/oven-sh/bun/issues/15939
+      const watcher = this.configWatchers.get(managed.workspace.rootPath)
+      watcher?.notifyFileChange(`sessions/${sessionId}/session.jsonl`)
     }
   }
 
@@ -3283,6 +3544,11 @@ export class SessionManager implements ISessionManager {
       await this.flushSession(managed.id)
       // Notify all windows for this workspace
       this.sendEvent({ type: 'session_status_changed', sessionId, sessionStatus }, managed.workspace.id)
+      // Workaround: Bun's fs.watch({ recursive: true }) on Linux doesn't track
+      // directories created after the watcher started.
+      // https://github.com/oven-sh/bun/issues/15939
+      const watcher = this.configWatchers.get(managed.workspace.rootPath)
+      watcher?.notifyFileChange(`sessions/${sessionId}/session.jsonl`)
     }
   }
 
@@ -3765,6 +4031,11 @@ export class SessionManager implements ISessionManager {
       this.persistSession(managed)
       // Notify renderer of the name change
       this.sendEvent({ type: 'title_generated', sessionId, title: name }, managed.workspace.id)
+      // Workaround: Bun's fs.watch({ recursive: true }) on Linux doesn't track
+      // directories created after the watcher started.
+      // https://github.com/oven-sh/bun/issues/15939
+      const watcher = this.configWatchers.get(managed.workspace.rootPath)
+      watcher?.notifyFileChange(`sessions/${sessionId}/session.jsonl`)
     }
   }
 
@@ -5388,6 +5659,11 @@ export class SessionManager implements ISessionManager {
       }, managed.workspace.id)
       // Persist to disk
       this.persistSession(managed)
+      // Workaround: Bun's fs.watch({ recursive: true }) on Linux doesn't track
+      // directories created after the watcher started.
+      // https://github.com/oven-sh/bun/issues/15939
+      const watcher = this.configWatchers.get(managed.workspace.rootPath)
+      watcher?.notifyFileChange(`sessions/${sessionId}/session.jsonl`)
     }
   }
 
@@ -5538,6 +5814,28 @@ export class SessionManager implements ISessionManager {
         if (!event.isIntermediate) {
           managed.lastMessageRole = 'assistant'
           managed.lastFinalMessageId = assistantMessage.id
+
+          const sessionPath = getSessionStoragePath(managed.workspace.rootPath, sessionId)
+
+          // Claude branch-cutoff support: persist message UUID + SDK session lineage in sidecar.
+          // Used to guard resumeSessionAt so we only send anchors valid for the parent SDK session.
+          if (event.turnId && managed.sdkSessionId && isClaudeMessageUuid(event.turnId)) {
+            try {
+              await saveClaudeTurnAnchor(sessionPath, assistantMessage.id, managed.sdkSessionId, event.turnId)
+            } catch (error) {
+              sessionLog.warn(`Failed to persist Claude turn anchor for session ${sessionId}:`, error)
+            }
+          }
+
+          // Pi branch-cutoff support: persist provider-native turn anchor in session sidecar.
+          // Keeps session.jsonl schema unchanged while enabling strict branch cutoffs later.
+          if (event.sdkTurnAnchor) {
+            try {
+              await savePiTurnAnchor(sessionPath, assistantMessage.id, event.sdkTurnAnchor)
+            } catch (error) {
+              sessionLog.warn(`Failed to persist Pi turn anchor for session ${sessionId}:`, error)
+            }
+          }
         }
 
         this.sendEvent({ type: 'text_complete', sessionId, text: event.text, isIntermediate: event.isIntermediate, turnId: event.turnId, parentToolUseId: event.parentToolUseId, timestamp: assistantMessage.timestamp, messageId: assistantMessage.id }, workspaceId)

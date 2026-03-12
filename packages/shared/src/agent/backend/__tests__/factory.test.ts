@@ -324,6 +324,18 @@ describe('phase4 backend abstraction APIs', () => {
       provider: 'pi',
       piAuthProvider: 'openai-codex',
     })).toEqual({ providerType: 'pi', piAuthProvider: 'openai-codex' });
+
+    expect(resolveSetupTestConnectionHint({
+      provider: 'pi',
+      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      customEndpoint: { api: 'openai-completions' },
+    })).toEqual({ providerType: 'pi_compat', piAuthProvider: 'openai' });
+
+    expect(resolveSetupTestConnectionHint({
+      provider: 'pi',
+      baseUrl: 'https://my-anthropic-proxy.internal/v1',
+      customEndpoint: { api: 'anthropic-messages' },
+    })).toEqual({ providerType: 'pi_compat', piAuthProvider: 'anthropic' });
   });
 
   it('fetchBackendModels dispatches for pi provider', async () => {
@@ -392,5 +404,17 @@ describe('phase4 backend abstraction APIs', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('API key is required');
+  });
+});
+
+describe('ClaudeAgent model switching', () => {
+  it('setModel updates getModel (regression: setModel used to write config.model but getModel reads _model)', () => {
+    const agent = createBackend(createTestConfig({ provider: 'anthropic', model: 'claude-opus-4-6' }));
+
+    expect(agent.getModel()).toBe('claude-opus-4-6');
+
+    agent.setModel('claude-sonnet-4-6');
+
+    expect(agent.getModel()).toBe('claude-sonnet-4-6');
   });
 });

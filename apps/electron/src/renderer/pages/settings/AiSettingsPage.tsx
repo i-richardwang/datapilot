@@ -48,7 +48,7 @@ import { OnboardingWizard, type ApiSetupMethod } from '@/components/onboarding'
 import { RenameDialog } from '@/components/ui/rename-dialog'
 import { useAppShellContext } from '@/context/AppShellContext'
 import { getModelShortName, type ModelDefinition } from '@config/models'
-import { getModelsForProviderType } from '@config/llm-connections'
+import { getModelsForProviderType, type CustomEndpointApi } from '@config/llm-connections'
 import { toast } from 'sonner'
 
 /**
@@ -564,6 +564,7 @@ export default function AiSettingsPage() {
     connectionDefaultModel?: string
     activePreset?: string
     models?: string[]
+    customApi?: CustomEndpointApi
   } | undefined>(undefined)
   const setFullscreenOverlayOpen = useSetAtom(fullscreenOverlayOpenAtom)
 
@@ -742,12 +743,15 @@ export default function AiSettingsPage() {
       ?.map((m: string | ModelDefinition) => typeof m === 'string' ? m : m.id)
       .filter(Boolean)
 
+    const isCustomEndpointConnection = !!connection.customEndpoint && !!connection.baseUrl?.trim()
+
     setEditInitialValues({
       apiKey,
       baseUrl: connection.baseUrl,
       connectionDefaultModel: modelStr,
-      activePreset: connection.piAuthProvider || undefined,
+      activePreset: isCustomEndpointConnection ? 'custom' : (connection.piAuthProvider || undefined),
       models: modelIds,
+      customApi: connection.customEndpoint?.api,
     })
 
     // Open overlay and jump directly to credentials step (no reset — jumpToCredentials sets state)
