@@ -1,6 +1,6 @@
 # Batch Processing Guide
 
-This guide explains batch processing in Craft Agent — running actions across large lists of items.
+This guide explains batch processing in DataPilot — running actions across large lists of items.
 
 > **Always use CLI commands** to manage batches. See [craft-cli.md](./craft-cli.md) for the full command reference.
 

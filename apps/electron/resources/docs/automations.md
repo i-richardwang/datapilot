@@ -1,6 +1,6 @@
 # Automations Configuration Guide
 
-This guide explains how to configure automations in Craft Agent to automate workflows based on events.
+This guide explains how to configure automations in DataPilot to automate workflows based on events.
 
 > **CLI-first workflow (recommended):** Use `craft-agent automation ...` commands instead of editing JSON directly.
 > - `craft-agent automation --help`
@@ -8,7 +8,7 @@ This guide explains how to configure automations in Craft Agent to automate work
 
 ## What Are Automations?
 
-Automations allow you to trigger actions automatically when specific events occur in Craft Agent. You can:
+Automations allow you to trigger actions automatically when specific events occur in DataPilot. You can:
 - Send prompts to create agent sessions based on events
 - Execute prompts on a schedule using cron expressions
 - Automate workflows based on permission mode changes, flags, or session status changes
@@ -59,7 +59,7 @@ craft-agent automation validate
 
 ## Supported Events
 
-### App Events (triggered by Craft Agent)
+### App Events (triggered by DataPilot)
 
 | Event | Trigger | Match Value |
 |-------|---------|-------------|
@@ -95,7 +95,7 @@ craft-agent automation validate
 
 ### Prompt Actions
 
-Send a prompt to Craft Agent (creates a new session for scheduled prompts).
+Send a prompt to DataPilot (creates a new session for scheduled prompts).
 
 ```json
 {
@@ -318,7 +318,7 @@ Automations are validated when:
 
 **Using config_validate:**
 
-Ask Craft Agent to validate your automations configuration:
+Ask DataPilot to validate your automations configuration:
 
 ```
 Validate my automations configuration

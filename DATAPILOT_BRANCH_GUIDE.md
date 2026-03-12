@@ -4,7 +4,7 @@
 > Base: `main` (commit `0a778e2`)
 > Purpose: 将 Craft Agent 改造为面向数据分析场景的垂直 Agent — **DataPilot**
 >
-> **Last updated:** 2026-03-12
+> **Last updated:** 2026-03-12 (v2)
 
 ## 目标
 
@@ -81,6 +81,16 @@
 | GitHub Issue 模板 | `bug_report.yml`、`feature_request.yml` | 用户提交 issue 时看到的描述 |
 | Viewer 应用 | `viewer/index.html`、`viewer/Header.tsx` | 页面标题和 logo tooltip |
 | 多实例开发 | `electron-dev.ts`（2 处） | `'DataPilot [${instanceNum}]'` |
+| 应用内文档 | `resources/docs/` 下 8 个 .md 文件 | 所有 prose 产品名替换（保留 `craft-agent` CLI 命令名和 MCP 工具名不变） |
+| 应用内 Release Notes | `resources/release-notes/` 下 8 个 .md 文件 | `0.2.32`–`0.7.0` 中 prose 产品名（保留 GitHub Issue 标题引用和包名不变） |
+| 自部署构建脚本 | `scripts/build-server.ts`（5 处） | help 文本、echo 输出、systemd `Description`、便捷脚本注释 |
+
+**未改动的应用内文本（有意保留）：**
+- `craft-agent`、`craft-agent-batch` — 实际 CLI 可执行文件名，docs 中的命令引用须与 binary 一致
+- `craft-agents-docs`、`SearchCraftAgents` — MCP 工具名，属于内部标识符
+- `@craft-agent/*` — 包名，属于 npm 元数据
+- GitHub Issue 标题引用（如 `0.3.4.md` 中 "Craft Agents on Hyprland..."）— 历史记录，改了会与 GitHub 不一致
+- `$CRAFT_LABEL` — 环境变量名，归入 P1
 
 **合并关注点:** 上游新增的用户可见文本中可能包含 "Craft Agent"，合并后需搜索：
 ```bash
@@ -211,6 +221,27 @@ grep -rn "Craft Agent" --include='*.tsx' --include='*.ts' --include='*.html' --i
 4. **检查上游是否新增了身份相关的提示词**，如有，需同步改为 DataPilot
 5. **检查上游是否新增了 `@craft-agent/` 引用或 `CRAFT_*` 环境变量**
 6. **检查上游是否新增了 `Craft Agents.app` 路径引用**（已改为 `DataPilot.app`）
+7. **检查上游是否新增了 `resources/docs/*.md` 文档**，新文档中的 "Craft Agent" 需替换为 "DataPilot"
+8. **检查上游是否新增了 `resources/release-notes/*.md`**，每次上游发版都会新增 release notes，需替换其中 "Craft Agent(s)" prose 文本
+
+### 高频变动区域（每次合并必查）
+
+以下区域上游大概率会持续新增包含 "Craft Agent" 的内容，合并后需要常规审查和修改：
+
+| 区域 | 原因 | 审查方法 |
+|------|------|----------|
+| `resources/release-notes/` | **每次上游发版必新增**一个 release notes 文件，里面几乎必然提到 "Craft Agent(s)" | `grep -rn "Craft Agent" apps/electron/resources/release-notes/ \| grep -v craft-agents-oss` |
+| `resources/docs/*.md` | 上游新增功能时会创建新文档或修改现有文档，prose 中可能包含产品名 | `grep -rn "Craft Agent" apps/electron/resources/docs/` |
+| `prompts/system.ts` | 上游频繁修改系统提示词，可能新增包含 "Craft Agent" 的段落 | `grep -n "Craft Agent" packages/shared/src/prompts/system.ts` |
+| `src/renderer/components/onboarding/` | 上游可能新增或修改引导流程步骤 | `grep -rn "Craft Agent" apps/electron/src/renderer/components/onboarding/` |
+| `errors.ts`、`connection-setup-logic.ts` | 上游新增 provider 或连接类型时，错误信息会包含产品名 | `grep -n "Craft Agent" packages/shared/src/agent/errors.ts packages/server-core/src/domain/connection-setup-logic.ts` |
+| `scripts/build-server.ts` | 上游增强自部署功能时可能新增 echo/log 输出 | `grep -n "Craft Agent" scripts/build-server.ts` |
+| `install-app.sh` / `install-app.ps1` | 上游修改安装流程时可能新增用户提示 | `grep -n "Craft Agent" scripts/install-app.sh scripts/install-app.ps1` |
+
+**建议：** 每次合并上游后，运行以下一行命令快速审查所有打包进应用的 "Craft Agent" 残留：
+```bash
+grep -rn "Craft Agent" apps/electron/resources/docs/ apps/electron/resources/release-notes/ packages/shared/src/prompts/system.ts apps/electron/src/renderer/ scripts/install-app.sh scripts/install-app.ps1 scripts/build-server.ts | grep -v node_modules | grep -v craft-agents-oss
+```
 
 ---
 
