@@ -178,7 +178,7 @@ export function CodeBlock({ code, language = 'text', className, mode = 'full', f
 
   // Full mode: rich styling with header and copy button
   return (
-    <div className={cn('relative group rounded-[8px] overflow-hidden border bg-muted/30', className)}>
+    <div className={cn('relative group rounded-lg overflow-hidden border bg-muted/30', className)}>
       {/* Language label + copy button */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 border-b text-xs">
         <span className="text-muted-foreground font-medium uppercase tracking-wide">

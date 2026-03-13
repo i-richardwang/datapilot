@@ -72,7 +72,7 @@ function LabelBadgeRowPlayground({ showValues, labelCount }: LabelBadgeRowPlaygr
   }, [initialLabels])
 
   return (
-    <div className="w-[500px] rounded-[12px] border border-border bg-sidebar overflow-hidden">
+    <div className="w-[500px] rounded-xl border border-border bg-sidebar overflow-hidden">
       {/* Simulated input area header */}
       <LabelBadgeRow
         sessionLabels={sessionLabels}

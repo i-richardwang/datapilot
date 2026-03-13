@@ -41,7 +41,7 @@ export function PermissionRequest({ request, onResponse, unstyled = false }: Per
         'overflow-hidden h-full flex flex-col bg-info/5',
         unstyled
           ? 'border-0'
-          : 'border border-info/30 rounded-[8px] shadow-middle'
+          : 'border border-info/30 rounded-lg shadow-middle'
       )}
       data-tutorial="permission-banner"
     >

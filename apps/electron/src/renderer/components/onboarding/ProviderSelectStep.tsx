@@ -29,19 +29,19 @@ const ALL_PROVIDER_OPTIONS: ProviderOption[] = [
     id: 'claude',
     name: 'Claude Pro / Max',
     description: 'Use your Anthropic subscription.',
-    icon: <img src={claudeIcon} alt="" className="size-5 rounded-[3px]" />,
+    icon: <img src={claudeIcon} alt="" className="size-5 rounded-xs" />,
   },
   {
     id: 'chatgpt',
     name: 'Codex · ChatGPT Plus',
     description: 'Use your ChatGPT Plus or Pro subscription.',
-    icon: <img src={openaiIcon} alt="" className="size-5 rounded-[3px]" />,
+    icon: <img src={openaiIcon} alt="" className="size-5 rounded-xs" />,
   },
   {
     id: 'copilot',
     name: 'GitHub Copilot',
     description: 'Use your GitHub Copilot subscription.',
-    icon: <img src={copilotIcon} alt="" className="size-5 rounded-[3px]" />,
+    icon: <img src={copilotIcon} alt="" className="size-5 rounded-xs" />,
   },
   {
     id: 'api_key',

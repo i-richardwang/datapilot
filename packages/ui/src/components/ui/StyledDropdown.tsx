@@ -151,7 +151,7 @@ export const StyledDropdownMenuItem = React.forwardRef<
       '[&_svg]:pointer-events-none [&_svg]:shrink-0',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       // styled additions
-      'pr-4 rounded-[4px] hover:bg-foreground/[0.03] focus:bg-foreground/[0.03]',
+      'pr-4 rounded-sm hover:bg-foreground/[0.03] focus:bg-foreground/[0.03]',
       '[&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0',
       variant === 'destructive' && 'text-destructive focus:text-destructive hover:text-destructive [&_svg]:!text-destructive',
       className,
@@ -186,7 +186,7 @@ export const StyledDropdownMenuSubTrigger = React.forwardRef<
     className={cn(
       'relative flex cursor-default items-center gap-2 px-2 py-1.5 text-sm outline-hidden select-none',
       '[&_svg]:pointer-events-none [&_svg]:shrink-0',
-      'pr-1.5 rounded-[4px] hover:bg-foreground/10 focus:bg-foreground/10 data-[state=open]:bg-foreground/10',
+      'pr-1.5 rounded-sm hover:bg-foreground/10 focus:bg-foreground/10 data-[state=open]:bg-foreground/10',
       '[&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0',
       className,
     )}

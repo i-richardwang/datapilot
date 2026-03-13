@@ -67,7 +67,7 @@ export function ToolbarStatusSlot({
           transition={{ duration: 0.15 }}
           className={cn(
             "absolute inset-0 z-10",
-            "rounded-b-[12px]",
+            "rounded-b-xl",
             "shadow-tinted",
             "flex items-center justify-center",
             "pointer-events-auto",
@@ -135,7 +135,7 @@ function BrowserStatusBar({
       transition={{ duration: 0.15 }}
       className={cn(
         "absolute inset-0 z-10",
-        "rounded-b-[12px]",
+        "rounded-b-xl",
         "flex items-center justify-center gap-2",
         "pointer-events-auto cursor-pointer",
         "transition-[background-color] duration-200",
@@ -161,7 +161,7 @@ function BrowserStatusBar({
           <Spinner className="text-[10px] leading-none" />
         ) : instance.favicon && !faviconFailed ? (
           isDarkTheme ? (
-            <span className="inline-flex h-4 w-4 items-center justify-center rounded-[5px] bg-white/90 p-[1px] leading-none">
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-sm bg-white/90 p-[1px] leading-none">
               <img
                 src={instance.favicon}
                 alt=""

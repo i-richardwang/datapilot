@@ -7,13 +7,15 @@
 
 ## Overview
 
-Our fork adds three categories of changes:
+Our fork adds four categories of changes:
 
 1. **Batch Processing System** — Processes large lists of items (CSV/JSON/JSONL) by running a prompt action per item as an independent agent session. Modeled after the **Automations** architecture; if upstream refactors automations, batch code likely needs the same treatment.
 
 2. **Lite Version Build Flag** (`CRAFT_LITE_VERSION`) — Build-time flag that hides non-essential UI (What's New, Help menu, subscription providers, Backlog/Needs Review statuses), excludes unused session tools (9 tools via `LITE_EXCLUDED_TOOLS`), and conditionally removes prompt sections (Browser Tools, Mermaid validation, Source Templates, Debug Mode) to reduce initial context. Replaces the old `lite` branch.
 
 3. **Preset Preservation Fix** — Fix to `resolvePresetStateForBaseUrlChange()` preserving Pi SDK provider routing when a preset points at a custom proxy endpoint.
+
+4. **Border-Radius Theme Tokens** — Overrides Tailwind v4's default `--radius-*` CSS variables to `0px` in `:root` for sharp-corner branding. Converts all hardcoded `rounded-[Npx]` arbitrary values to standard Tailwind classes (`rounded-sm`, `rounded-lg`, etc.) so they flow through the CSS variable system. CSS files with hardcoded `border-radius` pixel values are also converted to `var(--radius-*)`.
 
 ---
 
@@ -194,6 +196,24 @@ Split into `ALL_PROVIDER_OPTIONS` + filtered `PROVIDER_OPTIONS`. Lite hides clau
 
 Simplified `resolvePresetStateForBaseUrlChange()`: removed `activePresetHasEmptyUrl` branch that broke piAuthProvider routing.
 
+#### `apps/electron/src/renderer/index.css` *(Border-Radius Tokens)*
+
+Added `--radius-xs` through `--radius-2xl` (all `0px`) in `:root`. Converted 3 hardcoded `border-radius` values to `var(--radius-*)`.
+
+#### `packages/ui/src/styles/index.css` *(Border-Radius Tokens)*
+
+Same `:root` additions as above. Converted 3 hardcoded `border-radius` values to `var(--radius-*)`.
+
+#### `packages/ui/src/components/markdown/tiptap-editor.css` *(Border-Radius Tokens)*
+
+Converted ~20 hardcoded `border-radius` values (px/rem) to `var(--radius-*)`.
+
+#### ~115 TSX/TS files *(Border-Radius Tokens)*
+
+Mechanical find-and-replace: `rounded-[Npx]` → standard Tailwind class (`rounded-[2px]`→`rounded-xs`, `rounded-[4px]`→`rounded-sm`, `rounded-[6px]`→`rounded-md`, `rounded-[8px]`→`rounded-lg`, `rounded-[10px]`→`rounded-xl`, `rounded-[12px]`→`rounded-xl`, `rounded-[16px]`→`rounded-2xl`). Standard Tailwind classes (`rounded-md`, `rounded-lg`, etc.) are **not** modified — Tailwind v4 already compiles them to `var(--radius-*)`.
+
+**Pattern:** Only files with hardcoded pixel values are touched. Conflicts arise only if upstream also changes the same `rounded-[Npx]` string.
+
 ### LOW Risk — Additive Changes
 
 These are simple additive changes (exports, types, config entries) unlikely to conflict.
@@ -246,7 +266,9 @@ When merging upstream updates:
 8. **If upstream changes default statuses**: ensure lite conditional logic covers new statuses
 9. **If upstream adds/removes/renames session tools**: check `LITE_EXCLUDED_TOOLS` in `tool-defs.ts` and update if needed
 10. **If upstream rewrites system prompt sections**: verify lite conditionals in `system.ts` still wrap the correct blocks (Browser Tools, Mermaid validation, Source Templates, Debug Mode, doc table rows)
-11. **After merge, run tests**: `bun test packages/shared/src/batches/` and `bun test packages/session-tools-core/`
+11. **If upstream adds new components with `rounded-[Npx]` patterns**: convert to standard Tailwind classes (`rounded-sm`, `rounded-md`, `rounded-lg`, etc.) so they flow through `--radius-*` CSS variables
+12. **If upstream modifies `:root` blocks in `index.css` or `packages/ui/src/styles/index.css`**: preserve our `--radius-xs` through `--radius-2xl` overrides
+13. **After merge, run tests**: `bun test packages/shared/src/batches/` and `bun test packages/session-tools-core/`
 
 ---
 

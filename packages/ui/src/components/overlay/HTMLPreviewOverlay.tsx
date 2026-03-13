@@ -189,7 +189,7 @@ export function HTMLPreviewOverlay({
         )}
         {processedHtml && (
           <div
-            className="bg-white rounded-[12px] overflow-hidden shadow-minimal mx-auto"
+            className="bg-white rounded-xl overflow-hidden shadow-minimal mx-auto"
             style={{
               maxWidth: contentSize?.width ? `${contentSize.width + 128}px` : undefined,
               padding: '24px 64px 36px',

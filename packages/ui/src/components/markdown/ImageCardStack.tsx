@@ -175,7 +175,7 @@ function StackImage({
     <motion.li
       className={cn(
         'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2',
-        'overflow-hidden rounded-[10px] bg-background will-change-transform',
+        'overflow-hidden rounded-xl bg-background will-change-transform',
         'shadow-[1px_3px_8px_rgba(0,0,0,0.28)]'
       )}
       style={{

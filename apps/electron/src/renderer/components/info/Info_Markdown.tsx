@@ -55,7 +55,7 @@ export function Info_Markdown({
           <button
             onClick={() => setIsFullscreen(true)}
             className={cn(
-              'absolute top-2 right-2 p-1 rounded-[6px] transition-all z-10',
+              'absolute top-2 right-2 p-1 rounded-md transition-all z-10',
               'opacity-0 group-hover:opacity-100',
               'bg-background shadow-minimal',
               'text-muted-foreground/50 hover:text-foreground',

@@ -34,7 +34,7 @@ export function AddWorkspaceContainer({ children, className }: AddWorkspaceConta
   return (
     <div className={cn(
       "flex w-[28rem] flex-col items-center",
-      "bg-background rounded-[20px] shadow-strong p-8",
+      "bg-background rounded-2xl shadow-strong p-8",
       className
     )}>
       {children}

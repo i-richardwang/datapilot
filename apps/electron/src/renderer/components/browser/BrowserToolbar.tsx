@@ -42,7 +42,7 @@ export function BrowserToolbar({
       showProgressBar={!compact}
       className={
         compact
-          ? 'h-auto px-1.5 py-0.5 rounded-[8px] border border-foreground/10 bg-background/70 min-w-0'
+          ? 'h-auto px-1.5 py-0.5 rounded-lg border border-foreground/10 bg-background/70 min-w-0'
           : 'h-auto px-2 py-1.5 border-b border-border bg-background/80'
       }
     />

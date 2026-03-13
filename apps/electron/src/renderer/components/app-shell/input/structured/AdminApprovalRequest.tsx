@@ -47,7 +47,7 @@ export function AdminApprovalRequest({
         'overflow-hidden h-full flex flex-col bg-info/5',
         unstyled
           ? 'border-0'
-          : 'border border-info/30 rounded-[8px] shadow-middle'
+          : 'border border-info/30 rounded-lg shadow-middle'
       )}
     >
       <div className="p-4 space-y-3 flex-1 min-h-0 flex flex-col">

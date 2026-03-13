@@ -68,7 +68,7 @@ function Calendar({
         ),
         // Individual dropdown wrapper (month or year)
         dropdown_root: cn(
-          'relative rounded-[5px] shadow-minimal',
+          'relative rounded-sm shadow-minimal',
           defaultClassNames.dropdown_root
         ),
         // The native <select> is visually hidden; the caption_label shows the displayed value

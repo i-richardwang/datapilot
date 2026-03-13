@@ -132,7 +132,7 @@ export function IslandFollowUpContentView({
           <div className="pl-[4px] text-sm font-medium">{title}</div>
         </div>
 
-        <div className="relative rounded-[8px] px-0 py-1">
+        <div className="relative rounded-lg px-0 py-1">
           <textarea
             ref={measureTextareaRef}
             aria-hidden="true"
@@ -198,7 +198,7 @@ export function IslandFollowUpContentView({
               <button
                 type="button"
                 onClick={onDelete}
-                className="h-8 px-3 rounded-[8px] text-sm bg-background shadow-minimal text-red-500 inline-flex items-center cursor-pointer hover:bg-foreground/2"
+                className="h-8 px-3 rounded-lg text-sm bg-background shadow-minimal text-red-500 inline-flex items-center cursor-pointer hover:bg-foreground/2"
               >
                 {deleteLabel}
               </button>
@@ -209,13 +209,13 @@ export function IslandFollowUpContentView({
             <button
               type="button"
               onClick={onCancel}
-              className="h-8 px-3 rounded-[8px] text-sm text-foreground/75 hover:bg-foreground/5"
+              className="h-8 px-3 rounded-lg text-sm text-foreground/75 hover:bg-foreground/5"
             >
               Cancel
             </button>
 
             {canSubmitAndSend ? (
-              <div className="inline-flex rounded-[8px] bg-background shadow-minimal overflow-hidden">
+              <div className="inline-flex rounded-lg bg-background shadow-minimal overflow-hidden">
                 <button
                   type="button"
                   disabled={isEmpty}
@@ -271,7 +271,7 @@ export function IslandFollowUpContentView({
 
                   onSubmit(value)
                 }}
-                className="h-8 px-3 rounded-[8px] text-sm bg-background shadow-minimal text-foreground inline-flex items-center cursor-pointer hover:bg-foreground/2 disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent"
+                className="h-8 px-3 rounded-lg text-sm bg-background shadow-minimal text-foreground inline-flex items-center cursor-pointer hover:bg-foreground/2 disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent"
               >
                 {isViewMode ? editLabel : submitLabel}
               </button>

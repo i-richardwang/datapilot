@@ -8,7 +8,7 @@ import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
-const alertVariants = cva('rounded-[8px] border', {
+const alertVariants = cva('rounded-lg border', {
   variants: {
     variant: {
       warning: 'bg-foreground/5 border-border/50',

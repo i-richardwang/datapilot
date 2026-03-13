@@ -321,7 +321,7 @@ function LabelBadge({
 /**
  * Renders the current workflow state as a badge in the dynamic stacking container.
  * Click opens a SessionStatusMenu popover for changing the state.
- * Styled consistently with label badges (h-[30px], rounded-[8px], color-mix tinting).
+ * Styled consistently with label badges (h-[30px], rounded-lg, color-mix tinting).
  */
 function StateBadge({
   state,
@@ -398,7 +398,7 @@ function FilesPopoverButton({ sessionId, sessionFolderPath }: { sessionId?: stri
         <button
           type="button"
           className={cn(
-            "h-[30px] pl-[12px] pr-[14px] text-xs font-medium rounded-[8px] flex items-center gap-1.5 shrink-0",
+            "h-[30px] pl-[12px] pr-[14px] text-xs font-medium rounded-lg flex items-center gap-1.5 shrink-0",
             "outline-none select-none transition-colors shadow-minimal",
             "hover:bg-foreground/5 data-[state=open]:bg-foreground/5",
             "bg-[color-mix(in_srgb,var(--background)_97%,var(--foreground)_3%)]",
@@ -410,7 +410,7 @@ function FilesPopoverButton({ sessionId, sessionFolderPath }: { sessionId?: stri
         </button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[360px] h-[460px] min-w-[200px] max-w-[420px] overflow-hidden rounded-[8px] bg-background text-foreground shadow-modal-small p-0"
+        className="w-[360px] h-[460px] min-w-[200px] max-w-[420px] overflow-hidden rounded-lg bg-background text-foreground shadow-modal-small p-0"
         side="top"
         align="end"
         sideOffset={6}
@@ -550,7 +550,7 @@ function PermissionModeDropdown({ permissionMode, onPermissionModeChange, sessio
           type="button"
           data-tutorial="permission-mode-dropdown"
           className={cn(
-            "h-[30px] pl-2.5 pr-2 text-xs font-medium rounded-[8px] flex items-center gap-1.5 shadow-tinted outline-none select-none",
+            "h-[30px] pl-2.5 pr-2 text-xs font-medium rounded-lg flex items-center gap-1.5 shadow-tinted outline-none select-none",
             currentStyle.className
           )}
           style={{ '--shadow-color': currentStyle.shadowVar } as React.CSSProperties}
@@ -561,7 +561,7 @@ function PermissionModeDropdown({ permissionMode, onPermissionModeChange, sessio
         </button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-auto p-0 rounded-[8px] bg-background text-foreground shadow-modal-small"
+        className="w-auto p-0 rounded-lg bg-background text-foreground shadow-modal-small"
         side="top"
         align="start"
         sideOffset={4}

@@ -72,7 +72,7 @@ export function PreviewHeaderBadge({
 }: PreviewHeaderBadgeProps) {
   const variantClasses = PREVIEW_BADGE_VARIANTS[variant]
   const baseClasses = cn(
-    'flex items-center gap-1.5 h-[26px] px-2.5 rounded-[6px] font-sans text-[13px] font-medium bg-background shadow-minimal',
+    'flex items-center gap-1.5 h-[26px] px-2.5 rounded-md font-sans text-[13px] font-medium bg-background shadow-minimal',
     variantClasses,
     className
   )
@@ -152,7 +152,7 @@ export function PreviewHeader({
           <button
             onClick={onClose}
             className={cn(
-              'p-1.5 rounded-[6px] bg-background shadow-minimal cursor-pointer',
+              'p-1.5 rounded-md bg-background shadow-minimal cursor-pointer',
               'opacity-70 hover:opacity-100 transition-opacity',
               'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring'
             )}

@@ -203,7 +203,7 @@ export function SortableList<T extends SortableItemData>({
         >
           {activeItem ? (
             <div
-              className="sortable-overlay rounded-[6px] bg-background"
+              className="sortable-overlay rounded-md bg-background"
               style={{
                 boxShadow: '0 0 0 1px rgba(63, 63, 68, 0.05), 0px 15px 15px 0 rgba(34, 33, 81, 0.25)',
               }}

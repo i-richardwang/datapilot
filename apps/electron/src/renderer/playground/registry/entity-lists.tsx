@@ -25,7 +25,7 @@ import type { SessionMeta } from '@/atoms/sessions'
 function MockAvatar({ icon: Icon, color, label }: { icon: React.ComponentType<{ className?: string }>; color: string; label: string }) {
   return (
     <div
-      className="w-5 h-5 rounded-[4px] ring-1 ring-border/30 shrink-0 flex items-center justify-center bg-muted"
+      className="w-5 h-5 rounded-sm ring-1 ring-border/30 shrink-0 flex items-center justify-center bg-muted"
       title={label}
     >
       <Icon className={cn("w-3 h-3", color)} />
@@ -414,7 +414,7 @@ function SkillEntityListPreview({
           <EntityRow
             icon={
               skill.icon ? (
-                <div className="w-5 h-5 rounded-[4px] ring-1 ring-border/30 shrink-0 flex items-center justify-center bg-muted text-sm leading-none">
+                <div className="w-5 h-5 rounded-sm ring-1 ring-border/30 shrink-0 flex items-center justify-center bg-muted text-sm leading-none">
                   {skill.icon}
                 </div>
               ) : (
@@ -542,7 +542,7 @@ function MixedEntityListPreview({
           <EntityRow
             icon={
               skill.icon ? (
-                <div className="w-5 h-5 rounded-[4px] ring-1 ring-border/30 shrink-0 flex items-center justify-center bg-muted text-sm leading-none">
+                <div className="w-5 h-5 rounded-sm ring-1 ring-border/30 shrink-0 flex items-center justify-center bg-muted text-sm leading-none">
                   {skill.icon}
                 </div>
               ) : (
@@ -720,7 +720,7 @@ function InteractiveEntityListPreview({
             {...rowProps}
             icon={
               item.emoji ? (
-                <div className="w-5 h-5 rounded-[4px] ring-1 ring-border/30 shrink-0 flex items-center justify-center bg-muted text-sm leading-none">
+                <div className="w-5 h-5 rounded-sm ring-1 ring-border/30 shrink-0 flex items-center justify-center bg-muted text-sm leading-none">
                   {item.emoji}
                 </div>
               ) : (

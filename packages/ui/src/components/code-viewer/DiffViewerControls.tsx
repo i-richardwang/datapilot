@@ -59,7 +59,7 @@ export function DiffViewerControls({
       <button
         type="button"
         onClick={() => onDiffStyleChange(diffStyle === 'unified' ? 'split' : 'unified')}
-        className="cursor-pointer p-1.5 rounded-[6px] bg-background shadow-minimal opacity-70 hover:opacity-100 transition-opacity"
+        className="cursor-pointer p-1.5 rounded-md bg-background shadow-minimal opacity-70 hover:opacity-100 transition-opacity"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         title={diffStyle === 'unified' ? 'Switch to split view' : 'Switch to unified view'}
         aria-label={diffStyle === 'unified' ? 'Switch to split view' : 'Switch to unified view'}
@@ -73,7 +73,7 @@ export function DiffViewerControls({
         type="button"
         onClick={() => onBackgroundChange(!disableBackground)}
         className={cn(
-          'cursor-pointer p-1.5 rounded-[6px] bg-background shadow-minimal transition-opacity',
+          'cursor-pointer p-1.5 rounded-md bg-background shadow-minimal transition-opacity',
           disableBackground ? 'opacity-40 hover:opacity-70' : 'opacity-70 hover:opacity-100'
         )}
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}

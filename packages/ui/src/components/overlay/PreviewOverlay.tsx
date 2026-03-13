@@ -198,7 +198,7 @@ export function PreviewOverlay({
           width: '90vw',
           maxWidth: OVERLAY_LAYOUT.modalMaxWidth,
           height: `${OVERLAY_LAYOUT.modalMaxHeightPercent}vh`,
-          borderRadius: 16,
+          borderRadius: 'var(--radius-2xl)',
         }}
       >
         {header}

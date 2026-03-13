@@ -984,7 +984,7 @@ export const ChatDisplay = React.forwardRef<ChatDisplayHandle, ChatDisplayProps>
             const markId = `${turnId}-match-${matchIdIndex}`
             mark.id = markId
             // All highlights start as passive (subtle 30% opacity yellow)
-            mark.className = 'search-highlight bg-yellow-300/30 rounded-[2px]'
+            mark.className = 'search-highlight bg-yellow-300/30 rounded-xs'
             mark.textContent = text.slice(matchStart, matchEnd)
             fragments.unshift(mark)
             createdMatchIds.push(markId)
@@ -2255,7 +2255,7 @@ function ErrorMessage({ message }: { message: Message }) {
     <div className="flex justify-start mt-4">
       {/* Subtle bg (3% opacity) + tinted shadow for softer error appearance */}
       <div
-        className="max-w-[80%] shadow-tinted rounded-[8px] pl-5 pr-4 pt-2 pb-2.5 break-words"
+        className="max-w-[80%] shadow-tinted rounded-lg pl-5 pr-4 pt-2 pb-2.5 break-words"
         style={{
           backgroundColor: 'oklch(from var(--destructive) l c h / 0.03)',
           '--shadow-color': 'var(--destructive-rgb)',
@@ -2322,7 +2322,7 @@ function MessageBubble({
   if (message.role === 'assistant') {
     return (
       <div className="flex justify-start group">
-        <div className="relative max-w-[90%] bg-background shadow-minimal rounded-[8px] pl-6 pr-4 py-3 break-words min-w-0 select-text">
+        <div className="relative max-w-[90%] bg-background shadow-minimal rounded-lg pl-6 pr-4 py-3 break-words min-w-0 select-text">
           {/* Pop-out button - visible on hover */}
           {onPopOut && !message.isStreaming && (
             <button
@@ -2418,7 +2418,7 @@ function MessageBubble({
   if (message.role === 'warning') {
     return (
       <div className="flex justify-start">
-        <div className="max-w-[80%] bg-info/10 rounded-[8px] pl-5 pr-4 pt-2 pb-2.5 break-words select-none">
+        <div className="max-w-[80%] bg-info/10 rounded-lg pl-5 pr-4 pt-2 pb-2.5 break-words select-none">
           <div className="text-xs text-info/50 mb-0.5 font-semibold">
             Warning
           </div>

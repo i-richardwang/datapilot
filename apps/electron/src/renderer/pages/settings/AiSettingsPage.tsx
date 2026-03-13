@@ -264,7 +264,7 @@ function ConnectionRow({ connection, isLastConnection, onRenameClick, onDelete, 
           <ConnectionIcon connection={connection} size={14} />
           <span>{connection.name}</span>
           {connection.isDefault && (
-            <span className="inline-flex items-center h-5 px-2 text-[11px] font-medium rounded-[4px] bg-background shadow-minimal text-foreground/60">
+            <span className="inline-flex items-center h-5 px-2 text-[11px] font-medium rounded-sm bg-background shadow-minimal text-foreground/60">
               Default
             </span>
           )}
@@ -1008,7 +1008,7 @@ export default function AiSettingsPage() {
                 >
                   <button
                     onClick={handleCloseApiSetup}
-                    className="p-1.5 rounded-[6px] transition-all bg-background shadow-minimal text-muted-foreground/50 hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="p-1.5 rounded-md transition-all bg-background shadow-minimal text-muted-foreground/50 hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     title="Close (Esc)"
                   >
                     <X className="w-3.5 h-3.5" />

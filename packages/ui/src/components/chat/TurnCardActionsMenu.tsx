@@ -43,7 +43,7 @@ export function TurnCardActionsMenu({
           role="button"
           tabIndex={0}
           className={cn(
-            "p-1 rounded-[6px] transition-opacity shrink-0",
+            "p-1 rounded-md transition-opacity shrink-0",
             "opacity-0 group-hover:opacity-100",
             "bg-background shadow-minimal",
             "text-muted-foreground/50 hover:text-foreground",

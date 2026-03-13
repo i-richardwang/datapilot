@@ -47,7 +47,7 @@ export function MentionBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 h-6 pl-1 pr-1.5 rounded-[6px]',
+        'inline-flex items-center gap-1.5 h-6 pl-1 pr-1.5 rounded-md',
         'bg-foreground/5 text-[12px] text-foreground',
         'transition-colors hover:bg-foreground/8',
         className
@@ -72,7 +72,7 @@ export function MentionBadge({
             e.stopPropagation()
             onRemove()
           }}
-          className="shrink-0 h-4 w-4 rounded-[3px] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/10 transition-colors"
+          className="shrink-0 h-4 w-4 rounded-xs flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-foreground/10 transition-colors"
         >
           <X className="h-3 w-3" />
         </button>

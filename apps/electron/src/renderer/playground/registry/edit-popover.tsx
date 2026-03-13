@@ -204,7 +204,7 @@ function CompactChatPreview({
           style={{
             width: size.width,
             height: size.height,
-            borderRadius: 16,
+            borderRadius: 'var(--radius-2xl)',
             transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)`,
           }}
         >

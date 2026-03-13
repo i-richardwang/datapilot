@@ -116,7 +116,7 @@ function Info_PageHeader({ className, ...props }: Info_PageHeaderProps) {
 function Info_PageHero({ avatar, title, tagline, className }: Info_PageHeroProps) {
   return (
     <div className={cn('flex items-start gap-3', className)}>
-      <div className="h-[32px] w-[32px] shrink-0 mt-[2px] rounded-[4px] ring-1 ring-border/30 overflow-hidden">
+      <div className="h-[32px] w-[32px] shrink-0 mt-[2px] rounded-sm ring-1 ring-border/30 overflow-hidden">
         {avatar}
       </div>
       <div className="flex-1 min-w-0">

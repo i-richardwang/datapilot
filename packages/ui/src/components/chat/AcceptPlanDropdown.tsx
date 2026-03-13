@@ -156,7 +156,7 @@ export function AcceptPlanDropdown({
         <button
           type="button"
           className={cn(
-            "h-[28px] pl-2.5 pr-2 text-xs font-medium rounded-[6px] flex items-center gap-1.5 transition-all",
+            "h-[28px] pl-2.5 pr-2 text-xs font-medium rounded-md flex items-center gap-1.5 transition-all",
             "bg-success/5 text-success hover:bg-success/10 shadow-tinted",
             className
           )}
@@ -179,7 +179,7 @@ export function AcceptPlanDropdown({
           ref={menuRef}
           className={cn(
             "fixed z-50 min-w-[280px] p-1.5",
-            "bg-background rounded-[8px] shadow-strong border border-border/50",
+            "bg-background rounded-lg shadow-strong border border-border/50",
             "animate-in fade-in-0 zoom-in-95 duration-100"
           )}
           style={{ top: position.top, left: position.left }}
@@ -189,7 +189,7 @@ export function AcceptPlanDropdown({
             type="button"
             onClick={handleSelectAccept}
             className={cn(
-              "flex flex-col w-full px-3 py-2 text-left rounded-[6px]",
+              "flex flex-col w-full px-3 py-2 text-left rounded-md",
               "hover:bg-foreground/[0.05] focus:bg-foreground/[0.05] focus:outline-none",
               "transition-colors"
             )}
@@ -205,7 +205,7 @@ export function AcceptPlanDropdown({
             type="button"
             onClick={handleSelectCompact}
             className={cn(
-              "flex flex-col w-full px-3 py-2 text-left rounded-[6px]",
+              "flex flex-col w-full px-3 py-2 text-left rounded-md",
               "hover:bg-foreground/[0.05] focus:bg-foreground/[0.05] focus:outline-none",
               "transition-colors"
             )}

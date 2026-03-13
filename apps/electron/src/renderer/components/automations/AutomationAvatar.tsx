@@ -72,7 +72,7 @@ export function AutomationAvatar({ event, size = 'md', fluid, className }: Autom
   return (
     <span
       className={cn(
-        'inline-flex items-center justify-center rounded-[4px] ring-1 ring-border/30 shrink-0',
+        'inline-flex items-center justify-center rounded-sm ring-1 ring-border/30 shrink-0',
         fluid ? 'h-full w-full' : sizes.container,
         config.bg,
         className

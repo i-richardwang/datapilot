@@ -194,7 +194,7 @@ const FileThumbnail = memo(function FileThumbnail({ file }: { file: SessionFile 
         onLoad={() => setLoaded(true)}
         onError={() => setFailed(true)}
         className={cn(
-          'absolute inset-0 h-full w-full rounded-[2px] object-cover transition-opacity duration-200',
+          'absolute inset-0 h-full w-full rounded-xs object-cover transition-opacity duration-200',
           loaded ? 'opacity-100' : 'opacity-0'
         )}
       />
@@ -263,7 +263,7 @@ function FileTreeItem({
       className={cn(
         // Base styles matching LeftSidebar exactly
         // min-w-0 and overflow-hidden required for truncation to work in grid context
-        "group flex w-full min-w-0 overflow-hidden items-center gap-2 rounded-[6px] py-[5px] text-[13px] select-none outline-none text-left",
+        "group flex w-full min-w-0 overflow-hidden items-center gap-2 rounded-md py-[5px] text-[13px] select-none outline-none text-left",
         "focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring",
         "hover:bg-sidebar-hover transition-colors",
         // Same padding for all items - nested indentation handled by container

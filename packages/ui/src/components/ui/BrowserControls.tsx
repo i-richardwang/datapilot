@@ -19,7 +19,7 @@ const NavButton = forwardRef<HTMLButtonElement, NavButtonProps>(
       type="button"
       disabled={disabled}
       className={cn(
-        'h-7 w-7 flex items-center justify-center rounded-[6px]',
+        'h-7 w-7 flex items-center justify-center rounded-md',
         'hover:bg-foreground/5 focus:outline-none focus-visible:ring-0',
         'disabled:opacity-30 disabled:pointer-events-none',
         'transition-colors duration-100',
@@ -249,7 +249,7 @@ export function BrowserControls({
           onKeyDown={handleKeyDown}
           placeholder="Enter URL or search…"
           className={cn(
-            'w-full rounded-[8px] bg-transparent px-3 pl-8 text-[13px] text-foreground/70 outline-none transition-all',
+            'w-full rounded-lg bg-transparent px-3 pl-8 text-[13px] text-foreground/70 outline-none transition-all',
             compact ? 'h-[28px]' : 'h-[30px]',
             !safeThemeColor && (isFocused
               ? 'bg-background border border-transparent shadow-minimal'

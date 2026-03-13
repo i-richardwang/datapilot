@@ -60,7 +60,7 @@ export const StyledContextMenuItem = React.forwardRef<
   <ContextMenuItem
     ref={ref}
     className={cn(
-      "gap-3 pr-4 rounded-[4px] hover:bg-foreground/[0.03] focus:bg-foreground/[0.03]",
+      "gap-3 pr-4 rounded-sm hover:bg-foreground/[0.03] focus:bg-foreground/[0.03]",
       "[&_svg]:size-auto [&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0",
       variant === "destructive" && "text-destructive focus:text-destructive hover:text-destructive [&_svg]:!text-destructive",
       className
@@ -94,7 +94,7 @@ export const StyledContextMenuSubTrigger = React.forwardRef<
   <ContextMenuSubTrigger
     ref={ref}
     className={cn(
-      "gap-3 pr-4 rounded-[4px] hover:bg-foreground/10 focus:bg-foreground/10 data-[state=open]:bg-foreground/10",
+      "gap-3 pr-4 rounded-sm hover:bg-foreground/10 focus:bg-foreground/10 data-[state=open]:bg-foreground/10",
       "[&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0",
       className
     )}

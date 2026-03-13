@@ -80,7 +80,7 @@ function EntityIconComponent({
   const sizeClass = containerClassName ?? ICON_SIZE_CLASSES[size]
 
   // Standard container styling (ring + rounded + shrink-0)
-  const containerBase = 'rounded-[4px] ring-1 ring-border/30 shrink-0'
+  const containerBase = 'rounded-sm ring-1 ring-border/30 shrink-0'
 
   // --- Emoji rendering ---
   if (icon.kind === 'emoji') {
@@ -141,7 +141,7 @@ function EntityIconComponent({
         src={icon.value}
         alt={alt}
         className={cn(sizeClass, !chromeless && containerBase, className)}
-        fallbackClassName={!chromeless ? "bg-muted rounded-[4px]" : undefined}
+        fallbackClassName={!chromeless ? "bg-muted rounded-sm" : undefined}
         fallback={fallbackNode}
       />
     )
@@ -172,7 +172,7 @@ function EntityIconComponent({
       src={null}
       alt={alt}
       className={cn(sizeClass, !chromeless && containerBase, className)}
-      fallbackClassName={!chromeless ? "bg-muted rounded-[4px]" : undefined}
+      fallbackClassName={!chromeless ? "bg-muted rounded-sm" : undefined}
       fallback={<FallbackIcon className="w-full h-full text-muted-foreground p-0.5" />}
     />
   )

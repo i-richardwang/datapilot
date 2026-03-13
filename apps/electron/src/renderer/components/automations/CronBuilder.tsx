@@ -240,7 +240,7 @@ export function CronBuilder({
       </div>
 
       {/* Summary */}
-      <div className="bg-background shadow-minimal rounded-[8px] p-4 space-y-3">
+      <div className="bg-background shadow-minimal rounded-lg p-4 space-y-3">
         {/* Human-readable description */}
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" />

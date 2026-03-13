@@ -64,7 +64,7 @@ export const BrowserTabBadge = forwardRef<HTMLButtonElement, BrowserTabBadgeProp
           <Spinner className="text-[9px] leading-none" />
         ) : instance.favicon && !faviconFailed ? (
           isDarkThemeColor ? (
-            <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-[4px] bg-white/90 p-[1px] leading-none">
+            <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-sm bg-white/90 p-[1px] leading-none">
               <img
                 src={instance.favicon}
                 alt=""

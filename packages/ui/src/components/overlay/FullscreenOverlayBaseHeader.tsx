@@ -77,7 +77,7 @@ const contextMenuContentClasses = cn(
 const contextMenuItemClasses = cn(
   'relative flex cursor-default items-center gap-2 px-2 py-1.5 text-sm outline-hidden select-none',
   '[&_svg]:pointer-events-none [&_svg]:shrink-0',
-  'pr-4 rounded-[4px] hover:bg-foreground/[0.03] focus:bg-foreground/[0.03]',
+  'pr-4 rounded-sm hover:bg-foreground/[0.03] focus:bg-foreground/[0.03]',
   '[&>svg]:h-3.5 [&>svg]:w-3.5 [&>svg]:shrink-0'
 )
 
@@ -163,7 +163,7 @@ function FilePathBadge({ filePath }: FilePathBadgeProps) {
             {/* Badge that responds to left-click (dropdown) and right-click (context menu) */}
             <button
               className={cn(
-                'flex items-center gap-1.5 h-[26px] px-2.5 rounded-[6px]',
+                'flex items-center gap-1.5 h-[26px] px-2.5 rounded-md',
                 'font-sans text-[13px] font-medium text-foreground/70',
                 'bg-background shadow-minimal',
                 'min-w-0 cursor-pointer group'
@@ -221,7 +221,7 @@ export function FullscreenOverlayBaseHeader({
         <button
           onClick={handleCopy}
           className={cn(
-            'p-1.5 rounded-[6px] bg-background shadow-minimal cursor-pointer',
+            'p-1.5 rounded-md bg-background shadow-minimal cursor-pointer',
             'opacity-70 hover:opacity-100 transition-opacity',
             'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring'
           )}

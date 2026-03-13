@@ -94,7 +94,7 @@ function SettingsItemRow({ item, isSelected, isFirst, onSelect }: SettingsItemRo
           type="button"
           onClick={onSelect}
           className={cn(
-            'flex w-full items-start gap-2 pl-2 pr-4 py-3 text-left text-sm outline-none rounded-[8px]',
+            'flex w-full items-start gap-2 pl-2 pr-4 py-3 text-left text-sm outline-none rounded-lg',
             // Fast hover transition (75ms vs default 150ms)
             'transition-[background-color] duration-75',
             isSelected
@@ -126,7 +126,7 @@ function SettingsItemRow({ item, isSelected, isFirst, onSelect }: SettingsItemRo
             menuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
           )}
         >
-          <div className="flex items-center rounded-[8px] overflow-hidden border border-transparent hover:border-border/50">
+          <div className="flex items-center rounded-lg overflow-hidden border border-transparent hover:border-border/50">
             <DropdownMenu modal={true} onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <div className="p-1.5 hover:bg-foreground/10 data-[state=open]:bg-foreground/10 cursor-pointer">

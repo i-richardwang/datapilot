@@ -403,7 +403,7 @@ export function ApiKeyInput({
           <DropdownMenu>
             <DropdownMenuTrigger
               disabled={isDisabled}
-              className="flex h-6 items-center gap-1 rounded-[6px] bg-background shadow-minimal pl-2.5 pr-2 text-[12px] font-medium text-foreground/50 hover:bg-foreground/5 hover:text-foreground focus:outline-none"
+              className="flex h-6 items-center gap-1 rounded-md bg-background shadow-minimal pl-2.5 pr-2 text-[12px] font-medium text-foreground/50 hover:bg-foreground/5 hover:text-foreground focus:outline-none"
             >
               {presets.find(p => p.key === activePreset)?.label}
               <ChevronDown className="size-2.5 opacity-50" />
@@ -529,7 +529,7 @@ export function ApiKeyInput({
                     onClick={() => { setOpenTier(null); setTierFilter('') }}
                   />
                   <div
-                    className="fixed z-floating-menu min-w-[200px] overflow-hidden rounded-[8px] bg-background text-foreground shadow-modal-small"
+                    className="fixed z-floating-menu min-w-[200px] overflow-hidden rounded-lg bg-background text-foreground shadow-modal-small"
                     style={{
                       top: tierDropdownPosition.top,
                       left: tierDropdownPosition.left,
@@ -563,7 +563,7 @@ export function ApiKeyInput({
                                 setTierFilter('')
                               }}
                               className={cn(
-                                "flex cursor-pointer select-none items-center justify-between gap-3 rounded-[6px] px-3 py-2 text-[13px]",
+                                "flex cursor-pointer select-none items-center justify-between gap-3 rounded-md px-3 py-2 text-[13px]",
                                 "outline-none data-[selected=true]:bg-foreground/5"
                               )}
                             >

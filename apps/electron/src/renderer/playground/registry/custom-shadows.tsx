@@ -27,7 +27,7 @@ const activeShadowSpecs: ShadowSpec[] = [
     shadow: "boxShadow: '0 0 0 1px rgba(...), 0 15px 15px ...'",
     border: 'none (1px edge is included inside boxShadow first layer)',
     hasExplicitBorder: false,
-    previewClassName: 'rounded-[8px] bg-background px-3 py-2 text-sm',
+    previewClassName: 'rounded-lg bg-background px-3 py-2 text-sm',
     previewStyle: { boxShadow: '0 0 0 1px rgba(63, 63, 68, 0.05), 0px 15px 15px 0 rgba(34, 33, 81, 0.25)' },
   },
   {
@@ -49,7 +49,7 @@ const activeShadowSpecs: ShadowSpec[] = [
     shadow: 'shadow-[1px_3px_8px_rgba(0,0,0,0.28)]',
     border: 'none (card depth comes entirely from arbitrary shadow)',
     hasExplicitBorder: false,
-    previewClassName: 'rounded-[8px] bg-background px-3 py-2 text-sm shadow-[1px_3px_8px_rgba(0,0,0,0.28)]',
+    previewClassName: 'rounded-lg bg-background px-3 py-2 text-sm shadow-[1px_3px_8px_rgba(0,0,0,0.28)]',
   },
 ]
 
@@ -63,7 +63,7 @@ const runtimeShadowSpecs: ShadowSpec[] = [
     border: "runtime class: 'border border-foreground/20' on overlay element",
     hasExplicitBorder: true,
     note: 'Main-process runtime overlay for browser live mode (not a React component).',
-    previewClassName: 'rounded-[10px] bg-background px-3 py-2 text-sm border border-foreground/20',
+    previewClassName: 'rounded-xl bg-background px-3 py-2 text-sm border border-foreground/20',
     previewStyle: { boxShadow: 'inset 0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent), inset 0 0 20px color-mix(in oklab, var(--accent) 28%, transparent)' },
   },
 ]
@@ -79,7 +79,7 @@ function ValueBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="space-y-1">
       <div className="text-[10px] uppercase tracking-wide text-foreground/50">{label}</div>
-      <div className="rounded-[8px] bg-foreground/3 p-2 text-[11px] text-foreground/70 font-mono leading-snug break-words">
+      <div className="rounded-lg bg-foreground/3 p-2 text-[11px] text-foreground/70 font-mono leading-snug break-words">
         {value}
       </div>
     </div>
@@ -90,7 +90,7 @@ function BorderBadge({ hasExplicitBorder }: { hasExplicitBorder: boolean }) {
   return (
     <span
       className={cn(
-        'shrink-0 rounded-[6px] px-1.5 py-0.5 text-[10px] font-medium',
+        'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium',
         hasExplicitBorder ? 'bg-success/10 text-success' : 'bg-foreground/10 text-foreground/70'
       )}
     >
@@ -101,7 +101,7 @@ function BorderBadge({ hasExplicitBorder }: { hasExplicitBorder: boolean }) {
 
 function ShadowSpecCard({ spec }: { spec: ShadowSpec }) {
   return (
-    <div className="rounded-[10px] border border-border bg-background p-3 space-y-2">
+    <div className="rounded-xl border border-border bg-background p-3 space-y-2">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-sm font-medium truncate">{spec.component}</div>
@@ -109,7 +109,7 @@ function ShadowSpecCard({ spec }: { spec: ShadowSpec }) {
         </div>
         <div className="flex items-center gap-1.5">
           <BorderBadge hasExplicitBorder={spec.hasExplicitBorder} />
-          <span className={cn('shrink-0 rounded-[6px] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide', kindBadgeClass[spec.kind])}>
+          <span className={cn('shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide', kindBadgeClass[spec.kind])}>
             {spec.kind}
           </span>
         </div>
@@ -118,7 +118,7 @@ function ShadowSpecCard({ spec }: { spec: ShadowSpec }) {
       <ValueBlock label="Shadow" value={spec.shadow} />
       <ValueBlock label="Border" value={spec.border} />
 
-      <div className="rounded-[8px] bg-foreground/2 p-3">
+      <div className="rounded-lg bg-foreground/2 p-3">
         <div className={cn('w-full flex items-center', spec.previewClassName)} style={spec.previewStyle}>
           Shadow + border preview
         </div>
@@ -151,7 +151,7 @@ function Section({
         {filteredSpecs.map((spec) => <ShadowSpecCard key={spec.id} spec={spec} />)}
       </div>
       {filteredSpecs.length === 0 && (
-        <div className="rounded-[8px] border border-border bg-foreground/2 p-3 text-sm text-foreground/60">
+        <div className="rounded-lg border border-border bg-foreground/2 p-3 text-sm text-foreground/60">
           No items in this section match the current filter.
         </div>
       )}
@@ -180,7 +180,7 @@ function CustomShadowsAudit() {
           type="button"
           onClick={() => setShadowOnly(false)}
           className={cn(
-            'h-7 px-2.5 rounded-[6px] text-xs font-medium transition-colors',
+            'h-7 px-2.5 rounded-md text-xs font-medium transition-colors',
             !shadowOnly ? 'bg-background shadow-minimal text-foreground' : 'bg-foreground/5 text-foreground/70 hover:bg-foreground/10'
           )}
         >
@@ -190,7 +190,7 @@ function CustomShadowsAudit() {
           type="button"
           onClick={() => setShadowOnly(true)}
           className={cn(
-            'h-7 px-2.5 rounded-[6px] text-xs font-medium transition-colors',
+            'h-7 px-2.5 rounded-md text-xs font-medium transition-colors',
             shadowOnly ? 'bg-background shadow-minimal text-foreground' : 'bg-foreground/5 text-foreground/70 hover:bg-foreground/10'
           )}
         >
@@ -227,7 +227,7 @@ const allowedShadowVariants: AllowedShadowVariant[] = [
 function VariantPreview({ variant }: { variant: AllowedShadowVariant }) {
   if (variant.className === 'shadow-bottom-border' || variant.className === 'shadow-bottom-border-thin') {
     return (
-      <div className="rounded-[8px] border border-border bg-background overflow-hidden">
+      <div className="rounded-lg border border-border bg-background overflow-hidden">
         <div className={cn('px-3 py-2 text-sm', variant.className)}>Row 1</div>
         <div className={cn('px-3 py-2 text-sm', variant.className)}>Row 2</div>
         <div className="px-3 py-2 text-sm">Last row (no separator)</div>
@@ -240,8 +240,8 @@ function VariantPreview({ variant }: { variant: AllowedShadowVariant }) {
     : undefined
 
   return (
-    <div className="rounded-[8px] bg-foreground/2 p-4">
-      <div className={cn('rounded-[8px] bg-background px-3 py-2 text-sm', variant.className)} style={style}>
+    <div className="rounded-lg bg-foreground/2 p-4">
+      <div className={cn('rounded-lg bg-background px-3 py-2 text-sm', variant.className)} style={style}>
         Preview surface
       </div>
     </div>
@@ -261,7 +261,7 @@ function ShadowShowcase() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {allowedShadowVariants.map((variant) => (
-          <div key={variant.className} className="rounded-[10px] border border-border bg-background p-3 space-y-2">
+          <div key={variant.className} className="rounded-xl border border-border bg-background p-3 space-y-2">
             <div className="space-y-1">
               <div className="text-sm font-medium">{variant.className}</div>
               <div className="text-[11px] text-foreground/60">{variant.note}</div>

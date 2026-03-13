@@ -122,7 +122,7 @@
 /* Inline code */
 .tiptap-editor .tiptap-prose code {
   padding: 0 0.25rem;
-  border-radius: 0.25rem;
+  border-radius: var(--radius-sm);
   background: color-mix(in oklch, var(--foreground) 4%, transparent);
   font-family: var(--font-mono);
   font-size: 13px;
@@ -131,7 +131,7 @@
 /* Code blocks */
 .tiptap-editor .tiptap-prose pre {
   margin: 0.5rem 0;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-lg);
   background: color-mix(in oklch, var(--foreground) 3%, transparent);
   padding: 0.75rem;
   overflow-x: auto;
@@ -176,7 +176,7 @@
   align-items: center;
   gap: 0.25rem;
   min-height: 24px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: none;
   background: var(--background);
   box-shadow: var(--shadow-minimal);
@@ -239,7 +239,7 @@
   max-width: 100%;
   height: auto;
   margin: 0.75rem 0;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-lg);
 }
 
 /* Official TipTap image loading placeholder (no custom node-view) */
@@ -290,7 +290,7 @@
    under rounded code blocks. Keep wrapper transparent and clip to rounded corners. */
 .tiptap-editor .tiptap-prose .node-codeBlock.shiki {
   background: transparent !important;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
@@ -306,7 +306,7 @@
 
 .tiptap-editor .tiptap-mermaid-block {
   margin: 0.5rem 0;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
@@ -314,7 +314,7 @@
 .tiptap-editor .tiptap-latex-block {
   margin: 0.5rem 0;
   padding: 0.5rem 0;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-lg);
 }
 
 /* ── Bubble menu toolbar ── */
@@ -323,7 +323,7 @@
   align-items: center;
   gap: 2px;
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--background);
   border: none;
   box-shadow: var(--shadow-modal-small);
@@ -336,7 +336,7 @@
   min-width: 320px;
   max-width: 480px;
   padding: 6px;
-  border-radius: 10px;
+  border-radius: var(--radius-xl);
 }
 
 .tiptap-bubble-btn {
@@ -345,7 +345,7 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   border: none;
   cursor: pointer;
   background: transparent;
@@ -395,7 +395,7 @@
   border: none;
   cursor: pointer;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   box-shadow: var(--shadow-minimal);
   transition: background-color 0.1s, color 0.1s;
 }
@@ -406,7 +406,7 @@
 }
 
 .tiptap-bubble-textarea-shell {
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--foreground-2);
   box-shadow: var(--shadow-minimal);
   transition: background-color 0.1s;
@@ -423,7 +423,7 @@
   color: var(--foreground);
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 8px;
   resize: vertical;
   min-height: 80px;
@@ -452,7 +452,7 @@
 /* Clickable inline math nodes in editable mode */
 .tiptap-mathematics-render--editable {
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   transition: background-color 0.1s;
 }
 
@@ -503,7 +503,7 @@
 .is-selected .tiptap-latex-block {
   outline: var(--tiptap-image-selection-width) solid var(--tiptap-image-selection-color);
   outline-offset: 2px;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-lg);
   background: color-mix(in oklch, var(--accent) 5%, transparent);
 }
 
@@ -513,13 +513,13 @@
 .tiptap-editor .tiptap-prose .is-selected img {
   outline: var(--tiptap-image-selection-width) solid var(--tiptap-image-selection-color);
   outline-offset: 2px;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-lg);
 }
 
 .tiptap-mathematics-render--editable.is-selected,
 .is-selected .tiptap-mathematics-render--editable {
   background: color-mix(in oklch, var(--accent) 15%, transparent);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 
 /* ── Slash command menu ── */
@@ -530,7 +530,7 @@
   max-width: min(300px, calc(100vw - 32px));
   max-height: 320px;
   overflow: auto;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 4px;
   font-family: var(--font-sans);
 }
@@ -563,7 +563,7 @@
   gap: 8px;
   width: 100%;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: transparent;
   cursor: default;
   padding: 6px 8px;

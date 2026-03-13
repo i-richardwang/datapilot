@@ -189,7 +189,7 @@ export function MarkdownMermaidBlock({ code, className, showExpandButton = true,
           <button
             onClick={() => setIsFullscreen(true)}
             className={cn(
-              "absolute top-2 right-2 p-1 rounded-[6px] transition-all z-10 select-none",
+              "absolute top-2 right-2 p-1 rounded-md transition-all z-10 select-none",
               "opacity-0 group-hover:opacity-100",
               "bg-background shadow-minimal",
               "text-muted-foreground/50 hover:text-foreground",

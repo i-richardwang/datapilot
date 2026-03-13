@@ -143,7 +143,7 @@ export function SessionItem({
       titleTrailing={hasMatch ? (
         <span
           className={cn(
-            "inline-flex items-center justify-center min-w-[24px] px-1 py-0.5 rounded-[6px] text-[10px] font-medium tabular-nums leading-tight whitespace-nowrap shadow-tinted",
+            "inline-flex items-center justify-center min-w-[24px] px-1 py-0.5 rounded-md text-[10px] font-medium tabular-nums leading-tight whitespace-nowrap shadow-tinted",
             isSelected
               ? "bg-yellow-300/50 border border-yellow-500 text-yellow-900"
               : "bg-yellow-300/10 border border-yellow-600/20 text-yellow-800"

@@ -41,12 +41,12 @@ export function ConnectionIcon({ connection, size = 16, className = '', showTool
       alt=""
       width={size}
       height={size}
-      className={`rounded-[3px] flex-shrink-0 ${className}`}
+      className={`rounded-xs flex-shrink-0 ${className}`}
       style={{ width: size, height: size }}
     />
   ) : (
     <div
-      className={`rounded-[3px] bg-foreground/10 flex items-center justify-center flex-shrink-0 ${className}`}
+      className={`rounded-xs bg-foreground/10 flex items-center justify-center flex-shrink-0 ${className}`}
       style={{ width: size, height: size }}
     >
       <Brain

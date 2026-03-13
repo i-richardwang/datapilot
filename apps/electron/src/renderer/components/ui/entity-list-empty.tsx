@@ -44,7 +44,7 @@ export function EntityListEmptyScreen({
           {docKey && (
             <button
               onClick={() => window.electronAPI.openUrl(getDocUrl(docKey))}
-              className="inline-flex items-center h-7 px-3 text-xs font-medium rounded-[8px] bg-foreground/[0.02] shadow-minimal hover:bg-foreground/[0.05] transition-colors"
+              className="inline-flex items-center h-7 px-3 text-xs font-medium rounded-lg bg-foreground/[0.02] shadow-minimal hover:bg-foreground/[0.05] transition-colors"
             >
               Learn more
             </button>

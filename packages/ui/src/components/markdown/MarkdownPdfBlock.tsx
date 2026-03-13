@@ -167,7 +167,7 @@ export function MarkdownPdfBlock({ code, className, onCreateRegionAnnotation: _o
 
   return (
     <PdfBlockErrorBoundary fallback={fallback}>
-      <div className={cn('relative group rounded-[8px] overflow-hidden border bg-muted/10', className)}>
+      <div className={cn('relative group rounded-lg overflow-hidden border bg-muted/10', className)}>
         {/* Header */}
         <div className="px-3 py-2 bg-muted/50 border-b flex items-center gap-2">
           <FileText className="w-3.5 h-3.5 text-muted-foreground/50" />
@@ -179,7 +179,7 @@ export function MarkdownPdfBlock({ code, className, onCreateRegionAnnotation: _o
             <button
               onClick={() => setIsFullscreen(true)}
               className={cn(
-                "p-1 rounded-[6px] transition-all select-none",
+                "p-1 rounded-md transition-all select-none",
                 "bg-background shadow-minimal",
                 "text-muted-foreground/50 hover:text-foreground",
                 "focus:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:opacity-100",

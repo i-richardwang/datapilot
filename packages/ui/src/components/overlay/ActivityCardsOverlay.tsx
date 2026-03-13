@@ -98,7 +98,7 @@ export function ActivityCardsOverlay({
         <ContentFrame title={card.label}>
           <div className="flex-1 overflow-y-auto min-h-0 p-4 space-y-4">
             {isInputCard && commandPreview && (
-              <div className="bg-background shadow-minimal rounded-[8px] px-4 py-3 font-mono">
+              <div className="bg-background shadow-minimal rounded-lg px-4 py-3 font-mono">
                 <div className="text-xs font-semibold text-muted-foreground/70 mb-1">Command</div>
                 <div className="text-sm text-foreground overflow-x-auto">
                   <span className="text-muted-foreground select-none">$ </span>

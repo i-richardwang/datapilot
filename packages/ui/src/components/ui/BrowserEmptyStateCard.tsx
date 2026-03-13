@@ -24,7 +24,7 @@ export function BrowserEmptyStateCard({
 }: BrowserEmptyStateCardProps) {
   return (
     <div className="w-full h-full flex items-center justify-center p-8">
-      <div className="w-full max-w-[700px] bg-background shadow-minimal rounded-[8px] overflow-hidden border border-border/30">
+      <div className="w-full max-w-[700px] bg-background shadow-minimal rounded-lg overflow-hidden border border-border/30">
         <div className="px-4 py-3 border-b border-border/30 flex items-center bg-muted/20 select-none">
           <h3 className="text-[13px] font-medium text-foreground tracking-tight">
             {title}
@@ -44,7 +44,7 @@ export function BrowserEmptyStateCard({
                   type="button"
                   title={sample.full}
                   onClick={() => onPromptSelect?.(sample)}
-                  className="w-fit max-w-full flex items-center gap-1 h-8 px-2.5 rounded-[6px] bg-background shadow-minimal hover:bg-foreground/[0.03] transition-colors text-left cursor-pointer"
+                  className="w-fit max-w-full flex items-center gap-1 h-8 px-2.5 rounded-md bg-background shadow-minimal hover:bg-foreground/[0.03] transition-colors text-left cursor-pointer"
                 >
                   <span className="w-4 shrink-0 text-[11px] text-foreground/40 tabular-nums">{index + 1}.</span>
                   <span className="truncate text-[12px] text-foreground/70">{sample.short}</span>

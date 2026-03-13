@@ -163,7 +163,7 @@ export function highlightMatch(text: string, query: string): React.ReactNode {
 
   return React.createElement(React.Fragment, null,
     before,
-    React.createElement('span', { className: 'bg-yellow-300/30 rounded-[2px]' }, match),
+    React.createElement('span', { className: 'bg-yellow-300/30 rounded-xs' }, match),
     highlightMatch(after, query),
   )
 }

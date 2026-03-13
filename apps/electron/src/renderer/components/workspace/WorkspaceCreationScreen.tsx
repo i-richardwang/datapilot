@@ -156,7 +156,7 @@ export function WorkspaceCreationScreen({
             }}
             disabled={isCreating}
             className={cn(
-              "titlebar-no-drag flex items-center justify-center p-2 rounded-[6px]",
+              "titlebar-no-drag flex items-center justify-center p-2 rounded-md",
               "bg-background shadow-minimal hover:bg-foreground-5",
               "text-muted-foreground hover:text-foreground",
               "transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",

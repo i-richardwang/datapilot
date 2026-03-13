@@ -40,7 +40,7 @@ function isEditRequestBadge(badge: ContentBadge): boolean {
 function EditRequestBadge({ badge }: { badge: ContentBadge }) {
   const displayLabel = badge.collapsedLabel || badge.label
   return (
-    <span className="inline-flex items-center h-[28px] px-2.5 rounded-[8px] bg-background shadow-minimal text-[13px] text-muted-foreground">
+    <span className="inline-flex items-center h-[28px] px-2.5 rounded-lg bg-background shadow-minimal text-[13px] text-muted-foreground">
       {displayLabel}
     </span>
   )
@@ -53,17 +53,17 @@ function EditRequestBadge({ badge }: { badge: ContentBadge }) {
 function InlineBadge({ badge }: { badge: ContentBadge }) {
   return (
     <span
-      className="inline-flex items-center gap-1 h-[22px] px-1.5 mx-0.5 rounded-[5px] bg-background shadow-minimal text-[12px] align-middle"
+      className="inline-flex items-center gap-1 h-[22px] px-1.5 mx-0.5 rounded-sm bg-background shadow-minimal text-[12px] align-middle"
       style={{ verticalAlign: 'middle', transform: 'translateY(-1px)' }}
     >
       {badge.iconDataUrl ? (
         <img
           src={badge.iconDataUrl}
           alt=""
-          className="h-[12px] w-[12px] rounded-[2px] shrink-0"
+          className="h-[12px] w-[12px] rounded-xs shrink-0"
         />
       ) : (
-        <span className="h-[12px] w-[12px] rounded-[2px] bg-foreground/5 flex items-center justify-center text-foreground/50 shrink-0 text-[8px]">
+        <span className="h-[12px] w-[12px] rounded-xs bg-foreground/5 flex items-center justify-center text-foreground/50 shrink-0 text-[8px]">
           {badge.type === 'skill' ? SKILL_ICON_TEXT : badge.type === 'context' ? CONTEXT_ICON_TEXT : SOURCE_ICON_TEXT}
         </span>
       )}
@@ -79,10 +79,10 @@ function InlineBadge({ badge }: { badge: ContentBadge }) {
 function CommandBadge({ badge }: { badge: ContentBadge }) {
   return (
     <span
-      className="inline-flex items-center gap-1 h-[22px] px-1.5 mx-0.5 rounded-[5px] bg-background shadow-minimal text-[12px] align-middle"
+      className="inline-flex items-center gap-1 h-[22px] px-1.5 mx-0.5 rounded-sm bg-background shadow-minimal text-[12px] align-middle"
       style={{ verticalAlign: 'middle', transform: 'translateY(-1px)' }}
     >
-      <span className="h-[12px] w-[12px] rounded-[2px] bg-foreground/5 flex items-center justify-center text-foreground/50 shrink-0 text-[10px] font-medium">
+      <span className="h-[12px] w-[12px] rounded-xs bg-foreground/5 flex items-center justify-center text-foreground/50 shrink-0 text-[10px] font-medium">
         {COMMAND_ICON_TEXT}
       </span>
       <span className="truncate max-w-[200px]">{badge.label}</span>
@@ -100,11 +100,11 @@ function ContextBadge({ badge }: { badge: ContentBadge }) {
 
   return (
     <span
-      className="inline-flex items-center gap-1 h-[22px] px-1.5 mr-1 rounded-[5px] bg-background shadow-minimal text-[12px] align-middle"
+      className="inline-flex items-center gap-1 h-[22px] px-1.5 mr-1 rounded-sm bg-background shadow-minimal text-[12px] align-middle"
       style={{ verticalAlign: 'middle', transform: 'translateY(-1px)' }}
       title="Context badge"
     >
-      <span className="h-[12px] w-[12px] rounded-[2px] bg-foreground/5 flex items-center justify-center text-foreground/50 shrink-0 text-[8px]">
+      <span className="h-[12px] w-[12px] rounded-xs bg-foreground/5 flex items-center justify-center text-foreground/50 shrink-0 text-[8px]">
         {CONTEXT_ICON_TEXT}
       </span>
       <span className="truncate max-w-[200px] text-muted-foreground">{displayLabel}</span>
@@ -178,7 +178,7 @@ function InlineFileBadge({
       role={isClickable ? 'button' : undefined}
       onClick={() => isClickable && onFileClick!(badge.filePath!)}
       className={cn(
-        "inline-flex items-center gap-1 h-[22px] px-1.5 mx-0.5 rounded-[5px] bg-background shadow-minimal text-[12px] align-middle",
+        "inline-flex items-center gap-1 h-[22px] px-1.5 mx-0.5 rounded-sm bg-background shadow-minimal text-[12px] align-middle",
         isClickable && "hover:bg-foreground/5 transition-colors cursor-pointer"
       )}
       style={{ verticalAlign: 'middle', transform: 'translateY(-1px)' }}
@@ -370,7 +370,7 @@ export function UserMessageBubble({
               >
                 {isImage ? (
                   /* IMAGE: Square thumbnail only */
-                  <div className="h-14 w-14 rounded-[8px] overflow-hidden bg-background shadow-minimal">
+                  <div className="h-14 w-14 rounded-lg overflow-hidden bg-background shadow-minimal">
                     {hasThumbnail ? (
                       <img
                         src={`data:image/png;base64,${att.thumbnailBase64}`}
@@ -385,8 +385,8 @@ export function UserMessageBubble({
                   </div>
                 ) : (
                   /* DOCUMENT: Bubble with thumbnail/icon + 2-line text */
-                  <div className="flex items-center gap-2.5 rounded-[8px] bg-user-message-bubble pl-1.5 pr-3 py-1.5">
-                    <div className="h-11 w-8 rounded-[6px] overflow-hidden bg-background shadow-minimal flex items-center justify-center shrink-0">
+                  <div className="flex items-center gap-2.5 rounded-lg bg-user-message-bubble pl-1.5 pr-3 py-1.5">
+                    <div className="h-11 w-8 rounded-md overflow-hidden bg-background shadow-minimal flex items-center justify-center shrink-0">
                       {hasThumbnail ? (
                         <img
                           src={`data:image/png;base64,${att.thumbnailBase64}`}
@@ -425,7 +425,7 @@ export function UserMessageBubble({
       {/* Text content bubble */}
       <div
         className={cn(
-          "max-w-[80%] bg-user-message-bubble rounded-[16px] break-words min-w-0 select-text [&_p]:m-0",
+          "max-w-[80%] bg-user-message-bubble rounded-2xl break-words min-w-0 select-text [&_p]:m-0",
           compactMode ? "px-4 py-2" : "px-5 py-3.5",
           isPending && "animate-shimmer"
         )}

@@ -785,7 +785,7 @@ function PlannerBoard() {
                 key={p.id}
                 onClick={() => setActiveProjectId(p.id)}
                 className={cn(
-                  'w-full rounded-[10px] px-2.5 py-2 text-left transition-colors',
+                  'w-full rounded-xl px-2.5 py-2 text-left transition-colors',
                   p.id === project.id
                     ? 'bg-foreground/10 text-foreground'
                     : 'text-foreground/65 hover:bg-foreground/5 hover:text-foreground'
@@ -799,7 +799,7 @@ function PlannerBoard() {
       </aside>
 
       <section
-        className="bg-background shadow-middle rounded-[10px] overflow-hidden shrink-0 flex flex-col"
+        className="bg-background shadow-middle rounded-xl overflow-hidden shrink-0 flex flex-col"
         style={{ width: navigatorWidth }}
       >
           <div className="border-b border-border/60 px-5 py-3">
@@ -831,7 +831,7 @@ function PlannerBoard() {
             >
               <div
                 ref={flatListRef}
-                className="flex flex-col gap-1.5 rounded-[10px] p-1"
+                className="flex flex-col gap-1.5 rounded-xl p-1"
               >
                 {flatRows.map((row, index) => {
                   if (row.kind === 'heading') {
@@ -862,7 +862,7 @@ function PlannerBoard() {
                                 data-no-dnd="true"
                                 onPointerDown={(e) => e.stopPropagation()}
                                 onClick={(e) => e.stopPropagation()}
-                                className="h-6 w-6 inline-flex items-center justify-center rounded-[6px] hover:bg-foreground/5 data-[state=open]:bg-foreground/5"
+                                className="h-6 w-6 inline-flex items-center justify-center rounded-md hover:bg-foreground/5 data-[state=open]:bg-foreground/5"
                                 aria-label={`Open ${heading.title} menu`}
                               >
                                 <MoreHorizontal className="h-4 w-4 text-foreground/45" />
@@ -898,7 +898,7 @@ function PlannerBoard() {
                       }}
                       onClick={() => { if (!isDraggingRef.current) setSelectedTaskId(task.id) }}
                       className={cn(
-                        'planner-sortable-item w-full rounded-[8px] px-3 py-2 text-left select-none',
+                        'planner-sortable-item w-full rounded-lg px-3 py-2 text-left select-none',
                         selectedTaskId === task.id
                           ? 'planner-sortable-item--selected bg-background'
                           : 'bg-background shadow-none'
@@ -924,7 +924,7 @@ function PlannerBoard() {
           </ScrollArea>
       </section>
 
-      <aside className="bg-foreground-2 shadow-middle rounded-[10px] overflow-hidden flex-1 min-w-0 flex flex-col">
+      <aside className="bg-foreground-2 shadow-middle rounded-xl overflow-hidden flex-1 min-w-0 flex flex-col">
           {!selectedTask ? (
             <div className="p-5 text-sm text-foreground/50">Select a task to inspect details.</div>
           ) : (
@@ -1100,7 +1100,7 @@ function PlannerBoard() {
 
 function PlannerSyncStatePalette() {
   return (
-    <div className="w-[820px] rounded-[14px] border border-border bg-background p-4">
+    <div className="w-[820px] rounded-2xl border border-border bg-background p-4">
       <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
         <CalendarDays className="h-4 w-4 text-foreground/60" />
         Sync States (task_session_links_local)
@@ -1110,7 +1110,7 @@ function PlannerSyncStatePalette() {
           const meta = syncMeta[state]
           const Icon = meta.icon
           return (
-            <div key={state} className="rounded-[10px] border border-border/60 bg-foreground/[0.015] p-3">
+            <div key={state} className="rounded-xl border border-border/60 bg-foreground/[0.015] p-3">
               <div className="mb-1.5 flex items-center gap-1.5 text-sm font-medium">
                 <Icon className={cn('h-4 w-4', meta.cls.split(' ')[0])} />
                 {meta.label}

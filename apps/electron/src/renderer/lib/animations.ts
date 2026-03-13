@@ -25,5 +25,5 @@ export const overlayTransitionOut = {
 export const scaleBackValues = {
   scale: 0.92,
   y: 20,
-  borderRadius: 16,
+  borderRadius: 'var(--radius-2xl)',
 }

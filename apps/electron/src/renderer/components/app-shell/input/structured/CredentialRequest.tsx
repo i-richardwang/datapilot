@@ -108,7 +108,7 @@ export function CredentialRequest({ request, onResponse, unstyled = false }: Cre
   return (
     <div className={cn(
       'bg-background overflow-hidden h-full flex flex-col',
-      unstyled ? 'border-0' : 'border border-border rounded-[8px] shadow-middle'
+      unstyled ? 'border-0' : 'border border-border rounded-lg shadow-middle'
     )}>
       {/* Form wraps the entire card so password managers (1Password) can detect fields.
           action points to the source URL for domain-based credential matching. */}

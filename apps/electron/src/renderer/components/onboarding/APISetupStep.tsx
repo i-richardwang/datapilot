@@ -13,7 +13,7 @@ const SEGMENT_LABELS: Record<ProviderSegment, string> = {
 }
 
 const BetaBadge = () => (
-  <span className="inline px-1.5 pt-[2px] pb-[3px] text-[10px] font-accent font-bold rounded-[4px] bg-accent text-background ml-1 relative -top-[1px]">
+  <span className="inline px-1.5 pt-[2px] pb-[3px] text-[10px] font-accent font-bold rounded-sm bg-accent text-background ml-1 relative -top-[1px]">
     Beta
   </span>
 )
@@ -252,7 +252,7 @@ export function APISetupStep({
       />
 
       {/* Segment description */}
-      <div className="bg-foreground-2 rounded-[8px] p-4 mb-3">
+      <div className="bg-foreground-2 rounded-lg p-4 mb-3">
         <p className="text-sm text-muted-foreground text-center">
           {SEGMENT_DESCRIPTIONS[activeSegment]}
         </p>

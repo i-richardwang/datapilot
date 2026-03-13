@@ -147,7 +147,7 @@ export function MarkdownDiffBlock({ code, className }: MarkdownDiffBlockProps) {
     <DiffErrorBoundary fallback={fallback}>
       <div
         className={cn(
-          'relative rounded-[8px] overflow-hidden border bg-muted/30',
+          'relative rounded-lg overflow-hidden border bg-muted/30',
           className,
         )}
         style={{
