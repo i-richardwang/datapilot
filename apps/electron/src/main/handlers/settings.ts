@@ -25,6 +25,7 @@ export const CORE_HANDLED_CHANNELS = [
   RPC_CHANNELS.power.GET_KEEP_AWAKE,
   RPC_CHANNELS.appearance.GET_RICH_TOOL_DESCRIPTIONS,
   RPC_CHANNELS.appearance.SET_RICH_TOOL_DESCRIPTIONS,
+  RPC_CHANNELS.settings.GET_NETWORK_PROXY,
   RPC_CHANNELS.sessions.GET_MODEL,
   RPC_CHANNELS.sessions.SET_MODEL,
   RPC_CHANNELS.dialog.OPEN_FOLDER,
@@ -32,6 +33,7 @@ export const CORE_HANDLED_CHANNELS = [
 
 export const GUI_HANDLED_CHANNELS = [
   RPC_CHANNELS.power.SET_KEEP_AWAKE,
+  RPC_CHANNELS.settings.SET_NETWORK_PROXY,
 ] as const
 
 /** @deprecated Use CORE_HANDLED_CHANNELS / GUI_HANDLED_CHANNELS */
@@ -257,6 +259,16 @@ export function registerSettingsHandlers(server: RpcServer, deps: HandlerDeps): 
     const { setRichToolDescriptions } = await import('@craft-agent/shared/config/storage')
     setRichToolDescriptions(enabled)
   })
+
+  // ============================================================
+  // Network Proxy Settings
+  // ============================================================
+
+  // Get network proxy settings
+  server.handle(RPC_CHANNELS.settings.GET_NETWORK_PROXY, async () => {
+    const { getNetworkProxySettings } = await import('@craft-agent/shared/config/storage')
+    return getNetworkProxySettings()
+  })
 }
 
 // ============================================================
@@ -272,5 +284,11 @@ export function registerSettingsGuiHandlers(server: RpcServer, deps: HandlerDeps
     setKeepAwakeWhileRunning(enabled)
     // Update the power manager's cached value and power state
     setKeepAwakeSetting(enabled)
+  })
+
+  // Set network proxy settings (requires Electron session proxy)
+  server.handle(RPC_CHANNELS.settings.SET_NETWORK_PROXY, async (_ctx, settings: import('@craft-agent/shared/config/types').NetworkProxySettings) => {
+    const { updateConfiguredProxySettings } = await import('../network-proxy')
+    await updateConfiguredProxySettings(settings)
   })
 }

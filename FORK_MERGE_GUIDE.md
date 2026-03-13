@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: identify conflict zones, understand intent, make informed merge resolution decisions.
 >
-> **Last updated after:** v0.7.4 merge (Custom endpoints, session branching overhaul, model switching fix, Windows branch fixes)
+> **Last updated after:** v0.7.5 merge (Webhook actions for automations, network proxy, working directory history, model resolution refactor)
 
 ## Overview
 
@@ -262,3 +262,4 @@ When merging upstream updates:
 | lite-tools | 2026-03-11 | — | Lite mode tool exclusions: `LITE_EXCLUDED_TOOLS` (9 tools: 4 OAuth, browser, mermaid_validate, skill_validate, render_template). System prompt conditionals for Browser Tools, Mermaid validation, Source Templates, Debug Mode sections. `liteMode` passthrough in 5 call sites. |
 | v0.7.3 | 2026-03-11 | 1 | OAuth stability, background task UI, title generation with language awareness, exclude filter badges, MCP schema conversion, Minimax preset split. Resolved: `session-scoped-tools.ts` — adopted upstream's new cache strategy (cache tools array, not MCP server wrapper) while preserving batch context + lite mode passthrough. |
 | v0.7.4 | 2026-03-12 | 2 | Custom endpoints, session branching overhaul, model switching fix, Windows branch fixes. Resolved: `config-watcher.ts` — accepted upstream deletion (shared version has our batch additions); `pi-agent-server/src/index.ts` — adopted upstream's full custom endpoint system (`registerCustomEndpointModels`, `CustomEndpointApi`), replacing our `customBaseUrlOverride` approach. |
+| v0.7.5 | 2026-03-13 | 3 | Webhook actions for automations, network proxy, working directory history, model resolution refactor. Resolved: `AppShell.tsx` — added upstream's `onReplayAutomation` alongside batch handlers; `AppShellContext.tsx` — added `onReplayAutomation` to context interface; `SessionManager.ts` — merged `createPromptHistoryEntry` import with our `BatchProcessor` import. Additional fix: `rpc/automations.ts` — inserted `undefined` placeholders for fork's `hidden`/`batchContext` params in new `executePromptAutomation` call site. |

@@ -329,13 +329,13 @@ describe('phase4 backend abstraction APIs', () => {
       provider: 'pi',
       baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
       customEndpoint: { api: 'openai-completions' },
-    })).toEqual({ providerType: 'pi_compat', piAuthProvider: 'openai' });
+    })).toEqual({ providerType: 'pi_compat', piAuthProvider: 'openai', customEndpoint: { api: 'openai-completions' } });
 
     expect(resolveSetupTestConnectionHint({
       provider: 'pi',
       baseUrl: 'https://my-anthropic-proxy.internal/v1',
       customEndpoint: { api: 'anthropic-messages' },
-    })).toEqual({ providerType: 'pi_compat', piAuthProvider: 'anthropic' });
+    })).toEqual({ providerType: 'pi_compat', piAuthProvider: 'anthropic', customEndpoint: { api: 'anthropic-messages' } });
   });
 
   it('fetchBackendModels dispatches for pi provider', async () => {

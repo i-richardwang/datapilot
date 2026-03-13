@@ -154,6 +154,8 @@ export interface AppShellContextType {
   automationTestResults?: Record<string, import('../components/automations/types').TestResult>
   /** Fetch execution history for an automation by ID */
   getAutomationHistory?: (automationId: string) => Promise<import('../components/automations/types').ExecutionEntry[]>
+  /** Replay (re-execute) webhook actions for a failed automation */
+  onReplayAutomation?: (automationId: string, event: string) => void
 
   // Batch management
   /** Start a batch by ID */

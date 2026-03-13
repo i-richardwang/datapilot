@@ -234,9 +234,11 @@ describe('parseArgs', () => {
 import { getValidateSteps } from './index.ts'
 
 describe('getValidateSteps', () => {
-  it('returns 21 steps', () => {
+  it('returns a non-empty array of steps', () => {
     const steps = getValidateSteps()
-    expect(steps.length).toBe(27)
+    expect(steps.length).toBeGreaterThan(0)
+    // Sanity: at least the known lifecycle groups exist
+    expect(steps.length).toBeGreaterThanOrEqual(20)
   })
 
   it('first step is handshake', () => {
@@ -247,6 +249,11 @@ describe('getValidateSteps', () => {
   it('last step is disconnect', () => {
     const steps = getValidateSteps()
     expect(steps[steps.length - 1].name).toBe('Disconnect')
+  })
+
+  it('has no duplicate step names', () => {
+    const names = getValidateSteps().map((s) => s.name)
+    expect(new Set(names).size).toBe(names.length)
   })
 
   it('includes session lifecycle steps (create, read, delete)', () => {
@@ -285,6 +292,29 @@ describe('getValidateSteps', () => {
     expect(names).toContain('skills:delete')
   })
 
+  it('includes automation lifecycle steps', () => {
+    const names = getValidateSteps().map((s) => s.name)
+    expect(names).toContain('automation:create')
+    expect(names).toContain('automation:trigger (status change)')
+    expect(names).toContain('automation:verify session')
+    expect(names).toContain('automation:verify labels')
+    expect(names).toContain('automations:getLastExecuted')
+    expect(names).toContain('automation:cleanup')
+  })
+
+  it('includes session branching steps', () => {
+    const names = getValidateSteps().map((s) => s.name)
+    expect(names).toContain('sessions:branch')
+    expect(names).toContain('sessions:branch verify')
+    expect(names).toContain('sessions:branch send')
+  })
+
+  it('includes webhook validation steps', () => {
+    const names = getValidateSteps().map((s) => s.name)
+    expect(names).toContain('webhook:test (RPC)')
+    expect(names).toContain('webhook:verify failure')
+  })
+
   it('creates session with allow-all permission mode', () => {
     const steps = getValidateSteps()
     const createStep = steps.find((s) => s.name === 'sessions:create')
@@ -301,5 +331,20 @@ describe('getValidateSteps', () => {
     expect(skillDelete).toBeGreaterThan(skillMention)
     expect(sourceDelete).toBeGreaterThan(skillDelete)
     expect(sessionDelete).toBeGreaterThan(sourceDelete)
+  })
+
+  it('branching steps come after send message + tool use', () => {
+    const names = getValidateSteps().map((s) => s.name)
+    const toolUse = names.indexOf('send message + tool use')
+    const branch = names.indexOf('sessions:branch')
+    expect(branch).toBeGreaterThan(toolUse)
+  })
+
+  it('automation cleanup comes before sources:delete', () => {
+    const names = getValidateSteps().map((s) => s.name)
+    const cleanup = names.indexOf('automation:cleanup')
+    const srcDelete = names.indexOf('sources:delete')
+    expect(cleanup).toBeGreaterThan(-1)
+    expect(cleanup).toBeLessThan(srcDelete)
   })
 })

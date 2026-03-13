@@ -473,22 +473,22 @@ export interface ClaudeOAuthResult {
 // Automation types
 // ---------------------------------------------------------------------------
 
+export type TestAutomationAction =
+  | { type: 'prompt'; prompt: string; llmConnection?: string; model?: string }
+  | { type: 'webhook'; url: string; method?: string; headers?: Record<string, string>; bodyFormat?: 'json' | 'form' | 'raw'; body?: unknown; captureResponse?: boolean; auth?: { type: 'basic'; username: string; password: string } | { type: 'bearer'; token: string } }
+
 export interface TestAutomationPayload {
   workspaceId: string
   automationId?: string
   automationName?: string
-  actions: Array<{ type: 'prompt'; prompt: string; llmConnection?: string; model?: string }>
+  actions: TestAutomationAction[]
   permissionMode?: PermissionMode
   labels?: string[]
 }
 
-export interface TestAutomationActionResult {
-  type: 'prompt'
-  success: boolean
-  stderr?: string
-  sessionId?: string
-  duration: number
-}
+export type TestAutomationActionResult =
+  | { type: 'prompt'; success: boolean; stderr?: string; sessionId?: string; duration: number }
+  | { type: 'webhook'; success: boolean; url: string; statusCode: number; error?: string; duration: number }
 
 export interface TestAutomationResult {
   actions: TestAutomationActionResult[]

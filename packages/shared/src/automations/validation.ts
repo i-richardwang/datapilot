@@ -199,6 +199,22 @@ export function validateAutomationsContent(jsonString: string, fileName?: string
         }
       }
 
+      // Warn about webhook URLs with $VAR templates (can't validate until runtime)
+      if (matcher.actions) {
+        for (let j = 0; j < matcher.actions.length; j++) {
+          const action = matcher.actions[j];
+          if (action && typeof action === 'object' && 'type' in action && action.type === 'webhook' && 'url' in action && typeof action.url === 'string' && action.url.includes('$')) {
+            warnings.push({
+              file,
+              path: `automations.${event}[${i}].actions[${j}].url`,
+              message: 'Webhook URL contains variable templates — will be validated at runtime after expansion',
+              severity: 'warning',
+              suggestion: 'Ensure the referenced CRAFT_WH_* variables are set in your shell profile',
+            });
+          }
+        }
+      }
+
       // Warn if cron is used on non-SchedulerTick event
       if (matcher.cron && event !== 'SchedulerTick') {
         warnings.push({

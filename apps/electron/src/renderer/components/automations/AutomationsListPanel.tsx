@@ -107,9 +107,16 @@ function AutomationItem({
           <MicroBadge colorClass="bg-foreground/8 text-foreground/60">
             {getEventDisplayName(automation.event)}
           </MicroBadge>
-          <MicroBadge colorClass="bg-accent/10 text-accent">
-            Prompt
-          </MicroBadge>
+          {automation.actions.some(a => a.type === 'prompt') && (
+            <MicroBadge colorClass="bg-accent/10 text-accent">
+              Prompt
+            </MicroBadge>
+          )}
+          {automation.actions.some(a => a.type === 'webhook') && (
+            <MicroBadge colorClass="bg-orange-500/10 text-orange-600 dark:text-orange-400">
+              Webhook
+            </MicroBadge>
+          )}
         </>
       }
       trailing={

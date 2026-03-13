@@ -777,6 +777,7 @@ export interface ValidateContext {
   automationsJsonBackup?: string | null
   /** Backup of existing automations-history.jsonl before overwrite (undefined = didn't exist) */
   automationsHistoryBackup?: string | null
+  branchedSessionId?: string
   onEvent?: (ev: { type: string; [key: string]: unknown }) => void
 }
 
@@ -1054,6 +1055,49 @@ export function getValidateSteps(): ValidateStep[] {
           'Use the Bash tool to run: echo TOOL_VALIDATION_OK', 90_000, true, undefined, ctx.onEvent)
       },
     },
+    // ----- Session branching -----
+    {
+      name: 'sessions:branch',
+      fn: async (client, ctx) => {
+        if (!ctx.createdSessionId || !ctx.workspaceId) return 'skipped (no session)'
+        const r = (await client.invoke('sessions:getMessages', ctx.createdSessionId)) as ValidateMessagesResponse
+        const messages = r?.messages ?? r?.conversation ?? []
+        const firstAssistant = messages.find((m) => m.role === 'assistant') as any
+        if (!firstAssistant?.id) throw new Error('No assistant message found to branch from')
+        const branch = (await client.invoke('sessions:create', ctx.workspaceId, {
+          name: `__cli-validate-branch-${Date.now()}`,
+          permissionMode: 'allow-all',
+          branchFromSessionId: ctx.createdSessionId,
+          branchFromMessageId: firstAssistant.id,
+        })) as any
+        ctx.branchedSessionId = branch?.id
+        return `branched at message ${firstAssistant.id} → session ${branch?.id}`
+      },
+    },
+    {
+      name: 'sessions:branch verify',
+      fn: async (client, ctx) => {
+        if (!ctx.branchedSessionId) return 'skipped (no branch)'
+        const r = (await client.invoke('sessions:getMessages', ctx.branchedSessionId)) as ValidateMessagesResponse
+        const messages = r?.messages ?? r?.conversation ?? []
+        const hasAssistant = messages.some((m) => m.role === 'assistant')
+        if (!hasAssistant) throw new Error('Branch missing assistant message')
+        const origR = (await client.invoke('sessions:getMessages', ctx.createdSessionId!)) as ValidateMessagesResponse
+        const origMessages = origR?.messages ?? origR?.conversation ?? []
+        if (messages.length >= origMessages.length) {
+          throw new Error(`Branch has ${messages.length} messages, expected fewer than original (${origMessages.length})`)
+        }
+        return `branch has ${messages.length} messages (original has ${origMessages.length})`
+      },
+    },
+    {
+      name: 'sessions:branch send',
+      fn: async (client, ctx) => {
+        if (!ctx.branchedSessionId) return 'skipped (no branch)'
+        return await waitForSendEvents(client, ctx.branchedSessionId,
+          'Reply with exactly: BRANCH_OK', 60_000, false, undefined, ctx.onEvent)
+      },
+    },
     // ----- Source lifecycle -----
     {
       name: 'sources:create',
@@ -1142,13 +1186,27 @@ SKILLEOF`, 90_000, true, undefined, ctx.onEvent)
       name: 'automation:create',
       fn: async (client, ctx) => {
         if (!ctx.createdSessionId || !ctx.workspaceRootPath) return 'skipped (no session or workspace)'
-        ctx.automationName = `CLI Validate Automation ${Date.now()}`
         const configPath = `${ctx.workspaceRootPath}/automations.json`
         const historyPath = `${ctx.workspaceRootPath}/automations-history.jsonl`
-        // Backup existing files before overwriting (protects real workspace data)
-        const { readFile } = await import('fs/promises')
-        ctx.automationsJsonBackup = await readFile(configPath, 'utf-8').catch(() => null)
+        const { readFile, writeFile } = await import('fs/promises')
+
+        // Check if config already exists (CI case — .github/agents/automations.json committed)
+        const existingConfig = await readFile(configPath, 'utf-8').catch(() => null)
+        if (existingConfig) {
+          try {
+            const parsed = JSON.parse(existingConfig)
+            const entries = parsed?.automations?.SessionStatusChange
+            if (Array.isArray(entries) && entries.length > 0) {
+              ctx.automationName = entries[0].name
+              return `config already loaded (${ctx.automationName})`
+            }
+          } catch { /* parse failed, overwrite below */ }
+        }
+
+        // Non-CI: backup + write directly (no LLM call needed)
+        ctx.automationsJsonBackup = existingConfig
         ctx.automationsHistoryBackup = await readFile(historyPath, 'utf-8').catch(() => null)
+        ctx.automationName = `CLI Validate Automation ${Date.now()}`
         const config = JSON.stringify({
           version: 2,
           automations: {
@@ -1156,16 +1214,20 @@ SKILLEOF`, 90_000, true, undefined, ctx.onEvent)
               name: ctx.automationName,
               matcher: 'in-progress',
               labels: ['cli-validate-label'],
-              actions: [{ type: 'prompt', prompt: 'Reply with exactly: AUTOMATION_TRIGGERED' }],
+              actions: [
+                { type: 'prompt', prompt: 'Reply with exactly: AUTOMATION_TRIGGERED' },
+                { type: 'webhook', url: 'http://127.0.0.1:19999/validate-webhook',
+                  method: 'POST', bodyFormat: 'json',
+                  body: { event: '$CRAFT_EVENT', session: '$CRAFT_SESSION_ID' } },
+              ],
             }],
           },
         }, null, 2)
-        return await waitForSendEvents(client, ctx.createdSessionId,
-          `Use the Bash tool to run this exact command:
-cat > "${configPath}" << 'AUTOMATIONEOF'
-${config}
-AUTOMATIONEOF`, 90_000, true, undefined, ctx.onEvent)
-          .then((r) => { ctx.createdAutomation = true; return r })
+        await writeFile(configPath, config)
+        ctx.createdAutomation = true
+        // ConfigWatcher auto-detects automations.json changes (debounced)
+        await new Promise((r) => setTimeout(r, 2000))
+        return `wrote config (${ctx.automationName})`
       },
     },
     {
@@ -1263,11 +1325,60 @@ AUTOMATIONEOF`, 90_000, true, undefined, ctx.onEvent)
         return `${entries.length} automation(s), latest ran ${Math.round((Date.now() - recent[1]) / 1000)}s ago`
       },
     },
+    // ----- Webhook validation -----
+    {
+      name: 'webhook:test (RPC)',
+      fn: async (client, ctx) => {
+        if (!ctx.workspaceId) return 'skipped (no workspace)'
+        const r = (await client.invoke('automations:test', {
+          workspaceId: ctx.workspaceId,
+          actions: [{
+            type: 'webhook',
+            url: 'http://127.0.0.1:19999/validate-test',
+            method: 'GET',
+          }],
+        })) as any
+        const result = r?.actions?.[0]
+        if (result?.success) throw new Error('Expected webhook to fail (nothing listening)')
+        if (!result?.error && result?.statusCode !== 0) throw new Error('Expected error or statusCode 0 in result')
+        return `correctly failed: ${(result.error ?? `statusCode=${result.statusCode}`).slice(0, 80)}`
+      },
+    },
+    {
+      name: 'webhook:verify failure',
+      fn: async (client, ctx) => {
+        if (!ctx.workspaceRootPath) return 'skipped (no workspace root)'
+        const { readFile } = await import('fs/promises')
+        const historyPath = `${ctx.workspaceRootPath}/automations-history.jsonl`
+        const content = await readFile(historyPath, 'utf-8').catch(() => '')
+        const lines = content.trim().split('\n').filter(Boolean)
+        const entries = lines.map((l) => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean)
+        const webhookEntries = entries.filter((e: any) => e.webhook)
+        if (webhookEntries.length === 0) throw new Error('No webhook history entries found')
+        // Find a recent failed webhook entry (within last 2 minutes)
+        const recentThreshold = Date.now() - 120_000
+        const recentFailed = webhookEntries.find((e: any) =>
+          !e.ok && e.ts > recentThreshold && e.webhook?.method === 'POST'
+        )
+        if (!recentFailed) throw new Error('No recent failed webhook entry found in history')
+        return `webhook failure recorded: method=${recentFailed.webhook.method}, url=${recentFailed.webhook.url?.slice(0, 50)}`
+      },
+    },
     {
       name: 'automation:cleanup',
       fn: async (client, ctx) => {
         const cleaned = await cleanupAutomationArtifacts(client, ctx)
         return cleaned.length > 0 ? `cleaned: ${cleaned.join(', ')}` : 'nothing to clean'
+      },
+    },
+    {
+      name: 'sessions:branch delete',
+      fn: async (client, ctx) => {
+        if (!ctx.branchedSessionId) return 'skipped (no branch)'
+        await client.invoke('sessions:delete', ctx.branchedSessionId)
+        const id = ctx.branchedSessionId
+        ctx.branchedSessionId = undefined
+        return `deleted branch session: ${id}`
       },
     },
     {
@@ -1410,6 +1521,15 @@ export async function runValidation(client: CliRpcClient, jsonMode: boolean, noS
         const time = c.dim(elapsed < 1 ? `(${Math.round(elapsed * 1000)}ms)` : `(${elapsed.toFixed(1)}s)`)
         process.stderr.write(`${c.cyan(num)} ${step.name} ${dots} ${c.red('✗')}  ${msg}  ${time}\n`)
       }
+    }
+  }
+
+  // Cleanup: branched session
+  if (ctx.branchedSessionId && client.isConnected) {
+    try {
+      await client.invoke('sessions:delete', ctx.branchedSessionId)
+    } catch {
+      // best effort
     }
   }
 

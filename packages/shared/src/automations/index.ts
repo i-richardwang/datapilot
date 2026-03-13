@@ -8,7 +8,7 @@
  * - utils.ts: Shared utilities (toSnakeCase, expandEnvVars, etc.)
  * - automation-system.ts: AutomationSystem facade (main entry point)
  * - event-bus.ts: WorkspaceEventBus
- * - handlers/: PromptHandler, EventLogHandler
+ * - handlers/: PromptHandler, WebhookHandler, EventLogHandler
  */
 
 // ============================================================================
@@ -20,11 +20,16 @@ export type {
   AgentEvent,
   AutomationEvent,
   PromptAction,
+  WebhookAction,
+  WebhookHttpMethod,
+  WebhookBodyFormat,
+  WebhookAuth,
   AutomationAction,
   AutomationMatcher,
   AutomationsConfig,
   PromptReferences,
   PromptActionResult,
+  WebhookActionResult,
   ActionExecutionResult,
   PendingPrompt,
   AutomationResult,
@@ -72,8 +77,14 @@ export { AutomationsConfigSchema, zodErrorToIssues, VALID_EVENTS } from './schem
 // Security utilities
 export { sanitizeForShell } from './security.ts';
 
+// Webhook execution utilities
+export { executeWebhookRequest, executeWithRetry, createWebhookHistoryEntry, createPromptHistoryEntry, type ExecuteWebhookOptions, type RetryConfig } from './webhook-utils.ts';
+
+// Retry scheduler
+export { RetryScheduler, type RetryQueueEntry, type RetrySchedulerOptions } from './retry-scheduler.ts';
+
 // Config constants
-export { AUTOMATIONS_CONFIG_FILE, AUTOMATIONS_HISTORY_FILE } from './constants.ts';
+export { AUTOMATIONS_CONFIG_FILE, AUTOMATIONS_HISTORY_FILE, AUTOMATIONS_RETRY_QUEUE_FILE, HISTORY_FIELD_MAX_LENGTH } from './constants.ts';
 
 // Config path resolution
 export { resolveAutomationsConfigPath, generateShortId } from './resolve-config-path.ts';
@@ -109,8 +120,10 @@ export {
 export {
   PromptHandler,
   EventLogHandler,
+  WebhookHandler,
   type AutomationHandler,
   type PromptHandlerOptions,
   type EventLogHandlerOptions,
+  type WebhookHandlerOptions,
   type AutomationsConfigProvider,
 } from './handlers/index.ts';

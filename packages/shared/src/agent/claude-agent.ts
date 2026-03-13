@@ -320,7 +320,13 @@ export function jsonPropToZod(prop: any, depth = 0): z.ZodTypeAny {
       // Nested object with known properties → build z.object({...})
       if (prop.properties && typeof prop.properties === 'object') {
         const shape = jsonSchemaToZodShape(prop, depth + 1);
-        return withDesc(z.object(shape));
+        const obj = z.object(shape);
+        // JSON Schema defaults additionalProperties to true when omitted.
+        // Only use strict (strip) mode when explicitly set to false.
+        if (prop.additionalProperties === false) {
+          return withDesc(obj);
+        }
+        return withDesc(obj.passthrough());
       }
       // Generic object (no properties defined)
       return withDesc(z.record(z.string(), z.unknown()));

@@ -77,7 +77,7 @@ import { evaluateAutoLabels } from '@craft-agent/shared/labels/auto'
 import { listLabels } from '@craft-agent/shared/labels/storage'
 import { extractLabelId } from '@craft-agent/shared/labels'
 import { ensureLabelsExist } from '@craft-agent/shared/labels/crud'
-import { AutomationSystem, AUTOMATIONS_HISTORY_FILE, type AutomationSystemMetadataSnapshot } from '@craft-agent/shared/automations'
+import { AutomationSystem, AUTOMATIONS_HISTORY_FILE, createPromptHistoryEntry, type AutomationSystemMetadataSnapshot } from '@craft-agent/shared/automations'
 import { BatchProcessor } from '@craft-agent/shared/batches'
 
 // Import from server-core domain utilities
@@ -1352,14 +1352,13 @@ export class SessionManager implements ISessionManager {
             const pending = prompts[idx]
             if (!pending.matcherId) continue
 
-            const entry = {
-              id: pending.matcherId,
-              ts: Date.now(),
+            const entry = createPromptHistoryEntry({
+              matcherId: pending.matcherId,
               ok: result.status === 'fulfilled',
               sessionId: result.status === 'fulfilled' ? result.value.sessionId : undefined,
-              prompt: pending.prompt.slice(0, 200),
-              error: result.status === 'rejected' ? String(result.reason).slice(0, 200) : undefined,
-            }
+              prompt: pending.prompt,
+              error: result.status === 'rejected' ? String(result.reason) : undefined,
+            })
 
             appendFile(historyPath, JSON.stringify(entry) + '\n', 'utf-8').catch(e => sessionLog.warn('[Automations] Failed to write history:', e))
 

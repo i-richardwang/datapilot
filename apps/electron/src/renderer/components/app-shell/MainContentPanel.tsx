@@ -76,6 +76,7 @@ export function MainContentPanel({
     onToggleAutomation,
     onDuplicateAutomation,
     onDeleteAutomation,
+    onReplayAutomation,
     automationTestResults,
     getAutomationHistory,
     onStartBatch,
@@ -292,6 +293,7 @@ export function MainContentPanel({
               onToggleEnabled={onToggleAutomation ? () => onToggleAutomation(automation.id) : undefined}
               onDuplicate={onDuplicateAutomation ? () => onDuplicateAutomation(automation.id) : undefined}
               onDelete={onDeleteAutomation ? () => onDeleteAutomation(automation.id) : undefined}
+              onReplay={onReplayAutomation}
             />
           </Panel>
         )

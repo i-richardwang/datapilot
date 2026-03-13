@@ -246,9 +246,15 @@ function renderContentWithBadges(
       const textBefore = content.slice(lastEnd, badge.start)
       if (textBefore.trim()) {
         elements.push(
-          <span key={`text-${i}`} className="whitespace-pre-wrap">
+          <Markdown
+            key={`text-${i}`}
+            mode="minimal"
+            onUrlClick={onUrlClick}
+            onFileClick={onFileClick}
+            className="inline text-sm [&_a]:underline [&_code]:bg-foreground/10 [&_p]:whitespace-pre-wrap [&_p]:inline"
+          >
             {textBefore}
-          </span>
+          </Markdown>
         )
       }
     }
@@ -276,9 +282,15 @@ function renderContentWithBadges(
     const textAfter = content.slice(lastEnd)
     if (textAfter.trim()) {
       elements.push(
-        <span key="text-end" className="whitespace-pre-wrap">
+        <Markdown
+          key="text-end"
+          mode="minimal"
+          onUrlClick={onUrlClick}
+          onFileClick={onFileClick}
+          className="inline text-sm [&_a]:underline [&_code]:bg-foreground/10 [&_p]:whitespace-pre-wrap [&_p]:inline"
+        >
           {textAfter}
-        </span>
+        </Markdown>
       )
     }
   }

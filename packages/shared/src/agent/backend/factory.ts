@@ -391,12 +391,13 @@ export function resolveSetupTestConnectionHint(args: {
   baseUrl?: string;
   piAuthProvider?: string;
   customEndpoint?: CustomEndpointConfig;
-}): Pick<LlmConnection, 'providerType' | 'piAuthProvider'> {
+}): Pick<LlmConnection, 'providerType' | 'piAuthProvider' | 'customEndpoint'> {
   if (args.provider === 'pi') {
     if (args.customEndpoint && args.baseUrl?.trim()) {
       return {
         providerType: 'pi_compat',
         piAuthProvider: args.customEndpoint.api === 'anthropic-messages' ? 'anthropic' : 'openai',
+        customEndpoint: args.customEndpoint,
       };
     }
 
@@ -678,7 +679,7 @@ export async function testBackendConnection(args: {
   hostRuntime: BackendHostRuntimeContext;
   timeoutMs?: number;
   allowEmptyApiKey?: boolean;
-  connection?: Pick<LlmConnection, 'providerType' | 'piAuthProvider'>;
+  connection?: Pick<LlmConnection, 'providerType' | 'piAuthProvider' | 'customEndpoint'>;
 }): Promise<{ success: boolean; error?: string }> {
   const trimmedKey = args.apiKey.trim();
   if (!trimmedKey && !args.allowEmptyApiKey) {
@@ -709,6 +710,7 @@ export async function testBackendConnection(args: {
       defaultModel: testModel,
       createdAt: now,
       piAuthProvider: args.connection?.piAuthProvider,
+      customEndpoint: args.connection?.customEndpoint,
       ...(args.baseUrl?.trim() ? { baseUrl: args.baseUrl.trim() } : {}),
     } as LlmConnection;
 
@@ -722,7 +724,7 @@ export async function testBackendConnection(args: {
 
     const { driver, resolvedPaths } = resolveDriverRuntime(args.provider, args.hostRuntime);
     if (driver.testConnection) {
-      return driver.testConnection({
+      const driverResult = await driver.testConnection({
         provider: args.provider,
         apiKey: trimmedKey,
         model: testModel,
@@ -732,6 +734,8 @@ export async function testBackendConnection(args: {
         resolvedPaths,
         timeoutMs: args.timeoutMs ?? 20000,
       });
+      // null = driver declined to handle; fall through to generic subprocess test
+      if (driverResult !== null) return driverResult;
     }
 
     const cwd = homedir();

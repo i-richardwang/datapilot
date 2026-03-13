@@ -1,13 +1,14 @@
 /**
  * AutomationActionRow
  *
- * Inline display of a single automation action (prompt).
+ * Inline display of a single automation action (prompt or webhook).
  * Used within the "Then" section of AutomationInfoPage.
  */
 
-import { MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AutomationAction } from './types'
+import { ActionTypeIcon } from './ActionTypeIcon'
+import { DEFAULT_WEBHOOK_METHOD } from './constants'
 
 export interface AutomationActionRowProps {
   action: AutomationAction
@@ -34,7 +35,22 @@ function PromptText({ text }: { text: string }) {
   )
 }
 
+function WebhookText({ action }: { action: Extract<AutomationAction, { type: 'webhook' }> }) {
+  const method = action.method ?? DEFAULT_WEBHOOK_METHOD
+  return (
+    <span className="text-sm break-words">
+      <span className="font-mono font-medium text-accent">{method}</span>{' '}
+      <span className="text-foreground/70">{action.url}</span>
+      {action.bodyFormat && (
+        <span className="text-foreground/40 ml-1">({action.bodyFormat})</span>
+      )}
+    </span>
+  )
+}
+
 export function AutomationActionRow({ action, index, className }: AutomationActionRowProps) {
+  const isWebhook = action.type === 'webhook'
+
   return (
     <div className={cn('flex items-start gap-3 px-4 py-3', className)}>
       {/* Index + icon — h-5 matches the first line height of text-sm content */}
@@ -42,12 +58,16 @@ export function AutomationActionRow({ action, index, className }: AutomationActi
         <span className="text-xs text-muted-foreground tabular-nums w-4 text-right">
           {index + 1}.
         </span>
-        <MessageSquare className="h-3.5 w-3.5 text-foreground/50" />
+        <ActionTypeIcon type={action.type} className="h-3.5 w-3.5" />
       </div>
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <PromptText text={action.prompt} />
+        {isWebhook ? (
+          <WebhookText action={action} />
+        ) : (
+          <PromptText text={action.prompt} />
+        )}
       </div>
     </div>
   )

@@ -13,15 +13,21 @@ import type { AutomationMatcher } from './types.ts';
  *
  * Priority:
  * 1. Explicit `matcher.name`
- * 2. First action's `@mention` → "<mention> prompt"
- * 3. First action's prompt text (truncated to 40 chars)
- * 4. Event name fallback (raw event string)
+ * 2. First prompt action's `@mention` → "<mention> prompt"
+ * 3. First prompt action's prompt text (truncated to 40 chars)
+ * 4. First webhook action's URL (truncated to 40 chars)
+ * 5. Event name fallback (raw event string)
  */
 export function deriveAutomationName(event: string, matcher: AutomationMatcher): string {
   if (matcher.name) return matcher.name;
 
   const firstAction = matcher.actions[0];
   if (!firstAction) return event;
+
+  if (firstAction.type === 'webhook') {
+    const label = `Webhook ${firstAction.method ?? 'POST'} ${firstAction.url}`;
+    return label.length > 40 ? label.slice(0, 40) + '...' : label;
+  }
 
   // Extract @skill/@source mention
   const mentionMatch = firstAction.prompt.match(/@(\S+)/);

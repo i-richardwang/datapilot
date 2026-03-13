@@ -44,6 +44,9 @@ import type {
 // Pi AI types
 import type { TextContent as PiTextContent } from '@mariozechner/pi-ai';
 
+// Model resolution (extracted for testability + custom-endpoint precedence)
+import { resolvePiModel } from './model-resolution.ts';
+
 // Direct source imports from shared (bundled by bun build)
 import { handleLargeResponse, estimateTokens, TOKEN_LIMIT } from '../../shared/src/utils/large-response.ts';
 import { getSessionPlansPath, getSessionPath } from '../../shared/src/sessions/storage.ts';
@@ -298,36 +301,9 @@ function resolvedCwd(): string {
   return wd;
 }
 
-function resolvePiModel(
-  modelRegistry: PiModelRegistry,
-  modelId: string,
-  piAuthProvider?: string,
-): PiModel<any> | undefined {
-  // Strip Craft's pi/ prefix — Pi SDK uses bare model IDs (e.g. "claude-sonnet-4-6")
-  const bareId = modelId.startsWith('pi/') ? modelId.slice(3) : modelId;
-
-  // If we know the auth provider, do an exact provider+model lookup first.
-  // This avoids the getAll() ambiguity where the same model ID exists under
-  // multiple providers (e.g., "gpt-5.2" under both "openai" and
-  // "azure-openai-responses") and the wrong one matches first.
-  if (piAuthProvider) {
-    const exact = modelRegistry.find(piAuthProvider, bareId);
-    if (exact) return exact;
-  }
-
-  // Fallback: search all available models
-  const allModels = modelRegistry.getAll();
-  const match = allModels.find(m => m.id === bareId || m.name === bareId);
-  if (match) return match;
-
-  // Try common providers with the model ID
-  const providers = ['anthropic', 'openai', 'google'];
-  for (const provider of providers) {
-    const model = modelRegistry.find(provider, bareId);
-    if (model) return model;
-  }
-
-  return undefined;
+// Helper: derive preferCustomEndpoint flag from init config
+function shouldPreferCustomEndpoint(): boolean {
+  return Boolean(initConfig?.customEndpoint && initConfig?.baseUrl?.trim());
 }
 
 /**
@@ -565,7 +541,7 @@ async function ensureSession(): Promise<AgentSession> {
   // Set model if specified
   if (initConfig.model) {
     try {
-      const piModel = resolvePiModel(modelRegistry, initConfig.model, initConfig.piAuth?.provider);
+      const piModel = resolvePiModel(modelRegistry, initConfig.model, initConfig.piAuth?.provider, shouldPreferCustomEndpoint());
       if (piModel) {
         sessionOptions.model = piModel;
         setInterceptorApiHints(piModel as { api?: string; provider?: string; baseUrl?: string });
@@ -836,7 +812,7 @@ async function queryLlm(request: LLMQueryRequest): Promise<LLMQueryResult> {
   if (initConfig.piAuth) {
     const authProvider = initConfig.piAuth.provider;
     const bareModel = model.startsWith('pi/') ? model.slice(3) : model;
-    const resolved = resolvePiModel(modelRegistry, bareModel, authProvider);
+    const resolved = resolvePiModel(modelRegistry, bareModel, authProvider, shouldPreferCustomEndpoint());
     if (!resolved || (resolved as any).provider !== authProvider || isDeniedMiniModelId(model)) {
       const fallback = getDefaultSummarizationModel();
       debugLog(`[queryLlm] Model ${bareModel} incompatible with ${authProvider}, falling back to ${fallback}`);
@@ -859,7 +835,7 @@ async function queryLlm(request: LLMQueryRequest): Promise<LLMQueryResult> {
     // Resolve model
     let piModel: ReturnType<typeof resolvePiModel>;
     try {
-      piModel = resolvePiModel(modelRegistry, modelId, initConfig.piAuth?.provider);
+      piModel = resolvePiModel(modelRegistry, modelId, initConfig.piAuth?.provider, shouldPreferCustomEndpoint());
       if (piModel) {
         ephemeralOptions.model = piModel;
       }
@@ -974,7 +950,7 @@ async function queryLlm(request: LLMQueryRequest): Promise<LLMQueryResult> {
       const retryModel = fallbackCandidates.find(candidate => {
         if (triedModels.has(candidate)) return false;
         try {
-          const resolved = resolvePiModel(modelRegistry, candidate, initConfig.piAuth?.provider);
+          const resolved = resolvePiModel(modelRegistry, candidate, initConfig.piAuth?.provider, shouldPreferCustomEndpoint());
           if (!resolved) return false;
           if (initConfig.piAuth && (resolved as any).provider !== initConfig.piAuth.provider) {
             return false;
@@ -1342,7 +1318,7 @@ async function handleSetModel(msg: Extract<InboundMessage, { type: 'set_model' }
     debugLog(`[set_model] No active session or model registry, ignoring`);
     return;
   }
-  let piModel = resolvePiModel(piModelRegistry, msg.model, initConfig?.piAuth?.provider);
+  let piModel = resolvePiModel(piModelRegistry, msg.model, initConfig?.piAuth?.provider, shouldPreferCustomEndpoint());
 
   // For custom endpoints, dynamically register unknown models so mid-session switching works.
   // Uses registerCustomEndpointModels which accumulates into the existing model set

@@ -260,7 +260,8 @@ export function registerLlmConnectionsHandlers(server: RpcServer, deps: HandlerD
       return { success: false, error: setupValidation.error }
     }
 
-    deps.platform.logger?.info(`[testLlmConnectionSetup] Testing: provider=${provider}${piAuthProvider ? ` piAuth=${piAuthProvider}` : ''}${baseUrl ? ` baseUrl=${baseUrl}` : ''}`)
+    const hint = resolveSetupTestConnectionHint({ provider, baseUrl, piAuthProvider, customEndpoint })
+    deps.platform.logger?.info(`[testLlmConnectionSetup] Testing: provider=${provider}${piAuthProvider ? ` piAuth=${piAuthProvider}` : ''}${baseUrl ? ` baseUrl=${baseUrl}` : ''} hasCustomEndpoint=${!!customEndpoint} hintProvider=${hint.providerType}`)
 
     try {
       const testModel = model || getDefaultModelForConnection(provider, piAuthProvider)
@@ -272,7 +273,7 @@ export function registerLlmConnectionsHandlers(server: RpcServer, deps: HandlerD
         baseUrl,
         timeoutMs: 20000,
         hostRuntime: buildBackendHostRuntimeContext(deps.platform),
-        connection: resolveSetupTestConnectionHint({ provider, baseUrl, piAuthProvider, customEndpoint }),
+        connection: hint,
       })
 
       if (!result.success) {

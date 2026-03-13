@@ -208,6 +208,47 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient(DEEPLINK_SCHEME)
 }
 
+// Apply network proxy settings early (Node-level only — Electron sessions require app.whenReady)
+import { applyConfiguredProxySettings } from './network-proxy'
+void applyConfiguredProxySettings()
+
+// Accept self-signed / untrusted certificates when connecting to a user-configured remote server.
+// Only bypasses cert validation for the exact CRAFT_SERVER_URL origin — all other connections
+// use standard certificate verification. Without this, wss:// to self-signed servers fails with
+// ERR_CERT_AUTHORITY_INVALID because Chromium's WebSocket rejects untrusted certs.
+//
+// Electron's certificate-error always reports URLs with https:// scheme, so we normalize
+// wss:// → https:// (and ws:// → http://) to ensure origins compare correctly.
+function normalizeOriginForCert(urlStr: string): string {
+  const u = new URL(urlStr)
+  if (u.protocol === 'wss:') u.protocol = 'https:'
+  else if (u.protocol === 'ws:') u.protocol = 'http:'
+  return u.origin
+}
+
+if (process.env.CRAFT_SERVER_URL) {
+  let serverOrigin: string | undefined
+  try {
+    serverOrigin = normalizeOriginForCert(process.env.CRAFT_SERVER_URL)
+  } catch {
+    // Invalid URL — will fail later during connection, no need to handle here
+  }
+  if (serverOrigin) {
+    app.on('certificate-error', (event, _webContents, url, _error, _certificate, callback) => {
+      try {
+        if (normalizeOriginForCert(url) === serverOrigin) {
+          event.preventDefault()
+          callback(true)
+          return
+        }
+      } catch {
+        // URL parse failure — fall through to default rejection
+      }
+      callback(false)
+    })
+  }
+}
+
 // Register thumbnail:// custom protocol for file preview thumbnails in the sidebar.
 // Must happen before app.whenReady() — Electron requires early scheme registration.
 registerThumbnailScheme()
@@ -344,6 +385,10 @@ app.whenReady().then(async () => {
 
   // Register thumbnail:// protocol handler (scheme was registered earlier, before app.whenReady)
   registerThumbnailHandler()
+
+  // Re-apply proxy settings now that Electron sessions are available
+  // (first call before app.whenReady only configured Node-level proxy)
+  await applyConfiguredProxySettings()
 
   // Note: electron-updater handles pending updates internally via autoInstallOnAppQuit
 

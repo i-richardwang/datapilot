@@ -38,6 +38,7 @@ export interface AutomationInfoPageProps {
   onTest?: () => void
   onDuplicate?: () => void
   onDelete?: () => void
+  onReplay?: (automationId: string, event: string) => void
   className?: string
 }
 
@@ -49,6 +50,7 @@ export function AutomationInfoPage({
   onTest,
   onDuplicate,
   onDelete,
+  onReplay,
   className,
 }: AutomationInfoPageProps) {
   const workspace = useActiveWorkspace()
@@ -193,7 +195,7 @@ export function AutomationInfoPage({
           title="Recent Activity"
           description={executions.length > 0 ? `Last ${executions.length} runs` : undefined}
         >
-          <AutomationEventTimeline entries={executions} />
+          <AutomationEventTimeline entries={executions} onReplay={onReplay} />
         </Info_Section>
 
         {/* Section: Raw config (JSON) */}

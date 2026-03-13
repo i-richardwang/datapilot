@@ -6,6 +6,7 @@ import { TurnCard, type ActivityItem } from '@craft-agent/ui'
 import type { BackgroundTask } from '@/components/app-shell/ActiveTasksBar'
 import { ActiveOptionBadges } from '@/components/app-shell/ActiveOptionBadges'
 import { ChatInputZone, InputContainer } from '@/components/app-shell/input'
+import { setRecentWorkingDirs } from '@/components/app-shell/input/working-directory-history'
 import type { StructuredResponse } from '@/components/app-shell/input/structured/types'
 import { EmptyStateHint, getHintCount, getHintTemplate } from '@/components/chat/EmptyStateHint'
 import { Button } from '@/components/ui/button'
@@ -25,6 +26,7 @@ import {
   samplePdfAttachment,
 } from '../mock-utils'
 import { mockAdminApprovalRequest } from '../adapters/input-adapters'
+import { getRecentDirsForScenario, type RecentDirScenario } from '../recent-working-dirs'
 
 const sampleCodeAttachment: FileAttachment = {
   type: 'text',
@@ -540,6 +542,8 @@ interface InputContainerPlaygroundProps {
   showSources?: boolean
   sourceCount?: number
   showWorkingDirectory?: boolean
+  seedRecentDirs?: boolean
+  recentDirScenario?: RecentDirScenario
   showAttachments?: boolean
   attachmentCount?: number
   showFollowUps?: boolean
@@ -563,6 +567,8 @@ function InputContainerPlayground({
   showSources = true,
   sourceCount = 2,
   showWorkingDirectory = true,
+  seedRecentDirs = true,
+  recentDirScenario = 'few',
   showAttachments = false,
   attachmentCount = 2,
   showFollowUps = false,
@@ -578,6 +584,11 @@ function InputContainerPlayground({
   React.useEffect(() => {
     ensureMockElectronAPI()
   }, [])
+
+  React.useEffect(() => {
+    if (!seedRecentDirs) return
+    setRecentWorkingDirs(getRecentDirsForScenario(recentDirScenario))
+  }, [seedRecentDirs, recentDirScenario])
 
   React.useEffect(() => {
     setModel(currentModel)
@@ -721,7 +732,7 @@ function InputContainerPlayground({
         <div className="flex-1" />
 
         <ChatInputZone
-          key={`input:${inputMode}:${compactMode ? 'compact' : 'full'}:${showAttachments ? attachmentSeedKey : 'none'}:${showFollowUps ? followUpCount : 0}`}
+          key={`input:${inputMode}:${compactMode ? 'compact' : 'full'}:${showAttachments ? attachmentSeedKey : 'none'}:${showFollowUps ? followUpCount : 0}:${seedRecentDirs ? recentDirScenario : 'unseeded'}`}
           compactMode={compactMode}
           showOptionBadges={showOptionBadges}
           permissionMode={mode}
@@ -1350,6 +1361,25 @@ export const chatComponents: ComponentEntry[] = [
         defaultValue: '/Users/demo/projects/craft-agent',
       },
       {
+        name: 'seedRecentDirs',
+        description: 'Seed recent working directory history in playground local storage',
+        control: { type: 'boolean' },
+        defaultValue: true,
+      },
+      {
+        name: 'recentDirScenario',
+        description: 'Fixture set used for recent working directory history',
+        control: {
+          type: 'select',
+          options: [
+            { label: 'Few (3 items)', value: 'few' },
+            { label: 'Many (9 items + filter)', value: 'many' },
+            { label: 'None (empty)', value: 'none' },
+          ],
+        },
+        defaultValue: 'few',
+      },
+      {
         name: 'showAttachments',
         description: 'Show preloaded attachment chips above editor',
         control: { type: 'boolean' },
@@ -1380,6 +1410,33 @@ export const chatComponents: ComponentEntry[] = [
         name: 'Default (Comprehensive)',
         description: 'App-like full setup with badges, labels, statuses, sources, and working directory',
         props: {},
+      },
+      {
+        name: 'Working Dir History (Few)',
+        description: 'Recent working directory list with a few entries (remove button testing)',
+        props: {
+          showWorkingDirectory: true,
+          seedRecentDirs: true,
+          recentDirScenario: 'few',
+        },
+      },
+      {
+        name: 'Working Dir History (Many + Filter)',
+        description: 'Recent working directory list with many entries to trigger filter input path',
+        props: {
+          showWorkingDirectory: true,
+          seedRecentDirs: true,
+          recentDirScenario: 'many',
+        },
+      },
+      {
+        name: 'Working Dir History (Empty)',
+        description: 'No recent directory history (empty state)',
+        props: {
+          showWorkingDirectory: true,
+          seedRecentDirs: true,
+          recentDirScenario: 'none',
+        },
       },
       {
         name: 'Minimal',
