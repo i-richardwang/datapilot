@@ -25,7 +25,7 @@ export type CSSColor = string;
 export interface ThemeColors {
   background?: CSSColor;
   foreground?: CSSColor;
-  accent?: CSSColor; // Brand purple (Execute mode)
+  accent?: CSSColor; // Brand color (Execute mode)
   info?: CSSColor; // Amber (Ask mode, warnings)
   success?: CSSColor; // Green
   destructive?: CSSColor; // Red
@@ -248,14 +248,14 @@ export function getBackgroundColor(isDark: boolean): string {
 export const DEFAULT_THEME: ThemeOverrides = {
   background: 'oklch(0.98 0.003 265)',
   foreground: 'oklch(0.185 0.01 270)',
-  accent: 'oklch(0.58 0.22 293)',
+  accent: 'oklch(0.6716 0.1368 48.5130)',
   info: 'oklch(0.75 0.16 70)',
   success: 'oklch(0.55 0.17 145)',
   destructive: 'oklch(0.58 0.24 28)',
   dark: {
     background: 'oklch(0.145 0.015 270)',
     foreground: 'oklch(0.95 0.01 270)',
-    accent: 'oklch(0.65 0.22 293)',
+    accent: 'oklch(0.7214 0.1337 49.9802)',
     info: 'oklch(0.78 0.14 70)',
     success: 'oklch(0.60 0.17 145)',
     destructive: 'oklch(0.65 0.22 28)',
