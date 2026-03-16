@@ -517,6 +517,24 @@ export const LITE_EXCLUDED_TOOLS = new Set([
   'render_template',
 ]);
 
+/** Tools excluded in batch mode (no human interaction, no UI rendering, no session management) */
+export const BATCH_EXCLUDED_TOOLS = new Set([
+  'SubmitPlan',
+  'config_validate',
+  'skill_validate',
+  'mermaid_validate',
+  'source_test',
+  'source_oauth_trigger',
+  'source_google_oauth_trigger',
+  'source_slack_oauth_trigger',
+  'source_microsoft_oauth_trigger',
+  'source_credential_prompt',
+  'update_user_preferences',
+  'render_template',
+  'transform_data',
+  'send_developer_feedback',
+]);
+
 export interface SessionToolFilterOptions {
   /** Include the experimental send_developer_feedback tool. */
   includeDeveloperFeedback?: boolean;
@@ -524,6 +542,8 @@ export interface SessionToolFilterOptions {
   includeBatchOutput?: boolean;
   /** Exclude provider-specific OAuth tools for lite builds. Defaults to false. */
   liteMode?: boolean;
+  /** Exclude UI/interaction tools for batch-spawned sessions. Defaults to false. */
+  batchMode?: boolean;
 }
 
 /**
@@ -536,6 +556,7 @@ export function getSessionToolDefs(options?: SessionToolFilterOptions): SessionT
   const includeDeveloperFeedback = options?.includeDeveloperFeedback ?? true;
   const includeBatchOutput = options?.includeBatchOutput ?? false;
   const liteMode = options?.liteMode ?? false;
+  const batchMode = options?.batchMode ?? false;
 
   return SESSION_TOOL_DEFS.filter(def => {
     if (!includeDeveloperFeedback && def.name === 'send_developer_feedback') {
@@ -545,6 +566,9 @@ export function getSessionToolDefs(options?: SessionToolFilterOptions): SessionT
       return false;
     }
     if (liteMode && LITE_EXCLUDED_TOOLS.has(def.name)) {
+      return false;
+    }
+    if (batchMode && BATCH_EXCLUDED_TOOLS.has(def.name)) {
       return false;
     }
     return true;
@@ -661,12 +685,14 @@ export function getToolDefsAsJsonSchema(opts?: {
   includeDeveloperFeedback?: boolean;
   includeBatchOutput?: boolean;
   liteMode?: boolean;
+  batchMode?: boolean;
 }): JsonSchemaToolDef[] {
   const prefix = opts?.prefix || '';
   const defs = getSessionToolDefs({
     includeDeveloperFeedback: opts?.includeDeveloperFeedback,
     includeBatchOutput: opts?.includeBatchOutput,
     liteMode: opts?.liteMode,
+    batchMode: opts?.batchMode,
   });
 
   return defs.map(def => {

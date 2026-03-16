@@ -431,7 +431,7 @@ export class PiAgent extends BaseAgent {
     // are executed in the main process when the LLM calls them.
     this.assertBackendSessionToolParity();
     const isBatchSession = !!getSessionBatchContext(this._sessionId);
-    const sessionToolDefs = getSessionToolProxyDefs({ includeBatchOutput: isBatchSession });
+    const sessionToolDefs = getSessionToolProxyDefs({ includeBatchOutput: isBatchSession, batchMode: isBatchSession });
 
     // Patch call_llm description with provider-specific model hint
     if (this.config.miniModel) {
