@@ -7,6 +7,7 @@
  * that handles other domains (label, source, skill, automation, etc.).
  */
 
+import { readFileSync } from 'node:fs'
 import { resolveWorkspaceRoot } from './workspace.ts'
 import { cmdList } from './commands/list.ts'
 import { cmdGet } from './commands/get.ts'
@@ -47,7 +48,7 @@ EXAMPLES
   craft-agent-batch get abc123
   craft-agent-batch validate
   craft-agent-batch status abc123 --items
-  craft-agent-batch create --name "My batch" --source data.csv --id-field id --prompt "Process \$BATCH_ITEM_ID"
+  craft-agent-batch create --name "My batch" --source data.csv --id-field id --prompt-file prompt.txt
   craft-agent-batch update abc123 --name "Renamed" --concurrency 5
   craft-agent-batch update abc123 --enabled false
   craft-agent-batch enable abc123
@@ -65,7 +66,7 @@ REQUIRED
   --name <name>                 Display name for the batch
   --source <path>               Path to data source file (.csv, .json, .jsonl)
   --id-field <field>            Field name to use as unique item identifier
-  --prompt <template>           Prompt template (use \$BATCH_ITEM_<FIELD> placeholders)
+  --prompt-file <path>          Prompt template file (use $BATCH_ITEM_<FIELD> placeholders)
 
 OPTIONAL
   --concurrency <n>             Max concurrent sessions (default: 3)
@@ -80,13 +81,10 @@ OPTIONAL
 
 EXAMPLES
   craft-agent-batch create --name "User Analysis" --source data/users.csv --id-field user_id \\
-    --prompt "Analyse user \$BATCH_ITEM_USER_ID"
-
-  craft-agent-batch create --name "Reports" --source reports.json --id-field report_id \\
-    --prompt "Generate report for \$BATCH_ITEM_REPORT_ID" --concurrency 5 --permission-mode safe
+    --prompt-file prompt.txt
 
   craft-agent-batch create --name "Extraction" --source data.csv --id-field id \\
-    --prompt "Extract from \$BATCH_ITEM_ID" --output-path output/results.jsonl \\
+    --prompt-file prompt.txt --output-path output/results.jsonl \\
     --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
 `.trim()
 
@@ -98,7 +96,7 @@ USAGE
 
 FLAGS (all optional, same as create)
   --name <name>                 Display name
-  --prompt <template>           Prompt template
+  --prompt-file <path>          Prompt template file
   --source <path>               Data source file path
   --id-field <field>            Unique item identifier field
   --concurrency <n>             Max concurrent sessions
@@ -217,9 +215,10 @@ function parseLabels(flags: Record<string, string | boolean | string[]>): string
 
 /** Build UpdateOptions from parsed flags. */
 function buildUpdateOptions(flags: Record<string, string | boolean | string[]>): UpdateOptions {
+  const promptFile = strFlag(flags, 'prompt-file')
   return {
     name: strFlag(flags, 'name'),
-    prompt: strFlag(flags, 'prompt'),
+    prompt: promptFile ? readFileSync(promptFile, 'utf-8').trim() : undefined,
     source: strFlag(flags, 'source'),
     idField: strFlag(flags, 'id-field'),
     concurrency: parseConcurrency(flags),
@@ -304,10 +303,15 @@ function main(): void {
       const name = strFlag(flags, 'name')
       const source = strFlag(flags, 'source')
       const idField = strFlag(flags, 'id-field')
-      const prompt = strFlag(flags, 'prompt')
-      if (!name || !source || !idField || !prompt) {
-        console.error('Missing required flags: --name, --source, --id-field, --prompt')
+      const promptFile = strFlag(flags, 'prompt-file')
+      if (!name || !source || !idField || !promptFile) {
+        console.error('Missing required flags: --name, --source, --id-field, --prompt-file')
         console.error('Run: craft-agent-batch create --help')
+        process.exit(1)
+      }
+      const prompt = readFileSync(promptFile, 'utf-8').trim()
+      if (!prompt) {
+        console.error('Prompt file is empty')
         process.exit(1)
       }
 

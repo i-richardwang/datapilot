@@ -12,8 +12,8 @@ craft-agent-batch get <id>
 craft-agent-batch validate
 craft-agent-batch status <id>
 craft-agent-batch status <id> --items
-craft-agent-batch create --name "My batch" --source data.csv --id-field id --prompt "Process $BATCH_ITEM_ID"
-craft-agent-batch create --name "Extraction" --source data.csv --id-field id --prompt "Extract $BATCH_ITEM_ID" --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
+craft-agent-batch create --name "My batch" --source data.csv --id-field id --prompt-file prompt.txt
+craft-agent-batch create --name "Extraction" --source data.csv --id-field id --prompt-file prompt.txt --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
 craft-agent-batch update <id> --name "Renamed" --concurrency 5
 craft-agent-batch update <id> --enabled false
 craft-agent-batch update <id> --patch '{"execution":{"retryOnFailure":true}}'
@@ -68,12 +68,17 @@ One JSON object per line.
 
 ## Prompt Templates
 
-Use `$BATCH_ITEM_{FIELDNAME}` placeholders in `--prompt` to inject item fields. Field names are uppercased.
+Write your prompt template to a file and pass it via `--prompt-file`. Use `$BATCH_ITEM_{FIELDNAME}` placeholders to inject item fields. Field names are uppercased.
 
-For a CSV with columns `user_id`, `name`, `email`:
+**Field naming requirement:** All field names in the data source must use ASCII characters only (letters, numbers, underscores). For example: `user_id`, `name`, `email`. If your source data has non-ASCII field names (e.g. Chinese), rename them to English before use.
 
 ```
---prompt "Create a welcome email for $BATCH_ITEM_NAME at $BATCH_ITEM_EMAIL (account $BATCH_ITEM_USER_ID)"
+# prompt.txt
+Create a welcome email for $BATCH_ITEM_NAME at $BATCH_ITEM_EMAIL (account $BATCH_ITEM_USER_ID)
+```
+
+```bash
+craft-agent-batch create --name "Onboarding" --source users.csv --id-field user_id --prompt-file prompt.txt
 ```
 
 Additional action fields (set via `--patch`):
@@ -137,7 +142,7 @@ Example:
 
 ```bash
 craft-agent-batch create --name "User Analysis" --source data/users.csv --id-field user_id \
-  --prompt "Analyse user $BATCH_ITEM_USER_ID" \
+  --prompt-file prompt.txt \
   --output-path output/user-analysis.jsonl \
   --output-schema '{"type":"object","properties":{"summary":{"type":"string","description":"One-sentence summary"},"risk_level":{"type":"string","enum":["low","medium","high"]},"score":{"type":"number","description":"Risk score 0-100"}},"required":["summary","risk_level"]}'
 ```
@@ -148,12 +153,18 @@ Without `--output-schema`, the agent can output any JSON object (freeform mode).
 
 ### CSV User Processing with Structured Output
 
+```
+# prompt.txt
+Generate an onboarding summary for user $BATCH_ITEM_NAME ($BATCH_ITEM_EMAIL).
+Their role is $BATCH_ITEM_ROLE and they joined on $BATCH_ITEM_START_DATE.
+```
+
 ```bash
 craft-agent-batch create \
   --name "User Onboarding Summaries" \
   --source data/new-users.csv \
   --id-field user_id \
-  --prompt "Generate an onboarding summary for user $BATCH_ITEM_NAME ($BATCH_ITEM_EMAIL). Their role is $BATCH_ITEM_ROLE and they joined on $BATCH_ITEM_START_DATE." \
+  --prompt-file prompt.txt \
   --concurrency 5 \
   --permission-mode safe \
   --label "Batch" --label "onboarding" \
@@ -164,12 +175,18 @@ craft-agent-batch create \
 
 ### JSON Report Generation
 
+```
+# prompt.txt
+Generate a quarterly status report for project $BATCH_ITEM_PROJECT_ID ($BATCH_ITEM_TITLE)
+in the $BATCH_ITEM_REGION region. Include budget analysis and key milestones.
+```
+
 ```bash
 craft-agent-batch create \
   --name "Quarterly Report Generation" \
   --source data/projects.json \
   --id-field project_id \
-  --prompt "Generate a quarterly status report for project $BATCH_ITEM_PROJECT_ID ($BATCH_ITEM_TITLE) in the $BATCH_ITEM_REGION region. Include budget analysis and key milestones." \
+  --prompt-file prompt.txt \
   --concurrency 3 \
   --permission-mode allow-all \
   --label "Batch" --label "reports" \
@@ -178,13 +195,20 @@ craft-agent-batch create \
 
 ### JSONL Content Translation
 
+```
+# prompt.txt
+Translate the following text to $BATCH_ITEM_TARGET_LANG. Preserve formatting and tone.
+
+Text: $BATCH_ITEM_TEXT
+```
+
 ```bash
 craft-agent-batch create \
   --name "Content Translation" \
   --source data/content-to-translate.jsonl \
   --id-field content_id \
   --concurrency 10 \
-  --prompt "Translate the following text to $BATCH_ITEM_TARGET_LANG. Preserve formatting and tone.\n\nText: $BATCH_ITEM_TEXT" \
+  --prompt-file prompt.txt \
   --label "Batch" --label "translation" \
   --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
 ```

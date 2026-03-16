@@ -105,7 +105,7 @@ const POLICIES: Record<CliDomainNamespace, CliDomainPolicy> = {
       'craft-agent-batch get <id>',
       'craft-agent-batch validate',
       'craft-agent-batch status <id>',
-      'craft-agent-batch create --name "My batch" --source data.csv --id-field id --prompt "Process $BATCH_ITEM_ID"',
+      'craft-agent-batch create --name "My batch" --source data.csv --id-field id --prompt-file prompt.txt',
       'craft-agent-batch update <id> --name "Renamed" --concurrency 5',
       'craft-agent-batch update <id> --enabled false',
     ],

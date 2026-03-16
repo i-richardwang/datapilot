@@ -394,7 +394,7 @@ Manage batch processing jobs stored in `batches.json`.
 | `--name "<name>"` | **(required for create)** Display name for the batch |
 | `--source <path>` | **(required for create)** Path to data source file (`.csv`, `.json`, or `.jsonl`) |
 | `--id-field <field>` | **(required for create)** Field name used as the unique item identifier |
-| `--prompt "..."` | **(required for create)** Prompt template with `$BATCH_ITEM_<FIELD>` placeholders |
+| `--prompt-file <path>` | **(required for create)** Prompt template file with `$BATCH_ITEM_<FIELD>` placeholders |
 | `--concurrency <n>` | Max concurrent sessions (default: 3) |
 | `--model "<model-id>"` | Model ID for created sessions |
 | `--connection "<slug>"` | LLM connection slug |
@@ -420,11 +420,11 @@ craft-agent-batch validate
 craft-agent-batch status abc123
 craft-agent-batch status abc123 --items
 
-# Create with flat flags
-craft-agent-batch create --name "User Analysis" --source data/users.csv --id-field user_id --prompt "Analyse user $BATCH_ITEM_USER_ID"
-craft-agent-batch create --name "Reports" --source reports.json --id-field report_id --prompt "Generate report for $BATCH_ITEM_REPORT_ID" --concurrency 5 --permission-mode safe
+# Create (prompt template in a file)
+craft-agent-batch create --name "User Analysis" --source data/users.csv --id-field user_id --prompt-file prompt.txt
+craft-agent-batch create --name "Reports" --source reports.json --id-field report_id --prompt-file prompt.txt --concurrency 5 --permission-mode safe
 # Create with structured output
-craft-agent-batch create --name "Extraction" --source data.csv --id-field id --prompt "Extract from $BATCH_ITEM_ID" --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
+craft-agent-batch create --name "Extraction" --source data.csv --id-field id --prompt-file prompt.txt --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
 # Update with flat flags
 craft-agent-batch update abc123 --name "Renamed Batch" --concurrency 10
 craft-agent-batch update abc123 --enabled false
