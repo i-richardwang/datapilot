@@ -33,7 +33,7 @@ Types, schemas, CSV/JSON/JSONL parser, state persistence, processor (lifecycle +
 
 ### Batch Output Tool — `packages/session-tools-core/src/handlers/batch-output.ts`
 
-Handler + tests: coerces stringified JSON, validates against output schema via **ajv**, appends JSONL records.
+Handler + tests: coerces stringified JSON, validates against output schema via **ajv**, upserts JSONL records (same `_item_id` replaces previous record).
 
 ### Batch RPC Handlers — `packages/server-core/src/handlers/rpc/batches.ts`
 

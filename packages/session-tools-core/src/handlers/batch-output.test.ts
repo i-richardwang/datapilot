@@ -78,7 +78,7 @@ describe('handleBatchOutput', () => {
     expect(record.score).toBe(95)
   })
 
-  it('should append multiple records to same file', async () => {
+  it('should keep separate records for different items', async () => {
     const outputPath = join(tempDir, 'output.jsonl')
     const ctx1 = createTestContext({
       batchId: 'batch-1',
@@ -98,6 +98,50 @@ describe('handleBatchOutput', () => {
     expect(lines).toHaveLength(2)
     expect(JSON.parse(lines[0]!)._item_id).toBe('item-1')
     expect(JSON.parse(lines[1]!)._item_id).toBe('item-2')
+  })
+
+  it('should replace previous record when same item writes again', async () => {
+    const outputPath = join(tempDir, 'output.jsonl')
+    const ctx = createTestContext({
+      batchId: 'batch-1',
+      itemId: 'item-1',
+      outputPath,
+    })
+
+    await handleBatchOutput(ctx, { data: { value: 'initial' } })
+    await handleBatchOutput(ctx, { data: { value: 'corrected' } })
+
+    const lines = readFileSync(outputPath, 'utf-8').trim().split('\n')
+    expect(lines).toHaveLength(1)
+
+    const record = JSON.parse(lines[0]!)
+    expect(record._item_id).toBe('item-1')
+    expect(record.value).toBe('corrected')
+  })
+
+  it('should replace only the matching item, preserving others', async () => {
+    const outputPath = join(tempDir, 'output.jsonl')
+    const ctx1 = createTestContext({
+      batchId: 'batch-1',
+      itemId: 'item-1',
+      outputPath,
+    })
+    const ctx2 = createTestContext({
+      batchId: 'batch-1',
+      itemId: 'item-2',
+      outputPath,
+    })
+
+    await handleBatchOutput(ctx1, { data: { value: 'a' } })
+    await handleBatchOutput(ctx2, { data: { value: 'b' } })
+    await handleBatchOutput(ctx1, { data: { value: 'a-updated' } })
+
+    const lines = readFileSync(outputPath, 'utf-8').trim().split('\n')
+    expect(lines).toHaveLength(2)
+    expect(JSON.parse(lines[0]!)._item_id).toBe('item-2')
+    expect(JSON.parse(lines[0]!).value).toBe('b')
+    expect(JSON.parse(lines[1]!)._item_id).toBe('item-1')
+    expect(JSON.parse(lines[1]!).value).toBe('a-updated')
   })
 
   it('should create output directory if it does not exist', async () => {

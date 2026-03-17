@@ -1,15 +1,19 @@
 /**
  * Batch Output Handler
  *
- * Records structured output for a batch item. Appends a JSON line to
+ * Records structured output for a batch item. Writes a JSON line to
  * the shared JSONL output file configured in batches.json.
+ *
+ * If the same item has already written output (same _item_id), the
+ * previous record is replaced — ensuring each item has exactly one
+ * record in the output file.
  *
  * This tool is only functional within batch-spawned sessions — the
  * batchContext must be present on the SessionToolContext.
  */
 
 import { dirname } from 'node:path';
-import { appendFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import Ajv from 'ajv';
 import type { SessionToolContext } from '../context.ts';
 import type { ToolResult } from '../types.ts';
@@ -20,6 +24,23 @@ export interface BatchOutputArgs {
 }
 
 const ajv = new Ajv({ allErrors: true });
+
+/**
+ * Per-file write queue to serialize read-modify-write operations.
+ * Prevents data loss when multiple items write to the same file concurrently.
+ */
+const writeQueues = new Map<string, Promise<void>>();
+
+function withFileQueue<T>(filePath: string, fn: () => T): Promise<T> {
+  const prev = writeQueues.get(filePath) ?? Promise.resolve();
+  const next = prev.then(fn, fn); // run fn even if previous errored
+  // Store the void version to keep the chain going
+  const tail = next.then(() => {}, () => {});
+  writeQueues.set(filePath, tail);
+  // Clean up entry when this is still the latest queued operation
+  tail.then(() => { if (writeQueues.get(filePath) === tail) writeQueues.delete(filePath); });
+  return next;
+}
 
 /**
  * Validate data against a JSON Schema using ajv.
@@ -86,10 +107,49 @@ function coerceData(raw: Record<string, unknown> | string): { data: Record<strin
 }
 
 /**
+ * Replace or append an output record in a JSONL file.
+ *
+ * Reads existing lines, removes any with the same _item_id, then
+ * writes back all lines plus the new record. Serialized per-file
+ * via writeQueues to prevent concurrent read-modify-write races.
+ */
+function upsertRecord(outputPath: string, record: Record<string, unknown>): void {
+  const itemId = record._item_id;
+
+  // Ensure output directory exists
+  const dir = dirname(outputPath);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+
+  // Read existing lines (if file exists)
+  let existingLines: string[] = [];
+  if (existsSync(outputPath)) {
+    const content = readFileSync(outputPath, 'utf-8');
+    existingLines = content.split('\n').filter(line => line.trim() !== '');
+  }
+
+  // Filter out previous records for this item
+  const filteredLines = existingLines.filter(line => {
+    try {
+      const parsed = JSON.parse(line);
+      return parsed._item_id !== itemId;
+    } catch {
+      return true; // keep malformed lines
+    }
+  });
+
+  // Append the new record and write back
+  filteredLines.push(JSON.stringify(record));
+  writeFileSync(outputPath, filteredLines.join('\n') + '\n', 'utf-8');
+}
+
+/**
  * Handle the batch_output tool call.
  *
  * Validates output data against the configured schema (if any), then
- * appends a JSONL record with metadata to the output file.
+ * upserts a JSONL record with metadata to the output file. If the
+ * same item already has a record, it is replaced.
  */
 export async function handleBatchOutput(
   ctx: SessionToolContext,
@@ -131,15 +191,8 @@ export async function handleBatchOutput(
   };
 
   try {
-    // Ensure output directory exists
-    const dir = dirname(outputPath);
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
-    }
-
-    // Append to JSONL file (atomic for writes < PIPE_BUF on POSIX)
-    const line = JSON.stringify(record) + '\n';
-    appendFileSync(outputPath, line, 'utf-8');
+    // Serialize file writes to prevent concurrent read-modify-write races
+    await withFileQueue(outputPath, () => upsertRecord(outputPath, record));
 
     return successResponse(
       `Output recorded for item "${itemId}" → ${outputPath}\n` +
