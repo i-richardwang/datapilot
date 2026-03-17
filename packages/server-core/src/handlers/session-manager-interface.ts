@@ -162,6 +162,7 @@ export interface ISessionManager {
     hidden?: boolean,
     batchContext?: { batchId: string; itemId: string; outputPath: string; outputSchema?: Record<string, unknown> },
     automationName?: string,
+    workingDirectory?: string,
   ): Promise<{ sessionId: string }>
 
   // ---------------------------------------------------------------------------

@@ -74,6 +74,7 @@ OPTIONAL
   --connection <slug>           LLM connection slug
   --permission-mode <mode>      safe | ask | allow-all
   --label <label>               Label to apply (repeatable)
+  --working-directory <path>    Working directory for sessions (absolute path; omit for workspace default)
   --output-path <path>          Output file path (.jsonl) for structured results
   --output-schema <json>        JSON Schema for output validation
   --patch <json>                Raw JSON merged into the batch config (advanced)
@@ -104,6 +105,7 @@ FLAGS (all optional, same as create)
   --connection <slug>           LLM connection slug
   --permission-mode <mode>      safe | ask | allow-all
   --label <label>               Labels (repeatable, replaces existing)
+  --working-directory <path>    Working directory for sessions (absolute path; omit for workspace default)
   --enabled true|false          Enable or disable the batch
   --output-path <path>          Output file path (.jsonl)
   --output-schema <json>        JSON Schema for output validation
@@ -226,6 +228,7 @@ function buildUpdateOptions(flags: Record<string, string | boolean | string[]>):
     connection: strFlag(flags, 'connection'),
     permissionMode: parsePermissionMode(flags),
     labels: parseLabels(flags),
+    workingDirectory: strFlag(flags, 'working-directory'),
     enabled: parseEnabledFlag(flags),
     outputPath: strFlag(flags, 'output-path'),
     outputSchema: strFlag(flags, 'output-schema'),
@@ -325,6 +328,7 @@ function main(): void {
         connection: strFlag(flags, 'connection'),
         permissionMode: parsePermissionMode(flags),
         labels: parseLabels(flags),
+        workingDirectory: strFlag(flags, 'working-directory'),
         outputPath: strFlag(flags, 'output-path'),
         outputSchema: strFlag(flags, 'output-schema'),
         patch: strFlag(flags, 'patch'),

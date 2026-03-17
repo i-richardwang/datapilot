@@ -1395,6 +1395,7 @@ export class SessionManager implements ISessionManager {
             true,
             params.batchContext,
             params.automationName,
+            params.workingDirectory,
           )
         },
         onProgress: (progress) => {
@@ -6452,6 +6453,7 @@ export class SessionManager implements ISessionManager {
     hidden?: boolean,
     batchContext?: { batchId: string; itemId: string; outputPath: string; outputSchema?: Record<string, unknown> },
     automationName?: string,
+    workingDirectory?: string,
   ): Promise<{ sessionId: string }> {
     // Warn if llmConnection was specified but doesn't resolve
     if (llmConnection) {
@@ -6482,6 +6484,7 @@ export class SessionManager implements ISessionManager {
       llmConnection,
       model,
       hidden,
+      workingDirectory,
     })
 
     // Register batch context before sending the first message so that

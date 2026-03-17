@@ -22,6 +22,7 @@ export interface CreateOptions {
   connection?: string
   permissionMode?: 'safe' | 'ask' | 'allow-all'
   labels?: string[]
+  workingDirectory?: string
   outputPath?: string
   outputSchema?: string
   patch?: string
@@ -51,6 +52,7 @@ export function cmdCreate(workspaceRoot: string, opts: CreateOptions, asJson: bo
     id,
     name: opts.name,
     enabled: true,
+    ...(opts.workingDirectory ? { workingDirectory: opts.workingDirectory } : {}),
     source: {
       type: sourceType,
       path: opts.source,

@@ -79,6 +79,8 @@ export interface BatchConfig {
   name: string
   /** Whether this batch is enabled */
   enabled?: boolean
+  /** Working directory for sessions created by this batch (absolute path). Omit to use workspace default. */
+  workingDirectory?: string
   /** Data source configuration */
   source: BatchSource
   /** Execution configuration */
@@ -152,6 +154,8 @@ export interface BatchExecutePromptParams {
   mentions?: string[]
   llmConnection?: string
   model?: string
+  /** Working directory for the created session (absolute path). Omit to use workspace default. */
+  workingDirectory?: string
   /** Batch context for structured output collection */
   batchContext?: {
     batchId: string
