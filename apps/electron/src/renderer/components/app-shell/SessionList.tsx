@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { isToday, isYesterday, format, startOfDay } from "date-fns"
 import { useAction } from "@/actions"
-import { Inbox, Archive } from "lucide-react"
+import { Inbox, Archive, Layers } from "lucide-react"
 
 import { getSessionStatus } from "@/utils/session"
 import * as storage from "@/lib/local-storage"
@@ -595,6 +595,17 @@ export function SessionList({
           icon={<Archive />}
           title="No archived sessions"
           description="Sessions you archive will appear here. Archive sessions to keep your list tidy while preserving conversations."
+          className="h-full"
+        />
+      )
+    }
+
+    if (currentFilter?.kind === 'batch') {
+      return (
+        <EntityListEmptyScreen
+          icon={<Layers />}
+          title="No batch sessions"
+          description="Sessions created by batch processing will appear here."
           className="h-full"
         />
       )

@@ -104,6 +104,10 @@ export const routes = {
     archived: (sessionId?: string) =>
       sessionId ? `archived/session/${sessionId}` as const : 'archived' as const,
 
+    /** Batch sessions view (sessions navigator, batch filter) */
+    batchSessions: (sessionId?: string) =>
+      sessionId ? `batchSessions/session/${sessionId}` as const : 'batchSessions' as const,
+
     /** Todo state filter view (sessions navigator, state filter) */
     state: (stateId: string, sessionId?: string) =>
       sessionId

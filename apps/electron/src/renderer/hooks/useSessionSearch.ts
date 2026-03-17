@@ -269,6 +269,9 @@ export function sessionMatchesCurrentFilter(
       if (currentFilter.viewId === '__all__') return matched.length > 0
       return matched.some(v => v.id === currentFilter.viewId)
 
+    case 'batch':
+      return session.isBatch === true
+
     default:
       const _exhaustive: never = currentFilter
       return true
@@ -371,8 +374,8 @@ export function useSessionSearch({
 
   // --- Data pipeline ---
 
-  // Filter out hidden sessions before any processing
-  const visibleItems = useMemo(() => items.filter(item => !item.hidden), [items])
+  // Filter out hidden and batch sessions before any processing
+  const visibleItems = useMemo(() => items.filter(item => !item.hidden && !item.isBatch), [items])
 
   // Sort by most recent activity first
   const sortedItems = useMemo(() =>

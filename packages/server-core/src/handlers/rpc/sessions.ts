@@ -349,12 +349,12 @@ export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): 
       searchId: id,
     })
 
-    // Filter out hidden sessions (e.g., mini edit sessions)
+    // Filter out hidden sessions (e.g., mini edit sessions) and batch sessions
     const allSessions = await sessionManager.getSessions()
-    const hiddenSessionIds = new Set(
-      allSessions.filter(s => s.hidden).map(s => s.id)
+    const excludedSessionIds = new Set(
+      allSessions.filter(s => s.hidden || s.isBatch).map(s => s.id)
     )
-    const filteredResults = results.filter(r => !hiddenSessionIds.has(r.sessionId))
+    const filteredResults = results.filter(r => !excludedSessionIds.has(r.sessionId))
 
     log.info('[search]','ipc:response', { searchId: id, resultCount: filteredResults.length, totalFound: results.length })
     return filteredResults

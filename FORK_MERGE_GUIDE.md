@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: identify conflict zones, understand intent, make informed merge resolution decisions.
 >
-> **Last updated after:** batch-workdir (Batch per-batch working directory support)
+> **Last updated after:** batch-isBatch (Batch sessions: `hidden` → `isBatch` with dedicated sidebar filter)
 
 ## Overview
 
@@ -73,7 +73,7 @@ These files are frequently touched by upstream and have substantial fork modific
 #### `packages/server-core/src/sessions/SessionManager.ts`
 
 - Added `batchProcessors: Map<string, BatchProcessor>` with per-workspace init, callbacks (`onExecutePrompt`, `onProgress`, `onBatchComplete`, `onError`), config watcher, broadcasting
-- Modified `executePromptAutomation()`: added `hidden`, `batchContext`, and `workingDirectory` params (coexist with upstream's `automationName`)
+- Modified `executePromptAutomation()`: added `isBatch`, `batchContext`, and `workingDirectory` params (coexist with upstream's `automationName`)
 - Session completion handler notifies batch processors
 - Added `getBatchProcessor()`, `broadcastBatchesChanged()`, cleanup in `dispose()`
 
@@ -81,7 +81,7 @@ These files are frequently touched by upstream and have substantial fork modific
 
 #### `apps/electron/src/renderer/components/app-shell/AppShell.tsx`
 
-- **Batch:** sidebar nav item + count badge, "Add Batch" button (EditPopover), `BatchesListPanel` rendering, delete dialog, `useBatches()` hook, `batchHandlersRef` prop, context extension
+- **Batch:** sidebar nav item + count badge, "Add Batch" button (EditPopover), `BatchesListPanel` rendering, delete dialog, `useBatches()` hook, `batchHandlersRef` prop, context extension, "Batch Sessions" trailing sidebar item under All Sessions (filters `isBatch` sessions)
 - **Lite:** conditional "What's New" button via `...(!FEATURE_FLAGS.liteVersion ? [...] : [])`
 
 **Pattern:** Batch mirrors automations integration. Lite uses conditional spread.
@@ -142,7 +142,7 @@ Extended `ClaudeContextOptions` with `batchContext?: BatchContext`; added `valid
 
 #### `packages/server-core/src/handlers/session-manager-interface.ts`
 
-Added `getBatchProcessor?()` method; extended `executePromptAutomation()` with `hidden` + `batchContext` + `workingDirectory` params.
+Added `getBatchProcessor?()` method; extended `executePromptAutomation()` with `isBatch` + `batchContext` + `workingDirectory` params.
 **Note:** This was a 3-way conflict in v0.7.1 merge. Future upstream signature changes will conflict.
 
 #### `packages/shared/src/config/validators.ts`
@@ -250,13 +250,13 @@ These are simple additive changes (exports, types, config entries) unlikely to c
 | `packages/shared/CLAUDE.md` | Added batch import example, `batches/` in directory structure |
 | `packages/shared/package.json` | Added `"./batches"` subpath export |
 | `packages/shared/src/protocol/channels.ts` | Added `batches` namespace to `RPC_CHANNELS` |
-| `packages/shared/src/protocol/dto.ts` | Added `batch_progress`, `batch_complete` to `SessionEvent` |
+| `packages/shared/src/protocol/dto.ts` | Added `batch_progress`, `batch_complete` to `SessionEvent`; added `isBatch` to `Session` and `CreateSessionOptions` |
 | `packages/shared/src/protocol/events.ts` | Added `batches.CHANGED` to `BroadcastEventMap` |
 | `apps/electron/src/transport/channel-map.ts` | Added 10 batch channel mappings |
-| `apps/electron/src/shared/routes.ts` | Added `batches()` route builder |
+| `apps/electron/src/shared/routes.ts` | Added `batches()` and `batchSessions()` route builders |
 | `apps/electron/src/renderer/components/ui/EditPopover.tsx` | Added `'batch-config'` to `EditContextKey` |
 | `apps/electron/src/renderer/context/AppShellContext.tsx` | Added 6 batch methods to context interface |
-| `apps/electron/src/renderer/contexts/NavigationContext.tsx` | Re-exported `isBatchesNavigation` |
+| `apps/electron/src/renderer/contexts/NavigationContext.tsx` | Re-exported `isBatchesNavigation`; added `isBatch` exclusion to session filters, `batch` case to `filterSessionsByFilter` |
 | `packages/session-tools-core/src/handlers/index.ts` | Export `handleBatchOutput`, `BatchOutputArgs` |
 | `packages/session-tools-core/src/index.ts` | Export `BatchContext`, `handleBatchOutput`, `BatchOutputArgs`, `BatchOutputSchema` |
 | `apps/electron/src/main/index.ts` | Added `CRAFT_BATCH_CLI_ENTRY` env var assignment |
@@ -279,7 +279,7 @@ When merging upstream updates:
    - `AppShell.tsx` — batch UI + lite conditionals span sidebar, header, content, dialog
    - `tool-defs.ts` — batch tool registration, `LITE_EXCLUDED_TOOLS` set, and filter options
    - `session-scoped-tools.ts` — batch context registry + lite mode passthrough in tool init flow
-4. **If upstream changes `executePromptAutomation()` signature**: ensure `hidden`, `batchContext`, `automationName`, `workingDirectory` passthrough works
+4. **If upstream changes `executePromptAutomation()` signature**: ensure `isBatch`, `batchContext`, `automationName`, `workingDirectory` passthrough works
 5. **If upstream moves automations utilities** (`expandEnvVars`, `sanitizeForShell`): update imports in `batch-processor.ts`
 6. **If upstream changes `resolvePresetStateForBaseUrlChange()`**: re-verify our fix
 7. **If upstream changes feature flags / Vite config**: preserve our `liteVersion` getter and `define` entry
@@ -298,13 +298,14 @@ When merging upstream updates:
 |---------|------|-----------|-------|
 | v0.7.0 | 2026-03-06 | 9 | Major RPC/transport refactoring. Ported batch IPC → `rpc/batches.ts`, preload → `channel-map.ts`, types → protocol layer. |
 | post-merge | 2026-03-06 | — | Batch refinements: LLM string coercion, safe mode fix, ajv validation, one-shot menu, context injection. |
-| v0.7.1 | 2026-03-06 | 3 | Session naming. Merged our `hidden`/`batchContext` with upstream's `automationName`. |
+| v0.7.1 | 2026-03-06 | 3 | Session naming. Merged our `isBatch`/`batchContext` with upstream's `automationName`. |
 | v0.7.2 | 2026-03-10 | 5 | Island system, new presets, thinking level, bug fixes. Resolved: batch events + `message_annotations_updated`; batch ctx + diagnostics logging; upstream's `resolvePresetStateForBaseUrlChange` for Pi routing. |
 | post-v0.7.2 | 2026-03-10 | — | Batch CLI (`packages/batch-cli/`), wrapper scripts, `cli-domains.ts` batch policy, `pre-tool-use.ts` detection. Preset preservation fix. Lite version build flag (`CRAFT_LITE_VERSION`). |
 | lite-tools | 2026-03-11 | — | Lite mode tool exclusions: `LITE_EXCLUDED_TOOLS` (9 tools: 4 OAuth, browser, mermaid_validate, skill_validate, render_template). System prompt conditionals for Browser Tools, Mermaid validation, Source Templates, Debug Mode sections. `liteMode` passthrough in 5 call sites. |
 | v0.7.3 | 2026-03-11 | 1 | OAuth stability, background task UI, title generation with language awareness, exclude filter badges, MCP schema conversion, Minimax preset split. Resolved: `session-scoped-tools.ts` — adopted upstream's new cache strategy (cache tools array, not MCP server wrapper) while preserving batch context + lite mode passthrough. |
 | v0.7.4 | 2026-03-12 | 2 | Custom endpoints, session branching overhaul, model switching fix, Windows branch fixes. Resolved: `config-watcher.ts` — accepted upstream deletion (shared version has our batch additions); `pi-agent-server/src/index.ts` — adopted upstream's full custom endpoint system (`registerCustomEndpointModels`, `CustomEndpointApi`), replacing our `customBaseUrlOverride` approach. |
-| v0.7.5 | 2026-03-13 | 3 | Webhook actions for automations, network proxy, working directory history, model resolution refactor. Resolved: `AppShell.tsx` — added upstream's `onReplayAutomation` alongside batch handlers; `AppShellContext.tsx` — added `onReplayAutomation` to context interface; `SessionManager.ts` — merged `createPromptHistoryEntry` import with our `BatchProcessor` import. Additional fix: `rpc/automations.ts` — inserted `undefined` placeholders for fork's `hidden`/`batchContext` params in new `executePromptAutomation` call site. |
+| v0.7.5 | 2026-03-13 | 3 | Webhook actions for automations, network proxy, working directory history, model resolution refactor. Resolved: `AppShell.tsx` — added upstream's `onReplayAutomation` alongside batch handlers; `AppShellContext.tsx` — added `onReplayAutomation` to context interface; `SessionManager.ts` — merged `createPromptHistoryEntry` import with our `BatchProcessor` import. Additional fix: `rpc/automations.ts` — inserted `undefined` placeholders for fork's `isBatch`/`batchContext` params in new `executePromptAutomation` call site. |
 | batch-tools | 2026-03-16 | — | Batch mode tool filtering: `BATCH_EXCLUDED_TOOLS` (14 registry tools), `batchMode` option in `SessionToolFilterOptions`, backend tools (`spawn_session`, `batch_test`, `browser_tool`) conditionally skipped in Claude adapter. Batch sessions reduced from 19+ tools to 3 (`batch_output`, `call_llm`, `script_sandbox`). |
 | v0.7.6 | 2026-03-17 | 1 | Custom endpoint persistence, MCP custom headers, OAuth refresh loop fix, model ID format fix, OSS build scripts. Resolved: `storage.ts` — identical `customEndpoint` persistence fix on both sides (took upstream comment). Fork-only fixes retained: `pi-agent-server/index.ts` queryLlm provider check exemption, `pi.ts` validateStoredConnection enhancement, `submit-helpers.ts` preset preservation. |
 | batch-workdir | 2026-03-17 | — | Per-batch working directory: `BatchConfig.workingDirectory` (optional absolute path) passed through `BatchProcessor` → `executePromptAutomation()` → `createSession()`. CLI `--working-directory` flag on create/update. UI display in `BatchInfoPage` Execution section. |
+| batch-isBatch | 2026-03-18 | — | Batch sessions visibility: replaced `hidden: true` with `isBatch: true` persistent field. Batch sessions now excluded from All Sessions but visible under dedicated "Batch Sessions" sidebar entry (alongside Flagged/Archived). Added `{ kind: 'batch' }` to `SessionFilter`, `batchSessions` route, route-parser support, empty state. Updated server-side filtering (unread summary, markAllRead, search) and client notifications to exclude `isBatch` sessions. `hidden` field retained for mini-edit sessions only. |

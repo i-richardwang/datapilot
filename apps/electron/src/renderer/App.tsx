@@ -555,7 +555,7 @@ export default function App() {
 
             // Native notification for approval-required pauses (same gating as completion notifications)
             const notifySession = store.get(sessionAtomFamily(sessionId))
-            if (notifySession && !notifySession.hidden) {
+            if (notifySession && !notifySession.hidden && !notifySession.isBatch) {
               const isAdminPrompt = effect.request.type === 'admin_approval'
               const promptBody = isAdminPrompt
                 ? `Admin approval required: ${effect.request.appName || effect.request.toolName}`
@@ -736,7 +736,7 @@ export default function App() {
 
           // Show notification on complete (when window is not focused)
           // Skip hidden sessions (mini-agent sessions) - they shouldn't trigger notifications
-          if (event.type === 'complete' && !updatedSession.hidden) {
+          if (event.type === 'complete' && !updatedSession.hidden && !updatedSession.isBatch) {
             // Get the last assistant/plan message as preview
             const lastMessage = updatedSession.messages.findLast(
               m => (m.role === 'assistant' || m.role === 'plan') && !m.isIntermediate

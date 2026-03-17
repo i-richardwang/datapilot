@@ -184,6 +184,7 @@ export async function createSession(
     model?: string;
     llmConnection?: string;
     hidden?: boolean;
+    isBatch?: boolean;
     sessionStatus?: SessionConfig['sessionStatus'];
     labels?: string[];
     isFlagged?: boolean;
@@ -215,6 +216,7 @@ export async function createSession(
     model: options?.model,
     llmConnection: options?.llmConnection,
     hidden: options?.hidden,
+    isBatch: options?.isBatch,
     sessionStatus: options?.sessionStatus,
     labels: options?.labels,
     isFlagged: options?.isFlagged,

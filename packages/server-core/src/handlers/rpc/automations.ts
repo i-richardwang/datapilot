@@ -117,7 +117,7 @@ export function registerAutomationsHandlers(server: RpcServer, deps: HandlerDeps
           references.mentions,
           action.llmConnection,
           action.model,
-          undefined, // hidden (fork: batch-only param)
+          undefined, // isBatch (fork: batch-only param)
           undefined, // batchContext (fork: batch-only param)
           payload.automationName,
           undefined, // workingDirectory (fork: batch-only param)

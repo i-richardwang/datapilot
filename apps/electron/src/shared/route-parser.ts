@@ -64,7 +64,7 @@ export interface ParsedCompoundRoute {
  * Known prefixes that indicate a compound route
  */
 const COMPOUND_ROUTE_PREFIXES = [
-  'allSessions', 'flagged', 'archived', 'state', 'label', 'view', 'sources', 'skills', 'automations', 'batches', 'settings'
+  'allSessions', 'flagged', 'archived', 'batchSessions', 'state', 'label', 'view', 'sources', 'skills', 'automations', 'batches', 'settings'
 ]
 
 /**
@@ -249,6 +249,10 @@ export function parseCompoundRoute(route: string): ParsedCompoundRoute | null {
       sessionFilter = { kind: 'archived' }
       detailsStartIndex = 1
       break
+    case 'batchSessions':
+      sessionFilter = { kind: 'batch' }
+      detailsStartIndex = 1
+      break
     case 'state':
       if (!segments[1]) return null
       // Cast is safe because we're constructing from URL
@@ -348,6 +352,9 @@ export function buildCompoundRoute(parsed: ParsedCompoundRoute): string {
       break
     case 'archived':
       base = 'archived'
+      break
+    case 'batch':
+      base = 'batchSessions'
       break
     case 'state':
       base = `state/${filter.stateId}`
@@ -741,6 +748,12 @@ function convertParsedRouteToNavigationState(parsed: ParsedRoute): NavigationSta
       return {
         navigator: 'sessions',
         filter: { kind: 'archived' },
+        details: null,
+      }
+    case 'batchSessions':
+      return {
+        navigator: 'sessions',
+        filter: { kind: 'batch' },
         details: null,
       }
     case 'state':

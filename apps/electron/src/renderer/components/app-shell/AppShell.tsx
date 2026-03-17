@@ -1342,9 +1342,9 @@ function AppShellContent({
       : metas.filter(s => !s.hidden)
   }, [sessionMetaMap, activeWorkspaceId])
 
-  // Active sessions exclude archived - use this for all counts and filters except archived view
+  // Active sessions exclude archived and batch - use this for all counts and filters except archived/batch views
   const activeSessionMetas = useMemo(() => {
-    return workspaceSessionMetas.filter(s => !s.isArchived)
+    return workspaceSessionMetas.filter(s => !s.isArchived && !s.isBatch)
   }, [workspaceSessionMetas])
 
   const refreshWorkspaceUnreadMap = useCallback(async () => {
@@ -1391,6 +1391,7 @@ function AppShellContent({
   const isMetaDone = (s: SessionMeta) => s.sessionStatus === 'done' || s.sessionStatus === 'cancelled'
   const flaggedCount = activeSessionMetas.filter(s => s.isFlagged).length
   const archivedCount = workspaceSessionMetas.filter(s => s.isArchived).length
+  const batchSessionCount = workspaceSessionMetas.filter(s => s.isBatch).length
 
   // Compute session counts per label (cumulative: parent includes descendants).
   // Flatten the tree for iteration, use the tree for descendant lookups.
@@ -1478,6 +1479,10 @@ function AppShellContent({
       case 'archived':
         // Archived view shows only archived sessions
         result = workspaceSessionMetas.filter(s => s.isArchived)
+        break
+      case 'batch':
+        // Batch view shows only batch-created sessions
+        result = workspaceSessionMetas.filter(s => s.isBatch)
         break
       case 'state':
         // Filter by specific todo state (excludes archived)
@@ -1683,6 +1688,10 @@ function AppShellContent({
 
   const handleArchivedClick = useCallback(() => {
     navigate(routes.view.archived())
+  }, [])
+
+  const handleBatchSessionsClick = useCallback(() => {
+    navigate(routes.view.batchSessions())
   }, [])
 
   // Handler for individual todo state views
@@ -1978,6 +1987,7 @@ function AppShellContent({
     }
     result.push({ id: 'nav:flagged', type: 'nav', action: handleFlaggedClick })
     result.push({ id: 'nav:archived', type: 'nav', action: handleArchivedClick })
+    result.push({ id: 'nav:batchSessions', type: 'nav', action: handleBatchSessionsClick })
 
     // 2. Labels section header + regular label tree for keyboard nav
     result.push({ id: 'nav:labels', type: 'nav', action: () => handleLabelClick('__all__') })
@@ -2369,6 +2379,15 @@ function AppShellContent({
                           icon: Archive,
                           variant: (sessionFilter?.kind === 'archived' ? "default" : "ghost") as "default" | "ghost",
                           onClick: handleArchivedClick,
+                        },
+                        // Batch Sessions (trailing, non-sortable)
+                        {
+                          id: "nav:batchSessions",
+                          title: "Batch Sessions",
+                          label: batchSessionCount > 0 ? String(batchSessionCount) : undefined,
+                          icon: Layers,
+                          variant: (sessionFilter?.kind === 'batch' ? "default" : "ghost") as "default" | "ghost",
+                          onClick: handleBatchSessionsClick,
                         },
                       ],
                     },

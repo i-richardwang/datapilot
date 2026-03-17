@@ -607,6 +607,7 @@ export type SessionFilter =
   | { kind: 'label'; labelId: string }
   | { kind: 'view'; viewId: string }
   | { kind: 'archived' }
+  | { kind: 'batch' }
 
 /**
  * Settings subpage options - re-exported from settings-registry (single source of truth)

@@ -159,7 +159,7 @@ export interface ISessionManager {
     mentions?: string[],
     llmConnection?: string,
     model?: string,
-    hidden?: boolean,
+    isBatch?: boolean,
     batchContext?: { batchId: string; itemId: string; outputPath: string; outputSchema?: Record<string, unknown> },
     automationName?: string,
     workingDirectory?: string,

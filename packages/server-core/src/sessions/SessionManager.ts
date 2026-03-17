@@ -855,6 +855,8 @@ interface ManagedSession {
   authRetryInProgress?: boolean
   // Whether this session is hidden from session list (e.g., mini edit sessions)
   hidden?: boolean
+  // Whether this session was created by the batch processor
+  isBatch?: boolean
   branchFromMessageId?: string
   // Branch context strategy:
   // - sdk-fork: provider-level fork from parent SDK session
@@ -1971,7 +1973,7 @@ export class SessionManager implements ISessionManager {
     }
 
     for (const session of this.sessions.values()) {
-      if (session.hidden || session.isArchived) continue
+      if (session.hidden || session.isArchived || session.isBatch) continue
       if (!session.hasUnread) continue
 
       const workspaceId = session.workspace.id
@@ -2354,6 +2356,7 @@ export class SessionManager implements ISessionManager {
       permissionMode: defaultPermissionMode,
       workingDirectory: resolvedWorkingDir,
       hidden: options?.hidden,
+      isBatch: options?.isBatch,
       sessionStatus: options?.sessionStatus,
       labels: options?.labels,
       isFlagged: options?.isFlagged,
@@ -4018,7 +4021,7 @@ export class SessionManager implements ISessionManager {
     const updates: Promise<void>[] = []
     for (const managed of this.sessions.values()) {
       if (managed.workspace.id !== workspaceId) continue
-      if (managed.hidden || managed.isArchived) continue
+      if (managed.hidden || managed.isArchived || managed.isBatch) continue
       if (managed.isProcessing) continue
       if (!managed.hasUnread) continue
       managed.hasUnread = false
@@ -6450,7 +6453,7 @@ export class SessionManager implements ISessionManager {
     mentions?: string[],
     llmConnection?: string,
     model?: string,
-    hidden?: boolean,
+    isBatch?: boolean,
     batchContext?: { batchId: string; itemId: string; outputPath: string; outputSchema?: Record<string, unknown> },
     automationName?: string,
     workingDirectory?: string,
@@ -6483,7 +6486,7 @@ export class SessionManager implements ISessionManager {
       enabledSourceSlugs: resolved?.sourceSlugs,
       llmConnection,
       model,
-      hidden,
+      isBatch,
       workingDirectory,
     })
 

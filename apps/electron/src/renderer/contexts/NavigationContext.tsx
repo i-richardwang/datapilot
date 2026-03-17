@@ -536,21 +536,23 @@ export function NavigationProvider({
       return visibleSessions.filter((session) => {
         switch (filter.kind) {
           case 'allSessions':
-            return session.isArchived !== true
+            return session.isArchived !== true && session.isBatch !== true
           case 'flagged':
-            return session.isFlagged === true && session.isArchived !== true
+            return session.isFlagged === true && session.isArchived !== true && session.isBatch !== true
           case 'archived':
             return session.isArchived === true
+          case 'batch':
+            return session.isBatch === true
           case 'state':
-            return session.sessionStatus === filter.stateId && session.isArchived !== true
+            return session.sessionStatus === filter.stateId && session.isArchived !== true && session.isBatch !== true
           case 'label': {
-            if (session.isArchived === true) return false
+            if (session.isArchived === true || session.isBatch === true) return false
             if (!session.labels?.length) return false
             if (filter.labelId === '__all__') return true
             return session.labels.some(l => l === filter.labelId || l.startsWith(`${filter.labelId}::`))
           }
           case 'view':
-            if (session.isArchived === true) return false
+            if (session.isArchived === true || session.isBatch === true) return false
             return true
           default:
             return false

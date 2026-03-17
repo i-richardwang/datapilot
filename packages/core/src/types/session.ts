@@ -57,4 +57,5 @@ export interface SessionMetadata {
   isFlagged?: boolean;     // Whether this session is flagged
   status?: SessionStatus;  // Workflow status
   hidden?: boolean;        // Whether this session is hidden from session list
+  isBatch?: boolean;       // Whether this session was created by the batch processor
 }
