@@ -175,6 +175,13 @@ export function BatchInfoPage({
               <Info_Table.Row label="Max Retries" value={String(batch.execution?.maxRetries ?? 2)} />
             )}
             <Info_Table.Row label="Access Level" value={getPermissionDisplayName(batch.execution?.permissionMode)} />
+            {batch.workingDirectory && (
+              <Info_Table.Row label="Working Directory">
+                <code className="text-xs font-mono bg-foreground/5 px-1.5 py-0.5 rounded">
+                  {batch.workingDirectory}
+                </code>
+              </Info_Table.Row>
+            )}
             {batch.execution?.model && (
               <Info_Table.Row label="Model" value={batch.execution.model} />
             )}

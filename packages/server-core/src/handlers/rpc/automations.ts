@@ -120,6 +120,7 @@ export function registerAutomationsHandlers(server: RpcServer, deps: HandlerDeps
           undefined, // hidden (fork: batch-only param)
           undefined, // batchContext (fork: batch-only param)
           payload.automationName,
+          undefined, // workingDirectory (fork: batch-only param)
         )
         results.push({
           type: 'prompt',

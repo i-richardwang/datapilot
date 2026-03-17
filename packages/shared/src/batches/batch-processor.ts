@@ -470,6 +470,7 @@ export class BatchProcessor {
         mentions: config.action.mentions,
         llmConnection: config.execution?.llmConnection,
         model: config.execution?.model,
+        workingDirectory: config.workingDirectory,
         automationName: `Batch: ${config.name} — ${itemId}`,
       }
 

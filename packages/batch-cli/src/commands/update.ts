@@ -34,6 +34,7 @@ export interface UpdateOptions {
   connection?: string
   permissionMode?: 'safe' | 'ask' | 'allow-all'
   labels?: string[]
+  workingDirectory?: string
   enabled?: boolean
   outputPath?: string
   outputSchema?: string
@@ -49,6 +50,7 @@ function buildPatchFromFlags(opts: UpdateOptions): Record<string, unknown> {
 
   if (opts.name !== undefined) patch.name = opts.name
   if (opts.enabled !== undefined) patch.enabled = opts.enabled
+  if (opts.workingDirectory !== undefined) patch.workingDirectory = opts.workingDirectory
 
   // Source fields
   const sourcePatch: Record<string, unknown> = {}

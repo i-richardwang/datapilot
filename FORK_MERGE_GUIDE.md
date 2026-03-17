@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: identify conflict zones, understand intent, make informed merge resolution decisions.
 >
-> **Last updated after:** v0.7.6 merge (Custom endpoint persistence fix, MCP custom headers, OAuth refresh loop fix, OSS build parity)
+> **Last updated after:** batch-workdir (Batch per-batch working directory support)
 
 ## Overview
 
@@ -27,7 +27,7 @@ These won't conflict unless upstream adds similarly-named features.
 
 ### Batch Core — `packages/shared/src/batches/`
 
-Types, schemas, CSV/JSON/JSONL parser, state persistence, processor (lifecycle + concurrency + retry), output instruction builder, validation. 5 test files (~1300 lines).
+Types, schemas, CSV/JSON/JSONL parser, state persistence, processor (lifecycle + concurrency + retry), output instruction builder, validation. 5 test files (~1300 lines). `BatchConfig` supports optional `workingDirectory` (absolute path) to override the workspace default for batch sessions.
 
 **Cross-module dependency:** `batch-processor.ts` imports `expandEnvVars()` from `automations/utils.ts` and `sanitizeForShell()` from `automations/security.ts`. If upstream renames/moves these, batch-processor breaks.
 
@@ -41,7 +41,7 @@ Handler + tests: coerces stringified JSON, validates against output schema via *
 
 ### Batch UI — `apps/electron/src/renderer/components/batches/`
 
-`BatchesListPanel`, `BatchInfoPage`, `BatchActionRow`, `BatchItemTimeline`, `BatchMenu`, `BatchAvatar`, types. All mirror automations UI components.
+`BatchesListPanel`, `BatchInfoPage`, `BatchActionRow`, `BatchItemTimeline`, `BatchMenu`, `BatchAvatar`, types. All mirror automations UI components. `BatchInfoPage` displays `workingDirectory` in the Execution section when configured.
 
 **UI dependencies:** `Info_Page`, `EntityListEmptyScreen`, `EntityRow`, `EditPopover`, `SessionSearchHeader`, `useMenuComponents()`, `useNavigation()`, Jotai atoms, Sonner toasts.
 
@@ -52,7 +52,7 @@ Handler + tests: coerces stringified JSON, validates against output schema via *
 
 ### Batch CLI — `packages/batch-cli/`
 
-Standalone `craft-agent-batch` binary: 7 subcommands (list, get, validate, status, create, update, enable/disable). All logic delegates to `@craft-agent/shared/batches`.
+Standalone `craft-agent-batch` binary: 7 subcommands (list, get, validate, status, create, update, enable/disable). All logic delegates to `@craft-agent/shared/batches`. `create` and `update` support `--working-directory` flag.
 
 - `src/workspace.ts` resolves workspace root: `--workspace-root` → `CRAFT_WORKSPACE_PATH` env → `CRAFT_AGENT_WORKSPACE_ROOT` env → walk-up → CWD
 - Wrapper scripts: `apps/electron/resources/bin/craft-agent-batch{,.cmd}` — invoked via `CRAFT_BATCH_CLI_ENTRY` env var set in `main/index.ts`
@@ -73,7 +73,7 @@ These files are frequently touched by upstream and have substantial fork modific
 #### `packages/server-core/src/sessions/SessionManager.ts`
 
 - Added `batchProcessors: Map<string, BatchProcessor>` with per-workspace init, callbacks (`onExecutePrompt`, `onProgress`, `onBatchComplete`, `onError`), config watcher, broadcasting
-- Modified `executePromptAutomation()`: added `hidden` and `batchContext` params (coexist with upstream's `automationName`)
+- Modified `executePromptAutomation()`: added `hidden`, `batchContext`, and `workingDirectory` params (coexist with upstream's `automationName`)
 - Session completion handler notifies batch processors
 - Added `getBatchProcessor()`, `broadcastBatchesChanged()`, cleanup in `dispose()`
 
@@ -142,7 +142,7 @@ Extended `ClaudeContextOptions` with `batchContext?: BatchContext`; added `valid
 
 #### `packages/server-core/src/handlers/session-manager-interface.ts`
 
-Added `getBatchProcessor?()` method; extended `executePromptAutomation()` with `hidden` + `batchContext` params.
+Added `getBatchProcessor?()` method; extended `executePromptAutomation()` with `hidden` + `batchContext` + `workingDirectory` params.
 **Note:** This was a 3-way conflict in v0.7.1 merge. Future upstream signature changes will conflict.
 
 #### `packages/shared/src/config/validators.ts`
@@ -279,7 +279,7 @@ When merging upstream updates:
    - `AppShell.tsx` — batch UI + lite conditionals span sidebar, header, content, dialog
    - `tool-defs.ts` — batch tool registration, `LITE_EXCLUDED_TOOLS` set, and filter options
    - `session-scoped-tools.ts` — batch context registry + lite mode passthrough in tool init flow
-4. **If upstream changes `executePromptAutomation()` signature**: ensure `hidden`, `batchContext`, `automationName` passthrough works
+4. **If upstream changes `executePromptAutomation()` signature**: ensure `hidden`, `batchContext`, `automationName`, `workingDirectory` passthrough works
 5. **If upstream moves automations utilities** (`expandEnvVars`, `sanitizeForShell`): update imports in `batch-processor.ts`
 6. **If upstream changes `resolvePresetStateForBaseUrlChange()`**: re-verify our fix
 7. **If upstream changes feature flags / Vite config**: preserve our `liteVersion` getter and `define` entry
@@ -307,3 +307,4 @@ When merging upstream updates:
 | v0.7.5 | 2026-03-13 | 3 | Webhook actions for automations, network proxy, working directory history, model resolution refactor. Resolved: `AppShell.tsx` — added upstream's `onReplayAutomation` alongside batch handlers; `AppShellContext.tsx` — added `onReplayAutomation` to context interface; `SessionManager.ts` — merged `createPromptHistoryEntry` import with our `BatchProcessor` import. Additional fix: `rpc/automations.ts` — inserted `undefined` placeholders for fork's `hidden`/`batchContext` params in new `executePromptAutomation` call site. |
 | batch-tools | 2026-03-16 | — | Batch mode tool filtering: `BATCH_EXCLUDED_TOOLS` (14 registry tools), `batchMode` option in `SessionToolFilterOptions`, backend tools (`spawn_session`, `batch_test`, `browser_tool`) conditionally skipped in Claude adapter. Batch sessions reduced from 19+ tools to 3 (`batch_output`, `call_llm`, `script_sandbox`). |
 | v0.7.6 | 2026-03-17 | 1 | Custom endpoint persistence, MCP custom headers, OAuth refresh loop fix, model ID format fix, OSS build scripts. Resolved: `storage.ts` — identical `customEndpoint` persistence fix on both sides (took upstream comment). Fork-only fixes retained: `pi-agent-server/index.ts` queryLlm provider check exemption, `pi.ts` validateStoredConnection enhancement, `submit-helpers.ts` preset preservation. |
+| batch-workdir | 2026-03-17 | — | Per-batch working directory: `BatchConfig.workingDirectory` (optional absolute path) passed through `BatchProcessor` → `executePromptAutomation()` → `createSession()`. CLI `--working-directory` flag on create/update. UI display in `BatchInfoPage` Execution section. |
