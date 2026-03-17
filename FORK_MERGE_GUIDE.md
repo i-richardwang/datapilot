@@ -15,7 +15,7 @@ Our fork adds four categories of changes:
 
 3. **Preset Preservation Fix** — Fix to `resolvePresetStateForBaseUrlChange()` preserving Pi SDK provider routing when a preset points at a custom proxy endpoint.
 
-4. **Custom Endpoint Runtime Fixes** — Two fixes for upstream's custom endpoint system introduced in v0.7.4: (a) `queryLlm()` provider compatibility check now exempts `custom-endpoint` models so they aren't incorrectly rejected and forced to fallback; (b) `validateStoredConnection()` in the Pi driver makes actual API calls (Anthropic or OpenAI-compatible) instead of returning `{ success: true }` unconditionally.
+4. **Custom Endpoint Runtime Fixes** — Three fixes for upstream's custom endpoint system introduced in v0.7.4: (a) `queryLlm()` provider compatibility check now exempts `custom-endpoint` models so they aren't incorrectly rejected and forced to fallback; (b) `validateStoredConnection()` in the Pi driver makes actual API calls (Anthropic or OpenAI-compatible) instead of returning `{ success: true }` unconditionally; (c) `resolveModelForProvider()` skips the cross-provider model guard for custom endpoint connections so UI model selection isn't silently overridden by `defaultModel`.
 
 5. **Border-Radius Theme Tokens** — Overrides Tailwind v4's default `--radius-*` CSS variables to `0px` in `:root` for sharp-corner branding. Converts all hardcoded `rounded-[Npx]` arbitrary values to standard Tailwind classes (`rounded-sm`, `rounded-lg`, etc.) so they flow through the CSS variable system. CSS files with hardcoded `border-radius` pixel values are also converted to `var(--radius-*)`.
 
@@ -117,6 +117,12 @@ Modified `queryLlm()` provider compatibility check in two places: custom-endpoin
 #### `packages/shared/src/agent/backend/internal/drivers/pi.ts` *(Custom Endpoint Fix)*
 
 Added `testOpenAICompatible()` function (~70 lines) for OpenAI-compatible endpoint validation (tries `/chat/completions` then `/v1/chat/completions`). Enhanced `validateStoredConnection()` to make actual API calls for custom endpoints (routes to `testAnthropicCompatible` or `testOpenAICompatible` based on `customEndpoint.api`), with credential-only check fallback for standard Pi connections.
+
+#### `packages/shared/src/agent/backend/factory.ts` *(Custom Endpoint Fix)*
+
+`resolveModelForProvider()`: skips the cross-provider guard (`getModelProvider(model) !== provider`) when `connection.customEndpoint` is set. Without this, custom endpoint models (e.g. `claude-sonnet-4-6` with provider `'anthropic'`) are cleared because the connection resolves to provider `'pi'`, forcing fallback to `defaultModel` on every model switch.
+
+**Note:** Upstream v0.7.6 still has the original guard. If upstream fixes this, our change can be dropped.
 
 #### `packages/shared/src/agent/claude-agent.ts`
 

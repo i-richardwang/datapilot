@@ -634,7 +634,12 @@ export function resolveModelForProvider(
 ): string {
   // Cross-provider guard: if the model belongs to a different provider, fall back
   // to the connection's default. This prevents e.g. sending a Claude model to Pi.
-  if (managedModel) {
+  // Skip the guard for custom endpoints — they use standard model IDs (e.g.
+  // claude-sonnet-4-6) which resolve to 'anthropic' in MODEL_REGISTRY, but the
+  // connection provider is 'pi'. Without this bypass, every model selection is
+  // silently replaced by the connection's defaultModel.
+  const isCustomEndpoint = !!connection?.customEndpoint;
+  if (managedModel && !isCustomEndpoint) {
     const modelProvider = getModelProvider(managedModel);
     if (modelProvider && modelProvider !== provider) {
       managedModel = undefined; // Clear — will fall through to connection default
