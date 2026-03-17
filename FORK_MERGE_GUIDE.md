@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: identify conflict zones, understand intent, make informed merge resolution decisions.
 >
-> **Last updated after:** v0.7.5 merge (Webhook actions for automations, network proxy, working directory history, model resolution refactor)
+> **Last updated after:** v0.7.6 merge (Custom endpoint persistence fix, MCP custom headers, OAuth refresh loop fix, OSS build parity)
 
 ## Overview
 
@@ -15,7 +15,9 @@ Our fork adds four categories of changes:
 
 3. **Preset Preservation Fix** — Fix to `resolvePresetStateForBaseUrlChange()` preserving Pi SDK provider routing when a preset points at a custom proxy endpoint.
 
-4. **Border-Radius Theme Tokens** — Overrides Tailwind v4's default `--radius-*` CSS variables to `0px` in `:root` for sharp-corner branding. Converts all hardcoded `rounded-[Npx]` arbitrary values to standard Tailwind classes (`rounded-sm`, `rounded-lg`, etc.) so they flow through the CSS variable system. CSS files with hardcoded `border-radius` pixel values are also converted to `var(--radius-*)`.
+4. **Custom Endpoint Runtime Fixes** — Two fixes for upstream's custom endpoint system introduced in v0.7.4: (a) `queryLlm()` provider compatibility check now exempts `custom-endpoint` models so they aren't incorrectly rejected and forced to fallback; (b) `validateStoredConnection()` in the Pi driver makes actual API calls (Anthropic or OpenAI-compatible) instead of returning `{ success: true }` unconditionally.
+
+5. **Border-Radius Theme Tokens** — Overrides Tailwind v4's default `--radius-*` CSS variables to `0px` in `:root` for sharp-corner branding. Converts all hardcoded `rounded-[Npx]` arbitrary values to standard Tailwind classes (`rounded-sm`, `rounded-lg`, etc.) so they flow through the CSS variable system. CSS files with hardcoded `border-radius` pixel values are also converted to `var(--radius-*)`.
 
 ---
 
@@ -87,16 +89,18 @@ These files are frequently touched by upstream and have substantial fork modific
 #### `packages/session-tools-core/src/tool-defs.ts`
 
 - **Batch:** Added `batch_output` tool def (with `safeMode: 'allow'`), `BatchOutputSchema`, `'batches'` target in `ConfigValidateSchema`
-- **Batch:** Extended `SessionToolFilterOptions` with `includeBatchOutput?: boolean`
+- **Batch:** Extended `SessionToolFilterOptions` with `includeBatchOutput?: boolean` and `batchMode?: boolean`
+- **Batch:** Added `BATCH_EXCLUDED_TOOLS` set (14 tools: `SubmitPlan`, `config_validate`, `skill_validate`, `mermaid_validate`, `source_test`, 4 OAuth triggers, `source_credential_prompt`, `update_user_preferences`, `render_template`, `transform_data`, `send_developer_feedback`) — strips UI/interaction tools from batch sessions
 - **Lite:** Added `LITE_EXCLUDED_TOOLS` set (9 tools: 4 OAuth, `browser_tool`, `mermaid_validate`, `skill_validate`, `render_template`), `liteMode?: boolean` to `SessionToolFilterOptions`
-- Modified `getSessionToolDefs()` and `getToolDefsAsJsonSchema()` to filter/propagate both `includeBatchOutput` and `liteMode`
+- Modified `getSessionToolDefs()` and `getToolDefsAsJsonSchema()` to filter/propagate `includeBatchOutput`, `liteMode`, and `batchMode`
 
-**Pattern:** `includeBatchOutput` and `liteMode` both mirror `includeDeveloperFeedback`.
+**Pattern:** `includeBatchOutput`, `liteMode`, and `batchMode` all mirror `includeDeveloperFeedback`.
 
 #### `packages/shared/src/agent/session-scoped-tools.ts`
 
 - **Batch:** Added batch context registry: `registerSessionBatchContext()`, `getSessionBatchContext()`, `cleanupSessionBatchContext()`
-- **Batch:** Modified `getSessionScopedTools()`: passes `batchContext` to `createClaudeContext()`, derives `includeBatchOutput`
+- **Batch:** Modified `getSessionScopedTools()`: passes `batchContext` to `createClaudeContext()`, derives `includeBatchOutput`, passes `batchMode: isBatchSession`
+- **Batch:** In batch mode, conditionally skips backend-specific tools (`spawn_session`, `batch_test`, `browser_tool`) — only `call_llm` is kept
 - **Batch:** Modified `cleanupSessionScopedTools()`: also cleans up batch context
 - **Lite:** Added `liteMode: FEATURE_FLAGS.liteVersion` to `getSessionToolDefs()` call
 
@@ -104,13 +108,23 @@ These files are frequently touched by upstream and have substantial fork modific
 
 ### MEDIUM Risk — Check After Upstream Changes
 
+#### `packages/pi-agent-server/src/index.ts` *(Custom Endpoint Fix)*
+
+Modified `queryLlm()` provider compatibility check in two places: custom-endpoint models (provider === `'custom-endpoint'`) are now exempted from the `provider !== authProvider` rejection so they don't fallback to Anthropic default models. Without this fix, custom endpoints get 401 errors against `api.anthropic.com`.
+
+**Note:** Upstream v0.7.6 still has the original check without this exemption. If upstream fixes this themselves, our changes can be dropped.
+
+#### `packages/shared/src/agent/backend/internal/drivers/pi.ts` *(Custom Endpoint Fix)*
+
+Added `testOpenAICompatible()` function (~70 lines) for OpenAI-compatible endpoint validation (tries `/chat/completions` then `/v1/chat/completions`). Enhanced `validateStoredConnection()` to make actual API calls for custom endpoints (routes to `testAnthropicCompatible` or `testOpenAICompatible` based on `customEndpoint.api`), with credential-only check fallback for standard Pi connections.
+
 #### `packages/shared/src/agent/claude-agent.ts`
 
 Added batch context reading → `batchOutputSchema` passed to `buildContextParts()` in `buildTextPrompt()` / `buildSDKUserMessage()`.
 
 #### `packages/shared/src/agent/pi-agent.ts`
 
-Same as claude-agent, plus: `setupTools()` passes `includeBatchOutput` to `getSessionToolProxyDefs()`, `createSessionToolContext()` passes `batchContext`.
+Same as claude-agent, plus: `setupTools()` passes `includeBatchOutput` and `batchMode` to `getSessionToolProxyDefs()`, `createSessionToolContext()` passes `batchContext`.
 
 #### `packages/shared/src/agent/claude-context.ts`
 
@@ -223,7 +237,7 @@ These are simple additive changes (exports, types, config entries) unlikely to c
 | `packages/shared/src/agent/index.ts` | Export `registerSessionBatchContext` |
 | `packages/shared/src/agent/core/types.ts` | Added `batchOutputSchema?` to `ContextBlockOptions` |
 | `packages/shared/src/agent/mode-manager.ts` | Added `includeBatchOutput: true` and `liteMode: FEATURE_FLAGS.liteVersion` to safe mode allowlist |
-| `packages/shared/src/agent/backend/pi/session-tool-defs.ts` | Added `opts?: { includeBatchOutput? }` to `getSessionToolProxyDefs()`; passes `liteMode: FEATURE_FLAGS.liteVersion` |
+| `packages/shared/src/agent/backend/pi/session-tool-defs.ts` | Added `opts?: { includeBatchOutput?, batchMode? }` to `getSessionToolProxyDefs()`; passes `batchMode` and `liteMode: FEATURE_FLAGS.liteVersion` |
 | `packages/shared/src/docs/doc-links.ts` | Added `'batches'` to `DocFeature`, `batches` entry in `DOCS` |
 | `packages/shared/src/docs/index.ts` | Added `batches` to `DOC_REFS` |
 | `packages/shared/src/prompts/system.ts` | *(Batch)* Added Batches row to doc reference table; added CLI batch doc reference. *(Lite changes moved to MEDIUM risk above)* |
@@ -264,7 +278,7 @@ When merging upstream updates:
 6. **If upstream changes `resolvePresetStateForBaseUrlChange()`**: re-verify our fix
 7. **If upstream changes feature flags / Vite config**: preserve our `liteVersion` getter and `define` entry
 8. **If upstream changes default statuses**: ensure lite conditional logic covers new statuses
-9. **If upstream adds/removes/renames session tools**: check `LITE_EXCLUDED_TOOLS` in `tool-defs.ts` and update if needed
+9. **If upstream adds/removes/renames session tools**: check `LITE_EXCLUDED_TOOLS` and `BATCH_EXCLUDED_TOOLS` in `tool-defs.ts` and update if needed
 10. **If upstream rewrites system prompt sections**: verify lite conditionals in `system.ts` still wrap the correct blocks (Browser Tools, Mermaid validation, Source Templates, Debug Mode, doc table rows)
 11. **If upstream adds new components with `rounded-[Npx]` patterns**: convert to standard Tailwind classes (`rounded-sm`, `rounded-md`, `rounded-lg`, etc.) so they flow through `--radius-*` CSS variables
 12. **If upstream modifies `:root` blocks in `index.css` or `packages/ui/src/styles/index.css`**: preserve our `--radius-xs` through `--radius-2xl` overrides
@@ -285,3 +299,5 @@ When merging upstream updates:
 | v0.7.3 | 2026-03-11 | 1 | OAuth stability, background task UI, title generation with language awareness, exclude filter badges, MCP schema conversion, Minimax preset split. Resolved: `session-scoped-tools.ts` — adopted upstream's new cache strategy (cache tools array, not MCP server wrapper) while preserving batch context + lite mode passthrough. |
 | v0.7.4 | 2026-03-12 | 2 | Custom endpoints, session branching overhaul, model switching fix, Windows branch fixes. Resolved: `config-watcher.ts` — accepted upstream deletion (shared version has our batch additions); `pi-agent-server/src/index.ts` — adopted upstream's full custom endpoint system (`registerCustomEndpointModels`, `CustomEndpointApi`), replacing our `customBaseUrlOverride` approach. |
 | v0.7.5 | 2026-03-13 | 3 | Webhook actions for automations, network proxy, working directory history, model resolution refactor. Resolved: `AppShell.tsx` — added upstream's `onReplayAutomation` alongside batch handlers; `AppShellContext.tsx` — added `onReplayAutomation` to context interface; `SessionManager.ts` — merged `createPromptHistoryEntry` import with our `BatchProcessor` import. Additional fix: `rpc/automations.ts` — inserted `undefined` placeholders for fork's `hidden`/`batchContext` params in new `executePromptAutomation` call site. |
+| batch-tools | 2026-03-16 | — | Batch mode tool filtering: `BATCH_EXCLUDED_TOOLS` (14 registry tools), `batchMode` option in `SessionToolFilterOptions`, backend tools (`spawn_session`, `batch_test`, `browser_tool`) conditionally skipped in Claude adapter. Batch sessions reduced from 19+ tools to 3 (`batch_output`, `call_llm`, `script_sandbox`). |
+| v0.7.6 | 2026-03-17 | 1 | Custom endpoint persistence, MCP custom headers, OAuth refresh loop fix, model ID format fix, OSS build scripts. Resolved: `storage.ts` — identical `customEndpoint` persistence fix on both sides (took upstream comment). Fork-only fixes retained: `pi-agent-server/index.ts` queryLlm provider check exemption, `pi.ts` validateStoredConnection enhancement, `submit-helpers.ts` preset preservation. |

@@ -362,6 +362,7 @@ export function getSessionScopedTools(
     tools = getSessionToolDefs({
       includeDeveloperFeedback: FEATURE_FLAGS.developerFeedback,
       includeBatchOutput: isBatchSession,
+      batchMode: isBatchSession,
       liteMode: FEATURE_FLAGS.liteVersion,
     })
       .filter(def => def.handler !== null) // Skip backend-specific tools (call_llm)
@@ -380,38 +381,38 @@ export function getSessionScopedTools(
       }),
     );
 
-    // Add spawn_session — backend-specific (not in registry handler)
-    tools.push(
-      createSpawnSessionTool({
-        sessionId,
-        getSpawnSessionFn: () => {
-          const callbacks = getSessionScopedToolCallbacks(sessionId);
-          return callbacks?.spawnSessionFn;
-        },
-      }),
-    );
+    // Add backend-specific tools (skip some in batch mode — no UI, no session management)
+    if (!isBatchSession) {
+      tools.push(
+        createSpawnSessionTool({
+          sessionId,
+          getSpawnSessionFn: () => {
+            const callbacks = getSessionScopedToolCallbacks(sessionId);
+            return callbacks?.spawnSessionFn;
+          },
+        }),
+      );
 
-    // Add batch_test — backend-specific (requires BatchProcessor via session manager)
-    tools.push(
-      createBatchTestTool({
-        sessionId,
-        getBatchTestFn: () => {
-          const callbacks = getSessionScopedToolCallbacks(sessionId);
-          return callbacks?.batchTestFn;
-        },
-      }),
-    );
+      tools.push(
+        createBatchTestTool({
+          sessionId,
+          getBatchTestFn: () => {
+            const callbacks = getSessionScopedToolCallbacks(sessionId);
+            return callbacks?.batchTestFn;
+          },
+        }),
+      );
 
-    // Add browser_* tools — backend-specific (requires BrowserPaneManager in Electron)
-    tools.push(
-      ...createBrowserTools({
-        sessionId,
-        getBrowserPaneFns: () => {
-          const callbacks = getSessionScopedToolCallbacks(sessionId);
-          return callbacks?.browserPaneFns;
-        },
-      }),
-    );
+      tools.push(
+        ...createBrowserTools({
+          sessionId,
+          getBrowserPaneFns: () => {
+            const callbacks = getSessionScopedToolCallbacks(sessionId);
+            return callbacks?.browserPaneFns;
+          },
+        }),
+      );
+    }
 
     sessionToolsCache.set(cacheKey, tools);
   }
