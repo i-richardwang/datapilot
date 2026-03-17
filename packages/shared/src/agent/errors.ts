@@ -77,7 +77,7 @@ const ERROR_DEFINITIONS: Record<ErrorCode, Omit<AgentError, 'code' | 'originalEr
   },
   expired_oauth_token: {
     title: 'Session Expired',
-    message: 'Your Claude Max session has expired.',
+    message: 'Your session has expired. Please try signing in again.',
     actions: [
       { key: 'r', label: 'Re-authenticate', action: 'reauth' },
       { key: 's', label: 'Switch API setup', command: '/settings', action: 'settings' },
