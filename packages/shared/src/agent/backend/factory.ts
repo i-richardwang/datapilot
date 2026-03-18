@@ -32,9 +32,10 @@ import {
 } from '../../config/storage.ts';
 // Import deprecated type for legacy migration function only
 import type { LlmConnectionType, CustomEndpointConfig } from '../../config/llm-connections.ts';
-// Import validation helpers for provider-auth combinations
+// Import validation helpers and model resolution for provider-auth combinations
 import {
   isValidProviderAuthCombination,
+  getMiniModel,
 } from '../../config/llm-connections.ts';
 import { parseValidationError, type LlmValidationResult } from '../../config/llm-validation.ts';
 import type { ModelFetchResult } from '../../config/model-fetcher.ts';
@@ -643,6 +644,27 @@ export function resolveModelForProvider(
     const modelProvider = getModelProvider(managedModel);
     if (modelProvider && modelProvider !== provider) {
       managedModel = undefined; // Clear — will fall through to connection default
+    }
+  }
+
+  // Resolve tier-hint short names (e.g. 'sonnet', 'haiku') against the connection's
+  // model list. EditPopover and other callers use these as capability tier hints, not
+  // as literal model IDs. For custom connections whose models may be non-Anthropic
+  // (e.g. GLM, Kimi), we map them to the appropriate tier:
+  //   'haiku' → fastest/smallest model (via getMiniModel)
+  //   'sonnet' → connection's default model (primary/capable)
+  // Only applies when the managedModel is not already a valid ID in the connection's list.
+  if (managedModel && connection?.models && connection.models.length > 0) {
+    const toId = (m: { id: string } | string) => typeof m === 'string' ? m : m.id;
+    const connectionModelIds = connection.models.map(toId);
+    const isAlreadyValidId = connectionModelIds.includes(managedModel);
+
+    if (!isAlreadyValidId) {
+      if (managedModel.toLowerCase() === 'haiku') {
+        managedModel = getMiniModel(connection) || connection.defaultModel || undefined;
+      } else {
+        managedModel = connection.defaultModel || undefined;
+      }
     }
   }
 
