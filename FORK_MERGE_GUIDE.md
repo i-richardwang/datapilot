@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: identify conflict zones, understand intent, make informed merge resolution decisions.
 >
-> **Last updated after:** v0.7.7 merge (adaptive thinking, directory browsing, conditions system)
+> **Last updated after:** v0.7.8 merge (Amazon Bedrock, 1M context, automation history compaction)
 
 ## Overview
 
@@ -309,3 +309,4 @@ When merging upstream updates:
 | batch-isBatch | 2026-03-18 | — | Batch sessions visibility: replaced `hidden: true` with `isBatch: true` persistent field. Batch sessions now excluded from All Sessions but visible under dedicated "Batch Sessions" sidebar entry (alongside Flagged/Archived). Added `{ kind: 'batch' }` to `SessionFilter`, `batchSessions` route, route-parser support, empty state. Updated server-side filtering (unread summary, markAllRead, search) and client notifications to exclude `isBatch` sessions. `hidden` field retained for mini-edit sessions only. |
 | v0.7.7 | 2026-03-18 | 2 | Adaptive thinking levels, directory browsing, custom endpoint prefetch, onboarding skip, conditions system for automations. Resolved: `pi-agent-server/index.ts` — upstream adopted same custom-endpoint provider exemption (took upstream's cleaner implementation, fork fix no longer needed); `tool-defs.ts` — kept fork's `batch_output`/`batch_test` tools, adopted upstream's `readOnly` annotation on `call_llm`. Fork-only fixes retained: `pi.ts` validateStoredConnection, `factory.ts` cross-provider guard skip, `submit-helpers.ts` preset preservation. |
 | model-tier-fix | 2026-03-18 | — | `factory.ts` `resolveModelForProvider()`: resolve tier-hint short names (`'haiku'` → `getMiniModel()`, others → `connection.defaultModel`) against connection model list. Fixes EditPopover mini-agent sessions (batch/permissions/skills edit dialogs) routing to built-in providers instead of custom endpoints. |
+| v0.7.8 | 2026-03-19 | 1 | Amazon Bedrock provider, 1M context window, automation history compaction (`history-store.ts` with two-tier retention: 20/automation + 1000 global), CLI `--base-url`, error handling fixes (skip errors after handoff), session transcript persistence, generic error messages. Resolved: `SessionManager.ts` — adopted upstream's `appendAutomationHistoryEntry` import (replacing `AUTOMATIONS_HISTORY_FILE` + `appendFile`), preserved fork's `BatchProcessor` import. |
