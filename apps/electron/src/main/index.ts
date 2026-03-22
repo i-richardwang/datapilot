@@ -97,7 +97,7 @@ import { getPiModelsForAuthProvider, getAllPiModels } from '@craft-agent/shared/
 import { initNotificationService, initBadgeIcon, initInstanceBadge, updateBadgeCount } from './notifications'
 import { checkForUpdatesOnLaunch, setAutoUpdateEventSink, isUpdating } from './auto-update'
 import type { EventSink } from '@craft-agent/server-core/transport'
-import { validateGitBashPath } from '@craft-agent/server-core/services'
+import { validateGitBashPath, checkVCRedistInstalled } from '@craft-agent/server-core/services'
 
 // Initialize electron-log for renderer process support
 log.initialize()
@@ -455,6 +455,22 @@ app.whenReady().then(async () => {
             delete process.env.CLAUDE_CODE_GIT_BASH_PATH
             mainLog.warn(`Cleared invalid persisted Git Bash path: ${gitBashPath}`)
           }
+        }
+      }
+
+      // Check for VC++ Redistributable on Windows (required by onnxruntime / markitdown).
+      // Without it, document conversion tools (PDF, PPTX, DOCX, XLSX) crash with DLL errors.
+      // Sets env var so renderer can show an actionable toast with install button.
+      if (process.platform === 'win32') {
+        const vcCheck = checkVCRedistInstalled()
+        if (!vcCheck.installed) {
+          mainLog.warn('[vcredist]', vcCheck.message)
+          process.env.CRAFT_VCREDIST_MISSING = '1'
+          if (vcCheck.downloadUrl) {
+            process.env.CRAFT_VCREDIST_URL = vcCheck.downloadUrl
+          }
+        } else if (isDebugMode) {
+          mainLog.info('[vcredist]', vcCheck.message)
         }
       }
 

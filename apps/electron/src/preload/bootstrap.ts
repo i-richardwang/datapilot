@@ -28,6 +28,7 @@ import {
   LOCAL_CLIENT_CAPABILITIES,
 } from '@craft-agent/server-core/transport'
 import type { ConfirmDialogSpec, FileDialogSpec } from '@craft-agent/server-core/transport'
+import type { ElectronAPI } from '../shared/types'
 
 // Connection details — from env (remote server) or main process (local)
 let wsUrl: string
@@ -309,5 +310,12 @@ if (wsMode === 'remote') {
     callbackServer?.close()
   }
 }
+
+// System warnings — expose env-based flags set during main process startup
+// (preload-only: reads env var directly, no IPC round-trip needed)
+;(api as ElectronAPI).getSystemWarnings = async () => ({
+  vcredistMissing: process.env.CRAFT_VCREDIST_MISSING === '1',
+  downloadUrl: process.env.CRAFT_VCREDIST_URL,
+})
 
 contextBridge.exposeInMainWorld('electronAPI', api)

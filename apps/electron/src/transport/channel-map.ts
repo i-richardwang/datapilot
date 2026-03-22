@@ -38,6 +38,9 @@ export const CHANNEL_MAP = {
   onSessionEvent: listener(RPC_CHANNELS.sessions.EVENT),
   onUnreadSummaryChanged: listener(RPC_CHANNELS.sessions.UNREAD_SUMMARY_CHANGED),
 
+  // Transport reliability
+  onReconnected: listener('__transport:reconnected'),
+
   // Workspace management
   getWorkspaces: invoke(RPC_CHANNELS.workspaces.GET),
   createWorkspace: invoke(RPC_CHANNELS.workspaces.CREATE),

@@ -14,6 +14,9 @@ import {
   PROTOCOL_VERSION,
   HEARTBEAT_INTERVAL_MS,
   HEARTBEAT_MAX_MISSED,
+  EVENT_BUFFER_MAX_SIZE,
+  EVENT_BUFFER_TTL_MS,
+  DISCONNECTED_CLIENT_TTL_MS,
   type MessageEnvelope,
   type PushTarget,
   type ErrorCode,
@@ -26,6 +29,13 @@ import { createLogger } from '@craft-agent/shared/utils'
 // Client connection state
 // ---------------------------------------------------------------------------
 
+interface BufferedEvent {
+  seq: number
+  /** Shared serialized envelope — one allocation referenced by all client buffers. */
+  data: string
+  timestamp: number
+}
+
 interface ClientConnection {
   id: string
   ws: WebSocket
@@ -34,6 +44,12 @@ interface ClientConnection {
   capabilities: Set<string>
   missedPongs: number
   alive: boolean
+  /** Ring buffer of recent events for replay on reconnect. */
+  eventBuffer: BufferedEvent[]
+  /** Highest per-client seq the client has acknowledged. */
+  lastAckedSeq: number
+  /** Highest per-client seq assigned to this client. */
+  lastSentSeq: number
 }
 
 interface PendingInvoke {
@@ -93,6 +109,9 @@ export class WsRpcServer implements RpcServer {
   private _port = 0
   private _protocol: 'ws' | 'wss' = 'ws'
 
+  /** Recently disconnected clients retained for reconnect replay. */
+  private disconnectedClients = new Map<string, { client: ClientConnection; timer: ReturnType<typeof setTimeout> }>()
+
   private readonly host: string
   private readonly requestedPort: number
   private readonly requireAuth: boolean
@@ -135,19 +154,16 @@ export class WsRpcServer implements RpcServer {
   }
 
   push(channel: string, target: PushTarget, ...args: any[]): void {
-    const envelope: MessageEnvelope = {
-      id: randomUUID(),
-      type: 'event',
-      channel,
-      args,
-      serverId: this.serverId,
-    }
-    const data = serializeEnvelope(envelope)
+    const timestamp = Date.now()
 
     for (const client of this.clients.values()) {
-      if (this.matchesTarget(client, target)) {
-        this.safeSend(client.ws, data)
-      }
+      if (!this.matchesTarget(client, target)) continue
+      this.bufferAndMaybeSendEvent(client, channel, args, timestamp, true)
+    }
+
+    for (const { client } of this.disconnectedClients.values()) {
+      if (!this.matchesTarget(client, target)) continue
+      this.bufferAndMaybeSendEvent(client, channel, args, timestamp, false)
     }
   }
 
@@ -265,6 +281,11 @@ export class WsRpcServer implements RpcServer {
       client.ws.terminate()
     }
     this.clients.clear()
+    // Clean up disconnected client timers
+    for (const entry of this.disconnectedClients.values()) {
+      clearTimeout(entry.timer)
+    }
+    this.disconnectedClients.clear()
     this.wss?.close()
     this.wss = null
     this.httpsServer?.close()
@@ -340,7 +361,110 @@ export class WsRpcServer implements RpcServer {
           }
         }
 
-        // Register client
+        // ── Reconnect attempt ──
+        if (envelope.reconnectClientId && envelope.lastSeq != null) {
+          const entry = this.disconnectedClients.get(envelope.reconnectClientId)
+          if (entry) {
+            const prevClient = entry.client
+
+            // Identity must match (workspace + webContentsId)
+            const identityMatch =
+              prevClient.workspaceId === (envelope.workspaceId ?? null) &&
+              prevClient.webContentsId === (envelope.webContentsId ?? null)
+
+            if (identityMatch) {
+              // Valid reconnect — prepare client state but do NOT add to
+              // this.clients yet. The client stays in disconnectedClients
+              // during replay so that push() can't interleave new events
+              // between replayed ones. (Currently safe due to Node.js
+              // single-threading, but this ordering makes the invariant
+              // explicit and future-proof.)
+              clearTimeout(entry.timer)
+
+              prevClient.ws = ws
+              prevClient.alive = true
+              prevClient.missedPongs = 0
+              handshakeCompleted = true
+
+              // Determine replay vs stale using the per-client delivery sequence.
+              // Retained buffers continue collecting events while the client is disconnected,
+              // but TTL eviction still applies during the reconnect window.
+              this.evictBuffer(prevClient)
+
+              const lastSeq = envelope.lastSeq as number
+              const hasMissedEvents = lastSeq < prevClient.lastSentSeq
+              const firstBufferedSeq = prevClient.eventBuffer[0]?.seq
+              const canReplay = !hasMissedEvents
+                ? true
+                : firstBufferedSeq != null && lastSeq >= firstBufferedSeq - 1
+
+              if (canReplay) {
+                const replayEvents = prevClient.eventBuffer.filter(e => e.seq > lastSeq)
+
+                const ack: MessageEnvelope = {
+                  id: envelope.id,
+                  type: 'handshake_ack',
+                  protocolVersion: PROTOCOL_VERSION,
+                  clientId: prevClient.id,
+                  registeredChannels: [...this.handlers.keys()],
+                  reconnected: true,
+                }
+                this.safeSend(ws, serializeEnvelope(ack))
+
+                // Replay missed events in order
+                for (const event of replayEvents) {
+                  this.safeSend(ws, event.data)
+                }
+
+                transportLog.info('Client reconnected with replay', {
+                  clientId: prevClient.id,
+                  replayedCount: replayEvents.length,
+                  lastSeq,
+                })
+              } else {
+                // Buffer evicted — client must full-refresh
+                const ack: MessageEnvelope = {
+                  id: envelope.id,
+                  type: 'handshake_ack',
+                  protocolVersion: PROTOCOL_VERSION,
+                  clientId: prevClient.id,
+                  registeredChannels: [...this.handlers.keys()],
+                  reconnected: true,
+                  stale: true,
+                }
+                this.safeSend(ws, serializeEnvelope(ack))
+
+                transportLog.info('Client reconnected as stale', {
+                  clientId: prevClient.id,
+                  lastSeq,
+                  firstBufferedSeq,
+                  lastSentSeq: prevClient.lastSentSeq,
+                })
+              }
+
+              // Atomic state transition: move from disconnected → active
+              // AFTER replay is complete so push() can't target this client mid-replay.
+              this.disconnectedClients.delete(envelope.reconnectClientId)
+              this.clients.set(prevClient.id, prevClient)
+
+              this.setupClientHandlers(ws, prevClient)
+              this.onClientConnected?.({
+                clientId: prevClient.id,
+                webContentsId: prevClient.webContentsId,
+                workspaceId: prevClient.workspaceId,
+              })
+              return
+            }
+
+            // Identity mismatch — fall through to fresh connect
+            transportLog.warn('Reconnect identity mismatch', {
+              reconnectClientId: envelope.reconnectClientId,
+            })
+          }
+          // reconnectClientId not found — fall through to fresh connect
+        }
+
+        // ── Normal fresh connect ──
         const clientId = randomUUID()
         const client: ClientConnection = {
           id: clientId,
@@ -350,6 +474,9 @@ export class WsRpcServer implements RpcServer {
           capabilities: new Set(envelope.clientCapabilities ?? []),
           missedPongs: 0,
           alive: true,
+          eventBuffer: [],
+          lastAckedSeq: 0,
+          lastSentSeq: 0,
         }
         this.clients.set(clientId, client)
         handshakeCompleted = true
@@ -376,19 +503,7 @@ export class WsRpcServer implements RpcServer {
           workspaceId: client.workspaceId,
         })
 
-        // Setup close handler
-        ws.on('close', () => {
-          transportLog.info('Client disconnected', { clientId })
-          this.clients.delete(clientId)
-          this.rejectPendingInvokesForClient(clientId)
-          this.onClientDisconnected?.(clientId)
-        })
-
-        // Setup pong handler
-        ws.on('pong', () => {
-          client.alive = true
-          client.missedPongs = 0
-        })
+        this.setupClientHandlers(ws, client)
         return
       }
 
@@ -403,6 +518,20 @@ export class WsRpcServer implements RpcServer {
         await this.onRequest(client, envelope)
       } else if (envelope.type === 'response') {
         this.onClientResponse(envelope)
+      } else if (envelope.type === 'sequence_ack') {
+        const ackSeq = envelope.lastSeq
+        if (typeof ackSeq === 'number' && ackSeq > client.lastAckedSeq) {
+          client.lastAckedSeq = ackSeq
+          // Evict acknowledged events
+          const buf = client.eventBuffer
+          let removeCount = 0
+          while (removeCount < buf.length && buf[removeCount].seq <= ackSeq) {
+            removeCount++
+          }
+          if (removeCount > 0) {
+            buf.splice(0, removeCount)
+          }
+        }
       }
     })
 
@@ -457,13 +586,16 @@ export class WsRpcServer implements RpcServer {
 
   private startHeartbeat(): void {
     this.heartbeatTimer = setInterval(() => {
-      for (const [id, client] of this.clients) {
+      for (const [, client] of this.clients) {
+        // Skip sockets that are already closing/closed (e.g. terminated on a previous tick)
+        if (client.ws.readyState !== client.ws.OPEN) continue
+
         if (!client.alive) {
           client.missedPongs++
           if (client.missedPongs >= HEARTBEAT_MAX_MISSED) {
+            // Let the close handler (setupClientHandlers) handle all cleanup:
+            // clients.delete, buffer retention for reconnect, onClientDisconnected.
             client.ws.terminate()
-            this.clients.delete(id)
-            this.onClientDisconnected?.(id)
             continue
           }
         }
@@ -476,6 +608,93 @@ export class WsRpcServer implements RpcServer {
   // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
+
+  /** Wire up close + pong handlers for a WebSocket ↔ ClientConnection pair. */
+  private setupClientHandlers(ws: WebSocket, client: ClientConnection): void {
+    ws.on('close', () => {
+      transportLog.info('Client disconnected', { clientId: client.id })
+      this.clients.delete(client.id)
+
+      // Retain buffer for potential reconnect
+      const timer = setTimeout(() => {
+        this.disconnectedClients.delete(client.id)
+      }, DISCONNECTED_CLIENT_TTL_MS)
+      this.disconnectedClients.set(client.id, { client, timer })
+
+      // Cap disconnectedClients to prevent unbounded growth
+      if (this.disconnectedClients.size > 50) {
+        const oldestKey = this.disconnectedClients.keys().next().value
+        if (oldestKey) {
+          const oldest = this.disconnectedClients.get(oldestKey)
+          if (oldest) clearTimeout(oldest.timer)
+          this.disconnectedClients.delete(oldestKey)
+        }
+      }
+
+      this.rejectPendingInvokesForClient(client.id)
+      this.onClientDisconnected?.(client.id)
+    })
+
+    ws.on('pong', () => {
+      client.alive = true
+      client.missedPongs = 0
+    })
+  }
+
+  /** Assign a per-client seq, retain the event for replay, and optionally send it immediately. */
+  private bufferAndMaybeSendEvent(
+    client: ClientConnection,
+    channel: string,
+    args: any[],
+    timestamp: number,
+    shouldSend: boolean,
+  ): void {
+    client.lastSentSeq += 1
+    const seq = client.lastSentSeq
+
+    const envelope: MessageEnvelope = {
+      id: randomUUID(),
+      type: 'event',
+      channel,
+      args,
+      serverId: this.serverId,
+      seq,
+    }
+
+    const data = serializeEnvelope(envelope)
+    client.eventBuffer.push({ seq, data, timestamp })
+    this.evictBuffer(client)
+
+    if (shouldSend) {
+      this.safeSend(client.ws, data)
+    }
+  }
+
+  /** Evict stale/oversized entries from a client's event buffer via batch splice. */
+  private evictBuffer(client: ClientConnection): void {
+    const buf = client.eventBuffer
+    if (buf.length === 0) return
+
+    const now = Date.now()
+    let removeCount = 0
+
+    // Evict by TTL
+    while (removeCount < buf.length &&
+           now - buf[removeCount].timestamp > EVENT_BUFFER_TTL_MS) {
+      removeCount++
+    }
+
+    // Evict by size (keep at most EVENT_BUFFER_MAX_SIZE after TTL eviction)
+    const remaining = buf.length - removeCount
+    if (remaining > EVENT_BUFFER_MAX_SIZE) {
+      removeCount += remaining - EVENT_BUFFER_MAX_SIZE
+    }
+
+    // Single splice instead of O(n) shift loop
+    if (removeCount > 0) {
+      buf.splice(0, removeCount)
+    }
+  }
 
   private matchesTarget(client: ClientConnection, target: PushTarget): boolean {
     switch (target.to) {

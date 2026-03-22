@@ -228,6 +228,9 @@ export interface CoreBackendConfig {
    */
   onImageResize?: (filePath: string, maxSizeBytes: number) => Promise<string | null>;
 
+  /** Enable 1M context window for Opus 4.6. Default: true. Set false to use 200K and conserve usage limits. */
+  enable1MContext?: boolean;
+
   /**
    * Pre-computed source configurations for initial setup.
    * Passed at construction so backends can set up sources in postInit().

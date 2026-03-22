@@ -66,7 +66,7 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
     shortName: 'Sonnet',
     description: 'Best for everyday tasks',
     provider: 'anthropic',
-    contextWindow: 1_000_000,
+    contextWindow: 200_000,
   },
   {
     id: 'claude-haiku-4-5-20251001',
@@ -189,9 +189,14 @@ export function getModelShortName(modelId: string): string {
   if (modelId.includes('/')) {
     return modelId.split('/').pop() || modelId;
   }
-  // Fallback: strip claude- prefix and date suffix, then capitalize
-  const stripped = modelId.replace('claude-', '').replace(/-[\d.-]+$/, '');
-  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+  // Fallback: humanize the model ID (same logic as getModelDisplayName)
+  const stripped = modelId.replace('claude-', '').replace(/-\d{8}$/, '');
+  const parts = stripped.split('-');
+  const first = parts[0];
+  if (!first) return modelId;
+  const name = first.charAt(0).toUpperCase() + first.slice(1);
+  const version = parts.slice(1).join('.');
+  return version ? `${name} ${version}` : name;
 }
 
 /**

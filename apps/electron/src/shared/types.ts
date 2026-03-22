@@ -285,6 +285,9 @@ export interface ElectronAPI {
   onTransportConnectionStateChanged(callback: (state: TransportConnectionState) => void): () => void
   reconnectTransport(): Promise<void>
 
+  /** Fired after a WebSocket reconnect. isStale=true means buffer was evicted — full refresh needed. */
+  onReconnected(callback: (isStale: boolean) => void): () => void
+
   /** Check whether the server registered a handler for a given RPC channel. */
   isChannelAvailable(channel: string): boolean
 
@@ -300,6 +303,9 @@ export interface ElectronAPI {
   // Release notes
   getReleaseNotes(): Promise<string>
   getLatestReleaseVersion(): Promise<string | undefined>
+
+  // System warnings (startup checks)
+  getSystemWarnings(): Promise<{ vcredistMissing: boolean; downloadUrl?: string }>
 
   // Shell operations
   openUrl(url: string): Promise<void>

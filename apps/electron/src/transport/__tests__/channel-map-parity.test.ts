@@ -10,9 +10,16 @@ type FunctionKeys<T> = {
 
 type BrowserPaneKeys = `browserPane.${FunctionKeys<ElectronAPI['browserPane']>}`
 
+// Methods excluded from CHANNEL_MAP because they are implemented directly in the preload
+// (no IPC round-trip to the main process). Each reads local state or orchestrates client-side.
 type ApiToChannelMapKeys = Exclude<
   FunctionKeys<ElectronAPI>,
-  'performOAuth' | 'getTransportConnectionState' | 'onTransportConnectionStateChanged' | 'reconnectTransport' | 'isChannelAvailable'
+  | 'performOAuth'
+  | 'getTransportConnectionState'
+  | 'onTransportConnectionStateChanged'
+  | 'reconnectTransport'
+  | 'isChannelAvailable'
+  | 'getSystemWarnings' // reads env var set at startup — no IPC needed
 > | BrowserPaneKeys
 type ChannelMapKeys = keyof typeof CHANNEL_MAP & string
 
