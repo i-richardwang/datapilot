@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: identify conflict zones, understand intent, make informed merge resolution decisions.
 >
-> **Last updated after:** v0.7.11 merge (WebSocket reliable delivery, Copilot overhaul, 1M context toggle, custom endpoint contextWindow)
+> **Last updated after:** v0.7.12 merge (Bedrock env routing fixes, extended prompt cache, branch fork fallback)
 
 ## Overview
 
@@ -76,6 +76,7 @@ These files are frequently touched by upstream and have substantial fork modific
 - Modified `executePromptAutomation()`: added `isBatch`, `batchContext`, and `workingDirectory` params (coexist with upstream's `automationName`)
 - Session completion handler notifies batch processors
 - Added `getBatchProcessor()`, `broadcastBatchesChanged()`, cleanup in `dispose()`
+- v0.7.12 upstream also changed Claude session bootstrapping: restores managed Anthropic env vars via `resetManagedAnthropicAuthEnvVars()`, adds branch-fork fallback message plumbing, and reads `enable1MContext` from global config storage instead of workspace defaults
 
 **Pattern:** Mirrors automationSystems management. `automationName` passthrough follows upstream's naming flow.
 
@@ -125,6 +126,8 @@ Added `testOpenAICompatible()` function (~70 lines) for OpenAI-compatible endpoi
 #### `packages/shared/src/agent/claude-agent.ts`
 
 Added batch context reading → `batchOutputSchema` passed to `buildContextParts()` in `buildTextPrompt()` / `buildSDKUserMessage()`.
+
+**v0.7.12 note:** Upstream also added Bedrock env cleanup (`clearClaudeBedrockRoutingEnvVars()`), branch-fork fallback summarization (`getBranchFallbackMessages()` + `generateBranchFallbackContext()`), and moved 1M-context gating to global config semantics. Re-check these areas on future merges.
 
 #### `packages/shared/src/agent/pi-agent.ts`
 
@@ -311,3 +314,4 @@ When merging upstream updates:
 | model-tier-fix | 2026-03-18 | — | `factory.ts` `resolveModelForProvider()`: resolve tier-hint short names (`'haiku'` → `getMiniModel()`, others → `connection.defaultModel`) against connection model list. Fixes EditPopover mini-agent sessions (batch/permissions/skills edit dialogs) routing to built-in providers instead of custom endpoints. |
 | v0.7.8 | 2026-03-19 | 1 | Amazon Bedrock provider, 1M context window, automation history compaction (`history-store.ts` with two-tier retention: 20/automation + 1000 global), CLI `--base-url`, error handling fixes (skip errors after handoff), session transcript persistence, generic error messages. Resolved: `SessionManager.ts` — adopted upstream's `appendAutomationHistoryEntry` import (replacing `AUTOMATIONS_HISTORY_FILE` + `appendFile`), preserved fork's `BatchProcessor` import. |
 | v0.7.9–v0.7.11 | 2026-03-22 | 0 | **Clean merge — no conflicts.** v0.7.9: Reliable WebSocket event delivery (sequence-number tracking, reconnect replay, stale recovery in `App.tsx`/`transport/server.ts`/`transport/client.ts`), Copilot model overhaul (direct HTTP API + 3-tier fallback in `pi.ts` driver), 1M context `[1m]` model suffix fix, Windows vcredist + binary doc tools fixes. v0.7.10: Claude OAuth 429 fix (User-Agent). v0.7.11: Per-workspace 1M context toggle, custom endpoint `contextWindow` config, Bedrock setup form fix, Sonnet 1M suffix removed, model name truncation fix. All fork code (batch, lite, custom endpoint fixes, border-radius tokens) verified intact. |
+| v0.7.12 | 2026-03-24 | 0 | **Clean merge — no textual conflicts.** Upstream added Bedrock auth/env routing fixes, extended prompt cache (1h TTL), Docker headless server support, branch-fork fallback summarization, MCP schema cleanup, and moved 1M context control to global AI settings. Verified fork code still present: batch lifecycle in `SessionManager.ts`, batch prompt context in `claude-agent.ts`, lite-mode filtering, and custom endpoint fixes in `factory.ts`/`pi.ts`. |

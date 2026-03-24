@@ -212,6 +212,14 @@ export interface CoreBackendConfig {
   getRecoveryMessages?: () => RecoveryMessage[];
 
   /**
+   * Get ALL parent messages for branch fork fallback (not limited to 6).
+   * Called when SDK-level branch fork fails and we need to summarize
+   * the parent conversation for context injection via mini completion.
+   * Returns empty array for non-branched sessions.
+   */
+  getBranchFallbackMessages?: () => RecoveryMessage[];
+
+  /**
    * Callback to get branch seed messages (up to branch cutoff) for first turn in seeded branch mode.
    * When provided and non-empty, BaseAgent injects a hidden context block before the first user turn.
    */
