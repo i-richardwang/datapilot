@@ -1,10 +1,10 @@
 # DataPilot Branch Guide
 
 > Branch: `feature/data-analysis-agent`
-> Base: `main` (commit `c7005da`, includes upstream v0.7.11 + model tier fix)
+> Base: `main` (commit `0b10cad`, includes upstream v0.7.12 merge)
 > Purpose: 将 Craft Agent 改造为面向数据分析场景的垂直 Agent — **DataPilot**
 >
-> **Last updated:** 2026-03-22 (v7)
+> **Last updated:** 2026-03-24 (v8, merged main v0.7.12)
 
 ## 目标
 
@@ -242,6 +242,14 @@ grep -rn "Craft Agent" --include='*.tsx' --include='*.ts' --include='*.html' --i
 ```bash
 grep -rn "Craft Agent" apps/electron/resources/docs/ apps/electron/resources/release-notes/ packages/shared/src/prompts/system.ts apps/electron/src/renderer/ scripts/install-app.sh scripts/install-app.ps1 scripts/build-server.ts | grep -v node_modules | grep -v craft-agents-oss
 ```
+
+### 本次合并记录（2026-03-24）
+
+- 已合并 `main` 的两个新增提交：`d007f04`（upstream `v0.7.12`）和 `0b10cad`（`Merge upstream/main v0.7.12`）
+- 无文本冲突，但新增内容中有 3 处需要继续维持 DataPilot 约定：
+- `apps/electron/resources/release-notes/0.7.12.md` 中的产品名改为 `DataPilot`
+- `packages/shared/src/__tests__/unified-network-interceptor.schema.test.ts` 中的配置目录改为 `~/.datapilot`
+- `packages/shared/src/agent/claude-agent.ts` 注释中的配置路径同步改为 `~/.datapilot/config.json`
 
 ---
 
