@@ -1,10 +1,10 @@
 # DataPilot Branch Guide
 
 > Branch: `feature/data-analysis-agent`
-> Base: `main` (commit `0b10cad`, includes upstream v0.7.12 merge)
+> Base: `main` (commit `c6a0c78`, includes upstream v0.8.0 merge)
 > Purpose: 将 Craft Agent 改造为面向数据分析场景的垂直 Agent — **DataPilot**
 >
-> **Last updated:** 2026-03-24 (v8, merged main v0.7.12)
+> **Last updated:** 2026-03-26 (v9, merged main v0.8.0)
 
 ## 目标
 
@@ -243,13 +243,25 @@ grep -rn "Craft Agent" --include='*.tsx' --include='*.ts' --include='*.html' --i
 grep -rn "Craft Agent" apps/electron/resources/docs/ apps/electron/resources/release-notes/ packages/shared/src/prompts/system.ts apps/electron/src/renderer/ scripts/install-app.sh scripts/install-app.ps1 scripts/build-server.ts | grep -v node_modules | grep -v craft-agents-oss
 ```
 
-### 本次合并记录（2026-03-24）
+### 合并记录（2026-03-24，v0.7.12）
 
 - 已合并 `main` 的两个新增提交：`d007f04`（upstream `v0.7.12`）和 `0b10cad`（`Merge upstream/main v0.7.12`）
 - 无文本冲突，但新增内容中有 3 处需要继续维持 DataPilot 约定：
 - `apps/electron/resources/release-notes/0.7.12.md` 中的产品名改为 `DataPilot`
 - `packages/shared/src/__tests__/unified-network-interceptor.schema.test.ts` 中的配置目录改为 `~/.datapilot`
 - `packages/shared/src/agent/claude-agent.ts` 注释中的配置路径同步改为 `~/.datapilot/config.json`
+
+### 合并记录（2026-03-26，v0.8.0）
+
+- 已合并 `main` 的两个新增提交：`6ba3719`（upstream `v0.8.0`）和 `c6a0c78`（`Merge upstream/main v0.8.0`）
+- 2 个文本冲突：
+  - `apps/electron/src/main/handlers/workspace.ts` — upstream 将 `CHECK_SLUG` handler 从此文件移至 `packages/server-core/src/handlers/rpc/workspace.ts`，取 main 版本（新位置已自动继承 `.datapilot` 路径）
+  - `packages/server-core/src/bootstrap/headless-start.ts` — upstream 将日志从 "headless server" 简化为 "server"，保留 DataPilot 品牌（"DataPilot server listening..."）
+- 2 处新增用户可见文本需 DataPilot 替换：
+  - `apps/electron/src/renderer/components/workspace/AddWorkspaceStep_Choice.tsx` — "Use a remote Craft Agent Server." → "Use a remote DataPilot Server."
+  - `apps/electron/src/renderer/components/workspace/AddWorkspaceStep_ConnectRemote.tsx` — "Connect to a remote Craft Agent Server..." → "Connect to a remote DataPilot Server..."
+- v0.8.0 release notes（`0.8.0.md`）不含 "Craft Agent" 文本，无需修改
+- 无新增 `.craft-agent` 路径引用，无新增 `CRAFT_CONFIG_DIR` 环境变量
 
 ---
 
