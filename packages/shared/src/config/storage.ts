@@ -10,6 +10,7 @@ import {
   isValidWorkspace,
 } from '../workspaces/storage.ts';
 import { findIconFile } from '../utils/icon.ts';
+import { extractWorkspaceSlugFromPath } from '../utils/workspace-slug.ts';
 import { initializeDocs } from '../docs/index.ts';
 import { expandPath, toPortablePath, getBundledAssetsDir } from '../utils/paths.ts';
 import { debug } from '../utils/debug.ts';
@@ -29,6 +30,7 @@ export { CONFIG_DIR } from './paths.ts';
 
 // Re-export base types from core (single source of truth)
 export type {
+  WorkspaceInfo,
   Workspace,
   McpAuthType,
   AuthType,
@@ -78,6 +80,8 @@ export interface StoredConfig {
   gitBashPath?: string;
   // User chose "Setup later" during onboarding — skip showing onboarding on next launch
   setupDeferred?: boolean;
+  // Server mode — embedded remote server settings
+  serverConfig?: import('./server-config.ts').ServerConfig;
 }
 
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
@@ -93,6 +97,28 @@ let configDefaultsSynced = false;
  *
  * Source of truth: apps/electron/resources/config-defaults.json
  */
+/** Minimal config-defaults used when bundled assets aren't available (CI, standalone server). */
+const FALLBACK_CONFIG_DEFAULTS: ConfigDefaults = {
+  version: '1.0',
+  description: 'Default configuration values for Craft Agents',
+  defaults: {
+    notificationsEnabled: true,
+    colorTheme: 'default',
+    autoCapitalisation: true,
+    sendMessageKey: 'enter',
+    spellCheck: false,
+    keepAwakeWhileRunning: false,
+    richToolDescriptions: true,
+    extendedPromptCache: false,
+  },
+  workspaceDefaults: {
+    thinkingLevel: 'medium',
+    permissionMode: 'ask',
+    cyclablePermissionModes: ['safe', 'ask', 'allow-all'],
+    localMcpServers: { enabled: true },
+  },
+};
+
 function syncConfigDefaults(): void {
   if (configDefaultsSynced) return;
   configDefaultsSynced = true;
@@ -100,13 +126,19 @@ function syncConfigDefaults(): void {
   // Get bundled config-defaults.json from resources folder
   const bundledDir = getBundledAssetsDir('.');
   if (!bundledDir) {
-    debug('[config] No bundled assets dir found - config-defaults will not be synced');
+    debug('[config] No bundled assets dir found - using fallback config-defaults');
+    if (!existsSync(CONFIG_DEFAULTS_FILE)) {
+      writeFileSync(CONFIG_DEFAULTS_FILE, JSON.stringify(FALLBACK_CONFIG_DEFAULTS, null, 2), 'utf-8');
+    }
     return;
   }
 
   const bundledFile = join(bundledDir, 'config-defaults.json');
   if (!existsSync(bundledFile)) {
-    debug('[config] Bundled config-defaults.json not found at: ' + bundledFile);
+    debug('[config] Bundled config-defaults.json not found at: ' + bundledFile + ' - using fallback');
+    if (!existsSync(CONFIG_DEFAULTS_FILE)) {
+      writeFileSync(CONFIG_DEFAULTS_FILE, JSON.stringify(FALLBACK_CONFIG_DEFAULTS, null, 2), 'utf-8');
+    }
     return;
   }
 
@@ -541,7 +573,8 @@ export function getWorkspaces(): Workspace[] {
       }
     }
 
-    return { ...w, name, iconUrl };
+    const slug = extractWorkspaceSlugFromPath(w.rootPath, w.id);
+    return { ...w, name, slug, iconUrl };
   });
 }
 
@@ -605,11 +638,13 @@ export async function switchWorkspaceAtomic(workspaceId: string): Promise<{ work
  * Add a workspace to the global config.
  * @param workspace - Workspace data (must include rootPath)
  */
-export function addWorkspace(workspace: Omit<Workspace, 'id' | 'createdAt'>): Workspace {
+export function addWorkspace(workspace: Omit<Workspace, 'id' | 'createdAt' | 'slug'>): Workspace {
   const config = loadStoredConfig();
   if (!config) {
     throw new Error('No config found');
   }
+
+  const slug = extractWorkspaceSlugFromPath(workspace.rootPath, '');
 
   // Check if workspace with same rootPath already exists
   const existing = config.workspaces.find(w => w.rootPath === workspace.rootPath);
@@ -618,6 +653,7 @@ export function addWorkspace(workspace: Omit<Workspace, 'id' | 'createdAt'>): Wo
     const updated: Workspace = {
       ...existing,
       ...workspace,
+      slug,
       id: existing.id,
       createdAt: existing.createdAt,
     };
@@ -629,6 +665,7 @@ export function addWorkspace(workspace: Omit<Workspace, 'id' | 'createdAt'>): Wo
 
   const newWorkspace: Workspace = {
     ...workspace,
+    slug,
     id: generateWorkspaceId(),
     createdAt: Date.now(),
   };
@@ -672,6 +709,7 @@ export function syncWorkspaces(): void {
     const newWorkspace: Workspace = {
       id: wsConfig.id || generateWorkspaceId(),
       name: wsConfig.name,
+      slug: extractWorkspaceSlugFromPath(rootPath, ''),
       rootPath,
       createdAt: wsConfig.createdAt || Date.now(),
     };
@@ -2620,4 +2658,37 @@ export function ensureToolIcons(): void {
   } catch {
     // Ignore errors — tool icons are optional enhancement
   }
+}
+
+// ============================================
+// Server Mode Configuration
+// ============================================
+
+import { DEFAULT_SERVER_CONFIG, type ServerConfig } from './server-config.ts';
+import { randomUUID } from 'crypto';
+
+/**
+ * Get the current server configuration.
+ * Returns defaults if not yet configured.
+ */
+export function getServerConfig(): ServerConfig {
+  const config = loadStoredConfig();
+  return config?.serverConfig ?? { ...DEFAULT_SERVER_CONFIG };
+}
+
+/**
+ * Persist server configuration.
+ * Auto-generates a stable auth token on first enable if none exists.
+ */
+export function setServerConfig(serverConfig: ServerConfig): void {
+  const config = loadStoredConfig();
+  if (!config) return;
+
+  // Generate a stable token when first enabled (or if token is missing)
+  if (serverConfig.enabled && !serverConfig.token) {
+    serverConfig.token = randomUUID();
+  }
+
+  config.serverConfig = serverConfig;
+  saveConfig(config);
 }

@@ -221,6 +221,7 @@ cd packages/shared && bun run tsc --noEmit
 - Session lifecycle distinguishes **hard aborts** from **UI handoff interrupts**:
   - use hard aborts for true cancellation/teardown (`UserStop`, redirect fallback)
   - use handoff interrupts for pause points where control moves to the UI (`AuthRequest`, `PlanSubmitted`)
+- Remote workspace handoff summaries are injected as one-shot hidden context on the destination session's first turn.
 - Automations matching is unified through canonical matcher adapters in `src/automations/utils.ts` (`matcherMatches*`). Avoid direct primitive-only matcher checks in feature code so condition gating stays consistent across app and agent events.
 
 ## Source of truth

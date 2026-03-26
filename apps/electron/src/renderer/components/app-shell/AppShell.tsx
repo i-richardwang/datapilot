@@ -84,7 +84,7 @@ import { useFocusContext } from "@/context/FocusContext"
 import { getSessionTitle } from "@/utils/session"
 import { useSetAtom } from "jotai"
 import type { Session, Workspace, FileAttachment, PermissionRequest, LoadedSource, LoadedSkill, PermissionMode, SourceFilter, AutomationFilter, BatchFilter } from "../../../shared/types"
-import { sessionMetaMapAtom, type SessionMeta } from "@/atoms/sessions"
+import { sessionMetaMapAtom, sendToWorkspaceAtom, type SessionMeta } from "@/atoms/sessions"
 import { sourcesAtom } from "@/atoms/sources"
 import { skillsAtom } from "@/atoms/skills"
 import { panelStackAtom, panelCountAtom, focusedPanelIdAtom, focusedSessionIdAtom, focusNextPanelAtom, focusPrevPanelAtom, parseSessionIdFromRoute } from "@/atoms/panel-stack"
@@ -92,6 +92,7 @@ import { type SessionStatusId, type SessionStatus, statusConfigsToSessionStatuse
 import { useStatuses } from "@/hooks/useStatuses"
 import { useLabels } from "@/hooks/useLabels"
 import { useViews } from "@/hooks/useViews"
+import { useContainerWidth } from "@/hooks/useContainerWidth"
 import { LabelIcon, LabelValueTypeIcon } from "@/components/ui/label-icon"
 import { filterItems as filterLabelMenuItems, filterSessionStatuses as filterLabelMenuStates, type LabelMenuItem } from "@/components/ui/label-menu"
 import { FEATURE_FLAGS } from "@craft-agent/shared/feature-flags"
@@ -123,6 +124,7 @@ import { BATCH_STATUS_TO_FILTER_KIND } from "../batches/types"
 import { useBatches } from "@/hooks/useBatches"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { PanelHeader } from "./PanelHeader"
+import { SendToWorkspaceDialog } from "./SendToWorkspaceDialog"
 import { EditPopover, getEditConfig, type EditContextKey } from "@/components/ui/EditPopover"
 import SettingsNavigator from "@/pages/settings/SettingsNavigator"
 import {
@@ -548,7 +550,16 @@ function AppShellContent({
   const [isSidebarAndNavigatorHidden, setIsSidebarAndNavigatorHidden] = React.useState(() => {
     return isFocusedMode || storage.get(storage.KEYS.focusModeEnabled, false)
   })
-  const effectiveSidebarAndNavigatorHidden = isSidebarAndNavigatorHidden
+
+  // Auto-compact mode: shell width below mobile threshold hides sidebar/navigator
+  // and switches to single-panel mode. Works in both webui (narrow viewport) and
+  // desktop (narrow window or small screen).
+  const shellRef = useRef<HTMLDivElement>(null)
+  const shellWidth = useContainerWidth(shellRef)
+  const MOBILE_THRESHOLD = 768
+  const isAutoCompact = shellWidth > 0 && shellWidth < MOBILE_THRESHOLD
+
+  const effectiveSidebarAndNavigatorHidden = isSidebarAndNavigatorHidden || isAutoCompact
 
   // What's New overlay
   const [showWhatsNew, setShowWhatsNew] = React.useState(false)
@@ -815,6 +826,13 @@ function AppShellContent({
   }, [skills, setSkillsAtom])
   // Automations — state, handlers, loading, subscriptions
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId)
+
+  // Send to Workspace dialog state (driven by sendToWorkspaceAtom set from SessionMenu/BatchSessionMenu)
+  const sendToWorkspaceIds = useAtomValue(sendToWorkspaceAtom)
+  const setSendToWorkspaceIds = useSetAtom(sendToWorkspaceAtom)
+  const handleTransferComplete = useCallback((targetWorkspaceId: string, _newSessionIds: string[]) => {
+    onSelectWorkspace(targetWorkspaceId)
+  }, [onSelectWorkspace])
   const {
     automations, automationTestResults,
     automationPendingDelete, pendingDeleteAutomation, setAutomationPendingDelete,
@@ -1335,12 +1353,16 @@ function AppShellContent({
 
   // Filter session metadata by active workspace
   // Also exclude hidden sessions (mini-agent sessions) from all counts and lists
+  // For remote workspaces, sessions have the remote workspace ID (not the local one),
+  // so we match against both the local and remote workspace IDs.
+  const remoteWorkspaceId = activeWorkspace?.remoteServer?.remoteWorkspaceId
   const workspaceSessionMetas = useMemo(() => {
     const metas = Array.from(sessionMetaMap.values())
-    return activeWorkspaceId
-      ? metas.filter(s => s.workspaceId === activeWorkspaceId && !s.hidden)
-      : metas.filter(s => !s.hidden)
-  }, [sessionMetaMap, activeWorkspaceId])
+    if (!activeWorkspaceId) return metas.filter(s => !s.hidden)
+    return metas.filter(s =>
+      !s.hidden && (s.workspaceId === activeWorkspaceId || (remoteWorkspaceId && s.workspaceId === remoteWorkspaceId))
+    )
+  }, [sessionMetaMap, activeWorkspaceId, remoteWorkspaceId])
 
   // Active sessions exclude archived and batch - use this for all counts and filters except archived/batch views
   const activeSessionMetas = useMemo(() => {
@@ -2240,6 +2262,7 @@ function AppShellContent({
           onSelectWorkspace={onSelectWorkspace}
           workspaceUnreadMap={workspaceUnreadMap}
           onWorkspaceCreated={() => onRefreshWorkspaces?.()}
+          onWorkspaceRemoved={() => onRefreshWorkspaces?.()}
           activeSessionId={effectiveSessionId}
           onNewChat={() => handleNewChat()}
           onNewWindow={() => window.electronAPI.menuNewWindow()}
@@ -2255,10 +2278,12 @@ function AppShellContent({
           onToggleFocusMode={() => setIsSidebarAndNavigatorHidden(prev => !prev)}
           onAddSessionPanel={() => handleNewChat(true)}
           onAddBrowserPanel={() => { void handleNewBrowserWindow() }}
+          isCompact={isAutoCompact}
         />
 
       {/* === OUTER LAYOUT: Unified Panel Stack | Right Sidebar === */}
       <div
+        ref={shellRef}
         className="flex items-stretch relative"
         style={{ height: '100%', paddingRight: PANEL_EDGE_INSET, paddingBottom: PANEL_EDGE_INSET, paddingLeft: 0, gap: PANEL_GAP }}
       >
@@ -2570,7 +2595,7 @@ function AppShellContent({
           sidebarWidth={effectiveSidebarAndNavigatorHidden ? 0 : (isSidebarVisible ? sidebarWidth : 0)}
           navigatorSlot={
             <div
-              style={{ width: sessionListWidth }}
+              style={{ width: isAutoCompact ? '100%' : sessionListWidth }}
               className="h-full flex flex-col min-w-0 relative z-panel"
             >
             <PanelHeader
@@ -3328,9 +3353,10 @@ function AppShellContent({
             )}
             </div>
           }
-          navigatorWidth={effectiveSidebarAndNavigatorHidden ? 0 : sessionListWidth}
+          navigatorWidth={isAutoCompact ? sessionListWidth : (effectiveSidebarAndNavigatorHidden ? 0 : sessionListWidth)}
           isSidebarAndNavigatorHidden={effectiveSidebarAndNavigatorHidden}
           isRightSidebarVisible={false}
+          isCompact={isAutoCompact}
           isResizing={!!isResizing}
         />
 
@@ -3622,6 +3648,16 @@ function AppShellContent({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Send to Workspace dialog (driven by sendToWorkspaceAtom) */}
+      <SendToWorkspaceDialog
+        open={sendToWorkspaceIds.length > 0}
+        onOpenChange={(open) => { if (!open) setSendToWorkspaceIds([]) }}
+        sessionIds={sendToWorkspaceIds}
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
+        onTransferComplete={handleTransferComplete}
+      />
 
     </AppShellProvider>
   )
