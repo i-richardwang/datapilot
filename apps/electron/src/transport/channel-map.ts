@@ -380,5 +380,6 @@ export const CHANNEL_MAP = {
   duplicateBatch: invoke(RPC_CHANNELS.batches.DUPLICATE),
   deleteBatch: invoke(RPC_CHANNELS.batches.DELETE),
   testBatch: invoke(RPC_CHANNELS.batches.TEST),
+  getBatchTestResult: invoke(RPC_CHANNELS.batches.GET_TEST_RESULT),
   onBatchesChanged: listener(RPC_CHANNELS.batches.CHANGED),
 } satisfies ChannelMap

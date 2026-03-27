@@ -2,7 +2,7 @@ import { readFile, writeFile, unlink } from 'fs/promises'
 import { join } from 'path'
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { getWorkspaceByNameOrId } from '@craft-agent/shared/config'
-import { BATCHES_CONFIG_FILE, BATCH_STATE_FILE_PREFIX } from '@craft-agent/shared/batches'
+import { BATCHES_CONFIG_FILE, BATCH_STATE_FILE_PREFIX, BATCH_TEST_RESULT_FILE_PREFIX, TEST_BATCH_SUFFIX } from '@craft-agent/shared/batches'
 import type { RpcServer } from '@craft-agent/server-core/transport'
 import type { HandlerDeps } from '../handler-deps'
 
@@ -56,6 +56,7 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.batches.DUPLICATE,
   RPC_CHANNELS.batches.DELETE,
   RPC_CHANNELS.batches.TEST,
+  RPC_CHANNELS.batches.GET_TEST_RESULT,
 ] as const
 
 export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): void {
@@ -152,12 +153,14 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
     processor?.stop(batchId)
 
-    // Clean up state file
-    try {
-      const stateFilePath = join(workspace.rootPath, `${BATCH_STATE_FILE_PREFIX}${batchId}.json`)
-      await unlink(stateFilePath)
-    } catch {
-      // State file may not exist
+    // Clean up state file, test result file, and test state file
+    const cleanupFiles = [
+      join(workspace.rootPath, `${BATCH_STATE_FILE_PREFIX}${batchId}.json`),
+      join(workspace.rootPath, `${BATCH_TEST_RESULT_FILE_PREFIX}${batchId}.json`),
+      join(workspace.rootPath, `${BATCH_STATE_FILE_PREFIX}${batchId}${TEST_BATCH_SUFFIX}.json`),
+    ]
+    for (const f of cleanupFiles) {
+      try { await unlink(f) } catch { /* file may not exist */ }
     }
   })
 
@@ -169,5 +172,15 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     if (!processor) throw new Error('Batch processor not initialized')
 
     return processor.test(batchId, sampleSize ?? undefined)
+  })
+
+  server.handle(RPC_CHANNELS.batches.GET_TEST_RESULT, async (_ctx, workspaceId: string, batchId: string) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error('Workspace not found')
+
+    const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
+    if (!processor) return null
+
+    return processor.getTestResult(batchId)
   })
 }

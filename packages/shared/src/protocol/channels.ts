@@ -367,6 +367,7 @@ export const RPC_CHANNELS = {
     DUPLICATE: 'batches:duplicate',
     DELETE: 'batches:delete',
     TEST: 'batches:test',
+    GET_TEST_RESULT: 'batches:getTestResult',
     CHANGED: 'batches:changed',
   },
 } as const
