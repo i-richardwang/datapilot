@@ -56,6 +56,7 @@ COPY apps/electron/package.json apps/electron/
 COPY apps/cli/package.json apps/cli/
 COPY apps/marketing/package.json apps/marketing/
 COPY apps/viewer/package.json apps/viewer/
+COPY apps/webui/package.json apps/webui/
 
 RUN bun install --frozen-lockfile
 
@@ -68,6 +69,12 @@ RUN bun build packages/session-mcp-server/src/index.ts \
     bun build packages/pi-agent-server/src/index.ts \
       --outfile packages/pi-agent-server/dist/index.js --target node --format cjs
 
+# Build web UI assets (served by the server on the RPC port)
+RUN bunx vite build --config apps/webui/vite.config.ts
+
+# Pre-create .craft-agent so Docker named volumes inherit the correct permissions.
+RUN mkdir -p /home/craftagents/.craft-agent
+
 # Make app world-readable so any --user can run it. Home dir is writable for .craft-agent.
 RUN chmod -R a+rX /app && \
     chmod -R 777 /home/craftagents
@@ -76,6 +83,7 @@ USER craftagents
 
 ENV CRAFT_RPC_HOST=0.0.0.0
 ENV CRAFT_RPC_PORT=9100
+ENV CRAFT_WEBUI_DIR=/app/apps/webui/dist
 
 EXPOSE 9100
 

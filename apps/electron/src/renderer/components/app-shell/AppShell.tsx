@@ -94,9 +94,10 @@ import { useLabels } from "@/hooks/useLabels"
 import { useViews } from "@/hooks/useViews"
 import { useContainerWidth } from "@/hooks/useContainerWidth"
 import { LabelIcon, LabelValueTypeIcon } from "@/components/ui/label-icon"
-import { filterItems as filterLabelMenuItems, filterSessionStatuses as filterLabelMenuStates, type LabelMenuItem } from "@/components/ui/label-menu"
+import { filterSessionStatuses as filterLabelMenuStates } from "@/components/ui/label-menu"
+import { createLabelMenuItems, filterItems as filterLabelMenuItems, type LabelMenuItem } from "@/components/ui/label-menu-utils"
 import { FEATURE_FLAGS } from "@craft-agent/shared/feature-flags"
-import { buildLabelTree, getDescendantIds, getLabelDisplayName, flattenLabels, extractLabelId, findLabelById } from "@craft-agent/shared/labels"
+import { buildLabelTree, getDescendantIds, getLabelDisplayName, flattenLabels, extractLabelId, findLabelById, sortLabelsForDisplay } from "@craft-agent/shared/labels"
 import type { LabelConfig, LabelTreeNode } from "@craft-agent/shared/labels"
 import { resolveEntityColor } from "@craft-agent/shared/colors"
 import * as storage from "@/lib/local-storage"
@@ -1017,37 +1018,20 @@ function AppShellContent({
 
   // Load labels from workspace config
   const { labels: labelConfigs } = useLabels(activeWorkspace?.id || null)
+  const displayLabelConfigs = useMemo(() => sortLabelsForDisplay(labelConfigs), [labelConfigs])
 
   // Views: compiled once on config load, evaluated per session in list/chat
   const { evaluateSession: evaluateViews, viewConfigs } = useViews(activeWorkspace?.id || null)
 
-  // Build hierarchical label tree from nested config structure
-  const labelTree = useMemo(() => buildLabelTree(labelConfigs), [labelConfigs])
+  // Build hierarchical label tree from the display-sorted label config structure
+  const labelTree = useMemo(() => buildLabelTree(displayLabelConfigs), [displayLabelConfigs])
 
-  // Build flat LabelMenuItem[] from hierarchical labelConfigs for the filter dropdown's search mode.
-  // Uses the same structure as the # inline menu so we can reuse filterItems().
-  const flatLabelMenuItems = useMemo((): LabelMenuItem[] => {
-    const flat = flattenLabels(labelConfigs)
-    // Build parent path breadcrumbs for nested labels
-    const findParentPath = (tree: LabelConfig[], targetId: string, path: string[]): string[] | null => {
-      for (const node of tree) {
-        if (node.id === targetId) return path
-        if (node.children) {
-          const result = findParentPath(node.children, targetId, [...path, node.name])
-          if (result) return result
-        }
-      }
-      return null
-    }
-    return flat.map(label => {
-      let parentPath: string | undefined
-      const pathParts = findParentPath(labelConfigs, label.id, [])
-      if (pathParts && pathParts.length > 0) {
-        parentPath = pathParts.join(' / ') + ' / '
-      }
-      return { id: label.id, label: label.name, config: label, parentPath }
-    })
-  }, [labelConfigs])
+  // Build flat LabelMenuItem[] from hierarchical labels for the filter dropdown's search mode.
+  // Uses the same structure as the # inline menu so the two search surfaces stay aligned.
+  const flatLabelMenuItems = useMemo(
+    (): LabelMenuItem[] => createLabelMenuItems(displayLabelConfigs),
+    [displayLabelConfigs],
+  )
 
   // Filter dropdown keyboard navigation: tracks highlighted item index in flat search mode.
   // Unified index: [0..matchedStates-1] = statuses, [matchedStates..total-1] = labels.
@@ -1627,7 +1611,8 @@ function AppShellContent({
     onDeleteSession: handleDeleteSession,
     enabledSources: sources,
     skills,
-    labels: labelConfigs,
+    activeSessionWorkingDirectory,
+    labels: displayLabelConfigs,
     onSessionLabelsChange: handleSessionLabelsChange,
     enabledModes,
     sessionStatuses: effectiveSessionStatuses,
@@ -1654,7 +1639,7 @@ function AppShellContent({
     onDeleteBatch: handleDeleteBatch,
     testProgress,
     testResults,
-  }), [contextValue, handleDeleteSession, sources, skills, labelConfigs, handleSessionLabelsChange, enabledModes, effectiveSessionStatuses, handleSessionSourcesChange, searchActive, searchQuery, handleChatMatchInfoChange, handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, automationTestResults, getAutomationHistory, handleReplayAutomation, handleStartBatch, handlePauseBatch, handleResumeBatch, handleTestBatch, getBatchState, handleDuplicateBatch, handleDeleteBatch, testProgress, testResults])
+  }), [contextValue, handleDeleteSession, sources, skills, activeSessionWorkingDirectory, displayLabelConfigs, handleSessionLabelsChange, enabledModes, effectiveSessionStatuses, handleSessionSourcesChange, searchActive, searchQuery, handleChatMatchInfoChange, handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, automationTestResults, getAutomationHistory, handleReplayAutomation, handleStartBatch, handlePauseBatch, handleResumeBatch, handleTestBatch, getBatchState, handleDuplicateBatch, handleDeleteBatch, testProgress, testResults])
 
   // Persist expanded folders to localStorage (workspace-scoped)
   React.useEffect(() => {
@@ -2191,17 +2176,11 @@ function AppShellContent({
     }
   }, [navState, sessionFilter, effectiveSessionStatuses, labelConfigs, viewConfigs, automationFilter, batchFilter])
 
-  // Build recursive sidebar items from label tree.
+  // Build recursive sidebar items from the shared display-sorted label tree.
   // Each node renders with condensed height (compact: true) since many labels expected.
   // Clicking any label navigates to its filter view; the chevron toggles expand/collapse.
   const buildLabelSidebarItems = useCallback((nodes: LabelTreeNode[]): any[] => {
-    // Sort labels alphabetically by display name at every level (parent + children)
-    const sorted = [...nodes].sort((a, b) => {
-      const nameA = (a.label?.name || a.segment).toLowerCase()
-      const nameB = (b.label?.name || b.segment).toLowerCase()
-      return nameA.localeCompare(nameB)
-    })
-    return sorted.map(node => {
+    return nodes.map(node => {
       const hasChildren = node.children.length > 0
       const isActive = sessionFilter?.kind === 'label' && sessionFilter.labelId === node.fullId
       const count = labelCounts[node.fullId] || 0
@@ -2941,7 +2920,7 @@ function AppShellContent({
                                   </StyledDropdownMenuItem>
                                 ) : (
                                   <FilterLabelItems
-                                    labels={labelConfigs}
+                                    labels={displayLabelConfigs}
                                     labelFilter={labelFilter}
                                     setLabelFilter={setLabelFilter}
                                     pinnedLabelId={pinnedFilters.pinnedLabelId}
@@ -3339,7 +3318,7 @@ function AppShellContent({
                   }}
                   sessionStatuses={effectiveSessionStatuses}
                   evaluateViews={evaluateViews}
-                  labels={labelConfigs}
+                  labels={displayLabelConfigs}
                   onLabelsChange={handleSessionLabelsChange}
                   groupingMode={chatGroupingMode}
                   workspaceId={activeWorkspaceId ?? undefined}

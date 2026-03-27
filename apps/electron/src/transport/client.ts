@@ -855,18 +855,29 @@ export class WsRpcClient implements RpcClient {
 
     if (this.connected && this.ws) return
 
-    const isSocketUsable = !!this.ws && (
-      this.ws.readyState === this.ws.OPEN ||
-      this.ws.readyState === this.ws.CONNECTING
-    )
-
-    if (!this.connectStarted || !isSocketUsable) {
-      if (this.reconnectTimer) {
-        clearTimeout(this.reconnectTimer)
-        this.reconnectTimer = null
+    // If a reconnect is already scheduled or in progress, await it instead of
+    // canceling the backoff timer and forcing a new attempt. This prevents
+    // concurrent RPC calls from resetting the exponential backoff.
+    if (this.readyPromise || this.reconnectTimer) {
+      const ready = this.readyPromise
+      if (!ready) {
+        // Reconnect timer is pending but no readyPromise yet — wait for the
+        // timer to fire and produce one. Throw so caller can retry.
+        throw this.connectError ?? new Error(`Not connected (channel: ${channel})`)
       }
-      this.connect()
+      try {
+        await ready
+      } catch (error) {
+        throw error instanceof Error ? error : new Error(`Not connected (channel: ${channel})`)
+      }
+      if (!this.connected || !this.ws) {
+        throw new Error(`Not connected (channel: ${channel})`)
+      }
+      return
     }
+
+    // No connection in progress and no reconnect scheduled — start one
+    this.connect()
 
     const ready = this.readyPromise
     if (!ready) {

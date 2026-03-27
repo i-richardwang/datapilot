@@ -53,6 +53,8 @@ export interface AppShellContextType {
   enabledSources?: LoadedSource[]
   /** All skills for this workspace - provided by AppShell component (for @mentions) */
   skills?: LoadedSkill[]
+  /** Working directory of the active session — needed for project-level skill resolution */
+  activeSessionWorkingDirectory?: string
   /** All label configs (tree) for label menu and badge display */
   labels?: import('@craft-agent/shared/labels').LabelConfig[]
   /** Callback when session labels change */
@@ -102,7 +104,7 @@ export interface AppShellContextType {
   onOpenUrl: (url: string) => void
 
   // Workspace
-  onSelectWorkspace: (id: string, openInNewWindow?: boolean) => void
+  onSelectWorkspace: (id: string, openInNewWindow?: boolean) => void | Promise<void>
   onRefreshWorkspaces?: () => void
 
   // App actions
