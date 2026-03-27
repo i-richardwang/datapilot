@@ -42,7 +42,7 @@ export function Header({ hasSession, sessionTitle, isDark, onToggleTheme, onClea
         className="hover:opacity-80 transition-opacity"
         title="DataPilot"
       >
-        <CraftAgentLogo className="w-6 h-6 text-accent" />
+        <CraftAgentLogo className="w-6 h-6 text-[#9570BE]" />
       </a>
 
       {/* Session title - centered */}
