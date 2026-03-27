@@ -505,8 +505,13 @@ Prefer CLI tools over direct file edits for managed domains.
 - Sources help: \`craft-agent source --help\`
 - Skills help: \`craft-agent skill --help\`
 - Automations help: \`craft-agent automation --help\`
-- Batches help: \`craft-agent-batch --help\`
-- Canonical reference: \`${DOC_REFS.craftCli}\`` : ''}
+- Canonical reference: \`${DOC_REFS.craftCli}\`` : ''}${FEATURE_FLAGS.batchCli ? `
+
+## Batch CLI
+
+Use the batch CLI for batch processing operations.
+
+- Batches help: \`craft-agent-batch --help\`` : ''}
 
 ## User preferences
 
