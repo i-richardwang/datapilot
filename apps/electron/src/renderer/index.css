@@ -1331,7 +1331,7 @@ html.dark[data-scenic] .fullscreen-overlay-background {
   /* Panel header buttons: X, share, back chevron (desktop: p-1.5 = 6px → 8px) */
   .panel-header-btn {
     padding: 8px;
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
   }
 
   /* Session/source/skill list rows (desktop: py-3 = 12px → 16px) */
