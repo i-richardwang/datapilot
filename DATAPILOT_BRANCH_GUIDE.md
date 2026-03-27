@@ -4,7 +4,7 @@
 > Base: `main` (commit `1a3a98f`, includes upstream v0.8.1 merge)
 > Purpose: 将 Craft Agent 改造为面向数据分析场景的垂直 Agent — **DataPilot**
 >
-> **Last updated:** 2026-03-27 (v10, merged main v0.8.1)
+> **Last updated:** 2026-03-27 (v11, merged main viewer-server)
 
 ## 目标
 
@@ -281,6 +281,13 @@ grep -rn "Craft Agent" apps/electron/resources/docs/ apps/electron/resources/rel
   - `scripts/install-server.sh:77` — "Craft Agent Server Ready" → "DataPilot Server Ready"
   - `apps/electron/resources/release-notes/0.8.1.md:18` — `.craft-agent` → `.datapilot`
 - 1 处遗漏修复：`storage-update-llm-connection.test.ts:50` — `CRAFT_CONFIG_DIR` → `DATAPILOT_CONFIG_DIR`（P1 阶段遗漏）
+
+### 合并记录（2026-03-27，viewer-server）
+
+- 已合并 `main` 的 1 个新增提交：`dcf9209`（self-hosted viewer server）
+- 无冲突，`branding.ts` 自动合并（main 加 `CRAFT_VIEWER_URL` env var，本分支改品牌注释，不重叠）
+- 新增文件均为全新（`apps/viewer-server/`、`Dockerfile.viewer`），无品牌文本需替换
+- 无新增 `.craft-agent` 路径引用，无新增用户可见 "Craft Agent" 文本
 
 ---
 
