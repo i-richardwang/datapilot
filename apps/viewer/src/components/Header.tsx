@@ -42,7 +42,7 @@ export function Header({ hasSession, sessionTitle, isDark, onToggleTheme, onClea
         className="hover:opacity-80 transition-opacity"
         title="Craft Agent"
       >
-        <CraftAgentLogo className="w-6 h-6 text-[#9570BE]" />
+        <CraftAgentLogo className="w-6 h-6 text-accent" />
       </a>
 
       {/* Session title - centered */}
