@@ -22,6 +22,7 @@ export const LOCAL_ONLY_CHANNELS = new Set<string>([
   RPC_CHANNELS.workspaces.GET,
   RPC_CHANNELS.workspaces.CREATE,
   RPC_CHANNELS.workspaces.CHECK_SLUG,
+  RPC_CHANNELS.workspaces.UPDATE_REMOTE,
 
   // window — Electron window management
   RPC_CHANNELS.window.GET_WORKSPACE,
@@ -178,14 +179,7 @@ export const LOCAL_ONLY_CHANNELS = new Set<string>([
   RPC_CHANNELS.onboarding.GET_AUTH_STATE,
   RPC_CHANNELS.onboarding.VALIDATE_MCP,
   RPC_CHANNELS.onboarding.START_MCP_OAUTH,
-  RPC_CHANNELS.onboarding.START_CLAUDE_OAUTH,
-  RPC_CHANNELS.onboarding.EXCHANGE_CLAUDE_CODE,
-  RPC_CHANNELS.onboarding.HAS_CLAUDE_OAUTH_STATE,
-  RPC_CHANNELS.onboarding.CLEAR_CLAUDE_OAUTH_STATE,
   RPC_CHANNELS.onboarding.DEFER_SETUP,
-
-  // settings — local config (setup involves browser OAuth)
-  RPC_CHANNELS.settings.SETUP_LLM_CONNECTION,
   RPC_CHANNELS.settings.GET_NETWORK_PROXY,
   RPC_CHANNELS.settings.SET_NETWORK_PROXY,
 
@@ -247,6 +241,7 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   // file — workspace files (not openDialog which is native)
   RPC_CHANNELS.file.READ,
   RPC_CHANNELS.file.READ_DATA_URL,
+  RPC_CHANNELS.file.READ_PREVIEW_DATA_URL,
   RPC_CHANNELS.file.READ_BINARY,
   RPC_CHANNELS.file.READ_ATTACHMENT,
   RPC_CHANNELS.file.STORE_ATTACHMENT,
@@ -286,7 +281,16 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   RPC_CHANNELS.copilot.LOGOUT,
   RPC_CHANNELS.copilot.DEVICE_CODE,
 
+  // Claude OAuth — runs on workspace server so credentials and connection config
+  // end up on the same server that will use them. Browser opening is client-side.
+  // (ChatGPT OAuth stays LOCAL_ONLY — requires localhost callback server.)
+  RPC_CHANNELS.onboarding.START_CLAUDE_OAUTH,
+  RPC_CHANNELS.onboarding.EXCHANGE_CLAUDE_CODE,
+  RPC_CHANNELS.onboarding.HAS_CLAUDE_OAUTH_STATE,
+  RPC_CHANNELS.onboarding.CLEAR_CLAUDE_OAUTH_STATE,
+
   // settings — workspace-level settings
+  RPC_CHANNELS.settings.SETUP_LLM_CONNECTION,
   RPC_CHANNELS.settings.TEST_LLM_CONNECTION_SETUP,
   RPC_CHANNELS.settings.GET_DEFAULT_THINKING_LEVEL,
   RPC_CHANNELS.settings.SET_DEFAULT_THINKING_LEVEL,

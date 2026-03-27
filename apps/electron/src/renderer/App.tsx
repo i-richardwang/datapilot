@@ -27,6 +27,7 @@ import { NavigationProvider } from '@/contexts/NavigationContext'
 import { navigate, routes } from './lib/navigate'
 import { stripMarkdown } from './utils/text'
 import { getSessionsToRefreshAfterStaleReconnect } from './lib/reconnect-recovery'
+import { formatSessionLoadFailure, shouldTreatSessionLoadFailureAsTransportFallback } from './lib/session-load'
 import { extractWorkspaceSlugFromPath } from '@craft-agent/shared/utils/workspace-slug'
 import { DEFAULT_THINKING_LEVEL } from '@craft-agent/shared/agent/thinking-levels'
 import { initRendererPerf } from './lib/perf'
@@ -155,6 +156,35 @@ function handleBackgroundTaskEvent(
   // 3. KillShell succeeds (shell_killed event)
 }
 
+function SessionLoadErrorScreen({
+  message,
+  onRetry,
+}: {
+  message: string
+  onRetry: () => void
+}) {
+  return (
+    <div className="flex h-full items-center justify-center p-6">
+      <div className="max-w-lg rounded-xl border border-border/50 bg-background shadow-minimal p-6 text-center">
+        <h2 className="text-lg font-semibold text-foreground">Failed to load sessions</h2>
+        <p className="mt-2 text-sm text-foreground/60">
+          DataPilot could connect, but loading the session list failed. This is not being treated as an empty workspace to avoid hiding a real bug or data problem.
+        </p>
+        <p className="mt-3 rounded-lg bg-foreground/5 px-3 py-2 text-left text-xs text-foreground/70 break-words">
+          {message}
+        </p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-4 inline-flex h-8 items-center justify-center rounded-lg bg-foreground text-background px-3 text-sm font-medium hover:opacity-90 transition-opacity"
+        >
+          Retry loading sessions
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   // Initialize renderer perf tracking early (debug mode = running from source)
   // Uses useEffect with empty deps to run once on mount before any session switches
@@ -203,6 +233,15 @@ export default function App() {
     return workspace?.slug ?? windowWorkspaceId
   }, [windowWorkspaceId, workspaces])
 
+  // Get initial sessionId and focused mode from URL params (for "Open in New Window" feature)
+  const { initialSessionId, isFocusedMode } = useMemo(() => {
+    const params = new URLSearchParams(window.location.search)
+    return {
+      initialSessionId: params.get('sessionId'),
+      isFocusedMode: params.get('focused') === 'true',
+    }
+  }, [])
+
   // Derive remote workspace ID for session matching in NavigationContext
   const windowRemoteWorkspaceId = useMemo(() => {
     if (!windowWorkspaceId) return null
@@ -249,6 +288,7 @@ export default function App() {
 
   // Splash screen state - tracks when app is fully ready (all data loaded)
   const [sessionsLoaded, setSessionsLoaded] = useState(false)
+  const [sessionLoadError, setSessionLoadError] = useState<string | null>(null)
   const [splashExiting, setSplashExiting] = useState(false)
   const [splashHidden, setSplashHidden] = useState(false)
 
@@ -381,6 +421,58 @@ export default function App() {
     }
   }, [clearStreamingState, updateSessionDirect, syncSessionOptionsFromSession, reconcilePermissionModeState])
 
+  const loadSessionsFromServer = useCallback(async () => {
+    setSessionLoadError(null)
+
+    try {
+      const loadedSessions = await window.electronAPI.getSessions()
+
+      // Initialize per-session atoms and metadata map
+      // NOTE: No sessionsAtom used - sessions are only in per-session atoms
+      initializeSessions(loadedSessions)
+
+      // Initialize unified sessionOptions from session data
+      const optionsMap = new Map<string, SessionOptions>()
+      for (const s of loadedSessions) {
+        const hasNonDefaultMode = s.permissionMode && s.permissionMode !== 'ask'
+        const hasNonDefaultThinking = s.thinkingLevel && s.thinkingLevel !== DEFAULT_THINKING_LEVEL
+        if (hasNonDefaultMode || hasNonDefaultThinking) {
+          optionsMap.set(s.id, {
+            permissionMode: s.permissionMode ?? 'ask',
+            thinkingLevel: s.thinkingLevel ?? DEFAULT_THINKING_LEVEL,
+          })
+        }
+      }
+      setSessionOptions(optionsMap)
+
+      await Promise.allSettled(
+        loadedSessions.map((s) => reconcilePermissionModeState(s.id))
+      )
+
+      setSessionsLoaded(true)
+
+      if (initialSessionId && windowWorkspaceId) {
+        const session = loadedSessions.find(s => s.id === initialSessionId)
+        if (session) {
+          navigate(routes.view.allSessions(session.id))
+        }
+      }
+    } catch (err) {
+      console.error('[App] Failed to load sessions:', err)
+      const transportState = await window.electronAPI.getTransportConnectionState().catch(() => null)
+
+      if (shouldTreatSessionLoadFailureAsTransportFallback(transportState)) {
+        console.error('[App] Treating session load failure as transport fallback:', transportState)
+        setSessionsLoaded(true)
+        setSessionLoadError(null)
+        return
+      }
+
+      setSessionLoadError(formatSessionLoadFailure(err))
+      setSessionsLoaded(true)
+    }
+  }, [initializeSessions, initialSessionId, reconcilePermissionModeState, windowWorkspaceId])
+
   const refreshSessionListMetadataFromServer = useCallback(async (): Promise<Map<string, SessionMeta> | null> => {
     try {
       const sessions = await window.electronAPI.getSessions()
@@ -498,15 +590,6 @@ export default function App() {
     setShowResetDialog(true)
   }, [])
 
-  // Get initial sessionId and focused mode from URL params (for "Open in New Window" feature)
-  const { initialSessionId, isFocusedMode } = useMemo(() => {
-    const params = new URLSearchParams(window.location.search)
-    return {
-      initialSessionId: params.get('sessionId'),
-      isFocusedMode: params.get('focused') === 'true',
-    }
-  }, [])
-
   // Check auth state and get window's workspace ID on mount
   useEffect(() => {
     const initialize = async () => {
@@ -562,7 +645,7 @@ export default function App() {
     if (appState !== 'ready') return
 
     window.electronAPI.getWorkspaces().then(setWorkspaces)
-    window.electronAPI.getNotificationsEnabled().then(setNotificationsEnabled)
+    window.electronAPI.getNotificationsEnabled().then(setNotificationsEnabled).catch(() => {})
 
     // Show actionable toast for missing system dependencies (Windows only)
     window.electronAPI.getSystemWarnings().then((warnings) => {
@@ -577,41 +660,7 @@ export default function App() {
         })
       }
     }).catch(() => { /* non-fatal startup check */ })
-    window.electronAPI.getSessions().then(async (loadedSessions) => {
-      // Initialize per-session atoms and metadata map
-      // NOTE: No sessionsAtom used - sessions are only in per-session atoms
-      initializeSessions(loadedSessions)
-      // Initialize unified sessionOptions from session data
-      const optionsMap = new Map<string, SessionOptions>()
-      for (const s of loadedSessions) {
-        // Only store non-default options to keep the map lean
-        const hasNonDefaultMode = s.permissionMode && s.permissionMode !== 'ask'
-        const hasNonDefaultThinking = s.thinkingLevel && s.thinkingLevel !== DEFAULT_THINKING_LEVEL
-        if (hasNonDefaultMode || hasNonDefaultThinking) {
-          optionsMap.set(s.id, {
-            permissionMode: s.permissionMode ?? 'ask',
-            thinkingLevel: s.thinkingLevel ?? DEFAULT_THINKING_LEVEL,
-          })
-        }
-      }
-      setSessionOptions(optionsMap)
-
-      // Reconcile permission mode state from backend diagnostics (mode + modeVersion)
-      await Promise.allSettled(
-        loadedSessions.map((s) => reconcilePermissionModeState(s.id))
-      )
-
-      // Mark sessions as loaded for splash screen
-      setSessionsLoaded(true)
-
-      // If window was opened with a specific session (via "Open in New Window"), select it
-      if (initialSessionId && windowWorkspaceId) {
-        const session = loadedSessions.find(s => s.id === initialSessionId)
-        if (session) {
-          navigate(routes.view.allSessions(session.id))
-        }
-      }
-    })
+    void loadSessionsFromServer()
     // Load LLM connections with authentication status
     window.electronAPI.listLlmConnectionsWithStatus().then((connections) => {
       setLlmConnections(connections)
@@ -625,7 +674,7 @@ export default function App() {
     })
     // Load app-level theme
     window.electronAPI.getAppTheme().then(setAppTheme)
-  }, [appState, initialSessionId, windowWorkspaceId, initializeSessions, resolveDefaultConnectionSlug, reconcilePermissionModeState])
+  }, [appState, loadSessionsFromServer, resolveDefaultConnectionSlug])
 
   // Subscribe to theme change events (live updates when theme.json changes)
   useEffect(() => {
@@ -1788,13 +1837,20 @@ export default function App() {
               />
             )}
             <div className="flex-1 min-h-0">
-              <AppShell
-                contextValue={appShellContextValue}
-                defaultLayout={[20, 32, 48]}
-                menuNewChatTrigger={menuNewChatTrigger}
-                isFocusedMode={isFocusedMode}
-                batchHandlersRef={batchHandlersRef}
-              />
+              {sessionLoadError ? (
+                <SessionLoadErrorScreen
+                  message={sessionLoadError}
+                  onRetry={() => { void loadSessionsFromServer() }}
+                />
+              ) : (
+                <AppShell
+                  contextValue={appShellContextValue}
+                  defaultLayout={[20, 32, 48]}
+                  menuNewChatTrigger={menuNewChatTrigger}
+                  isFocusedMode={isFocusedMode}
+                  batchHandlersRef={batchHandlersRef}
+                />
+              )}
             </div>
             <ResetConfirmationDialog
               open={showResetDialog}

@@ -88,6 +88,7 @@ export function MainContentPanel({
     onDeleteBatch,
     testProgress,
     testResults,
+    activeSessionWorkingDirectory,
   } = useAppShellContext()
 
   // Session multi-select state
@@ -267,6 +268,7 @@ export function MainContentPanel({
           <SkillInfoPage
             skillSlug={navState.details.skillSlug}
             workspaceId={activeWorkspaceId || ''}
+            workingDirectory={activeSessionWorkingDirectory}
           />
         </Panel>
       )

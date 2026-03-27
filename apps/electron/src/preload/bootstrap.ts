@@ -182,6 +182,8 @@ client.handleCapability(CLIENT_OPEN_FILE_DIALOG, async (spec: FileDialogSpec) =>
 
 const api = buildClientApi(client, CHANNEL_MAP, (ch) => client.isChannelAvailable(ch))
 
+;(api as any).getRuntimeEnvironment = (): 'electron' | 'web' => 'electron'
+
 // ---------------------------------------------------------------------------
 // Transport connection state logging (for remote connections)
 // ---------------------------------------------------------------------------

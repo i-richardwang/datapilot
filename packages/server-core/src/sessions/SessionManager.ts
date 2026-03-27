@@ -6983,6 +6983,9 @@ export class SessionManager implements ISessionManager {
       }
       // Clear thinking level so the session inherits the workspace default
       storedSession.thinkingLevel = undefined
+      // Clear working directory — the source path won't exist on a different server.
+      // The user can set a new cwd after the session is transferred.
+      storedSession.workingDirectory = undefined
     }
 
     // Check source compatibility (before writing JSONL so fixes are persisted)

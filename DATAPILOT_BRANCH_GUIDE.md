@@ -1,10 +1,10 @@
 # DataPilot Branch Guide
 
 > Branch: `feature/data-analysis-agent`
-> Base: `main` (commit `c6a0c78`, includes upstream v0.8.0 merge)
+> Base: `main` (commit `1a3a98f`, includes upstream v0.8.1 merge)
 > Purpose: 将 Craft Agent 改造为面向数据分析场景的垂直 Agent — **DataPilot**
 >
-> **Last updated:** 2026-03-26 (v9, merged main v0.8.0)
+> **Last updated:** 2026-03-27 (v10, merged main v0.8.1)
 
 ## 目标
 
@@ -262,6 +262,25 @@ grep -rn "Craft Agent" apps/electron/resources/docs/ apps/electron/resources/rel
   - `apps/electron/src/renderer/components/workspace/AddWorkspaceStep_ConnectRemote.tsx` — "Connect to a remote Craft Agent Server..." → "Connect to a remote DataPilot Server..."
 - v0.8.0 release notes（`0.8.0.md`）不含 "Craft Agent" 文本，无需修改
 - 无新增 `.craft-agent` 路径引用，无新增 `CRAFT_CONFIG_DIR` 环境变量
+
+### 合并记录（2026-03-27，v0.8.1）
+
+- 已合并 `main` 的 5 个新增提交（upstream v0.8.1 + Merge commit + FORK_MERGE_GUIDE 更新）
+- 5 个冲突：
+  - `Dockerfile.server` — 上游新增 WebUI 构建和 `mkdir .craft-agent`，保留上游新增行并改为 `.datapilot`
+  - `FORK_MERGE_GUIDE.md` — 两处冲突（Last updated 行 + v0.8.0 合并记录），均取 main 版本（更完整）
+  - `AddWorkspaceStep_ConnectRemote.tsx` — 上游新增 reconnect 模式（`isReconnectMode` 三元表达式），保留上游逻辑并将 "Craft Agent Server" 替换为 "DataPilot Server"
+  - `scripts/install-app.sh` — 上游将构件名从 `Craft-Agent` 改为 `Craft-Agents`（复数），保留我们的 `.datapilot`/`@datapilot` 路径 + 上游新构件名
+  - `scripts/electron-build-assets.ts` — modify/delete，上游删除文件（我们仅改了注释路径），接受删除
+- 7 处新增用户可见文本需 DataPilot 替换：
+  - `App.tsx:171` — "Craft Agents could connect..." → "DataPilot could connect..."
+  - `AddWorkspaceStep_ConnectRemote.tsx:148` — 运行时路径 `.craft-agent/workspaces` → `.datapilot/workspaces`
+  - `apps/webui/src/index.html:6` — `<title>Craft Agents</title>` → `<title>DataPilot</title>`
+  - `apps/webui/src/login.html:6` — `<title>Craft Agents — Login</title>` → `<title>DataPilot — Login</title>`
+  - `apps/webui/src/login.html:224` — `<h1>Craft Agents</h1>` → `<h1>DataPilot</h1>`
+  - `scripts/install-server.sh:77` — "Craft Agent Server Ready" → "DataPilot Server Ready"
+  - `apps/electron/resources/release-notes/0.8.1.md:18` — `.craft-agent` → `.datapilot`
+- 1 处遗漏修复：`storage-update-llm-connection.test.ts:50` — `CRAFT_CONFIG_DIR` → `DATAPILOT_CONFIG_DIR`（P1 阶段遗漏）
 
 ---
 

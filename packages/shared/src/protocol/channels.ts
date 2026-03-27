@@ -55,6 +55,7 @@ export const RPC_CHANNELS = {
     GET: 'workspaces:get',
     CREATE: 'workspaces:create',
     CHECK_SLUG: 'workspaces:checkSlug',
+    UPDATE_REMOTE: 'workspaces:updateRemote',
   },
   window: {
     GET_WORKSPACE: 'window:getWorkspace',
@@ -73,6 +74,7 @@ export const RPC_CHANNELS = {
   file: {
     READ: 'file:read',
     READ_DATA_URL: 'file:readDataUrl',
+    READ_PREVIEW_DATA_URL: 'file:readPreviewDataUrl',
     READ_BINARY: 'file:readBinary',
     OPEN_DIALOG: 'file:openDialog',
     READ_ATTACHMENT: 'file:readAttachment',

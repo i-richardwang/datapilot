@@ -261,6 +261,19 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
       })
     }
 
+    // Return the default workspace ID so the webui can include it in the WS handshake
+    if (path === '/api/config/workspaces' && req.method === 'GET') {
+      const configSession = await validateSession(req.headers.get('cookie'), secret)
+      if (!configSession) {
+        return Response.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      const { getActiveWorkspace } = await import('@craft-agent/shared/config/storage')
+      const active = getActiveWorkspace()
+      return Response.json({
+        defaultWorkspaceId: active?.id ?? null,
+      })
+    }
+
     // ── Everything below requires a valid session cookie ──
     const cookieHeader = req.headers.get('cookie')
     const session = await validateSession(cookieHeader, secret)

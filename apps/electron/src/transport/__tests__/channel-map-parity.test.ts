@@ -16,6 +16,7 @@ type ApiToChannelMapKeys = Exclude<
   FunctionKeys<ElectronAPI>,
   | 'performOAuth'
   | 'getTransportConnectionState'
+  | 'getRuntimeEnvironment'
   | 'onTransportConnectionStateChanged'
   | 'reconnectTransport'
   | 'isChannelAvailable'
