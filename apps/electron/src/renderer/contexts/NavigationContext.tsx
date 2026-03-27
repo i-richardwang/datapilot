@@ -1210,6 +1210,9 @@ export function NavigationProvider({
       case 'archived':
         navigate(routes.view.archived(sessionId))
         break
+      case 'batch':
+        navigate(routes.view.batchSessions(sessionId))
+        break
       case 'state':
         navigate(routes.view.state(filter.stateId, sessionId))
         break

@@ -374,8 +374,13 @@ export function useSessionSearch({
 
   // --- Data pipeline ---
 
-  // Filter out hidden and batch sessions before any processing
-  const visibleItems = useMemo(() => items.filter(item => !item.hidden && !item.isBatch), [items])
+  // Filter out hidden sessions before any processing.
+  // Batch sessions are only included when the current filter is 'batch'.
+  const visibleItems = useMemo(() => items.filter(item => {
+    if (item.hidden) return false
+    if (item.isBatch) return currentFilter?.kind === 'batch'
+    return true
+  }), [items, currentFilter])
 
   // Sort by most recent activity first
   const sortedItems = useMemo(() =>
