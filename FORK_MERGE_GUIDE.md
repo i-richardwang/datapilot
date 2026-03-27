@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: identify conflict zones, understand intent, make informed merge resolution decisions.
 >
-> **Last updated after:** v0.8.1 merge (remote workspace recovery, Docker deployment, Web UI thumbnails, Pi subprocess error dedup)
+> **Last updated after:** viewer-server (self-hosted viewer backend, Dockerfile.viewer, configurable VIEWER_URL)
 
 ## Overview
 
@@ -18,6 +18,8 @@ Our fork adds four categories of changes:
 4. **Custom Endpoint Runtime Fixes** — Four fixes for upstream's custom endpoint system introduced in v0.7.4: (a) `queryLlm()` provider compatibility check now exempts `custom-endpoint` models so they aren't incorrectly rejected and forced to fallback; (b) `validateStoredConnection()` in the Pi driver makes actual API calls (Anthropic or OpenAI-compatible) instead of returning `{ success: true }` unconditionally; (c) `resolveModelForProvider()` skips the cross-provider model guard for custom endpoint connections so UI model selection isn't silently overridden by `defaultModel`; (d) `resolveModelForProvider()` resolves tier-hint short names (`'haiku'` → `getMiniModel()`, `'sonnet'`/`'opus'` → `connection.defaultModel`) against the connection's model list, so EditPopover mini-agent sessions route to the user's custom endpoint instead of falling back to built-in providers.
 
 5. **Border-Radius Theme Tokens** — Overrides Tailwind v4's default `--radius-*` CSS variables to `0px` in `:root` for sharp-corner branding. Converts all hardcoded `rounded-[Npx]` arbitrary values to standard Tailwind classes (`rounded-sm`, `rounded-lg`, etc.) so they flow through the CSS variable system. CSS files with hardcoded `border-radius` pixel values are also converted to `var(--radius-*)`.
+
+6. **Self-Hosted Viewer Server** (`apps/viewer-server/`) — Standalone HTTP backend for hosting shared session transcripts, replacing the upstream-only `agents.craft.do` service. Provides CRUD API (`/s/api`) with pluggable storage (filesystem default, S3-compatible optional). Serves the `apps/viewer` frontend as static files. Separate `Dockerfile.viewer` for independent deployment on port 9101. `VIEWER_URL` in `branding.ts` made configurable via `CRAFT_VIEWER_URL` env var.
 
 ---
 
@@ -61,6 +63,12 @@ Standalone `craft-agent-batch` binary: 7 subcommands (list, get, validate, statu
 
 - `apps/electron/resources/docs/batches.md` — agent reference doc
 - `apps/electron/resources/docs/craft-cli.md` — added `<!-- cli:batch:start/end -->` section
+
+### Self-Hosted Viewer Server — `apps/viewer-server/`
+
+Standalone Bun HTTP server providing the session sharing backend that upstream hosts at `agents.craft.do`. Entry point (`src/index.ts`), API routes (`src/routes.ts`), storage interface with filesystem (`src/storage/fs.ts`) and S3-compatible (`src/storage/s3.ts`) implementations. `Dockerfile.viewer` at repo root for independent container deployment.
+
+**Cross-module dependency:** `apps/viewer/dist` must be built first (`bun run viewer:build`) — the server serves these static files. `@aws-sdk/client-s3` is an optional dependency, only needed for S3 storage mode.
 
 ---
 
@@ -266,6 +274,9 @@ These are simple additive changes (exports, types, config entries) unlikely to c
 | `apps/electron/vite.config.ts` | Added `define` for `process.env.CRAFT_LITE_VERSION` |
 | `.env.example` | Added `CRAFT_LITE_VERSION` documentation |
 | `README.md` | Added `batches.json` to structure diagram, "Batches" section |
+| `packages/shared/src/branding.ts` | `VIEWER_URL` reads `CRAFT_VIEWER_URL` env var with fallback to upstream default |
+| `package.json` (root) | Added `viewer:server` and `viewer:server:dev` scripts |
+| `Dockerfile.viewer` | New Dockerfile for viewer-server container (port 9101) |
 
 ---
 
@@ -289,7 +300,9 @@ When merging upstream updates:
 10. **If upstream rewrites system prompt sections**: verify lite conditionals in `system.ts` still wrap the correct blocks (Browser Tools, Mermaid validation, Source Templates, Debug Mode, doc table rows)
 11. **If upstream adds new components with `rounded-[Npx]` patterns**: convert to standard Tailwind classes (`rounded-sm`, `rounded-md`, `rounded-lg`, etc.) so they flow through `--radius-*` CSS variables
 12. **If upstream modifies `:root` blocks in `index.css` or `packages/ui/src/styles/index.css`**: preserve our `--radius-xs` through `--radius-2xl` overrides
-13. **After merge, run tests**: `bun test packages/shared/src/batches/` and `bun test packages/session-tools-core/`
+13. **If upstream changes `branding.ts`**: preserve our `CRAFT_VIEWER_URL` env var override for `VIEWER_URL`
+14. **If upstream adds their own viewer backend or changes the `/s/api` contract**: reconcile with `apps/viewer-server/` routes
+15. **After merge, run tests**: `bun test packages/shared/src/batches/` and `bun test packages/session-tools-core/`
 
 ---
 
@@ -317,3 +330,4 @@ When merging upstream updates:
 | v0.7.12 | 2026-03-24 | 0 | **Clean merge — no textual conflicts.** Upstream added Bedrock auth/env routing fixes, extended prompt cache (1h TTL), Docker headless server support, branch-fork fallback summarization, MCP schema cleanup, and moved 1M context control to global AI settings. Verified fork code still present: batch lifecycle in `SessionManager.ts`, batch prompt context in `claude-agent.ts`, lite-mode filtering, and custom endpoint fixes in `factory.ts`/`pi.ts`. |
 | v0.8.0 | 2026-03-26 | 12 | Hybrid local/remote transport, multiple remote workspaces, browser-accessible WebUI, session export/import, mobile WebUI, supply chain hardening. Resolved: `AppShell.tsx` (5 hunks) — kept batch UI + upstream's `SendToWorkspaceDialog`, remote workspace filtering, `sendToWorkspaceAtom`; `SessionManager.ts` — merged `registerSessionBatchContext` import with upstream's `generateConversationSummary`, accepted new export/import/dispatch methods; `feature-flags.ts` — kept both `liteVersion` and upstream's `embeddedServer`; `rpc/index.ts` — kept `registerBatchesHandlers` + upstream's `serverCtx` parameter; `SessionList.tsx` — kept `Layers` icon + upstream's `useSetAtom`. 7 CSS class conflicts from border-radius tokens: kept upstream's new semantic classes (`header-icon-btn`, `input-toolbar-btn`, `entity-row-btn`, `panel-header-btn`) with fork's Tailwind token forms (`rounded-sm`/`rounded-md`/`rounded-lg`/`rounded-2xl`). |
 | v0.8.1 | 2026-03-27 | 4 | Remote workspace recovery flow, Docker-compose deployment, Web UI file thumbnails, consistent label ordering, Pi subprocess error dedup, session load error handling, chunked base64 for large attachments. Resolved: `App.tsx` — kept batch event handlers + upstream's `SessionLoadErrorScreen` wrapper; `AppShell.tsx` (2 hunks) — kept `FEATURE_FLAGS` import + upstream's `label-menu-utils` refactor and `sortLabelsForDisplay`, kept batch handlers in context memo + upstream's `activeSessionWorkingDirectory`/`displayLabelConfigs`; `MainContentPanel.tsx` — kept batch handlers + upstream's `activeSessionWorkingDirectory`; `SessionFilesSection.tsx` — kept fork's `rounded-xs` token + upstream's conditional `imgSrc` rendering. Converted upstream's new `rounded-[8px]` in `App.tsx` to `rounded-lg`. All fork code verified intact. |
+| viewer-server | 2026-03-27 | — | Self-hosted viewer backend: `apps/viewer-server/` (Bun HTTP server with fs/S3 storage), `Dockerfile.viewer` (port 9101), `branding.ts` `VIEWER_URL` made configurable via `CRAFT_VIEWER_URL` env var, root `package.json` scripts added. |

@@ -1,0 +1,71 @@
+# =============================================================================
+# Craft Agents Viewer Server — lightweight session sharing service
+#
+# Build:
+#   docker buildx build -f Dockerfile.viewer -t craft-viewer-server .
+#
+# Run (filesystem storage with volume):
+#   docker run -d -p 9101:9101 \
+#     -e VIEWER_BASE_URL=https://your-domain.com \
+#     -v viewer-data:/data \
+#     craft-viewer-server
+#
+# Run (S3/R2 storage):
+#   docker run -d -p 9101:9101 \
+#     -e VIEWER_BASE_URL=https://your-domain.com \
+#     -e VIEWER_STORAGE=s3 \
+#     -e VIEWER_S3_ENDPOINT=https://xxx.r2.cloudflarestorage.com \
+#     -e VIEWER_S3_BUCKET=shared-sessions \
+#     -e VIEWER_S3_ACCESS_KEY_ID=xxx \
+#     -e VIEWER_S3_SECRET_ACCESS_KEY=xxx \
+#     craft-viewer-server
+# =============================================================================
+
+FROM oven/bun:1.3-slim
+
+LABEL org.opencontainers.image.source="https://github.com/lukilabs/craft-agents-oss"
+LABEL org.opencontainers.image.description="Craft Agents Viewer — shared session hosting service"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+
+WORKDIR /app
+
+# Copy dependency manifests first for layer caching
+COPY package.json bun.lock ./
+COPY packages/shared/package.json packages/shared/
+COPY packages/core/package.json packages/core/
+COPY packages/ui/package.json packages/ui/
+COPY apps/viewer/package.json apps/viewer/
+COPY apps/viewer-server/package.json apps/viewer-server/
+# Workspace stubs for packages referenced in root lockfile
+COPY packages/server/package.json packages/server/
+COPY packages/server-core/package.json packages/server-core/
+COPY packages/session-tools-core/package.json packages/session-tools-core/
+COPY packages/session-mcp-server/package.json packages/session-mcp-server/
+COPY packages/pi-agent-server/package.json packages/pi-agent-server/
+COPY packages/craft-agents-commands/package.json packages/craft-agents-commands/
+COPY packages/craft-cli/package.json packages/craft-cli/
+COPY packages/batch-cli/package.json packages/batch-cli/
+COPY apps/electron/package.json apps/electron/
+COPY apps/cli/package.json apps/cli/
+COPY apps/webui/package.json apps/webui/
+
+RUN bun install --frozen-lockfile
+
+# Copy source
+COPY . .
+
+# Build viewer frontend
+RUN bunx vite build --config apps/viewer/vite.config.ts
+
+# Default data directory for filesystem storage
+RUN mkdir -p /data
+
+ENV VIEWER_PORT=9101
+ENV VIEWER_HOST=0.0.0.0
+ENV VIEWER_STATIC_DIR=/app/apps/viewer/dist
+ENV VIEWER_DATA_DIR=/data
+
+EXPOSE 9101
+VOLUME /data
+
+ENTRYPOINT ["bun", "run", "apps/viewer-server/src/index.ts"]
