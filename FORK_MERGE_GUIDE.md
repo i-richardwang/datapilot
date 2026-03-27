@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: identify conflict zones, understand intent, make informed merge resolution decisions.
 >
-> **Last updated after:** v0.7.12 merge (Bedrock env routing fixes, extended prompt cache, branch fork fallback)
+> **Last updated after:** v0.8.1 merge (remote workspace recovery, Docker deployment, Web UI thumbnails, Pi subprocess error dedup)
 
 ## Overview
 
@@ -111,7 +111,7 @@ These files are frequently touched by upstream and have substantial fork modific
 
 #### `packages/pi-agent-server/src/index.ts` *(Custom Endpoint Fix — resolved in v0.7.7)*
 
-~~Modified `queryLlm()` provider compatibility check in two places~~ — **upstream v0.7.7 adopted the same fix**. Both provider compatibility checks now exempt `custom-endpoint` models. Our fork-specific code was replaced with upstream's cleaner implementation during the v0.7.7 merge. **This fork change is no longer needed.** v0.7.9 added Bedrock provider module pre-registration (`setBedrockProviderModule`) and IAM credential type variant to `PiCredential`. v0.7.11 added Bedrock Pi model tier dropdown handling.
+~~Modified `queryLlm()` provider compatibility check in two places~~ — **upstream v0.7.7 adopted the same fix**. Both provider compatibility checks now exempt `custom-endpoint` models. Our fork-specific code was replaced with upstream's cleaner implementation during the v0.7.7 merge. **This fork change is no longer needed.** v0.7.9 added Bedrock provider module pre-registration (`setBedrockProviderModule`) and IAM credential type variant to `PiCredential`. v0.7.11 added Bedrock Pi model tier dropdown handling. v0.8.1 hardened uncaughtException/unhandledRejection handlers with try/catch around `send()` (broken stdout protection) and added `process.exit(1)` after each.
 
 #### `packages/shared/src/agent/backend/internal/drivers/pi.ts` *(Custom Endpoint Fix)*
 
@@ -131,7 +131,7 @@ Added batch context reading → `batchOutputSchema` passed to `buildContextParts
 
 #### `packages/shared/src/agent/pi-agent.ts`
 
-Same as claude-agent, plus: `setupTools()` passes `includeBatchOutput` and `batchMode` to `getSessionToolProxyDefs()`, `createSessionToolContext()` passes `batchContext`.
+Same as claude-agent, plus: `setupTools()` passes `includeBatchOutput` and `batchMode` to `getSessionToolProxyDefs()`, `createSessionToolContext()` passes `batchContext`. v0.8.1 upstream added subprocess error deduplication (`lastSubprocessError`, `subprocessErrorRepeatCount`, `resetSubprocessErrorDedup()`) to prevent broken subprocess error floods — auto-merged cleanly around our batch code.
 
 #### `packages/shared/src/agent/claude-context.ts`
 
@@ -315,3 +315,5 @@ When merging upstream updates:
 | v0.7.8 | 2026-03-19 | 1 | Amazon Bedrock provider, 1M context window, automation history compaction (`history-store.ts` with two-tier retention: 20/automation + 1000 global), CLI `--base-url`, error handling fixes (skip errors after handoff), session transcript persistence, generic error messages. Resolved: `SessionManager.ts` — adopted upstream's `appendAutomationHistoryEntry` import (replacing `AUTOMATIONS_HISTORY_FILE` + `appendFile`), preserved fork's `BatchProcessor` import. |
 | v0.7.9–v0.7.11 | 2026-03-22 | 0 | **Clean merge — no conflicts.** v0.7.9: Reliable WebSocket event delivery (sequence-number tracking, reconnect replay, stale recovery in `App.tsx`/`transport/server.ts`/`transport/client.ts`), Copilot model overhaul (direct HTTP API + 3-tier fallback in `pi.ts` driver), 1M context `[1m]` model suffix fix, Windows vcredist + binary doc tools fixes. v0.7.10: Claude OAuth 429 fix (User-Agent). v0.7.11: Per-workspace 1M context toggle, custom endpoint `contextWindow` config, Bedrock setup form fix, Sonnet 1M suffix removed, model name truncation fix. All fork code (batch, lite, custom endpoint fixes, border-radius tokens) verified intact. |
 | v0.7.12 | 2026-03-24 | 0 | **Clean merge — no textual conflicts.** Upstream added Bedrock auth/env routing fixes, extended prompt cache (1h TTL), Docker headless server support, branch-fork fallback summarization, MCP schema cleanup, and moved 1M context control to global AI settings. Verified fork code still present: batch lifecycle in `SessionManager.ts`, batch prompt context in `claude-agent.ts`, lite-mode filtering, and custom endpoint fixes in `factory.ts`/`pi.ts`. |
+| v0.8.0 | 2026-03-26 | 12 | Hybrid local/remote transport, multiple remote workspaces, browser-accessible WebUI, session export/import, mobile WebUI, supply chain hardening. Resolved: `AppShell.tsx` (5 hunks) — kept batch UI + upstream's `SendToWorkspaceDialog`, remote workspace filtering, `sendToWorkspaceAtom`; `SessionManager.ts` — merged `registerSessionBatchContext` import with upstream's `generateConversationSummary`, accepted new export/import/dispatch methods; `feature-flags.ts` — kept both `liteVersion` and upstream's `embeddedServer`; `rpc/index.ts` — kept `registerBatchesHandlers` + upstream's `serverCtx` parameter; `SessionList.tsx` — kept `Layers` icon + upstream's `useSetAtom`. 7 CSS class conflicts from border-radius tokens: kept upstream's new semantic classes (`header-icon-btn`, `input-toolbar-btn`, `entity-row-btn`, `panel-header-btn`) with fork's Tailwind token forms (`rounded-sm`/`rounded-md`/`rounded-lg`/`rounded-2xl`). |
+| v0.8.1 | 2026-03-27 | 4 | Remote workspace recovery flow, Docker-compose deployment, Web UI file thumbnails, consistent label ordering, Pi subprocess error dedup, session load error handling, chunked base64 for large attachments. Resolved: `App.tsx` — kept batch event handlers + upstream's `SessionLoadErrorScreen` wrapper; `AppShell.tsx` (2 hunks) — kept `FEATURE_FLAGS` import + upstream's `label-menu-utils` refactor and `sortLabelsForDisplay`, kept batch handlers in context memo + upstream's `activeSessionWorkingDirectory`/`displayLabelConfigs`; `MainContentPanel.tsx` — kept batch handlers + upstream's `activeSessionWorkingDirectory`; `SessionFilesSection.tsx` — kept fork's `rounded-xs` token + upstream's conditional `imgSrc` rendering. Converted upstream's new `rounded-[8px]` in `App.tsx` to `rounded-lg`. All fork code verified intact. |
