@@ -211,3 +211,12 @@ export interface TestBatchResult {
   }>
   outputPath?: string
 }
+
+/** On-disk wrapper for TestBatchResult with config hash for invalidation */
+export interface PersistedTestResult {
+  result: TestBatchResult
+  /** MD5 hash of the batch config at test time — stale results are discarded on load */
+  configHash: string
+  /** Timestamp when the result was persisted */
+  persistedAt: number
+}

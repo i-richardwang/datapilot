@@ -6,7 +6,7 @@
  * independent sessions via the onExecutePrompt callback.
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { randomBytes, createHash } from 'node:crypto'
 import { createLogger } from '../utils/debug.ts'
@@ -20,6 +20,9 @@ import {
   updateItemState,
   computeProgress,
   isBatchDone,
+  saveTestResult,
+  loadTestResult,
+  deleteTestResult,
 } from './batch-state-manager.ts'
 import { expandEnvVars } from '../automations/utils.ts'
 import { sanitizeForShell } from '../automations/security.ts'
@@ -154,6 +157,10 @@ export class BatchProcessor {
    * dispatching in the background. Returns initial progress immediately.
    */
   start(batchId: string): BatchProgress {
+    // Clear persisted test files — the batch is now running for real
+    deleteTestResult(this.options.workspaceRootPath, batchId)
+    this.deleteTestStateFile(batchId)
+
     const state = this.ensureActive(batchId)
 
     // Full (re)start: reset every item to pending so the batch re-executes
@@ -242,6 +249,31 @@ export class BatchProcessor {
    */
   getState(batchId: string): BatchState | null {
     return this.activeStates.get(batchId) ?? loadBatchState(this.options.workspaceRootPath, batchId)
+  }
+
+  /**
+   * Get the persisted test result for a batch, if one exists and the config
+   * has not changed since the test was run. Returns null if stale or missing.
+   */
+  getTestResult(batchId: string): TestBatchResult | null {
+    const persisted = loadTestResult(this.options.workspaceRootPath, batchId)
+    if (!persisted) return null
+
+    // Validate that the batch config hasn't changed since the test
+    const config = this.loadConfig()?.batches.find(b => b.id === batchId)
+    if (!config) {
+      deleteTestResult(this.options.workspaceRootPath, batchId)
+      this.deleteTestStateFile(batchId)
+      return null
+    }
+
+    if (computeConfigHash(config) !== persisted.configHash) {
+      deleteTestResult(this.options.workspaceRootPath, batchId)
+      this.deleteTestStateFile(batchId)
+      return null
+    }
+
+    return persisted.result
   }
 
   // ============================================================================
@@ -548,7 +580,7 @@ export class BatchProcessor {
 
     log.info(`[BatchProcessor] Batch "${batchId}" ${state.status}: ${progress.completedItems} completed, ${progress.failedItems} failed`)
 
-    // If this is a test batch, resolve the test promise and clean up
+    // If this is a test batch, resolve the test promise, persist result, and clean up
     const testResolver = this.testResolvers.get(batchId)
     if (testResolver) {
       const config = this.getBatchConfig(batchId)
@@ -562,16 +594,24 @@ export class BatchProcessor {
         error: itemState.error,
       }))
 
-      testResolver({
-        batchId: batchId.replace(TEST_BATCH_SUFFIX, ''),
+      const realBatchId = batchId.replace(TEST_BATCH_SUFFIX, '')
+      const testResult: TestBatchResult = {
+        batchId: realBatchId,
         testKey: batchId,
         sampleSize: state.totalItems,
         status: state.status === 'completed' ? 'completed' : 'failed',
         durationMs: state.startedAt ? Date.now() - state.startedAt : 0,
         items,
         outputPath: config?.output?.path,
-      })
+      }
 
+      // Persist test result to disk so it survives restart
+      const realConfig = this.loadConfig()?.batches.find(b => b.id === realBatchId)
+      if (realConfig) {
+        saveTestResult(this.options.workspaceRootPath, testResult, computeConfigHash(realConfig))
+      }
+
+      testResolver(testResult)
       this.testResolvers.delete(batchId)
       this.stop(batchId)
       return
@@ -671,6 +711,16 @@ export class BatchProcessor {
   }
 
   /**
+   * Delete the runtime test state file (batch-state-{id}__test.json).
+   * Called when test artifacts are no longer needed (start, delete, config change).
+   */
+  private deleteTestStateFile(batchId: string): void {
+    const testKey = `${batchId}${TEST_BATCH_SUFFIX}`
+    const path = join(this.options.workspaceRootPath, `batch-state-${testKey}.json`)
+    try { unlinkSync(path) } catch { /* file may not exist */ }
+  }
+
+  /**
    * Save all active batch states as paused. Called during cleanup.
    */
   dispose(): void {
@@ -731,4 +781,13 @@ function deterministicSample<T>(items: T[], n: number, seed: string): T[] {
     arr[j] = tmp
   }
   return arr.slice(0, n)
+}
+
+/**
+ * Compute an MD5 hash of the batch config fields that affect execution.
+ * Excludes `id` and `enabled` since those don't change how the batch runs.
+ */
+function computeConfigHash(config: BatchConfig): string {
+  const { id: _id, enabled: _enabled, ...rest } = config
+  return createHash('md5').update(JSON.stringify(rest)).digest('hex')
 }

@@ -374,6 +374,20 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   RPC_CHANNELS.automations.REPLAY,
   RPC_CHANNELS.automations.CHANGED,
 
+  // batches — workspace batch processing
+  RPC_CHANNELS.batches.LIST,
+  RPC_CHANNELS.batches.START,
+  RPC_CHANNELS.batches.PAUSE,
+  RPC_CHANNELS.batches.RESUME,
+  RPC_CHANNELS.batches.GET_STATUS,
+  RPC_CHANNELS.batches.GET_STATE,
+  RPC_CHANNELS.batches.SET_ENABLED,
+  RPC_CHANNELS.batches.DUPLICATE,
+  RPC_CHANNELS.batches.DELETE,
+  RPC_CHANNELS.batches.TEST,
+  RPC_CHANNELS.batches.GET_TEST_RESULT,
+  RPC_CHANNELS.batches.CHANGED,
+
   // git — workspace filesystem
   RPC_CHANNELS.git.GET_BRANCH,
 ])

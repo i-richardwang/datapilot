@@ -51,12 +51,33 @@ export function useBatches(
     setBatchesAtom(batches)
   }, [batches, setBatchesAtom])
 
-  // Load batches from IPC
-  const loadBatches = useCallback(async () => {
+  // Load batches and their persisted test results in one pass
+  const loadBatchesAndTestResults = useCallback(async () => {
     if (!activeWorkspaceId) return
     try {
       const items = await window.electronAPI.listBatches(activeWorkspaceId)
       setBatches(items)
+
+      // Load persisted test results (merge, don't replace — avoids clobbering in-flight test results)
+      const persisted: Record<string, TestBatchResult> = {}
+      for (const batch of items) {
+        if (!batch.id) continue
+        try {
+          const result = await window.electronAPI.getBatchTestResult(activeWorkspaceId, batch.id)
+          if (result) persisted[batch.id] = result
+        } catch { /* ignore */ }
+      }
+      setTestResults(prev => {
+        // Keep results for batches that currently have an active test (in testProgress),
+        // otherwise use the persisted value (or remove if not on disk).
+        const next: Record<string, TestBatchResult> = {}
+        for (const batch of items) {
+          if (!batch.id) continue
+          if (prev[batch.id]) next[batch.id] = prev[batch.id]  // keep in-flight
+          if (persisted[batch.id]) next[batch.id] = persisted[batch.id]  // persisted wins when present
+        }
+        return next
+      })
     } catch {
       setBatches([])
     }
@@ -64,15 +85,18 @@ export function useBatches(
 
   // Initial load
   useEffect(() => {
-    loadBatches()
-  }, [loadBatches])
+    loadBatchesAndTestResults()
+  }, [loadBatchesAndTestResults])
 
   // Subscribe to live batches updates (when batches.json changes on disk)
+  // Re-load test results too since config change may invalidate them
   useEffect(() => {
     if (!activeWorkspaceId) return
-    const cleanup = window.electronAPI.onBatchesChanged(() => { loadBatches() })
+    const cleanup = window.electronAPI.onBatchesChanged(() => {
+      loadBatchesAndTestResults()
+    })
     return () => { cleanup() }
-  }, [activeWorkspaceId, loadBatches])
+  }, [activeWorkspaceId, loadBatchesAndTestResults])
 
   // Update a single batch's progress in the list (or route test progress separately)
   const updateBatchProgress = useCallback((progress: BatchProgress) => {
@@ -88,8 +112,8 @@ export function useBatches(
 
   // Handle batch completion - reload the full list
   const handleBatchComplete = useCallback((_batchId: string) => {
-    loadBatches()
-  }, [loadBatches])
+    loadBatchesAndTestResults()
+  }, [loadBatchesAndTestResults])
 
   // Shared lookup
   const findBatch = useCallback((id: string) => batches.find(b => b.id === id), [batches])
@@ -97,6 +121,8 @@ export function useBatches(
   // Start a batch — progress updates arrive via onProgress events
   const handleStartBatch = useCallback((batchId: string) => {
     if (!activeWorkspaceId) return
+    // Clear test result — the batch is now running for real
+    setTestResults(prev => { const next = { ...prev }; delete next[batchId]; return next })
     window.electronAPI.startBatch(activeWorkspaceId, batchId)
       .then(() => { toast.success('Batch started') })
       .catch((err: Error) => { toast.error(`Failed to start batch: ${err.message}`) })
