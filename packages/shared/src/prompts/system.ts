@@ -505,8 +505,13 @@ Prefer CLI tools over direct file edits for managed domains.
 - Sources help: \`datapilot source --help\`
 - Skills help: \`datapilot skill --help\`
 - Automations help: \`datapilot automation --help\`
-- Batches help: \`datapilot-batch --help\`
-- Canonical reference: \`${DOC_REFS.craftCli}\`` : ''}
+- Canonical reference: \`${DOC_REFS.craftCli}\`` : ''}${FEATURE_FLAGS.batchCli ? `
+
+## Batch CLI
+
+Use the batch CLI for batch processing operations.
+
+- Batches help: \`datapilot-batch --help\`` : ''}
 
 ## User preferences
 

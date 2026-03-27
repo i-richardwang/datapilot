@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: identify conflict zones, understand intent, make informed merge resolution decisions.
 >
-> **Last updated after:** viewer-server (self-hosted viewer backend, Dockerfile.viewer, configurable VIEWER_URL)
+> **Last updated after:** batch-cli-flag-split (independent `FEATURE_FLAGS.batchCli` for batch CLI, server env setup)
 
 ## Overview
 
@@ -192,9 +192,15 @@ Added `'batch'` to `CliDomainNamespace`, `batch` policy entry with `patternPrefi
 
 #### `packages/shared/src/agent/core/pre-tool-use.ts`
 
-Added `batch-config` → `batch` mapping in `detectCliNamespaceFromConfigDetection()`, `craft-agent-batch` to token scan exemption.
+Added `batch-config` → `batch` mapping in `detectCliNamespaceFromConfigDetection()`, `craft-agent-batch` to token scan exemption. Added `CliFeatureFlags` interface and `isNamespaceGuardActive()` helper for namespace-aware flag routing (`batch` → `batchCli`, all others → `craftAgentsCli`). Both `getConfigCliRedirect()` and `getConfigDomainBashRedirect()` accept optional `flags` param; pipeline passes `{ craftAgentsCli, batchCli }` so guards activate per-namespace.
 
-#### `packages/shared/src/prompts/system.ts` *(Lite)*
+#### `packages/shared/src/agent/permissions-config.ts`
+
+Added `batchCli` check in `shouldCompileBashPattern()`: suppresses `^craft-agent-batch\s` patterns when `FEATURE_FLAGS.batchCli` is off (symmetric with existing `craftAgentsCli` check for `^craft-agent\s` patterns).
+
+#### `packages/shared/src/prompts/system.ts` *(Lite + Batch CLI)*
+
+Batch CLI guidance (`## Batch CLI` section with `craft-agent-batch --help`) is gated independently by `FEATURE_FLAGS.batchCli`, separate from the main `craftAgentsCli` block. This allows batch CLI to be active without enabling the full craft-agent CLI.
 
 Multiple `!FEATURE_FLAGS.liteVersion` conditionals spread across the system prompt:
 - Doc table: Mermaid and Browser Tools rows conditionally hidden
@@ -255,7 +261,7 @@ These are simple additive changes (exports, types, config entries) unlikely to c
 | `packages/shared/src/agent/backend/pi/session-tool-defs.ts` | Added `opts?: { includeBatchOutput?, batchMode? }` to `getSessionToolProxyDefs()`; passes `batchMode` and `liteMode: FEATURE_FLAGS.liteVersion` |
 | `packages/shared/src/docs/doc-links.ts` | Added `'batches'` to `DocFeature`, `batches` entry in `DOCS` |
 | `packages/shared/src/docs/index.ts` | Added `batches` to `DOC_REFS` |
-| `packages/shared/src/prompts/system.ts` | *(Batch)* Added Batches row to doc reference table; added CLI batch doc reference. *(Lite changes moved to MEDIUM risk above)* |
+| `packages/shared/src/prompts/system.ts` | *(Batch)* Added Batches row to doc reference table; batch CLI guidance gated by independent `FEATURE_FLAGS.batchCli` (not `craftAgentsCli`). *(Lite changes moved to MEDIUM risk above)* |
 | `packages/shared/CLAUDE.md` | Added batch import example, `batches/` in directory structure |
 | `packages/shared/package.json` | Added `"./batches"` subpath export |
 | `packages/shared/src/protocol/channels.ts` | Added `batches` namespace to `RPC_CHANNELS` |
@@ -269,8 +275,9 @@ These are simple additive changes (exports, types, config entries) unlikely to c
 | `packages/session-tools-core/src/handlers/index.ts` | Export `handleBatchOutput`, `BatchOutputArgs` |
 | `packages/session-tools-core/src/index.ts` | Export `BatchContext`, `handleBatchOutput`, `BatchOutputArgs`, `BatchOutputSchema` |
 | `apps/electron/src/main/index.ts` | Added `CRAFT_BATCH_CLI_ENTRY` env var assignment |
+| `packages/server/src/index.ts` | Added `CRAFT_BATCH_CLI_ENTRY` env var and PATH setup for batch CLI wrapper scripts in headless/WebUI server mode |
 | `apps/electron/resources/permissions/default.json` | Added `craft-agent-batch` read-only bash patterns |
-| `packages/shared/src/feature-flags.ts` | Added `isLiteVersion()` + `FEATURE_FLAGS.liteVersion` getter |
+| `packages/shared/src/feature-flags.ts` | Added `isLiteVersion()` + `FEATURE_FLAGS.liteVersion` getter; added `isBatchCliEnabled()` + `FEATURE_FLAGS.batchCli` getter (defaults to `true`, override via `CRAFT_FEATURE_BATCH_CLI=0`) |
 | `apps/electron/vite.config.ts` | Added `define` for `process.env.CRAFT_LITE_VERSION` |
 | `.env.example` | Added `CRAFT_LITE_VERSION` documentation |
 | `README.md` | Added `batches.json` to structure diagram, "Batches" section |
@@ -294,7 +301,7 @@ When merging upstream updates:
 4. **If upstream changes `executePromptAutomation()` signature**: ensure `isBatch`, `batchContext`, `automationName`, `workingDirectory` passthrough works
 5. **If upstream moves automations utilities** (`expandEnvVars`, `sanitizeForShell`): update imports in `batch-processor.ts`
 6. **If upstream changes `resolvePresetStateForBaseUrlChange()`**: re-verify our fix
-7. **If upstream changes feature flags / Vite config**: preserve our `liteVersion` getter and `define` entry
+7. **If upstream changes feature flags / Vite config**: preserve our `liteVersion` and `batchCli` getters and `define` entry
 8. **If upstream changes default statuses**: ensure lite conditional logic covers new statuses
 9. **If upstream adds/removes/renames session tools**: check `LITE_EXCLUDED_TOOLS` and `BATCH_EXCLUDED_TOOLS` in `tool-defs.ts` and update if needed
 10. **If upstream rewrites system prompt sections**: verify lite conditionals in `system.ts` still wrap the correct blocks (Browser Tools, Mermaid validation, Source Templates, Debug Mode, doc table rows)

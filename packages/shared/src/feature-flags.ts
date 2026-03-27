@@ -49,6 +49,18 @@ export function isCraftAgentsCliEnabled(): boolean {
 }
 
 /**
+ * Runtime-evaluated check for batch CLI (craft-agent-batch) integration.
+ *
+ * Defaults to enabled (fork-specific feature).
+ * Override with CRAFT_FEATURE_BATCH_CLI=1|0.
+ */
+export function isBatchCliEnabled(): boolean {
+  const override = parseBooleanEnv(getEnv('CRAFT_FEATURE_BATCH_CLI'));
+  if (override !== undefined) return override;
+  return true;
+}
+
+/**
  * Runtime-evaluated check for embedded server settings page.
  *
  * Defaults to disabled. Override with CRAFT_FEATURE_EMBEDDED_SERVER=1|0.
@@ -91,6 +103,15 @@ export const FEATURE_FLAGS = {
    */
   get craftAgentsCli(): boolean {
     return isCraftAgentsCliEnabled();
+  },
+  /**
+   * Enable batch CLI (craft-agent-batch) guidance and guardrails.
+   *
+   * Defaults to enabled (fork-specific feature).
+   * Override with CRAFT_FEATURE_BATCH_CLI=1|0.
+   */
+  get batchCli(): boolean {
+    return isBatchCliEnabled();
   },
   /**
    * Lite version — hides non-essential UI elements.

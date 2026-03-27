@@ -23,7 +23,7 @@
  *   CRAFT_WEBUI_WS_URL         — optional browser-facing ws:// or wss:// URL returned by /api/config
  */
 
-import { join } from 'node:path'
+import { join, delimiter } from 'node:path'
 import { readFileSync, existsSync } from 'node:fs'
 import { version as packageVersion } from '../package.json'
 import { enableDebug } from '@craft-agent/shared/utils/debug'
@@ -88,6 +88,16 @@ function parseOptionalWebSocketUrl(name: string, value: string | undefined): str
 // In packaged mode, use CRAFT_BUNDLED_ASSETS_ROOT env or cwd.
 const bundledAssetsRoot = process.env.CRAFT_BUNDLED_ASSETS_ROOT
   ?? join(import.meta.dir, '..', '..', '..', '..')
+
+// Batch CLI entry point — used by the craft-agent-batch wrapper script.
+// Use ??= so packaged deployments can override via env.
+process.env.CRAFT_BATCH_CLI_ENTRY ??= join(bundledAssetsRoot, 'packages', 'batch-cli', 'src', 'index.ts')
+
+// Ensure wrapper scripts (craft-agent-batch etc.) are on PATH for agent Bash sessions.
+const serverBinDir = join(bundledAssetsRoot, 'apps', 'electron', 'resources', 'bin')
+if (existsSync(serverBinDir)) {
+  process.env.PATH = `${serverBinDir}${delimiter}${process.env.PATH}`
+}
 
 // TLS configuration — when cert + key paths are provided, server listens on wss://
 let tls: WsRpcTlsOptions | undefined

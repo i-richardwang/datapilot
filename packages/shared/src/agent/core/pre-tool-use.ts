@@ -469,22 +469,36 @@ function detectCliNamespaceFromConfigDetection(detection: ConfigFileDetection): 
   return null
 }
 
+/** Flags indicating which CLI feature flags are active. */
+export interface CliFeatureFlags {
+  craftAgentsCli: boolean;
+  batchCli: boolean;
+}
+
+/** Check whether the guard for a given namespace should be active. */
+function isNamespaceGuardActive(namespace: CliDomainNamespace, flags?: CliFeatureFlags): boolean {
+  if (!flags) return true; // no flags passed → guard all (backward-compat)
+  return namespace === 'batch' ? flags.batchCli : flags.craftAgentsCli;
+}
+
 /**
  * For selected config domains, enforce CLI usage instead of direct file operations.
  * - labels/**: strict block on Read/Write/Edit
  * - sources/{slug}/config.json: redirect on Write/Edit
  * - skills/{slug}/SKILL.md: redirect on Write/Edit
  * - automations.json: redirect on Write/Edit
+ * - batches.json: redirect on Write/Edit
  */
 export function getConfigCliRedirect(
   toolName: string,
   input: Record<string, unknown>,
   workspaceRootPath: string,
   workingDirectory?: string,
+  flags?: CliFeatureFlags,
 ): { message: string } | null {
   const filePath = input.file_path as string | undefined;
 
-  if (filePath && LABELS_BLOCKED_FILE_TOOLS.has(toolName)) {
+  if ((!flags || flags.craftAgentsCli) && filePath && LABELS_BLOCKED_FILE_TOOLS.has(toolName)) {
     const relativePath = getWorkspaceRelativePath(filePath, workspaceRootPath, workingDirectory)
     if (relativePath) {
       const labelsScopeMatch = CRAFT_AGENTS_CLI_WORKSPACE_SCOPE_ENTRIES.find(
@@ -511,6 +525,9 @@ export function getConfigCliRedirect(
   const namespace = detectCliNamespaceFromConfigDetection(detection)
   if (!namespace) return null
 
+  // Skip redirect if the controlling flag for this namespace is off
+  if (!isNamespaceGuardActive(namespace, flags)) return null
+
   return {
     message: buildCliDomainBlockMessage(
       namespace,
@@ -527,6 +544,7 @@ export function getConfigDomainBashRedirect(
   input: Record<string, unknown>,
   workspaceRootPath: string,
   workingDirectory?: string,
+  flags?: CliFeatureFlags,
 ): { message: string } | null {
   const command = typeof input.command === 'string' ? input.command.trim() : '';
   if (!command) return null;
@@ -561,6 +579,7 @@ export function getConfigDomainBashRedirect(
 
     for (const entry of bashGuardEntries) {
       if (!matchesPathScope(relativePath, entry.scope)) continue
+      if (!isNamespaceGuardActive(entry.namespace, flags)) continue
 
       const context = entry.namespace === 'label'
         ? 'Direct Bash operations targeting the workspace labels/ folder are blocked.'
@@ -815,9 +834,10 @@ export function runPreToolUseChecks(ctx: PreToolUseInput): PreToolUseCheckResult
     wasModified = true;
   }
 
-  // 5b. Config-domain Bash guard (block direct labels/automations path operations unless using craft-agent)
-  if (FEATURE_FLAGS.craftAgentsCli && toolName === 'Bash') {
-    const configDomainBashRedirect = getConfigDomainBashRedirect(currentInput, workspaceRootPath, workingDirectory);
+  // 5b. Config-domain Bash guard (block direct config path operations unless using CLI tools)
+  const cliFlags: CliFeatureFlags = { craftAgentsCli: FEATURE_FLAGS.craftAgentsCli, batchCli: FEATURE_FLAGS.batchCli };
+  if ((cliFlags.craftAgentsCli || cliFlags.batchCli) && toolName === 'Bash') {
+    const configDomainBashRedirect = getConfigDomainBashRedirect(currentInput, workspaceRootPath, workingDirectory, cliFlags);
     if (configDomainBashRedirect) {
       return { type: 'block', reason: configDomainBashRedirect.message };
     }
@@ -829,9 +849,9 @@ export function runPreToolUseChecks(ctx: PreToolUseInput): PreToolUseCheckResult
     return { type: 'block', reason: configResult.error! };
   }
 
-  // 5d. Config file CLI redirect (labels + automations)
-  if (FEATURE_FLAGS.craftAgentsCli) {
-    const cliRedirect = getConfigCliRedirect(toolName, currentInput, workspaceRootPath, workingDirectory);
+  // 5d. Config file CLI redirect (labels + automations + batches)
+  if (cliFlags.craftAgentsCli || cliFlags.batchCli) {
+    const cliRedirect = getConfigCliRedirect(toolName, currentInput, workspaceRootPath, workingDirectory, cliFlags);
     if (cliRedirect) {
       return { type: 'block', reason: cliRedirect.message };
     }
