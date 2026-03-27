@@ -4,7 +4,7 @@
 > Base: `main` (commit `1a3a98f`, includes upstream v0.8.1 merge)
 > Purpose: 将 Craft Agent 改造为面向数据分析场景的垂直 Agent — **DataPilot**
 >
-> **Last updated:** 2026-03-27 (v11, merged main viewer-server)
+> **Last updated:** 2026-03-27 (v12, merged main batch-cli-flag-split)
 
 ## 目标
 
@@ -155,7 +155,7 @@ grep -rn "Craft Agent" --include='*.tsx' --include='*.ts' --include='*.html' --i
 | 其余 `CRAFT_*` 环境变量 → `DATAPILOT_*` | 12+ 个环境变量（如 `CRAFT_SERVER_TOKEN` 等） | **高** — 需同步修改所有引用点 |
 | CLI wrapper 脚本 `craft-agent` → `datapilot` | `resources/bin/` 下 4 个脚本 | **中** |
 | `CraftAgent` 类名 | `craft-agent.ts` 中的类和兼容别名 | **中** — 内部 API 变更 |
-| `CRAFT_FEATURE_*` feature flag | `feature-flags.ts` + 引用处 | **中** |
+| `CRAFT_FEATURE_*` feature flag | `feature-flags.ts` + 引用处（注意：`CRAFT_FEATURE_BATCH_CLI` 是 fork 新增的独立 flag，已默认启用，与上游的 `CRAFT_FEATURE_CRAFT_AGENTS_CLI` 无关） | **中** |
 | 构件文件名 `Craft-Agent-xxx` → `DataPilot-xxx` | `electron-builder.yml` + 安装/构建脚本 | **高** — 需同步服务端下载 URL |
 
 **建议:** 剩余改动作为独立 PR，充分测试后再合并。P1 改动后与上游合并会产生大量冲突，需权衡是否值得。
@@ -287,6 +287,18 @@ grep -rn "Craft Agent" apps/electron/resources/docs/ apps/electron/resources/rel
 - 已合并 `main` 的 1 个新增提交：`dcf9209`（self-hosted viewer server）
 - 无冲突，`branding.ts` 自动合并（main 加 `CRAFT_VIEWER_URL` env var，本分支改品牌注释，不重叠）
 - 新增文件均为全新（`apps/viewer-server/`、`Dockerfile.viewer`），无品牌文本需替换
+- 无新增 `.craft-agent` 路径引用，无新增用户可见 "Craft Agent" 文本
+
+### 合并记录（2026-03-27，batch-cli-flag-split）
+
+- 已合并 `main` 的 1 个新增提交：`cbacf5b`（独立 batch CLI feature flag）
+- 1 个冲突：`packages/shared/src/prompts/system.ts` — main 将 batch CLI help 从 `craftAgentsCli` 块拆分到独立的 `batchCli` 块（使用 `craft-agent-batch`），本分支使用 `datapilot-batch` 品牌名。解决：保留本分支品牌名 + main 的拆分结构
+- 本次 main 变更内容：
+  - 新增 `FEATURE_FLAGS.batchCli`（`CRAFT_FEATURE_BATCH_CLI`，默认 `true`），独立控制 batch CLI 功能
+  - `system.ts` 中 batch CLI 指导从 `craftAgentsCli` 块独立出来
+  - `pre-tool-use.ts` 中护栏逻辑按 namespace 分别检查对应 flag
+  - `permissions-config.ts` 中 batch bash pattern 由 `batchCli` 独立控制
+  - `packages/server/src/index.ts` 补齐 `CRAFT_BATCH_CLI_ENTRY` 和 PATH 配置
 - 无新增 `.craft-agent` 路径引用，无新增用户可见 "Craft Agent" 文本
 
 ---
