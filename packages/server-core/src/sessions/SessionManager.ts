@@ -6,7 +6,7 @@ import { existsSync } from 'fs'
 import { readFile, writeFile, mkdir, realpath } from 'fs/promises'
 import { homedir, tmpdir } from 'os'
 import { randomUUID } from 'node:crypto'
-import { type AgentEvent, setPermissionMode, hydratePreviousPermissionMode, getPermissionModeDiagnostics, type PermissionMode, unregisterSessionScopedToolCallbacks, mergeSessionScopedToolCallbacks, registerSessionBatchContext, AbortReason, type AuthRequest, type AuthResult, type CredentialAuthRequest, type BrowserPaneFns, generateConversationSummary } from '@craft-agent/shared/agent'
+import { type AgentEvent, setPermissionMode, hydratePreviousPermissionMode, getPermissionModeDiagnostics, type PermissionMode, unregisterSessionScopedToolCallbacks, cleanupSessionScopedTools, mergeSessionScopedToolCallbacks, registerSessionBatchContext, AbortReason, type AuthRequest, type AuthResult, type CredentialAuthRequest, type BrowserPaneFns, generateConversationSummary } from '@craft-agent/shared/agent'
 import {
   resolveSessionConnection,
   createBackendFromConnection,
@@ -4614,8 +4614,9 @@ export class SessionManager implements ISessionManager {
     // Cancel any pending persistence write (session is being deleted, no need to save)
     sessionPersistenceQueue.cancel(sessionId)
 
-    // Clean up session-scoped tool callbacks to prevent memory accumulation
+    // Clean up session-scoped tool registries to prevent memory accumulation
     unregisterSessionScopedToolCallbacks(sessionId)
+    cleanupSessionScopedTools(sessionId)
 
     // Destroy browser instances bound to this session
     if (this.browserPaneManager) {
@@ -4651,6 +4652,84 @@ export class SessionManager implements ISessionManager {
 
     // Clean up attachments directory (handled by deleteStoredSession for workspace-scoped storage)
     sessionLog.info(`Deleted session ${sessionId}`)
+  }
+
+  /**
+   * Hibernate a completed batch session: release heavy runtime resources (agent,
+   * MCP pool, pool server, messages, tool caches) while keeping the lightweight
+   * metadata in `this.sessions` for UI visibility.
+   *
+   * This reuses the same lazy-load pattern that `loadSessionsFromDisk()` relies on:
+   * - `messagesLoaded: false` → `ensureMessagesLoaded()` reloads from disk on demand
+   * - `agent: null` → `getOrCreateAgent()` recreates from scratch on demand
+   *
+   * Must be called AFTER `persistSession()` so data is safely on disk.
+   */
+  private async hibernateSession(sessionId: string): Promise<void> {
+    const managed = this.sessions.get(sessionId)
+    if (!managed || managed.isProcessing) return
+
+    // Flush any pending debounced persistence write BEFORE clearing messagesLoaded.
+    // persistSession() has a guard: `if (!managed.messagesLoaded) return` — so the
+    // flush must complete while the flag is still true.
+    await sessionPersistenceQueue.flush(sessionId)
+
+    // Dispose agent (stops ConfigWatcher, clears permissions, disconnects MCP pool)
+    if (managed.agent) {
+      managed.agent.dispose()
+      managed.agent = null
+    }
+
+    // Stop HTTP MCP pool server
+    if (managed.poolServer) {
+      managed.poolServer.stop().catch(err => {
+        sessionLog.warn(`Failed to stop pool server during hibernate for ${sessionId}: ${err instanceof Error ? err.message : err}`)
+      })
+      managed.poolServer = undefined
+    }
+    managed.mcpPool = undefined
+
+    // Release messages — the largest per-session memory consumer.
+    // Data is safe on disk; ensureMessagesLoaded() will reload on demand.
+    const messageCount = managed.messages.length
+    managed.messages = []
+    managed.messagesLoaded = false
+
+    // Clean up delta flush timers
+    const timer = this.deltaFlushTimers.get(sessionId)
+    if (timer) {
+      clearTimeout(timer)
+      this.deltaFlushTimers.delete(sessionId)
+    }
+    this.pendingDeltas.delete(sessionId)
+
+    // Clean up permission caches
+    this.clearAdminRememberApprovalsForSession(sessionId)
+    this.clearPendingPermissionRequestsForSession(sessionId)
+
+    // Clean up global session-scoped tool registries
+    unregisterSessionScopedToolCallbacks(sessionId)
+    cleanupSessionScopedTools(sessionId)
+
+    // Clear runtime Maps
+    managed.backgroundShellCommands.clear()
+    managed.backgroundTaskOutputs.clear()
+    managed.messageQueue = []
+    managed.streamingText = ''
+
+    // Clear ephemeral auth/agent state
+    managed.pendingAuthRequestId = undefined
+    managed.pendingAuthRequest = undefined
+    managed.lastSentMessage = undefined
+    managed.lastSentAttachments = undefined
+    managed.lastSentStoredAttachments = undefined
+    managed.lastSentOptions = undefined
+    managed.authRetryAttempted = undefined
+    managed.authRetryInProgress = undefined
+    managed.agentReady = undefined
+    managed.agentReadyResolve = undefined
+
+    sessionLog.info(`Hibernated batch session ${sessionId} — released agent, pool server, and ${messageCount} messages`)
   }
 
   async sendMessage(sessionId: string, message: string, attachments?: FileAttachment[], storedAttachments?: StoredAttachment[], options?: SendMessageOptions, existingMessageId?: string, _isAuthRetry?: boolean): Promise<void> {
@@ -5447,6 +5526,15 @@ export class SessionManager implements ISessionManager {
 
     // 6. Always persist
     this.persistSession(managed)
+
+    // 7. Hibernate completed batch sessions to release heavy resources.
+    // The session metadata stays in the Map for UI visibility; messages
+    // and agent are lazy-loaded from disk if the user opens the session later.
+    if (managed.isBatch && !managed.isProcessing && managed.messageQueue.length === 0) {
+      this.hibernateSession(sessionId).catch(err => {
+        sessionLog.error(`Failed to hibernate batch session ${sessionId}:`, err)
+      })
+    }
   }
 
   /**
@@ -7135,9 +7223,10 @@ export class SessionManager implements ISessionManager {
     this.pendingPermissionRequests.clear()
     this.adminRememberApprovals.clear()
 
-    // Clean up session-scoped tool callbacks for all sessions
+    // Clean up session-scoped tool registries for all sessions
     for (const sessionId of this.sessions.keys()) {
       unregisterSessionScopedToolCallbacks(sessionId)
+      cleanupSessionScopedTools(sessionId)
     }
 
     sessionLog.info('Cleanup complete')
