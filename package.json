@@ -74,6 +74,8 @@
     "viewer:typecheck": "cd apps/viewer && bun run typecheck",
     "viewer:build": "vite build --config apps/viewer/vite.config.ts",
     "viewer:preview": "vite preview --config apps/viewer/vite.config.ts",
+    "viewer:server": "bun run apps/viewer-server/src/index.ts",
+    "viewer:server:dev": "bun run viewer:build && CRAFT_DEBUG=true bun run apps/viewer-server/src/index.ts",
     "webui:dev": "lsof -ti:5175 | xargs kill -9 2>/dev/null; vite dev --config apps/webui/vite.config.ts",
     "webui:clean": "rm -rf apps/webui/dist",
     "webui:build": "vite build --config apps/webui/vite.config.ts",
