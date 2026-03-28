@@ -40,12 +40,12 @@ export function isDeveloperFeedbackEnabled(): boolean {
 /**
  * Runtime-evaluated check for craft-agents-cli integration.
  *
- * Defaults to disabled. Override with CRAFT_FEATURE_CRAFT_AGENTS_CLI=1|0.
+ * Defaults to enabled. Override with CRAFT_FEATURE_CRAFT_AGENTS_CLI=1|0.
  */
 export function isCraftAgentsCliEnabled(): boolean {
   const override = parseBooleanEnv(getEnv('CRAFT_FEATURE_CRAFT_AGENTS_CLI'));
   if (override !== undefined) return override;
-  return false;
+  return true;
 }
 
 /**
@@ -99,7 +99,7 @@ export const FEATURE_FLAGS = {
   /**
    * Enable craft-agent CLI guidance and guardrails.
    *
-   * Defaults to disabled. Override with CRAFT_FEATURE_CRAFT_AGENTS_CLI=1|0.
+   * Defaults to enabled. Override with CRAFT_FEATURE_CRAFT_AGENTS_CLI=1|0.
    */
   get craftAgentsCli(): boolean {
     return isCraftAgentsCliEnabled();

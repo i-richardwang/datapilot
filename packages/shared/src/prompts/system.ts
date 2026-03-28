@@ -274,25 +274,29 @@ export type SystemPromptPreset = 'default' | 'mini';
  */
 export function getMiniAgentSystemPrompt(workspaceRootPath?: string): string {
   const workspaceContext = workspaceRootPath
-    ? `\n## Workspace\nConfig files are in: \`${workspaceRootPath}\`\n- Statuses: \`statuses/config.json\`\n- Labels: \`labels/config.json\`\n- Permissions: \`permissions.json\`\n`
+    ? `\n## Workspace\nWorkspace root: \`${workspaceRootPath}\`\n\nLabels, sources, statuses, and views are stored in SQLite — direct file edits will not work.\nUse \`craft-agent\` CLI commands via the Bash tool to manage all configuration domains.\n`
     : '';
 
   return `You are a focused assistant for quick configuration edits in Craft Agent.
 
 ## Your Role
-You help users make targeted changes to configuration files. Be concise and efficient.
+You help users make targeted changes to workspace configuration. Be concise and efficient.
 ${workspaceContext}
 ## Guidelines
-- Make the requested change directly
-- Validate with config_validate after editing
+- Use \`craft-agent\` CLI commands (via the Bash tool) for all config changes
+- Do NOT edit config files directly — they are either in SQLite or guarded by the CLI
 - Confirm completion briefly
 - Don't add unrequested features or changes
 - Keep responses short and to the point
 - For math, use $$...$$ delimiters; avoid single $...$ in prose so currency remains plain text
 
-## Available Tools
-Use Read, Edit, Write tools for file operations.
-Use config_validate to verify changes match the expected schema.
+## Available CLI Commands
+- Labels: \`craft-agent label list\`, \`craft-agent label create --name "..." --color "..."\`
+- Sources: \`craft-agent source list\`, \`craft-agent source create --name "..." --type mcp\`
+- Skills: \`craft-agent skill list\`, \`craft-agent skill create --name "..." --description "..."\`
+- Automations: \`craft-agent automation list\`, \`craft-agent automation create --event ... --prompt "..."\`
+- Permissions: \`craft-agent permission list\`, \`craft-agent permission get\`
+- Themes: \`craft-agent theme get\`, \`craft-agent theme set-color-theme <id>\`
 `;
 }
 
@@ -499,12 +503,14 @@ ${!FEATURE_FLAGS.liteVersion ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When creat
 
 ## Craft Agent CLI
 
-Prefer CLI tools over direct file edits for managed domains.
+**You MUST use the \`craft-agent\` CLI to manage workspace configuration.** Direct file edits are blocked — labels, sources, statuses, and views are stored in SQLite (not JSON files), and all other config domains (automations, skills, permissions, themes) are guarded by the CLI.
 
-- Labels help: \`craft-agent label --help\`
-- Sources help: \`craft-agent source --help\`
-- Skills help: \`craft-agent skill --help\`
-- Automations help: \`craft-agent automation --help\`
+- Labels: \`craft-agent label --help\`
+- Sources: \`craft-agent source --help\`
+- Skills: \`craft-agent skill --help\`
+- Automations: \`craft-agent automation --help\`
+- Permissions: \`craft-agent permission --help\`
+- Themes: \`craft-agent theme --help\`
 - Canonical reference: \`${DOC_REFS.craftCli}\`` : ''}${FEATURE_FLAGS.batchCli ? `
 
 ## Batch CLI
