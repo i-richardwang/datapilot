@@ -68,10 +68,10 @@ describe('feature-flags runtime helpers', () => {
     expect(isDeveloperFeedbackEnabled()).toBe(true);
   });
 
-  it('isCraftAgentsCliEnabled defaults to false when no override is set', () => {
+  it('isCraftAgentsCliEnabled defaults to true when no override is set', () => {
     delete process.env.CRAFT_FEATURE_CRAFT_AGENTS_CLI;
 
-    expect(isCraftAgentsCliEnabled()).toBe(false);
+    expect(isCraftAgentsCliEnabled()).toBe(true);
   });
 
   it('isCraftAgentsCliEnabled honors explicit override true', () => {

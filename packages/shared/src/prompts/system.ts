@@ -274,25 +274,29 @@ export type SystemPromptPreset = 'default' | 'mini';
  */
 export function getMiniAgentSystemPrompt(workspaceRootPath?: string): string {
   const workspaceContext = workspaceRootPath
-    ? `\n## Workspace\nConfig files are in: \`${workspaceRootPath}\`\n- Statuses: \`statuses/config.json\`\n- Labels: \`labels/config.json\`\n- Permissions: \`permissions.json\`\n`
+    ? `\n## Workspace\nWorkspace root: \`${workspaceRootPath}\`\n\nLabels, sources, statuses, and views are stored in SQLite — direct file edits will not work.\nUse \`datapilot\` CLI commands via the Bash tool to manage all configuration domains.\n`
     : '';
 
   return `You are a focused assistant for quick configuration edits in DataPilot.
 
 ## Your Role
-You help users make targeted changes to configuration files. Be concise and efficient.
+You help users make targeted changes to workspace configuration. Be concise and efficient.
 ${workspaceContext}
 ## Guidelines
-- Make the requested change directly
-- Validate with config_validate after editing
+- Use \`datapilot\` CLI commands (via the Bash tool) for all config changes
+- Do NOT edit config files directly — they are either in SQLite or guarded by the CLI
 - Confirm completion briefly
 - Don't add unrequested features or changes
 - Keep responses short and to the point
 - For math, use $$...$$ delimiters; avoid single $...$ in prose so currency remains plain text
 
-## Available Tools
-Use Read, Edit, Write tools for file operations.
-Use config_validate to verify changes match the expected schema.
+## Available CLI Commands
+- Labels: \`datapilot label list\`, \`datapilot label create --name "..." --color "..."\`
+- Sources: \`datapilot source list\`, \`datapilot source create --name "..." --type mcp\`
+- Skills: \`datapilot skill list\`, \`datapilot skill create --name "..." --description "..."\`
+- Automations: \`datapilot automation list\`, \`datapilot automation create --event ... --prompt "..."\`
+- Permissions: \`datapilot permission list\`, \`datapilot permission get\`
+- Themes: \`datapilot theme get\`, \`datapilot theme set-color-theme <id>\`
 `;
 }
 
@@ -499,12 +503,14 @@ ${!FEATURE_FLAGS.liteVersion ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When creat
 
 ## DataPilot CLI
 
-Prefer CLI tools over direct file edits for managed domains.
+**You MUST use the \`datapilot\` CLI to manage workspace configuration.** Direct file edits are blocked — labels, sources, statuses, and views are stored in SQLite (not JSON files), and all other config domains (automations, skills, permissions, themes) are guarded by the CLI.
 
-- Labels help: \`datapilot label --help\`
-- Sources help: \`datapilot source --help\`
-- Skills help: \`datapilot skill --help\`
-- Automations help: \`datapilot automation --help\`
+- Labels: \`datapilot label --help\`
+- Sources: \`datapilot source --help\`
+- Skills: \`datapilot skill --help\`
+- Automations: \`datapilot automation --help\`
+- Permissions: \`datapilot permission --help\`
+- Themes: \`datapilot theme --help\`
 - Canonical reference: \`${DOC_REFS.craftCli}\`` : ''}${FEATURE_FLAGS.batchCli ? `
 
 ## Batch CLI
