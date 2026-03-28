@@ -25,7 +25,7 @@ import type { PermissionMode } from './mode-manager.ts';
 import type { LoadedSource } from '../sources/types.ts';
 import { buildCallLlmRequest, type LLMQueryRequest, type LLMQueryResult } from './llm-tool.ts';
 import { getLlmConnections, getDefaultLlmConnection } from '../config/storage.ts';
-import { loadAllSources } from '../sources/storage.ts';
+import { loadAllSources } from '../sources/storage.db.ts';
 import type { ApiServerConfig } from '../mcp/mcp-pool.ts';
 
 import type {
@@ -58,7 +58,7 @@ import { PrerequisiteManager } from './core/prerequisite-manager.ts';
 // Automation system for agent events
 import type { AutomationSystem } from '../automations/automation-system.ts';
 import type { AgentEvent as AutomationAgentEvent, SdkAutomationInput } from '../automations/types.ts';
-import { getSessionPlansPath, getSessionDataPath, getSessionPath } from '../sessions/storage.ts';
+import { getSessionPlansPath, getSessionDataPath, getSessionPath } from '../sessions/storage.db.ts';
 import { getMiniAgentSystemPrompt } from '../prompts/system.ts';
 import { buildTitlePrompt, buildRegenerateTitlePrompt, validateTitle } from '../utils/title-generator.ts';
 

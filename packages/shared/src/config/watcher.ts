@@ -39,7 +39,7 @@ import {
   loadSourceGuide,
   sourceNeedsIconDownload,
   downloadSourceIcon,
-} from '../sources/storage.ts';
+} from '../sources/storage.db.ts';
 import { permissionsConfigCache, getAppPermissionsDir } from '../agent/permissions-config.ts';
 import { getWorkspacePath, getWorkspaceSourcesPath, getWorkspaceSkillsPath } from '../workspaces/storage.ts';
 import type { LoadedSkill } from '../skills/types.ts';
@@ -48,7 +48,7 @@ import {
   loadStatusConfig,
   statusNeedsIconDownload,
   downloadStatusIcon,
-} from '../statuses/storage.ts';
+} from '../statuses/storage.db.ts';
 import { readSessionHeader } from '../sessions/jsonl.ts';
 import type { SessionHeader } from '../sessions/types.ts';
 import { AUTOMATIONS_CONFIG_FILE } from '../automations/constants.ts';
@@ -194,6 +194,7 @@ export class ConfigWatcher {
   private watchers: FSWatcher[] = [];
   private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
   private isRunning = false;
+  private useDbMode: boolean;
 
   // Track known items for detecting adds/removes
   private knownSources: Set<string> = new Set();
@@ -203,13 +204,17 @@ export class ConfigWatcher {
   // Track LLM connections for change detection (JSON string for deep comparison)
   private lastLlmConnectionsHash: string = '';
 
+  // DB event unsubscribe functions (for cleanup in stop())
+  private dbEventCleanups: Array<() => void> = [];
+
   // Computed paths
   private workspaceDir: string;
   private sourcesDir: string;
   private skillsDir: string;
 
-  constructor(workspaceIdOrPath: string, callbacks: ConfigWatcherCallbacks) {
+  constructor(workspaceIdOrPath: string, callbacks: ConfigWatcherCallbacks, options?: { useDbMode?: boolean }) {
     this.callbacks = callbacks;
+    this.useDbMode = options?.useDbMode ?? true;
     // Support both workspace ID and workspace root path
     // Paths contain '/' or '\\' (Windows) while IDs don't
     const isPath = workspaceIdOrPath.includes('/') || workspaceIdOrPath.includes('\\');
@@ -255,6 +260,12 @@ export class ConfigWatcher {
     this.watchGlobalConfigs();
     span.mark('watchGlobalConfigs');
 
+    // In DB mode, subscribe to dbEvents for DB-managed entities
+    if (this.useDbMode) {
+      this.registerDbEventListeners();
+      span.mark('registerDbEventListeners');
+    }
+
     // Watch workspace directory recursively
     this.watchWorkspaceDir();
     span.mark('watchWorkspaceDir');
@@ -297,6 +308,55 @@ export class ConfigWatcher {
   }
 
   /**
+   * Register listeners on dbEvents for DB-managed entities.
+   * Replaces file-system watching for statuses, labels, sources, and sessions.
+   */
+  private registerDbEventListeners(): void {
+    // Lazy import to avoid circular dependencies
+    const { dbEvents } = require('../db/events.ts');
+
+    const onStatusConfig = () => {
+      this.callbacks.onStatusConfigChange?.(this.workspaceId);
+    };
+    dbEvents.on('status:config', onStatusConfig);
+    this.dbEventCleanups.push(() => dbEvents.off('status:config', onStatusConfig));
+
+    const onLabelConfig = () => {
+      this.callbacks.onLabelConfigChange?.(this.workspaceId);
+    };
+    dbEvents.on('label:config', onLabelConfig);
+    this.dbEventCleanups.push(() => dbEvents.off('label:config', onLabelConfig));
+
+    const onSourceSaved = (slug: string) => {
+      const source = loadSource(this.workspaceDir, slug);
+      this.callbacks.onSourceChange?.(slug, source);
+    };
+    dbEvents.on('source:saved', onSourceSaved);
+    this.dbEventCleanups.push(() => dbEvents.off('source:saved', onSourceSaved));
+
+    const onSourceDeleted = (slug: string) => {
+      this.callbacks.onSourceChange?.(slug, null);
+      this.callbacks.onSourcesListChange?.(loadWorkspaceSources(this.workspaceDir));
+    };
+    dbEvents.on('source:deleted', onSourceDeleted);
+    this.dbEventCleanups.push(() => dbEvents.off('source:deleted', onSourceDeleted));
+
+    const onSessionMetadata = (sessionId: string) => {
+      this.handleSessionMetadataChange(sessionId);
+    };
+    dbEvents.on('session:metadata', onSessionMetadata);
+    this.dbEventCleanups.push(() => dbEvents.off('session:metadata', onSessionMetadata));
+
+    const onSessionSaved = (sessionId: string) => {
+      this.handleSessionMetadataChange(sessionId);
+    };
+    dbEvents.on('session:saved', onSessionSaved);
+    this.dbEventCleanups.push(() => dbEvents.off('session:saved', onSessionSaved));
+
+    debug('[ConfigWatcher] Registered DB event listeners');
+  }
+
+  /**
    * Manually notify the watcher of a file change.
    * Workaround: Bun's fs.watch({ recursive: true }) on Linux doesn't track
    * files in directories created after the watcher started.
@@ -334,6 +394,12 @@ export class ConfigWatcher {
     this.knownSources.clear();
     this.knownSkills.clear();
     this.knownThemes.clear();
+
+    // Unsubscribe from DB events
+    for (const cleanup of this.dbEventCleanups) {
+      cleanup();
+    }
+    this.dbEventCleanups = [];
 
     debug('[ConfigWatcher] Stopped');
   }
@@ -422,16 +488,25 @@ export class ConfigWatcher {
 
       // Directory-level changes (new/removed source folders)
       if (parts.length === 2) {
-        this.debounce('sources-dir', () => this.handleSourcesDirChange());
+        if (!this.useDbMode) {
+          this.debounce('sources-dir', () => this.handleSourcesDirChange());
+        }
+        // In DB mode, source list changes are handled via dbEvents
         return;
       }
 
       // File-level changes
-      if (file === 'config.json') {
-        this.debounce(`source-config:${slug}`, () => this.handleSourceConfigChange(slug));
-      } else if (file === 'guide.md') {
-        this.debounce(`source-guide:${slug}`, () => this.handleSourceGuideChange(slug));
+      if (file === 'config.json' || file === 'guide.md') {
+        // In DB mode, config and guide changes are handled via dbEvents
+        if (!this.useDbMode) {
+          if (file === 'config.json') {
+            this.debounce(`source-config:${slug}`, () => this.handleSourceConfigChange(slug));
+          } else {
+            this.debounce(`source-guide:${slug}`, () => this.handleSourceGuideChange(slug));
+          }
+        }
       } else if (file === 'permissions.json') {
+        // permissions.json is NOT in DB — always file-watched
         this.debounce(`source-permissions:${slug}`, () => this.handleSourcePermissionsChange(slug));
       }
       return;
@@ -459,15 +534,16 @@ export class ConfigWatcher {
     }
 
     // Session metadata changes: sessions/{id}/session.jsonl
-    // Detects external modifications (other instances, scripts, manual edits).
-    // Only reads line 1 (header) — lightweight even during active streaming.
+    // In DB mode, session metadata is handled via dbEvents — skip file watching.
     if (parts[0] === 'sessions' && parts.length >= 3) {
-      const sessionId = parts[1]!;
-      const file = parts[2];
+      if (!this.useDbMode) {
+        const sessionId = parts[1]!;
+        const file = parts[2];
 
-      // Only watch actual session files, ignore .tmp (atomic write intermediates)
-      if (file === 'session.jsonl') {
-        this.debounce(`session-meta:${sessionId}`, () => this.handleSessionMetadataChange(sessionId), SESSION_META_DEBOUNCE_MS);
+        // Only watch actual session files, ignore .tmp (atomic write intermediates)
+        if (file === 'session.jsonl') {
+          this.debounce(`session-meta:${sessionId}`, () => this.handleSessionMetadataChange(sessionId), SESSION_META_DEBOUNCE_MS);
+        }
       }
       return;
     }
@@ -476,13 +552,15 @@ export class ConfigWatcher {
     if (parts[0] === 'statuses' && parts.length >= 2) {
       const file = parts[1];
 
-      // config.json change
+      // config.json change — in DB mode, handled via dbEvents
       if (file === 'config.json') {
-        this.debounce('statuses-config', () => this.handleStatusConfigChange());
+        if (!this.useDbMode) {
+          this.debounce('statuses-config', () => this.handleStatusConfigChange());
+        }
         return;
       }
 
-      // Icon file changes: statuses/icons/*.svg, *.png, etc.
+      // Icon file changes: statuses/icons/*.svg, *.png, etc. — always file-watched
       if (file === 'icons' && parts.length >= 3) {
         const iconFilename = parts[2];
         if (iconFilename) {
@@ -498,8 +576,9 @@ export class ConfigWatcher {
     if (parts[0] === 'labels' && parts.length >= 2) {
       const file = parts[1];
 
-      // config.json change
+      // config.json change — in DB mode, handled via dbEvents
       if (file === 'config.json') {
+        if (this.useDbMode) return;
         this.debounce('labels-config', () => this.handleLabelConfigChange());
         return;
       }
@@ -944,11 +1023,60 @@ export class ConfigWatcher {
   // ============================================================
 
   /**
-   * Handle session.jsonl change — reads only line 1 (header) and emits if valid.
-   * This enables detection of external metadata changes (labels, name, flags)
-   * made by other instances, scripts, or manual edits.
+   * Handle session metadata change.
+   * In file mode: reads line 1 (header) from session.jsonl.
+   * In DB mode: loads session from DB and constructs a SessionHeader.
    */
   private handleSessionMetadataChange(sessionId: string): void {
+    if (this.useDbMode) {
+      // Load session metadata from DB and construct a SessionHeader-compatible object
+      const { loadSession } = require('../sessions/storage.db.ts');
+      const session = loadSession(this.workspaceDir, sessionId);
+      if (session) {
+        const header: SessionHeader = {
+          id: session.id,
+          workspaceRootPath: session.workspaceRootPath,
+          sdkSessionId: session.sdkSessionId,
+          name: session.name,
+          createdAt: session.createdAt,
+          lastUsedAt: session.lastUsedAt,
+          lastMessageAt: session.lastMessageAt,
+          isFlagged: session.isFlagged,
+          permissionMode: session.permissionMode,
+          previousPermissionMode: session.previousPermissionMode,
+          sessionStatus: session.sessionStatus,
+          labels: session.labels,
+          lastReadMessageId: session.lastReadMessageId,
+          hasUnread: session.hasUnread,
+          enabledSourceSlugs: session.enabledSourceSlugs,
+          workingDirectory: session.workingDirectory,
+          sdkCwd: session.sdkCwd,
+          sharedUrl: session.sharedUrl,
+          sharedId: session.sharedId,
+          model: session.model,
+          llmConnection: session.llmConnection,
+          connectionLocked: session.connectionLocked,
+          thinkingLevel: session.thinkingLevel,
+          pendingPlanExecution: session.pendingPlanExecution,
+          hidden: session.hidden,
+          isBatch: session.isBatch,
+          isArchived: session.isArchived,
+          archivedAt: session.archivedAt,
+          transferredSessionSummary: session.transferredSessionSummary,
+          transferredSessionSummaryApplied: session.transferredSessionSummaryApplied,
+          triggeredBy: session.triggeredBy,
+          messageCount: session.messages.length,
+          lastMessageRole: session.messages.length > 0
+            ? (session.messages[session.messages.length - 1]?.type as SessionHeader['lastMessageRole'])
+            : undefined,
+          preview: session.messages.find((m: { type: string }) => m.type === 'user')?.content?.slice(0, 150),
+          tokenUsage: session.tokenUsage,
+        };
+        this.callbacks.onSessionMetadataChange?.(sessionId, header);
+      }
+      return;
+    }
+
     const sessionFile = join(this.workspaceDir, 'sessions', sessionId, 'session.jsonl');
 
     if (!existsSync(sessionFile)) {
@@ -1115,9 +1243,10 @@ export class ConfigWatcher {
  */
 export function createConfigWatcher(
   workspaceId: string,
-  callbacks: ConfigWatcherCallbacks
+  callbacks: ConfigWatcherCallbacks,
+  options?: { useDbMode?: boolean }
 ): ConfigWatcher {
-  const watcher = new ConfigWatcher(workspaceId, callbacks);
+  const watcher = new ConfigWatcher(workspaceId, callbacks, options);
   watcher.start();
   return watcher;
 }

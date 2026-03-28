@@ -3,9 +3,8 @@
  *
  * Public exports for workspace-scoped session management.
  *
- * Sessions are stored in JSONL format:
- * - Line 1: SessionHeader (metadata for fast list loading)
- * - Lines 2+: StoredMessage (one message per line)
+ * Sessions are stored in SQLite (workspace.db) with session directories
+ * on disk for attachments, plans, data, downloads, and long_responses.
  */
 
 // Types
@@ -23,7 +22,7 @@ export type {
 // Field constants
 export { SESSION_PERSISTENT_FIELDS } from './types.ts';
 
-// Storage functions
+// Storage functions (SQLite-backed)
 export {
   // Directory utilities
   ensureSessionsDir,
@@ -75,13 +74,15 @@ export {
   listPlanFiles,
   deletePlanFile,
   getMostRecentPlanFile,
-  // Async persistence queue
-  sessionPersistenceQueue,
-  // Header metadata signature (for self-triggered event suppression)
-  getHeaderMetadataSignature,
-} from './storage.ts';
+} from './storage.db.ts';
 
-// JSONL helpers (for direct access if needed)
+// DB-mode persistence adapter (replaces file-based persistence queue)
+export {
+  sessionPersistenceQueue,
+  getHeaderMetadataSignature,
+} from './persistence-adapter-db.ts';
+
+// JSONL helpers (still needed for bundle export/import)
 export {
   readSessionHeader,
   readSessionJsonl,
@@ -122,5 +123,3 @@ export {
   validateBundle,
   MAX_BUNDLE_SIZE_BYTES,
 } from './bundle.ts';
-
-

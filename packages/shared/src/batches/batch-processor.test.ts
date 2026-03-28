@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { BatchProcessor } from './batch-processor.ts'
-import { loadBatchState } from './batch-state-manager.ts'
+import { loadBatchState } from './batch-state-manager.db.ts'
 import { BATCH_STATE_FILE_PREFIX } from './constants.ts'
 import type { BatchSystemOptions, BatchExecutePromptParams, BatchProgress } from './types.ts'
 

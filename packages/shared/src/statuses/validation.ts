@@ -5,7 +5,7 @@
  * Ensures sessions always have valid status references.
  */
 
-import { isValidStatusId } from './storage.ts';
+import { isValidStatusId } from './storage.db.ts';
 
 /**
  * Validate and normalize a session's status

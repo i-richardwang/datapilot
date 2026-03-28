@@ -55,7 +55,7 @@ import {
   loadSourceConfig as loadSourceConfigImpl,
   saveSourceConfig as saveSourceConfigImpl,
   getSourcePath,
-} from '../sources/storage.ts';
+} from '../sources/storage.db.ts';
 import type { FolderSourceConfig, LoadedSource as SharedLoadedSource } from '../sources/types.ts';
 import { getSourceCredentialManager } from '../sources/index.ts';
 import {
@@ -68,7 +68,7 @@ import {
 } from '../sources/types.ts';
 import { isGoogleOAuthConfigured as isGoogleOAuthConfiguredImpl } from '../auth/google-oauth.ts';
 import { debug } from '../utils/debug.ts';
-import { getSessionPlansPath, getSessionPath, getSessionDataPath } from '../sessions/storage.ts';
+import { getSessionPlansPath, getSessionPath, getSessionDataPath } from '../sessions/storage.db.ts';
 import { updatePreferences as updatePreferencesImpl } from '../config/preferences.ts';
 
 // Re-export types that may be needed by consumers

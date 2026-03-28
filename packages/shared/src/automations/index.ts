@@ -94,7 +94,7 @@ export { RetryScheduler, type RetryQueueEntry, type RetrySchedulerOptions } from
 export { AUTOMATIONS_CONFIG_FILE, AUTOMATIONS_HISTORY_FILE, AUTOMATIONS_RETRY_QUEUE_FILE, HISTORY_FIELD_MAX_LENGTH, AUTOMATION_HISTORY_MAX_RUNS_PER_MATCHER, AUTOMATION_HISTORY_MAX_ENTRIES } from './constants.ts';
 
 // History store
-export { appendAutomationHistoryEntry, compactAutomationHistory, compactAutomationHistorySync } from './history-store.ts';
+export { appendAutomationHistoryEntry, compactAutomationHistory, compactAutomationHistorySync } from './history-store.db.ts';
 
 // Config path resolution
 export { resolveAutomationsConfigPath, generateShortId } from './resolve-config-path.ts';

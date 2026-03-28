@@ -8,7 +8,7 @@
 export * from './types.ts';
 
 // Storage operations
-export * from './storage.ts';
+export * from './storage.db.ts';
 
 // CRUD operations
 export * from './crud.ts';

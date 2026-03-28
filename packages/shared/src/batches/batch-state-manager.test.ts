@@ -10,7 +10,7 @@ import {
   updateItemState,
   computeProgress,
   isBatchDone,
-} from './batch-state-manager.ts'
+} from './batch-state-manager.db.ts'
 import type { BatchState } from './types.ts'
 
 describe('batch-state-manager', () => {

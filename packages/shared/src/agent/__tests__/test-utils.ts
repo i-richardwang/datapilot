@@ -8,7 +8,7 @@ import type { AgentEvent } from '@craft-agent/core/types';
 import type { BackendConfig, ChatOptions } from '../backend/types.ts';
 import { AbortReason } from '../backend/types.ts';
 import type { Workspace } from '../../config/storage.ts';
-import type { SessionConfig as Session } from '../../sessions/storage.ts';
+import type { SessionConfig as Session } from '../../sessions/storage.db.ts';
 import type { LoadedSource } from '../../sources/types.ts';
 import { BaseAgent } from '../base-agent.ts';
 

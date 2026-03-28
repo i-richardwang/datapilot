@@ -13,7 +13,7 @@
 
 import type { LoadedSource, ApiConfig } from './types.ts';
 import { isMultiHeaderCredential, type ApiCredential } from './credential-manager.ts';
-import { isSourceUsable } from './storage.ts';
+import { isSourceUsable } from './storage.db.ts';
 import { createApiServer, type SummarizeCallback } from './api-tools.ts';
 import { createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import { debug } from '../utils/debug.ts';

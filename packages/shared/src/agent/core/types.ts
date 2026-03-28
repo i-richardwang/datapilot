@@ -8,7 +8,7 @@
 
 import type { LoadedSource } from '../../sources/types.ts';
 import type { Workspace } from '../../config/storage.ts';
-import type { SessionConfig } from '../../sessions/storage.ts';
+import type { SessionConfig } from '../../sessions/storage.db.ts';
 
 // Re-export common types from mode-types for convenience
 // These are the types needed by permission evaluation

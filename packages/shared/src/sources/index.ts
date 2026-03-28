@@ -58,7 +58,7 @@ export {
   sourceExists,
   // Parsing utilities
   parseGuideMarkdown,
-} from './storage.ts';
+} from './storage.db.ts';
 
 // Credential Manager (unified credential operations)
 export {

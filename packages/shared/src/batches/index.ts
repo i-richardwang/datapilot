@@ -79,7 +79,7 @@ export {
   saveTestResult,
   loadTestResult,
   deleteTestResult,
-} from './batch-state-manager.ts'
+} from './batch-state-manager.db.ts'
 
 // ============================================================================
 // Validation

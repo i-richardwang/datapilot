@@ -52,7 +52,7 @@ import {
   type MicrosoftOAuthOptions,
 } from '../auth/microsoft-oauth.ts';
 import { debug } from '../utils/debug.ts';
-import { markSourceAuthenticated, loadSourceConfig, saveSourceConfig } from './storage.ts';
+import { markSourceAuthenticated, loadSourceConfig, saveSourceConfig } from './storage.db.ts';
 
 /**
  * Result of authentication attempt

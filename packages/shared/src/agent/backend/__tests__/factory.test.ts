@@ -27,7 +27,7 @@ import {
 } from '../factory.ts';
 import type { BackendConfig } from '../types.ts';
 import type { Workspace, LlmConnection } from '../../../config/storage.ts';
-import type { SessionConfig as Session } from '../../../sessions/storage.ts';
+import type { SessionConfig as Session } from '../../../sessions/storage.db.ts';
 import { ClaudeAgent } from '../../claude-agent.ts';
 import { PiAgent } from '../../pi-agent.ts';
 import { isValidProviderAuthCombination } from '../../../config/llm-connections.ts';

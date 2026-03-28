@@ -1,7 +1,7 @@
 import { writeFile, rename, unlink } from 'fs/promises'
 import { dirname } from 'path'
 import type { StoredSession, SessionHeader } from './types.js'
-import { getSessionFilePath, ensureSessionsDir, ensureSessionDir } from './storage.js'
+import { getSessionFilePath, ensureSessionsDir, ensureSessionDir } from './storage.legacy.js'
 import { toPortablePath } from '../utils/paths.js'
 import { createSessionHeader, makeSessionPathPortable, readSessionHeader } from './jsonl.js'
 import { debug } from '../utils/debug.js'

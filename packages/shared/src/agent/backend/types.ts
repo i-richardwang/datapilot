@@ -20,7 +20,7 @@ import type { LoadedSource } from '../../sources/types.ts';
 import type { AuthRequest } from '../session-scoped-tools.ts';
 import type { McpClientPool } from '../../mcp/mcp-pool.ts';
 import type { Workspace } from '../../config/storage.ts';
-import type { SessionConfig as Session } from '../../sessions/storage.ts';
+import type { SessionConfig as Session } from '../../sessions/storage.db.ts';
 import type { SourceManager } from '../core/source-manager.ts';
 
 // Import AbortReason and RecoveryMessage from core module (single source of truth)
