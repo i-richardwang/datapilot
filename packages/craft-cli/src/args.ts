@@ -1,7 +1,7 @@
 /**
- * Argument parsing for craft-agent CLI.
+ * Argument parsing for datapilot CLI.
  *
- * Parses: craft-agent <entity> <action> [positionals...] [--flags]
+ * Parses: datapilot <entity> <action> [positionals...] [--flags]
  */
 
 export interface ParsedArgs {

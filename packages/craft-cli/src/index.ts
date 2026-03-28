@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * craft-agent CLI
+ * datapilot CLI
  *
  * Standalone binary for managing workspace configuration:
  * labels, sources, skills, automations, permissions, and themes.
@@ -24,7 +24,7 @@ import { routeTheme } from './commands/theme.ts'
 const VERSION = '0.7.2'
 
 const DISCOVER = {
-  name: 'craft-agent',
+  name: 'datapilot',
   version: VERSION,
   entities: ['label', 'source', 'automation', 'skill', 'permission', 'theme'],
   outputFormat: 'json-envelope',
@@ -42,7 +42,7 @@ async function main(): Promise<void> {
   }
   if (flags['help'] || !entity) {
     ok({
-      usage: 'craft-agent <entity> <action> [args] [--flags]',
+      usage: 'datapilot <entity> <action> [args] [--flags]',
       entities: ['label', 'source', 'automation', 'skill', 'permission', 'theme'],
       globalFlags: ['--help', '--version', '--discover', '--workspace-root <path>', '--json', '--stdin'],
     })

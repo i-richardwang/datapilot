@@ -26,7 +26,7 @@ export function routePermission(
   positionals: string[],
   flags: Record<string, string | boolean | string[]>,
 ): void {
-  if (!action) fail('USAGE_ERROR', 'Missing action', 'craft-agent permission <list|get|set|add-mcp-pattern|add-api-endpoint|add-bash-pattern|add-write-path|remove|validate|reset>')
+  if (!action) fail('USAGE_ERROR', 'Missing action', 'datapilot permission <list|get|set|add-mcp-pattern|add-api-endpoint|add-bash-pattern|add-write-path|remove|validate|reset>')
 
   const sourceSlug = strFlag(flags, 'source')
 
@@ -111,7 +111,7 @@ function cmdSet(
   flags: Record<string, string | boolean | string[]>,
 ): void {
   const input = parseInput(flags)
-  if (!input) fail('USAGE_ERROR', 'Missing --json or --stdin input', 'craft-agent permission set --json \'{...}\'')
+  if (!input) fail('USAGE_ERROR', 'Missing --json or --stdin input', 'datapilot permission set --json \'{...}\'')
 
   const config = input as PermissionsConfigFile
   const errors = validatePermissionsConfig(config)
@@ -133,7 +133,7 @@ function cmdAddPattern(
   field: 'allowedMcpPatterns' | 'allowedBashPatterns' | 'allowedWritePaths',
 ): void {
   const pattern = positionals[0]
-  if (!pattern) fail('USAGE_ERROR', `Missing pattern argument`, `craft-agent permission ${field === 'allowedMcpPatterns' ? 'add-mcp-pattern' : field === 'allowedBashPatterns' ? 'add-bash-pattern' : 'add-write-path'} "<pattern>"`)
+  if (!pattern) fail('USAGE_ERROR', `Missing pattern argument`, `datapilot permission ${field === 'allowedMcpPatterns' ? 'add-mcp-pattern' : field === 'allowedBashPatterns' ? 'add-bash-pattern' : 'add-write-path'} "<pattern>"`)
 
   const comment = strFlag(flags, 'comment')
 
@@ -157,10 +157,10 @@ function cmdAddApiEndpoint(
   flags: Record<string, string | boolean | string[]>,
 ): void {
   const method = strFlag(flags, 'method')
-  if (!method) fail('USAGE_ERROR', 'Missing --method', 'craft-agent permission add-api-endpoint --method GET --path ".*"')
+  if (!method) fail('USAGE_ERROR', 'Missing --method', 'datapilot permission add-api-endpoint --method GET --path ".*"')
 
   const path = strFlag(flags, 'path')
-  if (!path) fail('USAGE_ERROR', 'Missing --path', 'craft-agent permission add-api-endpoint --method GET --path ".*"')
+  if (!path) fail('USAGE_ERROR', 'Missing --path', 'datapilot permission add-api-endpoint --method GET --path ".*"')
 
   const comment = strFlag(flags, 'comment')
 
@@ -186,13 +186,13 @@ function cmdRemove(
   flags: Record<string, string | boolean | string[]>,
 ): void {
   const indexStr = positionals[0]
-  if (indexStr === undefined) fail('USAGE_ERROR', 'Missing index', 'craft-agent permission remove <index> --type <mcp|api|bash|write-path|blocked>')
+  if (indexStr === undefined) fail('USAGE_ERROR', 'Missing index', 'datapilot permission remove <index> --type <mcp|api|bash|write-path|blocked>')
 
   const index = parseInt(indexStr, 10)
   if (isNaN(index)) fail('USAGE_ERROR', 'Index must be a number')
 
   const type = strFlag(flags, 'type')
-  if (!type) fail('USAGE_ERROR', 'Missing --type flag', 'craft-agent permission remove <index> --type <mcp|api|bash|write-path|blocked>')
+  if (!type) fail('USAGE_ERROR', 'Missing --type flag', 'datapilot permission remove <index> --type <mcp|api|bash|write-path|blocked>')
 
   const fieldMap: Record<string, keyof PermissionsConfigFile> = {
     'mcp': 'allowedMcpPatterns',

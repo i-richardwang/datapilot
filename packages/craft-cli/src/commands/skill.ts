@@ -25,7 +25,7 @@ export function routeSkill(
   positionals: string[],
   flags: Record<string, string | boolean | string[]>,
 ): void {
-  if (!action) fail('USAGE_ERROR', 'Missing action', 'craft-agent skill <list|get|where|create|update|delete|validate>')
+  if (!action) fail('USAGE_ERROR', 'Missing action', 'datapilot skill <list|get|where|create|update|delete|validate>')
 
   const projectRoot = strFlag(flags, 'project-root') ?? process.cwd()
 
@@ -71,7 +71,7 @@ function cmdList(
 
 function cmdGet(ws: string, projectRoot: string, positionals: string[]): void {
   const slug = positionals[0]
-  if (!slug) fail('USAGE_ERROR', 'Missing skill slug', 'craft-agent skill get <slug>')
+  if (!slug) fail('USAGE_ERROR', 'Missing skill slug', 'datapilot skill get <slug>')
 
   const skill = loadSkillBySlug(ws, slug, projectRoot)
   if (!skill) fail('NOT_FOUND', `Skill '${slug}' not found`)
@@ -88,7 +88,7 @@ function cmdGet(ws: string, projectRoot: string, positionals: string[]): void {
 
 function cmdWhere(ws: string, projectRoot: string, positionals: string[]): void {
   const slug = positionals[0]
-  if (!slug) fail('USAGE_ERROR', 'Missing skill slug', 'craft-agent skill where <slug>')
+  if (!slug) fail('USAGE_ERROR', 'Missing skill slug', 'datapilot skill where <slug>')
 
   const locations: Array<{ source: string; path: string; exists: boolean }> = []
 
@@ -164,7 +164,7 @@ function cmdUpdate(
   flags: Record<string, string | boolean | string[]>,
 ): void {
   const slug = positionals[0]
-  if (!slug) fail('USAGE_ERROR', 'Missing skill slug', 'craft-agent skill update <slug> --json \'{...}\'')
+  if (!slug) fail('USAGE_ERROR', 'Missing skill slug', 'datapilot skill update <slug> --json \'{...}\'')
 
   const skill = loadSkillBySlug(ws, slug, projectRoot)
   if (!skill) fail('NOT_FOUND', `Skill '${slug}' not found`)
@@ -201,7 +201,7 @@ function cmdUpdate(
 
 function cmdDelete(ws: string, positionals: string[]): void {
   const slug = positionals[0]
-  if (!slug) fail('USAGE_ERROR', 'Missing skill slug', 'craft-agent skill delete <slug>')
+  if (!slug) fail('USAGE_ERROR', 'Missing skill slug', 'datapilot skill delete <slug>')
 
   const deleted = deleteSkill(ws, slug)
   if (!deleted) fail('NOT_FOUND', `Skill '${slug}' not found`)
@@ -217,7 +217,7 @@ function cmdValidate(
   flags: Record<string, string | boolean | string[]>,
 ): void {
   const slug = positionals[0]
-  if (!slug) fail('USAGE_ERROR', 'Missing skill slug', 'craft-agent skill validate <slug>')
+  if (!slug) fail('USAGE_ERROR', 'Missing skill slug', 'datapilot skill validate <slug>')
 
   const sourceFlag = strFlag(flags, 'source')
 

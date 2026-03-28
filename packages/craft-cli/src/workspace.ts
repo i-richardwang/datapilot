@@ -1,11 +1,11 @@
 /**
- * Workspace root resolution for craft-agent CLI.
+ * Workspace root resolution for datapilot CLI.
  *
  * Resolution order:
  * 1. --workspace-root <path> CLI flag (explicit)
  * 2. CRAFT_WORKSPACE_PATH env var (injected by SessionManager for every agent bash session)
  * 3. CRAFT_AGENT_WORKSPACE_ROOT env var (manual override)
- * 4. Walk up from CWD looking for .craft-agent/ dir
+ * 4. Walk up from CWD looking for .datapilot/ dir
  * 5. Fall back to CWD
  */
 
@@ -30,7 +30,7 @@ export function resolveWorkspaceRoot(explicitFlag?: string): string {
   // Walk up from CWD
   let dir = process.cwd()
   while (true) {
-    if (existsSync(join(dir, '.craft-agent'))) {
+    if (existsSync(join(dir, '.datapilot'))) {
       return dir
     }
     const parent = dirname(dir)

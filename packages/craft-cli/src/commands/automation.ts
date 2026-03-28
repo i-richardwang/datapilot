@@ -26,7 +26,7 @@ export function routeAutomation(
   positionals: string[],
   flags: Record<string, string | boolean | string[]>,
 ): void {
-  if (!action) fail('USAGE_ERROR', 'Missing action', 'craft-agent automation <list|get|create|update|delete|enable|disable|duplicate|history|last-executed|test|lint|validate>')
+  if (!action) fail('USAGE_ERROR', 'Missing action', 'datapilot automation <list|get|create|update|delete|enable|disable|duplicate|history|last-executed|test|lint|validate>')
 
   switch (action) {
     case 'list': return cmdList(ws)
@@ -101,7 +101,7 @@ function cmdList(ws: string): void {
 
 function cmdGet(ws: string, positionals: string[]): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing automation id', 'craft-agent automation get <id>')
+  if (!id) fail('USAGE_ERROR', 'Missing automation id', 'datapilot automation get <id>')
 
   const config = loadConfig(ws)
   const found = findMatcher(config, id)
@@ -118,7 +118,7 @@ function cmdCreate(
   const input = parseInput(flags)
 
   const event = ((input?.event as string) ?? strFlag(flags, 'event')) as AutomationEvent | undefined
-  if (!event) fail('USAGE_ERROR', 'Missing --event', 'craft-agent automation create --event <EventName>')
+  if (!event) fail('USAGE_ERROR', 'Missing --event', 'datapilot automation create --event <EventName>')
   if (!VALID_EVENTS.includes(event)) {
     fail('USAGE_ERROR', `Invalid event: ${event}`, `Valid events: ${VALID_EVENTS.join(', ')}`)
   }
@@ -194,7 +194,7 @@ function cmdUpdate(
   flags: Record<string, string | boolean | string[]>,
 ): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing automation id', 'craft-agent automation update <id>')
+  if (!id) fail('USAGE_ERROR', 'Missing automation id', 'datapilot automation update <id>')
 
   const config = loadConfig(ws)
   const found = findMatcher(config, id)
@@ -246,7 +246,7 @@ function cmdUpdate(
 
 function cmdDelete(ws: string, positionals: string[]): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing automation id', 'craft-agent automation delete <id>')
+  if (!id) fail('USAGE_ERROR', 'Missing automation id', 'datapilot automation delete <id>')
 
   const config = loadConfig(ws)
   const found = findMatcher(config, id)
@@ -266,7 +266,7 @@ function cmdDelete(ws: string, positionals: string[]): void {
 
 function cmdToggle(ws: string, positionals: string[], enabled: boolean): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', `Missing automation id`, `craft-agent automation ${enabled ? 'enable' : 'disable'} <id>`)
+  if (!id) fail('USAGE_ERROR', `Missing automation id`, `datapilot automation ${enabled ? 'enable' : 'disable'} <id>`)
 
   const config = loadConfig(ws)
   const found = findMatcher(config, id)
@@ -281,7 +281,7 @@ function cmdToggle(ws: string, positionals: string[], enabled: boolean): void {
 
 function cmdDuplicate(ws: string, positionals: string[]): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing automation id', 'craft-agent automation duplicate <id>')
+  if (!id) fail('USAGE_ERROR', 'Missing automation id', 'datapilot automation duplicate <id>')
 
   const config = loadConfig(ws)
   const found = findMatcher(config, id)
@@ -331,7 +331,7 @@ function cmdHistory(
 
 function cmdLastExecuted(ws: string, positionals: string[]): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing automation id', 'craft-agent automation last-executed <id>')
+  if (!id) fail('USAGE_ERROR', 'Missing automation id', 'datapilot automation last-executed <id>')
 
   const db = getWorkspaceDb(ws)
   const row = db.select()
@@ -353,7 +353,7 @@ function cmdTest(
   flags: Record<string, string | boolean | string[]>,
 ): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing automation id', 'craft-agent automation test <id> [--match "..."]')
+  if (!id) fail('USAGE_ERROR', 'Missing automation id', 'datapilot automation test <id> [--match "..."]')
 
   const config = loadConfig(ws)
   const found = findMatcher(config, id)

@@ -1,9 +1,9 @@
-# SQLite Migration & Craft CLI Guide
+# SQLite Migration & DataPilot CLI Guide
 
-> Records the storage migration from JSON files to SQLite and the Craft CLI implementation on branch `feature/sqlite-storage`.
+> Records the storage migration from JSON files to SQLite and the DataPilot CLI implementation on branch `feature/sqlite-storage`.
 > Purpose: track what changed, why, and what to watch during future merges with upstream/main.
 >
-> **Last updated after:** craft-cli implementation + prompt fixes
+> **Last updated after:** datapilot CLI implementation + prompt fixes
 
 ## Overview
 
@@ -11,7 +11,7 @@ This branch introduces two tightly coupled changes:
 
 1. **SQLite Storage Migration** — Labels, sources, statuses, views, and session data moved from individual JSON files to a per-workspace `workspace.db` SQLite database (via Drizzle ORM). Automation history also moved to SQLite. This eliminates race conditions, enables transactional writes, and provides a foundation for relational queries.
 
-2. **Craft Agent CLI** (`packages/craft-cli/`) — A `craft-agent` binary that exposes all configuration operations as CLI commands. Required because the storage migration broke the old system prompt strategy of guiding agents to edit JSON files directly. With data in SQLite, CLI is now the **only** path for agents to manage configuration.
+2. **DataPilot CLI** (`packages/craft-cli/`) — A `datapilot` binary that exposes all configuration operations as CLI commands. Required because the storage migration broke the old system prompt strategy of guiding agents to edit JSON files directly. With data in SQLite, CLI is now the **only** path for agents to manage configuration.
 
 These changes are complementary: the CLI exists because of the migration, and the migration's benefits are only fully realized when agents use the CLI instead of direct file access.
 
@@ -37,7 +37,7 @@ These changes are complementary: the CLI exists because of the migration, and th
 | **Automations config** | `automations.json` | Complex nested YAML/JSON structure; agent-editable via CLI |
 | **Skills** | `skills/{slug}/SKILL.md` | Markdown with YAML frontmatter; human-readable format is valuable |
 | **Permissions** | `permissions.json` + `sources/*/permissions.json` | Small JSON files; agent-editable via CLI |
-| **Themes** | `~/.craft-agent/theme.json` + `themes/*.json` | App-level config; not workspace-scoped |
+| **Themes** | `~/.datapilot/theme.json` + `themes/*.json` | App-level config; not workspace-scoped |
 | **Workspace config** | `config.json` | Top-level workspace metadata |
 | **Source icons** | `sources/{slug}/icon.*` | Binary files remain on filesystem |
 
@@ -71,7 +71,7 @@ These changes are complementary: the CLI exists because of the migration, and th
 
 ```
 packages/craft-cli/
-├── package.json                    # bin: { "craft-agent": "src/index.ts" }
+├── package.json                    # bin: { "datapilot": "src/index.ts" }
 ├── tsconfig.json
 └── src/
     ├── index.ts                    # Entry: shebang, arg parsing, entity routing
@@ -118,10 +118,10 @@ All commands return a JSON envelope on stdout:
 
 | Mechanism | What It Does |
 |-----------|-------------|
-| System prompt CLI section | Tells agent to use `craft-agent` CLI (mandatory, not optional) |
+| System prompt CLI section | Tells agent to use `datapilot` CLI (mandatory, not optional) |
 | PreToolUse file redirect | Hard-blocks Write/Edit on config files, returns CLI command suggestion |
 | PreToolUse bash guard | Hard-blocks bash operations on guarded paths (labels/, automations.json, etc.) |
-| Bash pattern allowlist | Allows `craft-agent` read commands in Explore mode |
+| Bash pattern allowlist | Allows `datapilot` read commands in Explore mode |
 
 Override: `CRAFT_FEATURE_CRAFT_AGENTS_CLI=0` to disable all guards (for debugging only).
 
@@ -174,7 +174,7 @@ Override: `CRAFT_FEATURE_CRAFT_AGENTS_CLI=0` to disable all guards (for debuggin
 | File | Change |
 |------|--------|
 | `packages/shared/src/__tests__/feature-flags.test.ts` | Test expectation updated: `craftAgentsCli` defaults to `true` |
-| `apps/electron/resources/permissions/default.json` | Added `craft-agent` read-only bash patterns |
+| `apps/electron/resources/permissions/default.json` | Added `datapilot` read-only bash patterns |
 
 ---
 

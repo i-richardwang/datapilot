@@ -29,7 +29,7 @@ export async function routeSource(
   positionals: string[],
   flags: Record<string, string | boolean | string[]>,
 ): Promise<void> {
-  if (!action) fail('USAGE_ERROR', 'Missing action', 'craft-agent source <list|get|create|update|delete|validate|test|init-guide|init-permissions|auth-help>')
+  if (!action) fail('USAGE_ERROR', 'Missing action', 'datapilot source <list|get|create|update|delete|validate|test|init-guide|init-permissions|auth-help>')
 
   switch (action) {
     case 'list': return cmdList(ws, flags)
@@ -60,7 +60,7 @@ function cmdList(ws: string, flags: Record<string, string | boolean | string[]>)
 
 function cmdGet(ws: string, positionals: string[]): void {
   const slug = positionals[0]
-  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'craft-agent source get <slug>')
+  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'datapilot source get <slug>')
 
   const source = loadSource(ws, slug)
   if (!source) fail('NOT_FOUND', `Source '${slug}' not found`)
@@ -131,7 +131,7 @@ function cmdUpdate(
   flags: Record<string, string | boolean | string[]>,
 ): void {
   const slug = positionals[0]
-  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'craft-agent source update <slug> --json \'{...}\'')
+  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'datapilot source update <slug> --json \'{...}\'')
 
   const config = loadSourceConfig(ws, slug)
   if (!config) fail('NOT_FOUND', `Source '${slug}' not found`)
@@ -153,7 +153,7 @@ function cmdUpdate(
 
 function cmdDelete(ws: string, positionals: string[]): void {
   const slug = positionals[0]
-  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'craft-agent source delete <slug>')
+  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'datapilot source delete <slug>')
 
   if (!sourceExists(ws, slug)) fail('NOT_FOUND', `Source '${slug}' not found`)
 
@@ -165,7 +165,7 @@ function cmdDelete(ws: string, positionals: string[]): void {
 
 function cmdValidate(ws: string, positionals: string[]): void {
   const slug = positionals[0]
-  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'craft-agent source validate <slug>')
+  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'datapilot source validate <slug>')
 
   const config = loadSourceConfig(ws, slug)
   if (!config) fail('NOT_FOUND', `Source '${slug}' not found`)
@@ -196,7 +196,7 @@ function cmdValidate(ws: string, positionals: string[]): void {
 
 function cmdTest(ws: string, positionals: string[]): void {
   const slug = positionals[0]
-  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'craft-agent source test <slug>')
+  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'datapilot source test <slug>')
 
   const config = loadSourceConfig(ws, slug)
   if (!config) fail('NOT_FOUND', `Source '${slug}' not found`)
@@ -236,7 +236,7 @@ function cmdInitGuide(
   flags: Record<string, string | boolean | string[]>,
 ): void {
   const slug = positionals[0]
-  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'craft-agent source init-guide <slug>')
+  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'datapilot source init-guide <slug>')
 
   const config = loadSourceConfig(ws, slug)
   if (!config) fail('NOT_FOUND', `Source '${slug}' not found`)
@@ -258,7 +258,7 @@ function cmdInitPermissions(
   flags: Record<string, string | boolean | string[]>,
 ): void {
   const slug = positionals[0]
-  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'craft-agent source init-permissions <slug>')
+  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'datapilot source init-permissions <slug>')
 
   if (!sourceExists(ws, slug)) fail('NOT_FOUND', `Source '${slug}' not found`)
 
@@ -289,7 +289,7 @@ function cmdInitPermissions(
 
 function cmdAuthHelp(ws: string, positionals: string[]): void {
   const slug = positionals[0]
-  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'craft-agent source auth-help <slug>')
+  if (!slug) fail('USAGE_ERROR', 'Missing source slug', 'datapilot source auth-help <slug>')
 
   const config = loadSourceConfig(ws, slug)
   if (!config) fail('NOT_FOUND', `Source '${slug}' not found`)

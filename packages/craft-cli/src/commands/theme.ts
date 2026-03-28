@@ -29,7 +29,7 @@ export function routeTheme(
   positionals: string[],
   flags: Record<string, string | boolean | string[]>,
 ): void {
-  if (!action) fail('USAGE_ERROR', 'Missing action', 'craft-agent theme <get|validate|list-presets|get-preset|set-color-theme|set-workspace-color-theme|set-override|reset-override>')
+  if (!action) fail('USAGE_ERROR', 'Missing action', 'datapilot theme <get|validate|list-presets|get-preset|set-color-theme|set-workspace-color-theme|set-override|reset-override>')
 
   switch (action) {
     case 'get': return cmdGet(ws)
@@ -104,7 +104,7 @@ function cmdListPresets(): void {
 
 function cmdGetPreset(positionals: string[]): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing preset id', 'craft-agent theme get-preset <id>')
+  if (!id) fail('USAGE_ERROR', 'Missing preset id', 'datapilot theme get-preset <id>')
 
   const preset = loadPresetTheme(id)
   if (!preset) fail('NOT_FOUND', `Preset '${id}' not found`)
@@ -115,7 +115,7 @@ function cmdGetPreset(positionals: string[]): void {
 
 function cmdSetColorTheme(positionals: string[]): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing preset id', 'craft-agent theme set-color-theme <id>')
+  if (!id) fail('USAGE_ERROR', 'Missing preset id', 'datapilot theme set-color-theme <id>')
 
   // Validate preset exists (unless 'default')
   if (id !== 'default') {
@@ -131,7 +131,7 @@ function cmdSetColorTheme(positionals: string[]): void {
 
 function cmdSetWorkspaceColorTheme(ws: string, positionals: string[]): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing preset id', 'craft-agent theme set-workspace-color-theme <id|default>')
+  if (!id) fail('USAGE_ERROR', 'Missing preset id', 'datapilot theme set-workspace-color-theme <id|default>')
 
   const wsConfig = loadWorkspaceConfig(ws)
   if (!wsConfig) fail('INTERNAL_ERROR', 'Could not load workspace config')
@@ -158,7 +158,7 @@ function cmdSetWorkspaceColorTheme(ws: string, positionals: string[]): void {
 
 function cmdSetOverride(flags: Record<string, string | boolean | string[]>): void {
   const input = parseInput(flags)
-  if (!input) fail('USAGE_ERROR', 'Missing --json', 'craft-agent theme set-override --json \'{...}\'')
+  if (!input) fail('USAGE_ERROR', 'Missing --json', 'datapilot theme set-override --json \'{...}\'')
 
   const theme = input as ThemeOverrides
   const errors = validateThemeOverrides(theme)

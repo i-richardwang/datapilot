@@ -1,5 +1,5 @@
 /**
- * JSON Envelope — all craft-agent CLI output goes through this.
+ * JSON Envelope — all datapilot CLI output goes through this.
  *
  * Success: { ok: true, data, warnings } → exit 0
  * Failure: { ok: false, error: { code, message, suggestion? }, warnings } → exit 1 or 2

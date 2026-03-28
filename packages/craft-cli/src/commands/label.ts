@@ -19,7 +19,7 @@ export function routeLabel(
   positionals: string[],
   flags: Record<string, string | boolean | string[]>,
 ): void {
-  if (!action) fail('USAGE_ERROR', 'Missing action', 'craft-agent label <list|get|create|update|delete|move|reorder|auto-rule-*>')
+  if (!action) fail('USAGE_ERROR', 'Missing action', 'datapilot label <list|get|create|update|delete|move|reorder|auto-rule-*>')
 
   switch (action) {
     case 'list': return cmdList(ws)
@@ -49,7 +49,7 @@ function cmdList(ws: string): void {
 
 function cmdGet(ws: string, positionals: string[]): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing label id', 'craft-agent label get <id>')
+  if (!id) fail('USAGE_ERROR', 'Missing label id', 'datapilot label get <id>')
 
   const label = getLabel(ws, id)
   if (!label) fail('NOT_FOUND', `Label '${id}' not found`)
@@ -65,7 +65,7 @@ function cmdCreate(
 ): void {
   const input = parseInput(flags)
   const name = (input?.name as string) ?? strFlag(flags, 'name')
-  if (!name) fail('USAGE_ERROR', 'Missing --name', 'craft-agent label create --name "<name>"')
+  if (!name) fail('USAGE_ERROR', 'Missing --name', 'datapilot label create --name "<name>"')
 
   const color = (input?.color as EntityColor) ?? strFlag(flags, 'color')
   const parentId = (input?.parentId as string) ?? strFlag(flags, 'parent-id') ?? undefined
@@ -88,7 +88,7 @@ function cmdUpdate(
   flags: Record<string, string | boolean | string[]>,
 ): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing label id', 'craft-agent label update <id> [--name ...] [--color ...] [--value-type ...]')
+  if (!id) fail('USAGE_ERROR', 'Missing label id', 'datapilot label update <id> [--name ...] [--color ...] [--value-type ...]')
 
   const input = parseInput(flags)
   const updates: Record<string, unknown> = {}
@@ -120,7 +120,7 @@ function cmdUpdate(
 
 function cmdDelete(ws: string, positionals: string[]): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing label id', 'craft-agent label delete <id>')
+  if (!id) fail('USAGE_ERROR', 'Missing label id', 'datapilot label delete <id>')
 
   try {
     const result = deleteLabel(ws, id)
@@ -138,10 +138,10 @@ function cmdMove(
   flags: Record<string, string | boolean | string[]>,
 ): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing label id', 'craft-agent label move <id> --parent <id|root>')
+  if (!id) fail('USAGE_ERROR', 'Missing label id', 'datapilot label move <id> --parent <id|root>')
 
   const parent = strFlag(flags, 'parent')
-  if (parent === undefined) fail('USAGE_ERROR', 'Missing --parent flag', 'craft-agent label move <id> --parent <id|root>')
+  if (parent === undefined) fail('USAGE_ERROR', 'Missing --parent flag', 'datapilot label move <id> --parent <id|root>')
 
   const newParentId = parent === 'root' ? null : parent
 
@@ -164,7 +164,7 @@ function cmdReorder(
   const parentId = parentFlag === 'root' ? null : (parentFlag ?? null)
 
   if (positionals.length === 0) {
-    fail('USAGE_ERROR', 'Missing ordered IDs', 'craft-agent label reorder [--parent <id|root>] <id1> <id2> ...')
+    fail('USAGE_ERROR', 'Missing ordered IDs', 'datapilot label reorder [--parent <id|root>] <id1> <id2> ...')
   }
 
   try {
@@ -179,7 +179,7 @@ function cmdReorder(
 
 function cmdAutoRuleList(ws: string, positionals: string[]): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing label id', 'craft-agent label auto-rule-list <id>')
+  if (!id) fail('USAGE_ERROR', 'Missing label id', 'datapilot label auto-rule-list <id>')
 
   const label = getLabel(ws, id)
   if (!label) fail('NOT_FOUND', `Label '${id}' not found`)
@@ -194,11 +194,11 @@ function cmdAutoRuleAdd(
   flags: Record<string, string | boolean | string[]>,
 ): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing label id', 'craft-agent label auto-rule-add <id> --pattern "<regex>"')
+  if (!id) fail('USAGE_ERROR', 'Missing label id', 'datapilot label auto-rule-add <id> --pattern "<regex>"')
 
   const input = parseInput(flags)
   const pattern = (input?.pattern as string) ?? strFlag(flags, 'pattern')
-  if (!pattern) fail('USAGE_ERROR', 'Missing --pattern', 'craft-agent label auto-rule-add <id> --pattern "<regex>"')
+  if (!pattern) fail('USAGE_ERROR', 'Missing --pattern', 'datapilot label auto-rule-add <id> --pattern "<regex>"')
 
   const rule: AutoLabelRule = { pattern }
   const ruleFlags = (input?.flags as string) ?? strFlag(flags, 'flags')
@@ -235,10 +235,10 @@ function cmdAutoRuleRemove(
   flags: Record<string, string | boolean | string[]>,
 ): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing label id', 'craft-agent label auto-rule-remove <id> --index <n>')
+  if (!id) fail('USAGE_ERROR', 'Missing label id', 'datapilot label auto-rule-remove <id> --index <n>')
 
   const indexStr = strFlag(flags, 'index')
-  if (indexStr === undefined) fail('USAGE_ERROR', 'Missing --index', 'craft-agent label auto-rule-remove <id> --index <n>')
+  if (indexStr === undefined) fail('USAGE_ERROR', 'Missing --index', 'datapilot label auto-rule-remove <id> --index <n>')
   const index = parseInt(indexStr, 10)
   if (isNaN(index)) fail('USAGE_ERROR', '--index must be a number')
 
@@ -261,7 +261,7 @@ function cmdAutoRuleRemove(
 
 function cmdAutoRuleClear(ws: string, positionals: string[]): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing label id', 'craft-agent label auto-rule-clear <id>')
+  if (!id) fail('USAGE_ERROR', 'Missing label id', 'datapilot label auto-rule-clear <id>')
 
   const config = loadLabelConfig(ws)
   const label = config.labels.reduce<import('@craft-agent/shared/labels').LabelConfig | null>(
@@ -279,7 +279,7 @@ function cmdAutoRuleClear(ws: string, positionals: string[]): void {
 
 function cmdAutoRuleValidate(ws: string, positionals: string[]): void {
   const id = positionals[0]
-  if (!id) fail('USAGE_ERROR', 'Missing label id', 'craft-agent label auto-rule-validate <id>')
+  if (!id) fail('USAGE_ERROR', 'Missing label id', 'datapilot label auto-rule-validate <id>')
 
   const label = getLabel(ws, id)
   if (!label) fail('NOT_FOUND', `Label '${id}' not found`)
