@@ -61,12 +61,20 @@
     "./automations/resolve-config-path": "./src/automations/resolve-config-path.ts",
     "./batches": "./src/batches/index.ts",
     "./batches/constants": "./src/batches/constants.ts",
-    "./protocol": "./src/protocol/index.ts"
+    "./protocol": "./src/protocol/index.ts",
+    "./db": "./src/db/index.ts",
+    "./db/schema": "./src/db/schema/index.ts",
+    "./db/events": "./src/db/events.ts",
+    "./statuses/storage.db": "./src/statuses/storage.db.ts",
+    "./labels/storage.db": "./src/labels/storage.db.ts",
+    "./views/storage.db": "./src/views/storage.db.ts",
+    "./workspaces/storage.db": "./src/workspaces/storage.db.ts"
   },
   "dependencies": {
     "@craft-agent/core": "workspace:*",
     "@craft-agent/session-tools-core": "workspace:*",
     "@isaacs/ttlcache": "^2.1.4",
+    "drizzle-orm": "^0.45.2",
     "@leeoniya/ufuzzy": "^1.0.19",
     "bash-parser": "^0.5.0",
     "croner": "^10.0.1",
