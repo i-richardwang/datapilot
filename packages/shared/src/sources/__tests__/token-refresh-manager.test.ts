@@ -9,7 +9,7 @@
 import { describe, test, expect, mock, beforeEach } from 'bun:test';
 import { isOAuthSource, type LoadedSource, type FolderSourceConfig } from '../types.ts';
 import { TokenRefreshManager } from '../token-refresh-manager.ts';
-import { isSourceUsable } from '../storage.ts';
+import { isSourceUsable } from '../storage.db.ts';
 import type { SourceCredentialManager } from '../credential-manager.ts';
 
 // Mock storage module to prevent disk I/O

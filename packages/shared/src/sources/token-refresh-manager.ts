@@ -13,7 +13,7 @@
 
 import { isOAuthSource, type LoadedSource } from './types.ts';
 import type { SourceCredentialManager } from './credential-manager.ts';
-import { markSourceAuthenticated } from './storage.ts';
+import { markSourceAuthenticated } from './storage.db.ts';
 
 /** Default cooldown after failed refresh (5 minutes) */
 const DEFAULT_COOLDOWN_MS = 5 * 60 * 1000;

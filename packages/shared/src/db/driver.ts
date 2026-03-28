@@ -54,6 +54,14 @@ export async function autoRegisterDriver(): Promise<void> {
 }
 
 /**
+ * Check whether a SQLite driver has been registered.
+ * Used to conditionally enable DB-backed storage at module load time.
+ */
+export function isDriverRegistered(): boolean {
+  return _create !== null;
+}
+
+/**
  * Create a Drizzle database instance. Synchronous — requires prior driver registration.
  */
 export function createDrizzleDatabase(dbPath: string): DrizzleDatabase {

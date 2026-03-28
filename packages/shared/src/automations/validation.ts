@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { resolveAutomationsConfigPath } from './resolve-config-path.ts';
 import { AUTOMATIONS_CONFIG_FILE } from './constants.ts';
 import { AutomationsConfigSchema, zodErrorToIssues, DEPRECATED_EVENT_ALIASES } from './schemas.ts';
-import { isValidLabelId } from '../labels/storage.ts';
+import { isValidLabelId } from '../labels/storage.db.ts';
 import { extractLabelId } from '../labels/values.ts';
 import { getLlmConnection } from '../config/storage.ts';
 import { getDefaultModelsForConnection } from '../config/llm-connections.ts';

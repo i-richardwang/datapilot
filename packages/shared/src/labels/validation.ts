@@ -6,7 +6,7 @@
  * Invalid IDs are silently filtered out (handles deleted labels gracefully).
  */
 
-import { isValidLabelId } from './storage.ts';
+import { isValidLabelId } from './storage.db.ts';
 import { extractLabelId } from './values.ts';
 
 /**

@@ -6,7 +6,7 @@
  * Delete cascade strips the label (and descendants) from all sessions.
  */
 
-import { loadLabelConfig, saveLabelConfig, isValidLabelId, isValidLabelIdFormat } from './storage.ts';
+import { loadLabelConfig, saveLabelConfig, isValidLabelId, isValidLabelIdFormat } from './storage.db.ts';
 import { findLabelById, collectAllIds, getDescendantIds, getLabelDisplayName } from './tree.ts';
 import { extractLabelId, parseLabelEntry, formatLabelEntry } from './values.ts';
 import type { LabelConfig, CreateLabelInput, UpdateLabelInput } from './types.ts';

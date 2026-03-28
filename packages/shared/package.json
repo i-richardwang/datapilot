@@ -44,10 +44,10 @@
     "./utils/workspace-slug": "./src/utils/workspace-slug.ts",
     "./labels": "./src/labels/index.ts",
     "./labels/auto": "./src/labels/auto/index.ts",
-    "./labels/storage": "./src/labels/storage.ts",
+    "./labels/storage": "./src/labels/storage.db.ts",
     "./labels/crud": "./src/labels/crud.ts",
     "./views": "./src/views/index.ts",
-    "./views/storage": "./src/views/storage.ts",
+    "./views/storage": "./src/views/storage.db.ts",
     "./validation": "./src/validation/index.ts",
     "./version": "./src/version/index.ts",
     "./branding": "./src/branding.ts",
@@ -68,7 +68,11 @@
     "./statuses/storage.db": "./src/statuses/storage.db.ts",
     "./labels/storage.db": "./src/labels/storage.db.ts",
     "./views/storage.db": "./src/views/storage.db.ts",
-    "./workspaces/storage.db": "./src/workspaces/storage.db.ts"
+    "./workspaces/storage.db": "./src/workspaces/storage.db.ts",
+    "./sources/storage.db": "./src/sources/storage.db.ts",
+    "./sessions/storage.db": "./src/sessions/storage.db.ts",
+    "./automations/history-store.db": "./src/automations/history-store.db.ts",
+    "./batches/batch-state-manager.db": "./src/batches/batch-state-manager.db.ts"
   },
   "dependencies": {
     "@craft-agent/core": "workspace:*",

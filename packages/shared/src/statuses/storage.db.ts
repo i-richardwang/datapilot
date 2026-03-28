@@ -231,7 +231,6 @@ function rowToStatusConfig(row: typeof statusesTable.$inferSelect): StatusConfig
     label: row.label,
     color: row.color as StatusConfig['color'],
     icon: row.icon ?? undefined,
-    shortcut: row.shortcut ?? undefined,
     category: row.category as StatusCategory,
     isFixed: row.isFixed,
     isDefault: row.isDefault,

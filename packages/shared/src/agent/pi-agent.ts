@@ -82,7 +82,7 @@ import { join } from 'path';
 import { homedir } from 'os';
 
 // Session storage (plans folder path)
-import { getSessionDataPath, getSessionPath, getSessionPlansPath } from '../sessions/storage.ts';
+import { getSessionDataPath, getSessionPath, getSessionPlansPath } from '../sessions/storage.db.ts';
 
 // Error typing
 import { parseError, type AgentError } from './errors.ts';

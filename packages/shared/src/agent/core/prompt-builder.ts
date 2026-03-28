@@ -16,7 +16,7 @@ import { isLocalMcpEnabled } from '../../workspaces/storage.ts';
 import { formatPreferencesForPrompt } from '../../config/preferences.ts';
 import { formatSessionState } from '../mode-manager.ts';
 import { getDateTimeContext, getWorkingDirectoryContext } from '../../prompts/system.ts';
-import { getSessionPlansPath, getSessionDataPath, getSessionPath } from '../../sessions/storage.ts';
+import { getSessionPlansPath, getSessionDataPath, getSessionPath } from '../../sessions/storage.db.ts';
 import { buildBatchOutputInstruction } from '../../batches/output-instruction.ts';
 import type {
   PromptBuilderConfig,

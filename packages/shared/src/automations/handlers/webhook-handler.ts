@@ -13,7 +13,7 @@ import { APP_EVENTS, type AutomationEvent, type WebhookAction, type WebhookActio
 import { matcherMatches, buildWebhookEnv, expandEnvVars } from '../utils.ts';
 import { executeWithRetry, redactUrl, isTransientFailure, createWebhookHistoryEntry, expandWebhookAction } from '../webhook-utils.ts';
 import { RetryScheduler } from '../retry-scheduler.ts';
-import { appendAutomationHistoryEntry } from '../history-store.ts';
+import { appendAutomationHistoryEntry } from '../history-store.db.ts';
 
 const log = createLogger('webhook-handler');
 

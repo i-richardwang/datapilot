@@ -16,7 +16,7 @@
  */
 
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk';
-import { getSessionPlansPath, getSessionPath } from '../sessions/storage.ts';
+import { getSessionPlansPath, getSessionPath } from '../sessions/storage.db.ts';
 import { debug } from '../utils/debug.ts';
 import { DOC_REFS } from '../docs/index.ts';
 import { createClaudeContext } from './claude-context.ts';

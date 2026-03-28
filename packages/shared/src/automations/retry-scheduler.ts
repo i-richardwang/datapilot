@@ -17,7 +17,7 @@ import { join } from 'path';
 import { createLogger } from '../utils/debug.ts';
 import { executeWebhookRequest, createWebhookHistoryEntry } from './webhook-utils.ts';
 import { AUTOMATIONS_RETRY_QUEUE_FILE } from './constants.ts';
-import { appendAutomationHistoryEntry } from './history-store.ts';
+import { appendAutomationHistoryEntry } from './history-store.db.ts';
 import type { WebhookAction, WebhookActionResult } from './types.ts';
 
 const log = createLogger('retry-scheduler');

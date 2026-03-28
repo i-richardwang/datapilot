@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { createLabel, ensureLabelsExist } from '../crud.ts';
-import { loadLabelConfig, saveLabelConfig } from '../storage.ts';
+import { loadLabelConfig, saveLabelConfig } from '../storage.db.ts';
 import { flattenLabels } from '../tree.ts';
 
 let workspaceRoot: string;

@@ -5,7 +5,7 @@
  */
 
 // Driver registration (call once at app startup)
-export { autoRegisterDriver, registerDriver } from './driver.ts';
+export { autoRegisterDriver, registerDriver, isDriverRegistered } from './driver.ts';
 
 // Connection management
 export {

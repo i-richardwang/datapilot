@@ -21,7 +21,7 @@ import {
   resolveAuthEnvVars,
 } from '../config/llm-connections.ts';
 import type { McpClientPool } from '../mcp/mcp-pool.ts';
-import { loadPlanFromPath, type SessionConfig as Session } from '../sessions/storage.ts';
+import { loadPlanFromPath, type SessionConfig as Session } from '../sessions/storage.db.ts';
 import { DEFAULT_MODEL, isClaudeModel, getDefaultSummarizationModel, getModelContextWindow } from '../config/models.ts';
 import { getCredentialManager } from '../credentials/index.ts';
 import { loadPreferences, formatPreferencesForPrompt } from '../config/preferences.ts';
@@ -53,7 +53,7 @@ import {
   PERMISSION_MODE_CONFIG,
   SAFE_MODE_CONFIG,
 } from './mode-manager.ts';
-import { getSessionDataPath, getSessionPlansPath, getSessionPath } from '../sessions/storage.ts';
+import { getSessionDataPath, getSessionPlansPath, getSessionPath } from '../sessions/storage.db.ts';
 import { getLastApiError } from '../interceptor-common.ts';
 import { extractWorkspaceSlug } from '../utils/workspace.ts';
 import {

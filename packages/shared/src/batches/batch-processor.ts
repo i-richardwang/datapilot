@@ -23,7 +23,7 @@ import {
   saveTestResult,
   loadTestResult,
   deleteTestResult,
-} from './batch-state-manager.ts'
+} from './batch-state-manager.db.ts'
 import { expandEnvVars } from '../automations/utils.ts'
 import { sanitizeForShell } from '../automations/security.ts'
 import type {

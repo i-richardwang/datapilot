@@ -4,6 +4,7 @@ import { OAuthFlowStore } from '@craft-agent/shared/auth'
 import { ensureConfigDir, loadStoredConfig, saveConfig } from '@craft-agent/shared/config'
 import { CONFIG_DIR } from '@craft-agent/shared/config/paths'
 import { setBundledAssetsRoot } from '@craft-agent/shared/utils'
+import { autoRegisterDriver } from '@craft-agent/shared/db'
 import { WsRpcServer, type WsRpcTlsOptions } from '../transport/server'
 import type { EventSink, RpcServer } from '../transport/types'
 import { createHeadlessPlatform } from '../runtime/platform-headless'
@@ -206,6 +207,8 @@ export async function bootstrapServer<TSessionManager, THandlerDeps>(
   }
 
   options.applyPlatformToSubsystems?.(platform)
+
+  await autoRegisterDriver()
 
   bootstrapConfigArtifacts(platform)
   ensureGlobalConfigExists(platform)

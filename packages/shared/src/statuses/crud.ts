@@ -5,7 +5,7 @@
  * Enforces business rules (fixed statuses, default statuses, uniqueness).
  */
 
-import { loadStatusConfig, saveStatusConfig } from './storage.ts';
+import { loadStatusConfig, saveStatusConfig } from './storage.db.ts';
 import type { StatusConfig, CreateStatusInput, UpdateStatusInput } from './types.ts';
 
 /**

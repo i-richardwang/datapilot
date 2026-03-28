@@ -20,8 +20,9 @@ import { homedir } from 'os';
 import { randomUUID } from 'crypto';
 import { expandPath, toPortablePath } from '../utils/paths.ts';
 import { atomicWriteFileSync, readJsonFileSync } from '../utils/files.ts';
-import { getDefaultStatusConfig, saveStatusConfig, ensureDefaultIconFiles } from '../statuses/storage.ts';
-import { getDefaultLabelConfig, saveLabelConfig } from '../labels/storage.ts';
+import { getDefaultStatusConfig, saveStatusConfig, ensureDefaultIconFiles } from '../statuses/storage.db.ts';
+import { getDefaultLabelConfig, saveLabelConfig } from '../labels/storage.db.ts';
+import { getWorkspaceDb } from '../db/connection.ts';
 import { loadConfigDefaults } from '../config/storage.ts';
 import { parsePermissionMode, PERMISSION_MODE_ORDER } from '../agent/mode-types.ts';
 import { normalizeThinkingLevel } from '../agent/thinking-levels.ts';
@@ -329,6 +330,9 @@ export function createWorkspaceAtPath(
   mkdirSync(getWorkspaceSourcesPath(rootPath), { recursive: true });
   mkdirSync(getWorkspaceSessionsPath(rootPath), { recursive: true });
   mkdirSync(getWorkspaceSkillsPath(rootPath), { recursive: true });
+
+  // Initialize workspace.db (creates file + runs migrations)
+  getWorkspaceDb(rootPath);
 
   // Save config
   saveWorkspaceConfig(rootPath, config);

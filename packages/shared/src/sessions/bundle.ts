@@ -13,7 +13,7 @@ import { readFile } from 'fs/promises'
 import type { SessionHeader, StoredMessage, SessionConfig } from './types.ts'
 import type { StoredSession } from './types.ts'
 import { readSessionJsonl } from './jsonl.ts'
-import { getSessionPath, getSessionFilePath } from './storage.ts'
+import { getSessionPath, getSessionFilePath } from './storage.db.ts'
 import { debug } from '../utils/debug.ts'
 
 /**
