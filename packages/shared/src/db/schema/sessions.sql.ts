@@ -8,7 +8,7 @@
  * Session directories still exist on disk for: attachments/, plans/, data/, downloads/, long_responses/
  */
 
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, primaryKey } from 'drizzle-orm/sqlite-core';
 
 export const sessions = sqliteTable('sessions', {
   // Identity
@@ -97,7 +97,7 @@ export const sessions = sqliteTable('sessions', {
 
 /** Session messages — one row per message, ordered by position */
 export const messages = sqliteTable('messages', {
-  id: text('id').primaryKey(),
+  id: text('id').notNull(),
   sessionId: text('session_id').notNull()
     .references(() => sessions.id, { onDelete: 'cascade' }),
   /** Insertion order within session (0-based) */
@@ -105,5 +105,6 @@ export const messages = sqliteTable('messages', {
   /** Full StoredMessage as JSON (content made portable via {{SESSION_PATH}} token) */
   content: text('content', { mode: 'json' }).notNull(),
 }, (table) => [
+  primaryKey({ columns: [table.sessionId, table.id] }),
   index('idx_messages_session_pos').on(table.sessionId, table.position),
 ]);

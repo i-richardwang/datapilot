@@ -135,10 +135,11 @@ const WORKSPACE_MIGRATIONS: Migration[] = [
 
       -- Messages
       CREATE TABLE IF NOT EXISTS messages (
-        id TEXT PRIMARY KEY,
+        id TEXT NOT NULL,
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
         position INTEGER NOT NULL,
-        content TEXT NOT NULL
+        content TEXT NOT NULL,
+        PRIMARY KEY(session_id, id)
       );
 
       CREATE INDEX IF NOT EXISTS idx_messages_session_pos ON messages(session_id, position);
