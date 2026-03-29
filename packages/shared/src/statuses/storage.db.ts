@@ -90,7 +90,8 @@ export function ensureDefaultIconFiles(workspaceRootPath: string): void {
     mkdirSync(iconsDir, { recursive: true });
   }
   for (const [filename, svg] of Object.entries(DEFAULT_ICON_SVGS)) {
-    const filePath = join(iconsDir, filename);
+    const svgFilename = filename.endsWith('.svg') ? filename : `${filename}.svg`;
+    const filePath = join(iconsDir, svgFilename);
     if (!existsSync(filePath)) {
       const { writeFileSync } = require('fs');
       writeFileSync(filePath, svg, 'utf-8');
