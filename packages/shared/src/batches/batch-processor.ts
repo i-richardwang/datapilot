@@ -516,20 +516,26 @@ export class BatchProcessor {
         }
       }
 
-      const result = await this.options.onExecutePrompt(params)
+      // Register the session→item mapping BEFORE processing starts.
+      // executePromptAutomation awaits sendMessage which blocks until the agent
+      // finishes. On completion, onProcessingStopped fires (without await) and
+      // calls onSessionComplete — if the mapping isn't set yet, the batch item
+      // stays stuck in "running" forever. With synchronous DB writes (SQLite),
+      // the microtask ordering guarantees this race always loses.
+      params.onSessionCreated = (sessionId) => {
+        updateItemState(state, itemId, { sessionId })
+        this.sessionToItem.set(sessionId, { batchId, itemId })
+        saveBatchState(this.options.workspaceRootPath, state)
+        log.debug(`[BatchProcessor] Dispatched item "${itemId}" → session ${sessionId}`)
+      }
+
+      await this.options.onExecutePrompt(params)
 
       // After await, batch may have been stopped/deleted — abort if so
       if (!this.activeStates.has(batchId)) {
         log.debug(`[BatchProcessor] Batch "${batchId}" was stopped during dispatch of item "${itemId}", skipping state update`)
         return
       }
-
-      // Record session mapping for completion callback
-      updateItemState(state, itemId, { sessionId: result.sessionId })
-      this.sessionToItem.set(result.sessionId, { batchId, itemId })
-      saveBatchState(this.options.workspaceRootPath, state)
-
-      log.debug(`[BatchProcessor] Dispatched item "${itemId}" → session ${result.sessionId}`)
     } catch (error) {
       // After await, batch may have been stopped/deleted — abort if so
       if (!this.activeStates.has(batchId)) {

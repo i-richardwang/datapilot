@@ -1425,6 +1425,7 @@ export class SessionManager implements ISessionManager {
             params.batchContext,
             params.automationName,
             params.workingDirectory,
+            params.onSessionCreated,
           )
         },
         onProgress: (progress) => {
@@ -6704,6 +6705,7 @@ export class SessionManager implements ISessionManager {
     batchContext?: { batchId: string; itemId: string; outputPath: string; outputSchema?: Record<string, unknown> },
     automationName?: string,
     workingDirectory?: string,
+    onSessionCreated?: (sessionId: string) => void,
   ): Promise<{ sessionId: string }> {
     // Warn if llmConnection was specified but doesn't resolve
     if (llmConnection) {
@@ -6756,6 +6758,10 @@ export class SessionManager implements ISessionManager {
     // a synthetic empty session and temporarily show "New chat".
     this.sendEvent({ type: 'session_created', sessionId: session.id }, workspaceId)
 
+    // Notify caller of the sessionId before processing starts.
+    // Batch processor uses this to register the session→item mapping so that
+    // onSessionComplete (fired from onProcessingStopped) can find it.
+    onSessionCreated?.(session.id)
 
     // Send the prompt
     await this.sendMessage(session.id, prompt, undefined, undefined, {

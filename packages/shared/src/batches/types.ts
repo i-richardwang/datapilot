@@ -165,6 +165,8 @@ export interface BatchExecutePromptParams {
   }
   /** Human-readable name for the session (used as title and triggeredBy metadata) */
   automationName?: string
+  /** Called with the sessionId after session creation, before processing starts */
+  onSessionCreated?: (sessionId: string) => void
 }
 
 export interface BatchSystemOptions {
