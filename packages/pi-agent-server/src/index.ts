@@ -63,7 +63,7 @@ import { resolvePiModel } from './model-resolution.ts';
 
 // Direct source imports from shared (bundled by bun build)
 import { handleLargeResponse, estimateTokens, TOKEN_LIMIT } from '../../shared/src/utils/large-response.ts';
-import { getSessionPlansPath, getSessionPath } from '../../shared/src/sessions/storage.ts';
+import { getSessionPlansPath, getSessionPath } from '../../shared/src/sessions/storage.db.ts';
 import { buildCallLlmRequest, withTimeout, LLM_QUERY_TIMEOUT_MS } from '../../shared/src/agent/llm-tool.ts';
 import type { LLMQueryRequest, LLMQueryResult } from '../../shared/src/agent/llm-tool.ts';
 import { PI_TOOL_NAME_MAP, THINKING_TO_PI } from '../../shared/src/agent/backend/pi/constants.ts';

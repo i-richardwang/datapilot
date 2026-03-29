@@ -155,13 +155,13 @@ export function reorderStatuses(
  * WARNING: Deletes all custom statuses
  */
 export function resetToDefaults(workspaceRootPath: string): void {
-  const { getDefaultStatusConfig } = require('./storage.ts');
+  const { getDefaultStatusConfig } = require('./storage.db.ts');
   const config = getDefaultStatusConfig();
   saveStatusConfig(workspaceRootPath, config);
 
   // Migrate any sessions with now-invalid statuses
   const validIds = new Set(config.statuses.map((s: StatusConfig) => s.id));
-  const { listSessions, updateSessionMetadata } = require('../sessions/storage.ts');
+  const { listSessions, updateSessionMetadata } = require('../sessions/storage.db.ts');
   const sessions = listSessions(workspaceRootPath);
 
   for (const session of sessions) {
@@ -180,7 +180,7 @@ function migrateSessionsFromDeletedStatus(
   deletedStatusId: string
 ): number {
   // Import session storage functions
-  const { listSessions, updateSessionMetadata } = require('../sessions/storage.ts');
+  const { listSessions, updateSessionMetadata } = require('../sessions/storage.db.ts');
 
   const sessions = listSessions(workspaceRootPath);
   let migratedCount = 0;
