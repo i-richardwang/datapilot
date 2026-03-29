@@ -3,7 +3,7 @@
   "version": "0.7.2",
   "type": "module",
   "bin": {
-    "craft-agent-batch": "src/index.ts"
+    "datapilot-batch": "src/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -7,19 +7,19 @@ This guide explains batch processing in DataPilot — running actions across lar
 ## CLI Commands
 
 ```bash
-craft-agent-batch list
-craft-agent-batch get <id>
-craft-agent-batch validate
-craft-agent-batch status <id>
-craft-agent-batch status <id> --items
-craft-agent-batch create --name "My batch" --source data.csv --id-field id --prompt-file prompt.txt
-craft-agent-batch create --name "Extraction" --source data.csv --id-field id --prompt-file prompt.txt --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
-craft-agent-batch update <id> --name "Renamed" --concurrency 5
-craft-agent-batch update <id> --enabled false
-craft-agent-batch update <id> --patch '{"execution":{"retryOnFailure":true}}'
-craft-agent-batch enable <id>
-craft-agent-batch disable <id>
-craft-agent-batch delete <id>
+datapilot-batch list
+datapilot-batch get <id>
+datapilot-batch validate
+datapilot-batch status <id>
+datapilot-batch status <id> --items
+datapilot-batch create --name "My batch" --source data.csv --id-field id --prompt-file prompt.txt
+datapilot-batch create --name "Extraction" --source data.csv --id-field id --prompt-file prompt.txt --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
+datapilot-batch update <id> --name "Renamed" --concurrency 5
+datapilot-batch update <id> --enabled false
+datapilot-batch update <id> --patch '{"execution":{"retryOnFailure":true}}'
+datapilot-batch enable <id>
+datapilot-batch disable <id>
+datapilot-batch delete <id>
 ```
 
 ## What Are Batches?
@@ -78,7 +78,7 @@ Create a welcome email for $BATCH_ITEM_NAME at $BATCH_ITEM_EMAIL (account $BATCH
 ```
 
 ```bash
-craft-agent-batch create --name "Onboarding" --source users.csv --id-field user_id --prompt-file prompt.txt
+datapilot-batch create --name "Onboarding" --source users.csv --id-field user_id --prompt-file prompt.txt
 ```
 
 Additional action fields (set via `--patch`):
@@ -100,7 +100,7 @@ These fields control how items are processed. Common ones have dedicated flags; 
 Example using `--patch` for fields without dedicated flags:
 
 ```bash
-craft-agent-batch update <id> --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
+datapilot-batch update <id> --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
 ```
 
 ## Output Configuration
@@ -141,7 +141,7 @@ The `--output-schema` flag takes a JSON Schema string with `type: "object"`:
 Example:
 
 ```bash
-craft-agent-batch create --name "User Analysis" --source data/users.csv --id-field user_id \
+datapilot-batch create --name "User Analysis" --source data/users.csv --id-field user_id \
   --prompt-file prompt.txt \
   --output-path output/user-analysis.jsonl \
   --output-schema '{"type":"object","properties":{"summary":{"type":"string","description":"One-sentence summary"},"risk_level":{"type":"string","enum":["low","medium","high"]},"score":{"type":"number","description":"Risk score 0-100"}},"required":["summary","risk_level"]}'
@@ -160,7 +160,7 @@ Their role is $BATCH_ITEM_ROLE and they joined on $BATCH_ITEM_START_DATE.
 ```
 
 ```bash
-craft-agent-batch create \
+datapilot-batch create \
   --name "User Onboarding Summaries" \
   --source data/new-users.csv \
   --id-field user_id \
@@ -182,7 +182,7 @@ in the $BATCH_ITEM_REGION region. Include budget analysis and key milestones.
 ```
 
 ```bash
-craft-agent-batch create \
+datapilot-batch create \
   --name "Quarterly Report Generation" \
   --source data/projects.json \
   --id-field project_id \
@@ -203,7 +203,7 @@ Text: $BATCH_ITEM_TEXT
 ```
 
 ```bash
-craft-agent-batch create \
+datapilot-batch create \
   --name "Content Translation" \
   --source data/content-to-translate.jsonl \
   --id-field content_id \
@@ -245,7 +245,7 @@ The test runs real sessions with the same configuration as production, but:
 1. Create the batch configuration using CLI
 2. Call `batch_test` to run a sample
 3. **Review** the results (see Review Checklist below)
-4. If issues found, update the prompt or schema using CLI (`craft-agent-batch update`)
+4. If issues found, update the prompt or schema using CLI (`datapilot-batch update`)
 5. Repeat steps 2-4 until satisfied
 6. Tell the user the batch is ready — the user starts the full batch from the UI
 
@@ -308,7 +308,7 @@ Individual items within a batch have their own status:
 The CLI validates configuration automatically on `create` and `update`. You can also run validation explicitly:
 
 ```bash
-craft-agent-batch validate
+datapilot-batch validate
 ```
 
 Or use the `config_validate` tool with `target: "batches"`.
