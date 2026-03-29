@@ -289,6 +289,7 @@ async function main(): Promise<void> {
       "--outfile=apps/electron/dist/main.cjs",
       "--external:electron",
       "--external:better-sqlite3",
+      "--external:bun:sqlite",
       ...buildDefines,
     ],
     cwd: ROOT_DIR,

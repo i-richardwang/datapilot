@@ -282,7 +282,7 @@ function stripLabelFromSessions(
   deletedLabelId: string
 ): number {
   // Dynamic import to avoid circular dependency with sessions module
-  const { listSessions, updateSessionMetadata } = require('../sessions/storage.ts');
+  const { listSessions, updateSessionMetadata } = require('../sessions/storage.db.ts');
 
   const sessions = listSessions(workspaceRootPath);
   let strippedCount = 0;
