@@ -553,8 +553,8 @@ export function getConfigDomainBashRedirect(
     return null;
   }
 
-  // Exempt separate-binary CLI commands (e.g. craft-agent-batch) from token scanning
-  if (/^craft-agent-batch\b/.test(command)) {
+  // Exempt separate-binary CLI commands (e.g. datapilot-batch) from token scanning
+  if (/^datapilot-batch\b/.test(command)) {
     return null;
   }
 

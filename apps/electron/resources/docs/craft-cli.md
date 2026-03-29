@@ -372,20 +372,20 @@ craft-agent theme reset-override
 
 Manage batch processing jobs stored in `batches.json`.
 
-> **Note:** Batch commands use a separate binary `craft-agent-batch` (not `craft-agent`).
+> **Note:** Batch commands use a separate binary `datapilot-batch` (not `craft-agent`).
 > This binary ships with the `@craft-agent/batch-cli` package and has plain-text output
 > (not the JSON envelope format of the main `craft-agent` CLI).
 
 ### Commands
-- `craft-agent-batch list`
-- `craft-agent-batch get <id>`
-- `craft-agent-batch validate`
-- `craft-agent-batch status <id> [--items]`
-- `craft-agent-batch create` (see flags below)
-- `craft-agent-batch update <id>` (same flags as create, all optional)
-- `craft-agent-batch enable <id>`
-- `craft-agent-batch disable <id>`
-- `craft-agent-batch delete <id>`
+- `datapilot-batch list`
+- `datapilot-batch get <id>`
+- `datapilot-batch validate`
+- `datapilot-batch status <id> [--items]`
+- `datapilot-batch create` (see flags below)
+- `datapilot-batch update <id>` (same flags as create, all optional)
+- `datapilot-batch enable <id>`
+- `datapilot-batch disable <id>`
+- `datapilot-batch delete <id>`
 
 ### Flags for `batch create` / `update`
 
@@ -414,25 +414,25 @@ Manage batch processing jobs stored in `batches.json`.
 
 ```bash
 # Read operations (allowed in Explore mode)
-craft-agent-batch list
-craft-agent-batch get abc123
-craft-agent-batch validate
-craft-agent-batch status abc123
-craft-agent-batch status abc123 --items
+datapilot-batch list
+datapilot-batch get abc123
+datapilot-batch validate
+datapilot-batch status abc123
+datapilot-batch status abc123 --items
 
 # Create (prompt template in a file)
-craft-agent-batch create --name "User Analysis" --source data/users.csv --id-field user_id --prompt-file prompt.txt
-craft-agent-batch create --name "Reports" --source reports.json --id-field report_id --prompt-file prompt.txt --concurrency 5 --permission-mode safe
+datapilot-batch create --name "User Analysis" --source data/users.csv --id-field user_id --prompt-file prompt.txt
+datapilot-batch create --name "Reports" --source reports.json --id-field report_id --prompt-file prompt.txt --concurrency 5 --permission-mode safe
 # Create with structured output
-craft-agent-batch create --name "Extraction" --source data.csv --id-field id --prompt-file prompt.txt --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
+datapilot-batch create --name "Extraction" --source data.csv --id-field id --prompt-file prompt.txt --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
 # Update with flat flags
-craft-agent-batch update abc123 --name "Renamed Batch" --concurrency 10
-craft-agent-batch update abc123 --enabled false
+datapilot-batch update abc123 --name "Renamed Batch" --concurrency 10
+datapilot-batch update abc123 --enabled false
 # Update with --patch for complex changes
-craft-agent-batch update abc123 --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
-craft-agent-batch enable abc123
-craft-agent-batch disable abc123
-craft-agent-batch delete abc123
+datapilot-batch update abc123 --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
+datapilot-batch enable abc123
+datapilot-batch disable abc123
+datapilot-batch delete abc123
 ```
 
 ### Notes

@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
- * craft-agent-batch CLI
+ * datapilot-batch CLI
  *
  * Standalone binary for batch processing commands.
- * Named craft-agent-batch to avoid conflicting with the private craft-agent CLI
+ * Named datapilot-batch to avoid conflicting with the private craft-agent CLI
  * that handles other domains (label, source, skill, automation, etc.).
  */
 
@@ -21,10 +21,10 @@ import { cmdDelete } from './commands/delete.ts'
 const VERSION = '0.7.3'
 
 const HELP = `
-craft-agent-batch — Batch processing CLI
+datapilot-batch — Batch processing CLI
 
 USAGE
-  craft-agent-batch <command> [options]
+  datapilot-batch <command> [options]
 
 COMMANDS
   list                          List all batches
@@ -44,23 +44,23 @@ GLOBAL OPTIONS
   --version, -v                 Show version
 
 EXAMPLES
-  craft-agent-batch list
-  craft-agent-batch get abc123
-  craft-agent-batch validate
-  craft-agent-batch status abc123 --items
-  craft-agent-batch create --name "My batch" --source data.csv --id-field id --prompt-file prompt.txt
-  craft-agent-batch update abc123 --name "Renamed" --concurrency 5
-  craft-agent-batch update abc123 --enabled false
-  craft-agent-batch enable abc123
-  craft-agent-batch disable abc123
-  craft-agent-batch delete abc123
+  datapilot-batch list
+  datapilot-batch get abc123
+  datapilot-batch validate
+  datapilot-batch status abc123 --items
+  datapilot-batch create --name "My batch" --source data.csv --id-field id --prompt-file prompt.txt
+  datapilot-batch update abc123 --name "Renamed" --concurrency 5
+  datapilot-batch update abc123 --enabled false
+  datapilot-batch enable abc123
+  datapilot-batch disable abc123
+  datapilot-batch delete abc123
 `.trim()
 
 const CREATE_HELP = `
-craft-agent-batch create — Create a new batch
+datapilot-batch create — Create a new batch
 
 USAGE
-  craft-agent-batch create [options]
+  datapilot-batch create [options]
 
 REQUIRED
   --name <name>                 Display name for the batch
@@ -81,19 +81,19 @@ OPTIONAL
   --json                        Output created batch as JSON
 
 EXAMPLES
-  craft-agent-batch create --name "User Analysis" --source data/users.csv --id-field user_id \\
+  datapilot-batch create --name "User Analysis" --source data/users.csv --id-field user_id \\
     --prompt-file prompt.txt
 
-  craft-agent-batch create --name "Extraction" --source data.csv --id-field id \\
+  datapilot-batch create --name "Extraction" --source data.csv --id-field id \\
     --prompt-file prompt.txt --output-path output/results.jsonl \\
     --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
 `.trim()
 
 const UPDATE_HELP = `
-craft-agent-batch update — Update an existing batch
+datapilot-batch update — Update an existing batch
 
 USAGE
-  craft-agent-batch update <id> [options]
+  datapilot-batch update <id> [options]
 
 FLAGS (all optional, same as create)
   --name <name>                 Display name
@@ -113,10 +113,10 @@ FLAGS (all optional, same as create)
   --json                        Output updated batch as JSON
 
 EXAMPLES
-  craft-agent-batch update abc123 --name "Renamed Batch" --concurrency 10
-  craft-agent-batch update abc123 --enabled false
-  craft-agent-batch update abc123 --output-path output/new.jsonl
-  craft-agent-batch update abc123 --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
+  datapilot-batch update abc123 --name "Renamed Batch" --concurrency 10
+  datapilot-batch update abc123 --enabled false
+  datapilot-batch update abc123 --output-path output/new.jsonl
+  datapilot-batch update abc123 --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
 `.trim()
 
 function parseArgs(argv: string[]): {
@@ -276,7 +276,7 @@ function main(): void {
     case 'get': {
       const id = args[0]
       if (!id) {
-        console.error('Usage: craft-agent-batch get <id>')
+        console.error('Usage: datapilot-batch get <id>')
         process.exit(1)
       }
       cmdGet(workspaceRoot, id)
@@ -290,7 +290,7 @@ function main(): void {
     case 'status': {
       const id = args[0]
       if (!id) {
-        console.error('Usage: craft-agent-batch status <id> [--items]')
+        console.error('Usage: datapilot-batch status <id> [--items]')
         process.exit(1)
       }
       const showItems = flags['items'] === true
@@ -309,7 +309,7 @@ function main(): void {
       const promptFile = strFlag(flags, 'prompt-file')
       if (!name || !source || !idField || !promptFile) {
         console.error('Missing required flags: --name, --source, --id-field, --prompt-file')
-        console.error('Run: craft-agent-batch create --help')
+        console.error('Run: datapilot-batch create --help')
         process.exit(1)
       }
       const prompt = readFileSync(promptFile, 'utf-8').trim()
@@ -343,8 +343,8 @@ function main(): void {
       }
       const id = args[0]
       if (!id) {
-        console.error('Usage: craft-agent-batch update <id> [flags]')
-        console.error('Run: craft-agent-batch update --help')
+        console.error('Usage: datapilot-batch update <id> [flags]')
+        console.error('Run: datapilot-batch update --help')
         process.exit(1)
       }
       const opts = buildUpdateOptions(flags)
@@ -359,7 +359,7 @@ function main(): void {
     case 'enable': {
       const id = args[0]
       if (!id) {
-        console.error('Usage: craft-agent-batch enable <id>')
+        console.error('Usage: datapilot-batch enable <id>')
         process.exit(1)
       }
       cmdEnable(workspaceRoot, id, asJson)
@@ -369,7 +369,7 @@ function main(): void {
     case 'disable': {
       const id = args[0]
       if (!id) {
-        console.error('Usage: craft-agent-batch disable <id>')
+        console.error('Usage: datapilot-batch disable <id>')
         process.exit(1)
       }
       cmdDisable(workspaceRoot, id, asJson)
@@ -379,7 +379,7 @@ function main(): void {
     case 'delete': {
       const id = args[0]
       if (!id) {
-        console.error('Usage: craft-agent-batch delete <id>')
+        console.error('Usage: datapilot-batch delete <id>')
         process.exit(1)
       }
       cmdDelete(workspaceRoot, id, asJson)
@@ -389,7 +389,7 @@ function main(): void {
     default:
       console.error(`Unknown subcommand: ${subcommand}`)
       console.error('')
-      console.error('Run: craft-agent-batch --help')
+      console.error('Run: datapilot-batch --help')
       process.exit(1)
   }
 }

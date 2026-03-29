@@ -126,8 +126,8 @@
       "comment": "craft-agent theme read-only operations"
     },
     {
-      "pattern": "^craft-agent-batch\\s+(list|get|validate|status)\\b",
-      "comment": "craft-agent-batch read-only operations"
+      "pattern": "^datapilot-batch\\s+(list|get|validate|status)\\b",
+      "comment": "datapilot-batch read-only operations"
     },
     {
       "pattern": "^craft-agent\\s*$",
@@ -146,12 +146,12 @@
       "comment": "craft-agent global flags"
     },
     {
-      "pattern": "^craft-agent-batch\\s*$",
-      "comment": "craft-agent-batch bare invocation (prints help)"
+      "pattern": "^datapilot-batch\\s*$",
+      "comment": "datapilot-batch bare invocation (prints help)"
     },
     {
-      "pattern": "^craft-agent-batch\\s+--(help|version)\\b",
-      "comment": "craft-agent-batch global flags"
+      "pattern": "^datapilot-batch\\s+--(help|version)\\b",
+      "comment": "datapilot-batch global flags"
     },
     {
       "pattern": "^find\\b",
