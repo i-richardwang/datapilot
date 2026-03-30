@@ -14,7 +14,10 @@ import { colors as c } from '../format.ts'
 export function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
   const result = { ...target }
   for (const [key, val] of Object.entries(source)) {
-    if (val !== null && typeof val === 'object' && !Array.isArray(val) &&
+    if (val === null) {
+      // RFC 7386 (JSON Merge Patch): null means "remove this field"
+      delete result[key]
+    } else if (typeof val === 'object' && !Array.isArray(val) &&
         typeof result[key] === 'object' && result[key] !== null && !Array.isArray(result[key])) {
       result[key] = deepMerge(result[key] as Record<string, unknown>, val as Record<string, unknown>)
     } else {
@@ -30,14 +33,14 @@ export interface UpdateOptions {
   source?: string
   idField?: string
   concurrency?: number
-  model?: string
-  connection?: string
-  permissionMode?: 'safe' | 'ask' | 'allow-all'
-  labels?: string[]
-  workingDirectory?: string
+  model?: string | null
+  connection?: string | null
+  permissionMode?: 'safe' | 'ask' | 'allow-all' | null
+  labels?: string[] | null
+  workingDirectory?: string | null
   enabled?: boolean
-  outputPath?: string
-  outputSchema?: string
+  outputPath?: string | null
+  outputSchema?: string | null
   patch?: string
 }
 
@@ -76,18 +79,26 @@ function buildPatchFromFlags(opts: UpdateOptions): Record<string, unknown> {
   if (opts.permissionMode !== undefined) execPatch.permissionMode = opts.permissionMode
   if (Object.keys(execPatch).length > 0) patch.execution = execPatch
 
-  // Output fields
-  const outputPatch: Record<string, unknown> = {}
-  if (opts.outputPath !== undefined) outputPatch.path = opts.outputPath
-  if (opts.outputSchema !== undefined) {
-    try {
-      outputPatch.schema = JSON.parse(opts.outputSchema)
-    } catch {
-      console.error('Invalid --output-schema JSON:', opts.outputSchema)
-      process.exit(1)
+  // Output fields — clearing output-path clears the entire output block
+  if (opts.outputPath === null) {
+    patch.output = null
+  } else {
+    const outputPatch: Record<string, unknown> = {}
+    if (opts.outputPath !== undefined) outputPatch.path = opts.outputPath
+    if (opts.outputSchema !== undefined) {
+      if (opts.outputSchema === null) {
+        outputPatch.schema = null
+      } else {
+        try {
+          outputPatch.schema = JSON.parse(opts.outputSchema)
+        } catch {
+          console.error('Invalid --output-schema JSON:', opts.outputSchema)
+          process.exit(1)
+        }
+      }
     }
+    if (Object.keys(outputPatch).length > 0) patch.output = outputPatch
   }
-  if (Object.keys(outputPatch).length > 0) patch.output = outputPatch
 
   return patch
 }
@@ -126,6 +137,15 @@ export function cmdUpdate(workspaceRoot: string, idOrName: string, opts: UpdateO
   }
 
   const updated = deepMerge(batch as unknown as Record<string, unknown>, patchObj)
+
+  // Clean up empty optional parent objects left after field clearing
+  for (const key of ['execution', 'output']) {
+    const val = updated[key]
+    if (val && typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length === 0) {
+      delete updated[key]
+    }
+  }
+
   const newBatches = parsed.data.batches.map(b => (b === batch ? updated : b))
   const newConfig = { ...parsed.data, batches: newBatches }
   const json = JSON.stringify(newConfig, null, 2)
