@@ -117,6 +117,15 @@ EXAMPLES
   datapilot-batch update abc123 --enabled false
   datapilot-batch update abc123 --output-path output/new.jsonl
   datapilot-batch update abc123 --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
+
+CLEARING FIELDS
+  Pass an empty string to clear an optional field back to its default:
+    datapilot-batch update abc123 --model ""
+    datapilot-batch update abc123 --output-path ""      (removes entire output config)
+    datapilot-batch update abc123 --label ""             (removes all labels)
+
+  Or use --patch with null values:
+    datapilot-batch update abc123 --patch '{"execution":{"model":null}}'
 `.trim()
 
 function parseArgs(argv: string[]): {
@@ -215,23 +224,31 @@ function parseLabels(flags: Record<string, string | boolean | string[]>): string
   return undefined
 }
 
-/** Build UpdateOptions from parsed flags. */
+/** Build UpdateOptions from parsed flags. Empty strings on clearable fields become null. */
 function buildUpdateOptions(flags: Record<string, string | boolean | string[]>): UpdateOptions {
   const promptFile = strFlag(flags, 'prompt-file')
+  const rawModel = strFlag(flags, 'model')
+  const rawConnection = strFlag(flags, 'connection')
+  const rawPermMode = strFlag(flags, 'permission-mode')
+  const rawWorkDir = strFlag(flags, 'working-directory')
+  const rawOutputPath = strFlag(flags, 'output-path')
+  const rawOutputSchema = strFlag(flags, 'output-schema')
+  const rawLabels = parseLabels(flags)
+
   return {
     name: strFlag(flags, 'name'),
     prompt: promptFile ? readFileSync(promptFile, 'utf-8').trim() : undefined,
     source: strFlag(flags, 'source'),
     idField: strFlag(flags, 'id-field'),
     concurrency: parseConcurrency(flags),
-    model: strFlag(flags, 'model'),
-    connection: strFlag(flags, 'connection'),
-    permissionMode: parsePermissionMode(flags),
-    labels: parseLabels(flags),
-    workingDirectory: strFlag(flags, 'working-directory'),
+    model: rawModel === '' ? null : rawModel,
+    connection: rawConnection === '' ? null : rawConnection,
+    permissionMode: rawPermMode === '' ? null : parsePermissionMode(flags),
+    labels: rawLabels?.length === 1 && rawLabels[0] === '' ? null : rawLabels,
+    workingDirectory: rawWorkDir === '' ? null : rawWorkDir,
     enabled: parseEnabledFlag(flags),
-    outputPath: strFlag(flags, 'output-path'),
-    outputSchema: strFlag(flags, 'output-schema'),
+    outputPath: rawOutputPath === '' ? null : rawOutputPath,
+    outputSchema: rawOutputSchema === '' ? null : rawOutputSchema,
     patch: strFlag(flags, 'patch'),
   }
 }
