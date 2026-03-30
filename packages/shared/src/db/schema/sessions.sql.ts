@@ -110,20 +110,20 @@ export const messages = sqliteTable('messages', {
 ]);
 
 /**
- * Per-turn token usage — one row per API call (append-only).
+ * Per-turn token usage — one row per API call (append-only, permanent).
  *
  * Provides accurate, per-turn granularity for usage statistics.
  * Column names align with Claude Code's JSONL usage format.
  *
  * Key properties:
  * - NOT copied during session fork (only messages are copied)
- * - CASCADE-deleted when the parent session is hard-deleted
+ * - NOT deleted when the parent session is hard-deleted (permanent audit log)
  * - Aggregatable via simple SUM() queries for session/workspace totals
  */
 export const turnUsage = sqliteTable('turn_usage', {
   rowId: integer('rowid').primaryKey({ autoIncrement: true }),
-  sessionId: text('session_id').notNull()
-    .references(() => sessions.id, { onDelete: 'cascade' }),
+  /** Session ID (no foreign key — records survive session deletion) */
+  sessionId: text('session_id').notNull(),
   /** Assistant message ID this turn produced (if any) */
   messageId: text('message_id'),
   /** Model used for this API call */

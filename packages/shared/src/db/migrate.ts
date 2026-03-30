@@ -174,10 +174,11 @@ const WORKSPACE_MIGRATIONS: Migration[] = [
   {
     name: '0001_turn_usage',
     sql: `
-      -- Per-turn token usage (one row per API call, append-only)
+      -- Per-turn token usage (one row per API call, append-only, permanent)
+      -- No foreign key to sessions — records survive session deletion
       CREATE TABLE IF NOT EXISTS turn_usage (
         rowid INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+        session_id TEXT NOT NULL,
         message_id TEXT,
         model TEXT,
         input_tokens INTEGER NOT NULL DEFAULT 0,
