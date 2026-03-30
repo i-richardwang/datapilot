@@ -123,3 +123,12 @@ export {
   validateBundle,
   MAX_BUNDLE_SIZE_BYTES,
 } from './bundle.ts';
+
+// Per-turn token usage tracking
+export {
+  saveTurnUsage,
+  getSessionTurnUsage,
+  getSessionUsageSummary,
+  type TurnUsageRecord,
+  type SessionUsageSummary,
+} from './turn-usage.db.ts';

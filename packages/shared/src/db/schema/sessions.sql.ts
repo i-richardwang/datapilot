@@ -8,7 +8,7 @@
  * Session directories still exist on disk for: attachments/, plans/, data/, downloads/, long_responses/
  */
 
-import { sqliteTable, text, integer, index, primaryKey } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index, primaryKey } from 'drizzle-orm/sqlite-core';
 
 export const sessions = sqliteTable('sessions', {
   // Identity
@@ -107,4 +107,34 @@ export const messages = sqliteTable('messages', {
 }, (table) => [
   primaryKey({ columns: [table.sessionId, table.id] }),
   index('idx_messages_session_pos').on(table.sessionId, table.position),
+]);
+
+/**
+ * Per-turn token usage — one row per API call (append-only).
+ *
+ * Provides accurate, per-turn granularity for usage statistics.
+ * Column names align with Claude Code's JSONL usage format.
+ *
+ * Key properties:
+ * - NOT copied during session fork (only messages are copied)
+ * - CASCADE-deleted when the parent session is hard-deleted
+ * - Aggregatable via simple SUM() queries for session/workspace totals
+ */
+export const turnUsage = sqliteTable('turn_usage', {
+  rowId: integer('rowid').primaryKey({ autoIncrement: true }),
+  sessionId: text('session_id').notNull()
+    .references(() => sessions.id, { onDelete: 'cascade' }),
+  /** Assistant message ID this turn produced (if any) */
+  messageId: text('message_id'),
+  /** Model used for this API call */
+  model: text('model'),
+  inputTokens: integer('input_tokens').notNull().default(0),
+  outputTokens: integer('output_tokens').notNull().default(0),
+  cacheCreationInputTokens: integer('cache_creation_input_tokens').notNull().default(0),
+  cacheReadInputTokens: integer('cache_read_input_tokens').notNull().default(0),
+  costUsd: real('cost_usd').notNull().default(0),
+  timestamp: integer('timestamp', { mode: 'number' }).notNull(),
+}, (table) => [
+  index('idx_turn_usage_session').on(table.sessionId),
+  index('idx_turn_usage_timestamp').on(table.timestamp),
 ]);

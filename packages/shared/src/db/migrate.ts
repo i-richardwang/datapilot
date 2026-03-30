@@ -171,6 +171,27 @@ const WORKSPACE_MIGRATIONS: Migration[] = [
       );
     `,
   },
+  {
+    name: '0001_turn_usage',
+    sql: `
+      -- Per-turn token usage (one row per API call, append-only)
+      CREATE TABLE IF NOT EXISTS turn_usage (
+        rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+        message_id TEXT,
+        model TEXT,
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        cache_creation_input_tokens INTEGER NOT NULL DEFAULT 0,
+        cache_read_input_tokens INTEGER NOT NULL DEFAULT 0,
+        cost_usd REAL NOT NULL DEFAULT 0,
+        timestamp INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_turn_usage_session ON turn_usage(session_id);
+      CREATE INDEX IF NOT EXISTS idx_turn_usage_timestamp ON turn_usage(timestamp);
+    `,
+  },
 ];
 
 /**
