@@ -368,21 +368,21 @@ export function getSessionScopedTools(
       .filter(def => def.handler !== null) // Skip backend-specific tools (call_llm)
       .map(def => registryTool(def.name, def.inputSchema.shape));
 
-    // Add call_llm — backend-specific (not in registry handler)
-    const sessionPath = getSessionPath(workspaceRootPath, sessionId);
-    tools.push(
-      createLLMTool({
-        sessionId,
-        sessionPath,
-        getQueryFn: () => {
-          const callbacks = getSessionScopedToolCallbacks(sessionId);
-          return callbacks?.queryFn;
-        },
-      }),
-    );
-
-    // Add backend-specific tools (skip some in batch mode — no UI, no session management)
+    // Add backend-specific tools (skip in batch mode — no UI, no session management, no sub-LLM)
     if (!isBatchSession) {
+      // call_llm — backend-specific (not in registry handler)
+      const sessionPath = getSessionPath(workspaceRootPath, sessionId);
+      tools.push(
+        createLLMTool({
+          sessionId,
+          sessionPath,
+          getQueryFn: () => {
+            const callbacks = getSessionScopedToolCallbacks(sessionId);
+            return callbacks?.queryFn;
+          },
+        }),
+      );
+
       tools.push(
         createSpawnSessionTool({
           sessionId,

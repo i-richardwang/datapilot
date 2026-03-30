@@ -536,6 +536,9 @@ export const BATCH_EXCLUDED_TOOLS = new Set([
   'transform_data',
   'send_developer_feedback',
   'call_llm',
+  'batch_test',
+  'browser_tool',
+  'spawn_session',
 ]);
 
 export interface SessionToolFilterOptions {
