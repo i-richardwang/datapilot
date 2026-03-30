@@ -141,6 +141,15 @@ export interface BatchProgress {
   pendingItems: number
 }
 
+export interface BatchItemsPage {
+  items: Array<{ id: string; state: BatchItemState }>
+  total: number
+  offset: number
+  limit: number
+  /** Index of the first running item in the full ordered list, or -1 if none running */
+  runningOffset: number
+}
+
 // ============================================================================
 // System Options
 // ============================================================================

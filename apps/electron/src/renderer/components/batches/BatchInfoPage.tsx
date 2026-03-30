@@ -3,10 +3,14 @@
  *
  * Detail view for a selected batch, using the Info_Page compound component system.
  * Follows AutomationInfoPage pattern: Hero → Sections (Source, Action, Execution, Progress, Items, JSON).
+ *
+ * Items are loaded via paginated getBatchItems RPC (50 per page) to avoid
+ * serializing thousands of items over IPC. Auto-positions to the execution
+ * frontier (first running item) on initial load.
  */
 
 import * as React from 'react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Info_Page,
   Info_Section,
@@ -23,7 +27,13 @@ import { BatchItemTimeline } from './BatchItemTimeline'
 import { BATCH_STATUS_DISPLAY, BATCH_STATUS_BADGE_COLOR, getPermissionDisplayName } from './types'
 import { TEST_BATCH_SUFFIX } from '@craft-agent/shared/batches/constants'
 import type { BatchListItem } from './types'
-import type { BatchState, BatchStatus, BatchProgress, TestBatchResult } from '@craft-agent/shared/batches'
+import type { BatchState, BatchStatus, BatchProgress, BatchItemState, BatchItemsPage, TestBatchResult } from '@craft-agent/shared/batches'
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const PAGE_SIZE = 50
 
 // ============================================================================
 // Component
@@ -38,6 +48,7 @@ export interface BatchInfoPageProps {
   onDuplicate?: () => void
   onDelete?: () => void
   getBatchState?: (batchId: string) => Promise<BatchState | null>
+  getBatchItems?: (batchId: string, offset: number, limit: number) => Promise<BatchItemsPage | null>
   testProgress?: BatchProgress
   testResult?: TestBatchResult
   className?: string
@@ -52,12 +63,12 @@ export function BatchInfoPage({
   onDuplicate,
   onDelete,
   getBatchState,
+  getBatchItems,
   testProgress,
   testResult,
   className,
 }: BatchInfoPageProps) {
   const workspace = useActiveWorkspace()
-  const [batchState, setBatchState] = useState<BatchState | null>(null)
   const status: BatchStatus = batch.progress?.status ?? 'pending'
 
   const editActions = status === 'pending' && workspace?.rootPath ? (
@@ -68,19 +79,55 @@ export function BatchInfoPage({
     />
   ) : undefined
 
-  // Load full batch state (with items) on mount and when progress changes
+  // ---------------------------------------------------------------------------
+  // Paginated items loading (replaces full-state fetch)
+  // ---------------------------------------------------------------------------
+
+  const [itemsPage, setItemsPage] = useState<BatchItemsPage | null>(null)
+  const [pageOffset, setPageOffset] = useState(0)
+  const hasAutoPositioned = useRef(false)
+
+  // Fetch current page of items
   useEffect(() => {
-    if (!getBatchState || !batch.id) return
+    if (!getBatchItems || !batch.id) return
     let stale = false
-    getBatchState(batch.id).then(state => {
-      if (!stale) setBatchState(state)
+    getBatchItems(batch.id, pageOffset, PAGE_SIZE).then(page => {
+      if (!stale) setItemsPage(page)
     })
     return () => { stale = true }
-  }, [getBatchState, batch.id, batch.progress])
+  }, [getBatchItems, batch.id, pageOffset, batch.progress])
 
-  const itemCount = batchState ? Object.keys(batchState.items).length : 0
+  // Auto-position to execution frontier on first load
+  useEffect(() => {
+    if (hasAutoPositioned.current || !itemsPage) return
+    hasAutoPositioned.current = true
+    if (itemsPage.runningOffset >= 0) {
+      const frontierPage = Math.floor(itemsPage.runningOffset / PAGE_SIZE) * PAGE_SIZE
+      if (frontierPage !== pageOffset) {
+        setPageOffset(frontierPage)
+      }
+    }
+  }, [itemsPage]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load test state (with items) when a test is running or has completed
+  // Reset when switching batches
+  useEffect(() => {
+    hasAutoPositioned.current = false
+    setPageOffset(0)
+    setItemsPage(null)
+  }, [batch.id])
+
+  const itemCount = itemsPage?.total ?? batch.progress?.totalItems ?? 0
+
+  // Convert page items to Record for BatchItemTimeline
+  const pageItemsRecord = useMemo<Record<string, BatchItemState>>(() => {
+    if (!itemsPage) return {}
+    return Object.fromEntries(itemsPage.items.map(({ id, state }) => [id, state]))
+  }, [itemsPage])
+
+  // ---------------------------------------------------------------------------
+  // Test state (still uses full getBatchState — test batches are small)
+  // ---------------------------------------------------------------------------
+
   const [testState, setTestState] = useState<BatchState | null>(null)
   const isTestRunning = !!testProgress
   const hasTestResult = !!testResult
@@ -108,6 +155,17 @@ export function BatchInfoPage({
 
   const testStatus: BatchStatus | undefined = testDisplayProgress?.status
   const testItemCount = testState ? Object.keys(testState.items).length : 0
+
+  // ---------------------------------------------------------------------------
+  // Pagination helpers
+  // ---------------------------------------------------------------------------
+
+  const totalPages = itemsPage ? Math.ceil(itemsPage.total / PAGE_SIZE) : 0
+  const currentPage = Math.floor(pageOffset / PAGE_SIZE) + 1
+  const frontierPage = itemsPage && itemsPage.runningOffset >= 0
+    ? Math.floor(itemsPage.runningOffset / PAGE_SIZE) * PAGE_SIZE
+    : -1
+  const isOnFrontierPage = frontierPage >= 0 && frontierPage === pageOffset
 
   return (
     <Info_Page className={className}>
@@ -309,12 +367,44 @@ export function BatchInfoPage({
           </Info_Section>
         )}
 
-        {/* Section: Items */}
+        {/* Section: Items (paginated) */}
         <Info_Section
           title="Items"
           description={itemCount > 0 ? `${itemCount} items in this batch` : undefined}
         >
-          <BatchItemTimeline items={batchState?.items ?? {}} />
+          <BatchItemTimeline items={pageItemsRecord} />
+          {itemsPage && itemsPage.total > PAGE_SIZE && (
+            <div className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground border-t border-border/30">
+              <span>
+                {itemsPage.offset + 1}–{Math.min(itemsPage.offset + PAGE_SIZE, itemsPage.total)} of {itemsPage.total}
+                {totalPages > 1 && ` · page ${currentPage} of ${totalPages}`}
+              </span>
+              <div className="flex items-center gap-1.5">
+                {frontierPage >= 0 && !isOnFrontierPage && (
+                  <button
+                    onClick={() => setPageOffset(frontierPage)}
+                    className="text-accent hover:underline cursor-pointer"
+                  >
+                    Go to active
+                  </button>
+                )}
+                <button
+                  onClick={() => setPageOffset(p => Math.max(0, p - PAGE_SIZE))}
+                  disabled={pageOffset === 0}
+                  className="px-2 py-1 rounded hover:bg-muted disabled:opacity-30 cursor-pointer disabled:cursor-default"
+                >
+                  Prev
+                </button>
+                <button
+                  onClick={() => setPageOffset(p => p + PAGE_SIZE)}
+                  disabled={pageOffset + PAGE_SIZE >= itemsPage.total}
+                  className="px-2 py-1 rounded hover:bg-muted disabled:opacity-30 cursor-pointer disabled:cursor-default"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </Info_Section>
 
         {/* Section: Raw config (JSON) */}
