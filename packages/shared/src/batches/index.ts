@@ -26,6 +26,7 @@ export type {
   BatchItem,
   TestBatchResult,
   PersistedTestResult,
+  BatchItemsPage,
 } from './types.ts'
 
 // ============================================================================
@@ -79,6 +80,7 @@ export {
   saveTestResult,
   loadTestResult,
   deleteTestResult,
+  getBatchItemsPage,
 } from './batch-state-manager.db.ts'
 
 // ============================================================================

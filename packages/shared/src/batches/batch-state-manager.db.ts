@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { getWorkspaceDb } from '../db/connection.ts';
 import { dbEvents } from '../db/events.ts';
 import { batchState as batchStateTable, batchTestResults } from '../db/schema/batches.sql.ts';
-import type { BatchState, BatchItemState, BatchProgress, TestBatchResult, PersistedTestResult } from './types.ts';
+import type { BatchState, BatchItemState, BatchProgress, BatchItemsPage, TestBatchResult, PersistedTestResult } from './types.ts';
 
 // ============================================================================
 // Batch State Path (compatibility)
@@ -155,6 +155,33 @@ export function isBatchDone(state: BatchState): boolean {
 export function deleteBatchState(workspaceRootPath: string, batchId: string): void {
   const db = getWorkspaceDb(workspaceRootPath);
   db.delete(batchStateTable).where(eq(batchStateTable.batchId, batchId)).run();
+}
+
+// ============================================================================
+// Paginated Item Query
+// ============================================================================
+
+/**
+ * Return a page of items from a batch state.
+ * Used by the GET_ITEMS RPC to avoid sending all items over IPC.
+ */
+export function getBatchItemsPage(
+  state: BatchState,
+  offset: number,
+  limit: number,
+): BatchItemsPage {
+  const allEntries = Object.entries(state.items)
+  const total = allEntries.length
+  const clampedOffset = total === 0 ? 0 : Math.max(0, Math.min(offset, total - 1))
+  const sliced = allEntries.slice(clampedOffset, clampedOffset + limit)
+  const runningOffset = allEntries.findIndex(([, item]) => item.status === 'running')
+  return {
+    items: sliced.map(([id, state]) => ({ id, state })),
+    total,
+    offset: clampedOffset,
+    limit,
+    runningOffset,
+  }
 }
 
 // ============================================================================

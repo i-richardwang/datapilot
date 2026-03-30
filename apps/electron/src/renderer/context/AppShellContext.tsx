@@ -173,6 +173,8 @@ export interface AppShellContextType {
   onTestBatch?: (batchId: string) => void
   /** Get full batch state (including items) by ID */
   getBatchState?: (batchId: string) => Promise<import('@craft-agent/shared/batches').BatchState | null>
+  /** Get a paginated slice of batch items */
+  getBatchItems?: (batchId: string, offset: number, limit: number) => Promise<import('@craft-agent/shared/batches').BatchItemsPage | null>
   /** Duplicate a batch by ID — clones config with " Copy" suffix */
   onDuplicateBatch?: (batchId: string) => void
   /** Delete a batch by ID — removes from batches config and state file */

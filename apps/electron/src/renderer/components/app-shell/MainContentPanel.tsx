@@ -84,6 +84,7 @@ export function MainContentPanel({
     onResumeBatch,
     onTestBatch,
     getBatchState,
+    getBatchItems,
     onDuplicateBatch,
     onDeleteBatch,
     testProgress,
@@ -330,6 +331,7 @@ export function MainContentPanel({
               onDuplicate={onDuplicateBatch ? () => onDuplicateBatch(batch.id ?? '') : undefined}
               onDelete={onDeleteBatch ? () => onDeleteBatch(batch.id ?? '') : undefined}
               getBatchState={getBatchState}
+              getBatchItems={getBatchItems}
               testProgress={testProgress?.[batch.id ?? '']}
               testResult={testResults?.[batch.id ?? '']}
             />
