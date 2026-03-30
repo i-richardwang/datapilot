@@ -363,6 +363,7 @@ export const RPC_CHANNELS = {
     RESUME: 'batches:resume',
     GET_STATUS: 'batches:getStatus',
     GET_STATE: 'batches:getState',
+    GET_ITEMS: 'batches:getItems',
     SET_ENABLED: 'batches:setEnabled',
     DUPLICATE: 'batches:duplicate',
     DELETE: 'batches:delete',

@@ -16,7 +16,7 @@ import { toast } from 'sonner'
 import { batchesAtom } from '@/atoms/batches'
 import type { BatchListItem } from '@/components/batches/types'
 import { TEST_BATCH_SUFFIX } from '@craft-agent/shared/batches/constants'
-import type { BatchProgress, BatchState, TestBatchResult } from '@craft-agent/shared/batches'
+import type { BatchProgress, BatchState, BatchItemsPage, TestBatchResult } from '@craft-agent/shared/batches'
 
 export interface UseBatchesResult {
   batches: BatchListItem[]
@@ -25,6 +25,7 @@ export interface UseBatchesResult {
   handleResumeBatch: (batchId: string) => void
   handleTestBatch: (batchId: string) => void
   getBatchState: (batchId: string) => Promise<BatchState | null>
+  getBatchItems: (batchId: string, offset: number, limit: number) => Promise<BatchItemsPage | null>
   updateBatchProgress: (progress: BatchProgress) => void
   handleBatchComplete: (batchId: string) => void
   testProgress: Record<string, BatchProgress>
@@ -179,6 +180,18 @@ export function useBatches(
     }
   }, [activeWorkspaceId])
 
+  // Get a paginated slice of items
+  const getBatchItems = useCallback(async (
+    batchId: string, offset: number, limit: number,
+  ): Promise<BatchItemsPage | null> => {
+    if (!activeWorkspaceId) return null
+    try {
+      return await window.electronAPI.getBatchItems(activeWorkspaceId, batchId, offset, limit)
+    } catch {
+      return null
+    }
+  }, [activeWorkspaceId])
+
   // Duplicate
   const handleDuplicateBatch = useCallback((batchId: string) => {
     if (!activeWorkspaceId) return
@@ -207,6 +220,7 @@ export function useBatches(
     handleResumeBatch,
     handleTestBatch,
     getBatchState,
+    getBatchItems,
     updateBatchProgress,
     handleBatchComplete,
     testProgress,

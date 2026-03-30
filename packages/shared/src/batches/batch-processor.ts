@@ -23,6 +23,7 @@ import {
   saveTestResult,
   loadTestResult,
   deleteTestResult,
+  getBatchItemsPage,
 } from './batch-state-manager.db.ts'
 import { expandEnvVars } from '../automations/utils.ts'
 import { sanitizeForShell } from '../automations/security.ts'
@@ -35,6 +36,7 @@ import type {
   BatchSystemOptions,
   BatchExecutePromptParams,
   TestBatchResult,
+  BatchItemsPage,
 } from './types.ts'
 
 const log = createLogger('batch-processor')
@@ -249,6 +251,15 @@ export class BatchProcessor {
    */
   getState(batchId: string): BatchState | null {
     return this.activeStates.get(batchId) ?? loadBatchState(this.options.workspaceRootPath, batchId)
+  }
+
+  /**
+   * Get a paginated slice of items for a batch.
+   */
+  getItems(batchId: string, offset: number, limit: number): BatchItemsPage | null {
+    const state = this.activeStates.get(batchId) ?? loadBatchState(this.options.workspaceRootPath, batchId)
+    if (!state) return null
+    return getBatchItemsPage(state, offset, limit)
   }
 
   /**
