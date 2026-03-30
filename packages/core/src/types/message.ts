@@ -278,6 +278,8 @@ export interface Message {
   /** Annotation payloads for this message */
   annotations?: AnnotationV1[];
   isError?: boolean;
+  /** Per-message token usage from the API response */
+  tokenUsage?: MessageTokenUsage;
   isStreaming?: boolean;
   // Pending: streaming text where we don't yet know if it's intermediate
   // Set to true when text_delta creates message, false when text_complete arrives
@@ -396,6 +398,20 @@ export interface StoredMessage {
   authWorkspace?: string;
   // Queued: user message that is waiting to be processed (persisted for recovery)
   isQueued?: boolean;
+  /** Per-message token usage from the API response */
+  tokenUsage?: MessageTokenUsage;
+}
+
+/**
+ * Per-message token usage (attached to individual assistant messages for granular tracking)
+ */
+export interface MessageTokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  cacheCreationTokens?: number;
+  /** Model used for this specific message */
+  model?: string;
 }
 
 /**
@@ -524,7 +540,7 @@ export type AgentEvent =
   | { type: 'status'; message: string }
   | { type: 'info'; message: string }
   | { type: 'text_delta'; text: string; turnId?: string; parentToolUseId?: string }
-  | { type: 'text_complete'; text: string; isIntermediate?: boolean; turnId?: string; parentToolUseId?: string; sdkTurnAnchor?: string }
+  | { type: 'text_complete'; text: string; isIntermediate?: boolean; turnId?: string; parentToolUseId?: string; sdkTurnAnchor?: string; tokenUsage?: MessageTokenUsage }
   | { type: 'tool_start'; toolName: string; toolUseId: string; input: Record<string, unknown>; intent?: string; displayName?: string; turnId?: string; parentToolUseId?: string; toolDisplayMeta?: ToolDisplayMeta }
   | { type: 'tool_result'; toolUseId: string; toolName?: string; result: string; isError: boolean; input?: Record<string, unknown>; turnId?: string; parentToolUseId?: string }
   | {

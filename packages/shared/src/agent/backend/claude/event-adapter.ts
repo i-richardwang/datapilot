@@ -13,7 +13,7 @@
  */
 
 import type { SDKMessage, SDKAssistantMessageError } from '@anthropic-ai/claude-agent-sdk';
-import type { AgentEvent } from '@craft-agent/core/types';
+import type { AgentEvent, MessageTokenUsage } from '@craft-agent/core/types';
 import type { AgentError } from '../../errors.ts';
 import { BaseEventAdapter } from '../base-event-adapter.ts';
 import { ToolIndex, extractToolStarts, extractToolResults, isParentTaskTool, type ContentBlock } from '../../tool-matching.ts';
@@ -65,8 +65,10 @@ export function buildWindowsSkillsDirError(errorText: string): { type: 'typed_er
  */
 interface AssistantUsage {
   input_tokens: number;
+  output_tokens: number;
   cache_read_input_tokens: number;
   cache_creation_input_tokens: number;
+  model?: string;
 }
 
 /**
@@ -94,6 +96,7 @@ export class ClaudeEventAdapter extends BaseEventAdapter {
   private emittedToolStarts = new Set<string>();
   private activeParentTools = new Set<string>();
   private pendingText: string | null = null;
+  private pendingTokenUsage: MessageTokenUsage | null = null;
 
   // Session-persistent state (survives across turns)
   private lastAssistantUsage: AssistantUsage | null = null;
@@ -249,8 +252,10 @@ export class ClaudeEventAdapter extends BaseEventAdapter {
       const usage = (message as any).message.usage;
       this.lastAssistantUsage = {
         input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens ?? 0,
         cache_read_input_tokens: usage.cache_read_input_tokens ?? 0,
         cache_creation_input_tokens: usage.cache_creation_input_tokens ?? 0,
+        model: (message as any).message.model,
       };
 
       const currentInputTokens =
@@ -302,6 +307,18 @@ export class ClaudeEventAdapter extends BaseEventAdapter {
     if (textContent) {
       // Don't emit text_complete yet — wait for message_delta to get stop_reason
       this.pendingText = textContent;
+      // Attach per-message token usage so it can be persisted with the assistant message
+      if (this.lastAssistantUsage) {
+        this.pendingTokenUsage = {
+          inputTokens: this.lastAssistantUsage.input_tokens +
+            this.lastAssistantUsage.cache_read_input_tokens +
+            this.lastAssistantUsage.cache_creation_input_tokens,
+          outputTokens: this.lastAssistantUsage.output_tokens,
+          cacheReadTokens: this.lastAssistantUsage.cache_read_input_tokens || undefined,
+          cacheCreationTokens: this.lastAssistantUsage.cache_creation_input_tokens || undefined,
+          model: this.lastAssistantUsage.model,
+        };
+      }
     }
   }
 
@@ -334,8 +351,10 @@ export class ClaudeEventAdapter extends BaseEventAdapter {
           isIntermediate,
           turnId: this.currentTurnId || undefined,
           parentToolUseId: (message as any).parent_tool_use_id || undefined,
+          tokenUsage: this.pendingTokenUsage || undefined,
         });
         this.pendingText = null;
+        this.pendingTokenUsage = null;
       }
     }
 

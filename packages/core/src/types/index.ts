@@ -40,6 +40,7 @@ export type {
   AnnotationV1,
   Message,
   StoredMessage,
+  MessageTokenUsage,
   TokenUsage,
   AgentEventUsage,
   RecoveryAction,

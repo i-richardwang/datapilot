@@ -6052,6 +6052,7 @@ export class SessionManager implements ISessionManager {
           isIntermediate: event.isIntermediate,
           turnId: event.turnId,
           parentToolUseId: event.parentToolUseId,
+          tokenUsage: event.tokenUsage,
         }
         managed.messages.push(assistantMessage)
         managed.streamingText = ''
