@@ -2,8 +2,8 @@
 
 This guide explains how to create and configure skills in DataPilot.
 
-> **CLI-first workflow (recommended):** Use `craft-agent skill ...` commands instead of editing `SKILL.md` files directly.
-> - `craft-agent skill --help`
+> **CLI-first workflow (recommended):** Use `datapilot skill ...` commands instead of editing `SKILL.md` files directly.
+> - `datapilot skill --help`
 > - Canonical command reference: [craft-cli.md](./craft-cli.md)
 
 ## What Are Skills?
