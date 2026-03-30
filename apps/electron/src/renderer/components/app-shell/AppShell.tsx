@@ -845,7 +845,7 @@ function AppShellContent({
   const {
     batches,
     handleStartBatch, handlePauseBatch, handleResumeBatch, handleTestBatch,
-    getBatchState,
+    getBatchState, getBatchItems,
     updateBatchProgress, handleBatchComplete,
     testProgress, testResults,
     batchPendingDelete, pendingDeleteBatch, setBatchPendingDelete,
@@ -1635,11 +1635,12 @@ function AppShellContent({
     onResumeBatch: handleResumeBatch,
     onTestBatch: handleTestBatch,
     getBatchState,
+    getBatchItems,
     onDuplicateBatch: handleDuplicateBatch,
     onDeleteBatch: handleDeleteBatch,
     testProgress,
     testResults,
-  }), [contextValue, handleDeleteSession, sources, skills, activeSessionWorkingDirectory, displayLabelConfigs, handleSessionLabelsChange, enabledModes, effectiveSessionStatuses, handleSessionSourcesChange, searchActive, searchQuery, handleChatMatchInfoChange, handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, automationTestResults, getAutomationHistory, handleReplayAutomation, handleStartBatch, handlePauseBatch, handleResumeBatch, handleTestBatch, getBatchState, handleDuplicateBatch, handleDeleteBatch, testProgress, testResults])
+  }), [contextValue, handleDeleteSession, sources, skills, activeSessionWorkingDirectory, displayLabelConfigs, handleSessionLabelsChange, enabledModes, effectiveSessionStatuses, handleSessionSourcesChange, searchActive, searchQuery, handleChatMatchInfoChange, handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, automationTestResults, getAutomationHistory, handleReplayAutomation, handleStartBatch, handlePauseBatch, handleResumeBatch, handleTestBatch, getBatchState, getBatchItems, handleDuplicateBatch, handleDeleteBatch, testProgress, testResults])
 
   // Persist expanded folders to localStorage (workspace-scoped)
   React.useEffect(() => {

@@ -52,6 +52,7 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.batches.RESUME,
   RPC_CHANNELS.batches.GET_STATUS,
   RPC_CHANNELS.batches.GET_STATE,
+  RPC_CHANNELS.batches.GET_ITEMS,
   RPC_CHANNELS.batches.SET_ENABLED,
   RPC_CHANNELS.batches.DUPLICATE,
   RPC_CHANNELS.batches.DELETE,
@@ -120,6 +121,16 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     if (!processor) return null
 
     return processor.getState(batchId)
+  })
+
+  server.handle(RPC_CHANNELS.batches.GET_ITEMS, async (_ctx, workspaceId: string, batchId: string, offset: number, limit: number) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error('Workspace not found')
+
+    const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
+    if (!processor) return null
+
+    return processor.getItems(batchId, offset, limit)
   })
 
   server.handle(RPC_CHANNELS.batches.SET_ENABLED, async (_ctx, workspaceId: string, batchId: string, enabled: boolean) => {

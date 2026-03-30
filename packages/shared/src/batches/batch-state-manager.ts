@@ -8,7 +8,7 @@
 import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { BATCH_STATE_FILE_PREFIX, BATCH_TEST_RESULT_FILE_PREFIX } from './constants.ts'
-import type { BatchState, BatchItemState, BatchItemStatus, BatchProgress, TestBatchResult, PersistedTestResult } from './types.ts'
+import type { BatchState, BatchItemState, BatchItemStatus, BatchProgress, BatchItemsPage, TestBatchResult, PersistedTestResult } from './types.ts'
 
 /**
  * Get the file path for a batch state file.
@@ -119,6 +119,33 @@ export function isBatchDone(state: BatchState): boolean {
     }
   }
   return true
+}
+
+// ============================================================================
+// Paginated Item Query
+// ============================================================================
+
+/**
+ * Return a page of items from a batch state.
+ * Used by the GET_ITEMS RPC to avoid sending all items over IPC.
+ */
+export function getBatchItemsPage(
+  state: BatchState,
+  offset: number,
+  limit: number,
+): BatchItemsPage {
+  const allEntries = Object.entries(state.items)
+  const total = allEntries.length
+  const clampedOffset = total === 0 ? 0 : Math.max(0, Math.min(offset, total - 1))
+  const sliced = allEntries.slice(clampedOffset, clampedOffset + limit)
+  const runningOffset = allEntries.findIndex(([, item]) => item.status === 'running')
+  return {
+    items: sliced.map(([id, state]) => ({ id, state })),
+    total,
+    offset: clampedOffset,
+    limit,
+    runningOffset,
+  }
 }
 
 // ============================================================================
