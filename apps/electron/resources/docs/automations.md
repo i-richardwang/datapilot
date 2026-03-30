@@ -2,8 +2,8 @@
 
 This guide explains how to configure automations in DataPilot to automate workflows based on events.
 
-> **CLI-first workflow (recommended):** Use `craft-agent automation ...` commands instead of editing JSON directly.
-> - `craft-agent automation --help`
+> **CLI-first workflow (recommended):** Use `datapilot automation ...` commands instead of editing JSON directly.
+> - `datapilot automation --help`
 > - Canonical command reference: [craft-cli.md](./craft-cli.md)
 
 ## What Are Automations?
@@ -25,18 +25,18 @@ Automations are configured in `automations.json` at the root of your workspace:
 ## Recommended CLI Commands
 
 ```bash
-craft-agent automation list
-craft-agent automation get <id>
-craft-agent automation create --event UserPromptSubmit --prompt "..."
-craft-agent automation update <id> --json '{...}'
-craft-agent automation enable <id>
-craft-agent automation disable <id>
-craft-agent automation duplicate <id>
-craft-agent automation history [<id>] --limit 20
-craft-agent automation last-executed <id>
-craft-agent automation test <id> --match "..."
-craft-agent automation lint
-craft-agent automation validate
+datapilot automation list
+datapilot automation get <id>
+datapilot automation create --event UserPromptSubmit --prompt "..."
+datapilot automation update <id> --json '{...}'
+datapilot automation enable <id>
+datapilot automation disable <id>
+datapilot automation duplicate <id>
+datapilot automation history [<id>] --limit 20
+datapilot automation last-executed <id>
+datapilot automation test <id> --match "..."
+datapilot automation lint
+datapilot automation validate
 ```
 
 ## Basic Structure
@@ -728,7 +728,7 @@ A single automation can have both prompt and webhook actions. They execute in or
             "method": "POST",
             "headers": {
               "Authorization": "Bearer ${CRAFT_WH_API_TOKEN}",
-              "X-Source": "craft-agent"
+              "X-Source": "datapilot"
             },
             "body": {
               "event": "${CRAFT_EVENT}",

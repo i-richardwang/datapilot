@@ -102,48 +102,48 @@
       "comment": "CLI tools: bare invocation (prints help)"
     },
     {
-      "pattern": "^craft-agent\\s+label\\s+(list|get|auto-rule-list|auto-rule-validate)\\b",
-      "comment": "craft-agent label read-only operations"
+      "pattern": "^datapilot\\s+label\\s+(list|get|auto-rule-list|auto-rule-validate)\\b",
+      "comment": "datapilot label read-only operations"
     },
     {
-      "pattern": "^craft-agent\\s+source\\s+(list|get|validate|test|auth-help)\\b",
-      "comment": "craft-agent source read-only operations"
+      "pattern": "^datapilot\\s+source\\s+(list|get|validate|test|auth-help)\\b",
+      "comment": "datapilot source read-only operations"
     },
     {
-      "pattern": "^craft-agent\\s+skill\\s+(list|get|validate|where)\\b",
-      "comment": "craft-agent skill read-only operations"
+      "pattern": "^datapilot\\s+skill\\s+(list|get|validate|where)\\b",
+      "comment": "datapilot skill read-only operations"
     },
     {
-      "pattern": "^craft-agent\\s+automation\\s+(list|get|validate|history|last-executed|test|lint)\\b",
-      "comment": "craft-agent automation read-only operations"
+      "pattern": "^datapilot\\s+automation\\s+(list|get|validate|history|last-executed|test|lint)\\b",
+      "comment": "datapilot automation read-only operations"
     },
     {
-      "pattern": "^craft-agent\\s+permission\\s+(list|get|validate)\\b",
-      "comment": "craft-agent permission read-only operations"
+      "pattern": "^datapilot\\s+permission\\s+(list|get|validate)\\b",
+      "comment": "datapilot permission read-only operations"
     },
     {
-      "pattern": "^craft-agent\\s+theme\\s+(get|validate|list-presets|get-preset)\\b",
-      "comment": "craft-agent theme read-only operations"
+      "pattern": "^datapilot\\s+theme\\s+(get|validate|list-presets|get-preset)\\b",
+      "comment": "datapilot theme read-only operations"
     },
     {
       "pattern": "^datapilot-batch\\s+(list|get|validate|status)\\b",
       "comment": "datapilot-batch read-only operations"
     },
     {
-      "pattern": "^craft-agent\\s*$",
-      "comment": "craft-agent bare invocation (prints help)"
+      "pattern": "^datapilot\\s*$",
+      "comment": "datapilot bare invocation (prints help)"
     },
     {
-      "pattern": "^craft-agent\\s+(label|source|skill|automation|permission|theme)\\s*$",
-      "comment": "craft-agent entity help"
+      "pattern": "^datapilot\\s+(label|source|skill|automation|permission|theme)\\s*$",
+      "comment": "datapilot entity help"
     },
     {
-      "pattern": "^craft-agent\\s+(label|source|skill|automation|permission|theme)\\s+--help\\b",
-      "comment": "craft-agent entity help flags"
+      "pattern": "^datapilot\\s+(label|source|skill|automation|permission|theme)\\s+--help\\b",
+      "comment": "datapilot entity help flags"
     },
     {
-      "pattern": "^craft-agent\\s+--(help|version|discover)\\b",
-      "comment": "craft-agent global flags"
+      "pattern": "^datapilot\\s+--(help|version|discover)\\b",
+      "comment": "datapilot global flags"
     },
     {
       "pattern": "^datapilot-batch\\s*$",

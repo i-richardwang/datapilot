@@ -417,7 +417,7 @@ function buildCliDomainBlockMessage(namespace: CliDomainNamespace, context: stri
   const policy = CLI_DOMAIN_POLICIES[namespace]
   const noun = namespace === 'automation' ? 'automation' : namespace
   const quickExamplesHeading = namespace === 'label' ? 'Quick examples:' : 'Examples:'
-  const cliInvocation = policy.patternPrefix ?? `craft-agent ${namespace}`
+  const cliInvocation = policy.patternPrefix ?? `datapilot ${namespace}`
 
   return [
     `${context}`,
@@ -549,7 +549,7 @@ export function getConfigDomainBashRedirect(
   const command = typeof input.command === 'string' ? input.command.trim() : '';
   if (!command) return null;
 
-  if (/^craft-agent\s+(label|automation|source|skill)\b/.test(command)) {
+  if (/^datapilot\s+(label|automation|source|skill)\b/.test(command)) {
     return null;
   }
 

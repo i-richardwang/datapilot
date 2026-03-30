@@ -379,7 +379,7 @@ function shouldCompileBashPattern(pattern: string): boolean {
   if (!FEATURE_FLAGS.batchCli && pattern.startsWith('^datapilot-batch\\s')) {
     return false;
   }
-  if (!FEATURE_FLAGS.craftAgentsCli && pattern.startsWith('^craft-agent\\s')) {
+  if (!FEATURE_FLAGS.craftAgentsCli && pattern.startsWith('^datapilot\\s')) {
     return false;
   }
   return true;
@@ -738,7 +738,7 @@ class PermissionsConfigCache {
     // Add allowed bash patterns (as CompiledBashPattern with metadata for error messages)
     for (const patternEntry of config.allowedBashPatterns) {
       if (!shouldCompileBashPattern(patternEntry.pattern)) {
-        debug(`[Permissions] Skipping craft-agent bash pattern (feature disabled): ${patternEntry.pattern}`);
+        debug(`[Permissions] Skipping datapilot bash pattern (feature disabled): ${patternEntry.pattern}`);
         continue;
       }
 
@@ -793,7 +793,7 @@ class PermissionsConfigCache {
     // Add allowed bash patterns (making config more permissive)
     for (const patternEntry of custom.allowedBashPatterns) {
       if (!shouldCompileBashPattern(patternEntry.pattern)) {
-        debug(`[Permissions] Skipping craft-agent bash pattern (feature disabled): ${patternEntry.pattern}`);
+        debug(`[Permissions] Skipping datapilot bash pattern (feature disabled): ${patternEntry.pattern}`);
         continue;
       }
 
@@ -879,7 +879,7 @@ class PermissionsConfigCache {
     // Bash patterns - apply normally (not source-specific)
     for (const patternEntry of custom.allowedBashPatterns) {
       if (!shouldCompileBashPattern(patternEntry.pattern)) {
-        debug(`[Permissions] Skipping craft-agent bash pattern (feature disabled): ${patternEntry.pattern}`);
+        debug(`[Permissions] Skipping datapilot bash pattern (feature disabled): ${patternEntry.pattern}`);
         continue;
       }
 
