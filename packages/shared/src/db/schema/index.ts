@@ -20,7 +20,7 @@ export { viewsConfig } from './views.sql.ts';
 export { sources } from './sources.sql.ts';
 
 // Sessions
-export { sessions, messages } from './sessions.sql.ts';
+export { sessions, messages, turnUsage } from './sessions.sql.ts';
 
 // Automations
 export { automationHistory } from './automations.sql.ts';

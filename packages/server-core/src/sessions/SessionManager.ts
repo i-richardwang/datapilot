@@ -68,6 +68,7 @@ import {
   type SessionStatus,
   type SessionHeader,
   pickSessionFields,
+  saveTurnUsage,
 } from '@craft-agent/shared/sessions'
 import { loadWorkspaceSources, loadAllSources, getSourcesBySlugs, isSourceUsable, type LoadedSource, type McpServerConfig, getSourcesNeedingAuth, getSourceCredentialManager, getSourceServerBuilder, type SourceWithCredential, isApiOAuthProvider, SERVER_BUILD_ERRORS, TokenRefreshManager, createTokenGetter } from '@craft-agent/shared/sources'
 import { ConfigWatcher, type ConfigWatcherCallbacks } from '@craft-agent/shared/config'
@@ -6578,6 +6579,23 @@ export class SessionManager implements ISessionManager {
           // Update context window (use latest value - may change if model switches)
           if (event.usage.contextWindow) {
             managed.tokenUsage.contextWindow = event.usage.contextWindow
+          }
+
+          // Write per-turn usage record for accurate usage tracking
+          try {
+            saveTurnUsage(managed.workspace.rootPath, {
+              sessionId: managed.id,
+              messageId: managed.lastFinalMessageId ?? undefined,
+              model: managed.model ?? undefined,
+              inputTokens: event.usage.inputTokens,
+              outputTokens: event.usage.outputTokens,
+              cacheCreationInputTokens: event.usage.cacheCreationTokens ?? 0,
+              cacheReadInputTokens: event.usage.cacheReadTokens ?? 0,
+              costUsd: event.usage.costUsd ?? 0,
+              timestamp: Date.now(),
+            })
+          } catch (error) {
+            sessionLog.warn('Failed to persist turn usage:', error)
           }
         }
         break
