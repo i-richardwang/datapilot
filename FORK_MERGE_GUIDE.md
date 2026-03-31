@@ -21,6 +21,8 @@ Our fork adds four categories of changes:
 
 6. **Self-Hosted Viewer Server** (`apps/viewer-server/`) — Standalone HTTP backend for hosting shared session transcripts, replacing the upstream-only `agents.craft.do` service. Provides CRUD API (`/s/api`) with pluggable storage (filesystem default, S3-compatible optional). Serves the `apps/viewer` frontend as static files. Separate `Dockerfile.viewer` for independent deployment on port 9101. `VIEWER_URL` in `branding.ts` made configurable via `CRAFT_VIEWER_URL` env var.
 
+7. **Docker Compose Deployment** (`docker-compose.yml`, `.env.docker`) — One-command deployment for server (port 9100, Web UI + RPC) and viewer (port 9101, session sharing). Uses `.env` file for configuration (`CRAFT_SERVER_TOKEN` etc.). `CRAFT_HEALTH_PORT` enables container health checks. If upstream adds its own compose file, merge carefully — our version includes the fork-only viewer service.
+
 ---
 
 ## New Files (Low Conflict Risk)
@@ -284,6 +286,8 @@ These are simple additive changes (exports, types, config entries) unlikely to c
 | `packages/shared/src/branding.ts` | `VIEWER_URL` reads `CRAFT_VIEWER_URL` env var with fallback to upstream default |
 | `package.json` (root) | Added `viewer:server` and `viewer:server:dev` scripts |
 | `Dockerfile.viewer` | New Dockerfile for viewer-server container (port 9101) |
+| `docker-compose.yml` | Docker Compose for server + viewer one-command deployment |
+| `.env.docker` | Environment variable template for Docker deployment |
 
 ---
 
