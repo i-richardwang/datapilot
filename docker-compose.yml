@@ -12,6 +12,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.server
+      args:
+        - CRAFT_LITE_VERSION=${CRAFT_LITE_VERSION:-}
     ports:
       - "${CRAFT_RPC_PORT:-9100}:9100"
     environment:
@@ -37,8 +39,5 @@ services:
     environment:
       - VIEWER_BASE_URL=${VIEWER_BASE_URL:-http://localhost:9101}
     volumes:
-      - viewer-data:/data
+      - ${VIEWER_DATA_DIR:-viewer-data}:/data
     restart: unless-stopped
-
-volumes:
-  viewer-data:
