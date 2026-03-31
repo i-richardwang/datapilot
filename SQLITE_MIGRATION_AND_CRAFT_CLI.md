@@ -222,3 +222,11 @@ When merging upstream updates into this branch:
 - `packages/craft-cli/` → `@craft-agent/shared` (workspace dependency)
 - All CLI commands import from `@craft-agent/shared/` subpaths (labels, sources, automations, skills, agent, config, db, workspaces)
 - `db-init.ts` calls `autoRegisterDriver()` from `@craft-agent/shared/db` before any command execution
+
+## Docker Considerations
+
+The SQLite migration impacts Docker builds:
+
+- **`better-sqlite3` native build:** This package requires `python3`, `make`, and `g++` to compile. However, the Docker server image runs on Bun which uses the built-in `bun:sqlite` driver (see `driver.ts` auto-detection). The `better-sqlite3` native binary is never loaded at runtime.
+- **`--ignore-scripts` flag:** `Dockerfile.server` uses `bun install --frozen-lockfile --ignore-scripts` to skip `better-sqlite3`'s native compilation, keeping the image slim (no build toolchain needed).
+- **`packages/craft-cli`:** This branch adds a `COPY packages/craft-cli/package.json` line to both Dockerfiles that does not exist on `main` or `feature/data-analysis-agent`.
