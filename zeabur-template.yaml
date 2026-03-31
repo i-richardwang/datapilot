@@ -1,0 +1,100 @@
+# yaml-language-server: $schema=https://schema.zeabur.app/template.json
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+    name: Craft Agents
+spec:
+    description: "Craft Agents is an open-source, agent-native workflow platform for intuitive interaction with AI agents. Features multi-session management, MCP service connections, custom skills, and document-centric workflows."
+    icon: https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/apps/electron/resources/icon.svg
+    tags:
+        - AI
+        - Agent
+        - Tool
+    readme: |-
+        # Craft Agents
+
+        An open-source, agent-native workflow platform built for intuitive interaction with AI agents (Claude, GPT, Gemini, etc.).
+
+        ## Features
+        - Connect to any API/MCP service (Linear, Gmail, Slack, Postgres, etc.)
+        - Create custom skills and sources instantly
+        - Multi-session workflow management with status tracking
+        - Support for multiple LLM providers (Anthropic, OpenAI, Google, etc.)
+        - Batch processing from CSV/JSON/JSONL files
+        - Event-driven automations with cron scheduling
+
+        ## Services
+        - **Server**: Main Craft Agents server with WebSocket API and embedded Web UI (port 9100)
+        - **Viewer**: Lightweight session sharing service for public/shared viewing of agent sessions (port 9101)
+
+        ## Usage
+        1. After deployment, access the Web UI via the Server domain
+        2. Log in using the auto-generated Server Token (shown in Instructions)
+        3. Configure your LLM API keys (Anthropic, OpenAI, etc.) through the Web UI
+        4. Start creating agent sessions and workflows
+
+        ## Documentation
+        - GitHub: https://github.com/i-richardwang/craft-agents-oss
+    variables:
+        - key: CRAFT_WEBUI_WS_URL
+          type: STRING
+          name: Server WebSocket URL
+          description: "Browser-facing WebSocket URL for the server (e.g. wss://your-domain.com). Required when using a custom domain with HTTPS."
+    services:
+        - name: server
+          icon: https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/apps/electron/resources/icon.svg
+          template: GIT
+          spec:
+            source:
+                source: GITHUB
+                repo: 1172467685
+                branch: main
+                dockerfile: Dockerfile.server
+            ports:
+                - id: web
+                  port: 9100
+                  type: HTTP
+            volumes:
+                - id: server-data
+                  dir: /home/craftagents/.craft-agent
+            instructions:
+                - type: PASSWORD
+                  title: Server Token
+                  content: ${CRAFT_SERVER_TOKEN}
+                  category: Credentials
+            env:
+                CRAFT_SERVER_TOKEN:
+                    default: ${PASSWORD}
+                    expose: true
+                CRAFT_HEALTH_PORT:
+                    default: "9101"
+                CRAFT_RPC_HOST:
+                    default: 0.0.0.0
+                CRAFT_RPC_PORT:
+                    default: "9100"
+                CRAFT_LITE_VERSION:
+                    default: "1"
+
+        - name: viewer
+          icon: https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/apps/electron/resources/icon.svg
+          template: GIT
+          dependencies:
+            - server
+          spec:
+            source:
+                source: GITHUB
+                repo: 1172467685
+                branch: main
+                dockerfile: Dockerfile.viewer
+            ports:
+                - id: web
+                  port: 9101
+                  type: HTTP
+            volumes:
+                - id: viewer-data
+                  dir: /data
+            env:
+                VIEWER_PORT:
+                    default: "9101"
+                VIEWER_HOST:
+                    default: 0.0.0.0
