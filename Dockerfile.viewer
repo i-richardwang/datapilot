@@ -48,7 +48,8 @@ COPY apps/electron/package.json apps/electron/
 COPY apps/cli/package.json apps/cli/
 COPY apps/webui/package.json apps/webui/
 
-RUN bun install --frozen-lockfile
+# Skip better-sqlite3 native build — Docker runs on Bun which uses built-in bun:sqlite
+RUN bun install --frozen-lockfile --ignore-scripts
 
 # Copy source
 COPY . .
