@@ -238,7 +238,8 @@ export function TopBar({
     toggleSidebar: onToggleSidebar,
   }
 
-  const menuLeftPadding = isMac ? 86 : 12
+  const isWeb = window.electronAPI?.getRuntimeEnvironment() === 'web'
+  const menuLeftPadding = (isMac && !isWeb) ? 86 : 12
 
   return (
     <div
