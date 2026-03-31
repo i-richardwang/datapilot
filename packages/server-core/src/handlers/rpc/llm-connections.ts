@@ -104,17 +104,29 @@ export function registerLlmConnectionsHandlers(server: RpcServer, deps: HandlerD
       const isCustomEndpointCompat = !!customEndpoint
       if (customEndpoint) {
         updates.customEndpoint = customEndpoint
-        // Route custom OpenAI/Anthropic-compatible endpoints through PiAgent.
-        updates.providerType = 'pi_compat'
-        updates.authType = 'api_key_with_endpoint'
-        // Keep provider hint in lockstep with selected protocol toggle.
-        updates.piAuthProvider = customEndpoint.api === 'anthropic-messages' ? 'anthropic' : 'openai'
+        if (customEndpoint.api === 'anthropic-claude-sdk') {
+          // Route through ClaudeAgent (Anthropic SDK) for true Anthropic-compatible endpoints.
+          updates.providerType = 'anthropic_compat'
+          updates.authType = 'api_key_with_endpoint'
+          updates.piAuthProvider = undefined
+          updates.name = 'Claude Agent SDK'
+        } else {
+          // Route custom OpenAI/Anthropic-compatible endpoints through PiAgent.
+          updates.providerType = 'pi_compat'
+          updates.authType = 'api_key_with_endpoint'
+          // Keep provider hint in lockstep with selected protocol toggle.
+          updates.piAuthProvider = customEndpoint.api === 'anthropic-messages' ? 'anthropic' : 'openai'
+        }
       } else if (setup.baseUrl !== undefined) {
         // Base URL was explicitly updated without custom protocol config.
         // Treat this as non-custom mode and clear stale custom endpoint metadata.
         updates.customEndpoint = undefined
         if (connection.providerType === 'pi_compat' && connection.authType !== 'oauth') {
           updates.providerType = 'pi'
+          updates.authType = 'api_key'
+        } else if (connection.providerType === 'anthropic_compat' && connection.customEndpoint?.api === 'anthropic-claude-sdk') {
+          // Clearing a Claude SDK custom endpoint — revert to default anthropic
+          updates.providerType = 'anthropic'
           updates.authType = 'api_key'
         }
       }
