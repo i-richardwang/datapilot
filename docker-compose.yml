@@ -1,0 +1,44 @@
+# Craft Agent — Docker Compose
+#
+# Quick start:
+#   1. cp .env.docker .env
+#   2. Edit .env — set CRAFT_SERVER_TOKEN
+#      (or generate one: docker compose run --rm server --generate-token)
+#   3. docker compose up --build
+#   4. Open http://localhost:9100
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "${CRAFT_RPC_PORT:-9100}:9100"
+    environment:
+      - CRAFT_SERVER_TOKEN=${CRAFT_SERVER_TOKEN}
+      - CRAFT_WEBUI_PASSWORD=${CRAFT_WEBUI_PASSWORD:-}
+      - CRAFT_HEALTH_PORT=9101
+    volumes:
+      - ${CRAFT_DATA_DIR:-~/.craft-agent}:/home/craftagents/.craft-agent
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9101/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  viewer:
+    build:
+      context: .
+      dockerfile: Dockerfile.viewer
+    ports:
+      - "${VIEWER_PORT:-9101}:9101"
+    environment:
+      - VIEWER_BASE_URL=${VIEWER_BASE_URL:-http://localhost:9101}
+    volumes:
+      - viewer-data:/data
+    restart: unless-stopped
+
+volumes:
+  viewer-data:
