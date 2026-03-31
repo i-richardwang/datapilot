@@ -35,6 +35,11 @@ spec:
 
         ## Documentation
         - GitHub: https://github.com/i-richardwang/craft-agents-oss
+    variables:
+        - key: CRAFT_WEBUI_WS_URL
+          type: STRING
+          name: Server WebSocket URL
+          description: "Browser-facing WebSocket URL for the server (e.g. wss://your-domain.com). Required when using a custom domain with HTTPS."
     services:
         - name: server
           icon: https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/apps/electron/resources/icon.svg
@@ -43,7 +48,7 @@ spec:
             source:
                 source: GITHUB
                 repo: 1172467685
-                branch: feature/data-analysis-agent
+                branch: feature/datapilot-sqlite
                 dockerfile: Dockerfile.server
             ports:
                 - id: web
@@ -79,7 +84,7 @@ spec:
             source:
                 source: GITHUB
                 repo: 1172467685
-                branch: feature/data-analysis-agent
+                branch: feature/datapilot-sqlite
                 dockerfile: Dockerfile.viewer
             ports:
                 - id: web
