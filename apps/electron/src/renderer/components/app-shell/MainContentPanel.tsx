@@ -87,6 +87,7 @@ export function MainContentPanel({
     getBatchItems,
     onDuplicateBatch,
     onDeleteBatch,
+    onRetryBatchItem,
     testProgress,
     testResults,
     activeSessionWorkingDirectory,
@@ -330,6 +331,7 @@ export function MainContentPanel({
               onTest={onTestBatch ? () => onTestBatch(batch.id ?? '') : undefined}
               onDuplicate={onDuplicateBatch ? () => onDuplicateBatch(batch.id ?? '') : undefined}
               onDelete={onDeleteBatch ? () => onDeleteBatch(batch.id ?? '') : undefined}
+              onRetryItem={onRetryBatchItem ? (itemId: string) => onRetryBatchItem(batch.id ?? '', itemId) : undefined}
               getBatchState={getBatchState}
               getBatchItems={getBatchItems}
               testProgress={testProgress?.[batch.id ?? '']}
