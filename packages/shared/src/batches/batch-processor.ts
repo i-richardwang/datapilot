@@ -239,6 +239,59 @@ export class BatchProcessor {
   }
 
   /**
+   * Retry a single failed item. Resets it to pending and dispatches if the
+   * batch is running. If the batch already completed/failed, it is reactivated.
+   */
+  retryItem(batchId: string, itemId: string): BatchProgress {
+    // Load into memory if needed (cold restart / completed batch on disk only)
+    if (!this.activeStates.has(batchId)) {
+      this.ensureActive(batchId)
+    }
+
+    const state = this.activeStates.get(batchId)!
+    const itemState = state.items[itemId]
+    if (!itemState) {
+      throw new Error(`Item "${itemId}" not found in batch "${batchId}"`)
+    }
+    if (itemState.status !== 'failed') {
+      throw new Error(`Item "${itemId}" is not failed (status: ${itemState.status})`)
+    }
+
+    // Reset item to pending — preserve retryCount for historical tracking
+    updateItemState(state, itemId, {
+      status: 'pending',
+      sessionId: undefined,
+      completedAt: undefined,
+      error: undefined,
+    })
+
+    if (state.status === 'completed' || state.status === 'failed') {
+      // Reactivate a finished batch
+      state.status = 'running'
+      state.completedAt = undefined
+      saveBatchState(this.options.workspaceRootPath, state)
+
+      log.info(`[BatchProcessor] Retrying item "${itemId}" — reactivated batch "${batchId}"`)
+      return this.beginDispatching(batchId, state)
+    }
+
+    saveBatchState(this.options.workspaceRootPath, state)
+
+    if (state.status === 'running') {
+      this.dispatchNext(batchId).catch((error) => {
+        log.error(`[BatchProcessor] Failed to dispatch after retry for batch "${batchId}":`, error)
+        this.options.onError?.(batchId, error instanceof Error ? error : new Error(String(error)))
+      })
+    }
+
+    log.info(`[BatchProcessor] Retrying item "${itemId}" in batch "${batchId}" (batch status: ${state.status})`)
+
+    const progress = computeProgress(state)
+    this.options.onProgress?.(progress)
+    return progress
+  }
+
+  /**
    * Get progress for a batch.
    */
   getProgress(batchId: string): BatchProgress | null {
