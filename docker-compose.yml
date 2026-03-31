@@ -21,7 +21,7 @@ services:
     volumes:
       - ${DATAPILOT_DATA_DIR:-~/.datapilot}:/home/craftagents/.datapilot
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9101/ || exit 1"]
+      test: ["CMD-SHELL", "bun -e 'await fetch(\"http://localhost:9101/\")' || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
