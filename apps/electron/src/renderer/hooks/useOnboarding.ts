@@ -446,8 +446,10 @@ export function useOnboarding({
       }
 
       // Validate connection by spawning a lightweight subprocess test.
-      // Custom endpoint protocol routes through PiAgent at runtime, so test with Pi too.
-      const setupTestProvider = data.customEndpoint ? 'pi' : (isPiApiKeyFlow ? 'pi' : 'anthropic')
+      // Claude SDK custom endpoints route through Anthropic SDK; others through Pi.
+      const setupTestProvider = data.customEndpoint
+        ? (data.customEndpoint.api === 'anthropic-claude-sdk' ? 'anthropic' : 'pi')
+        : (isPiApiKeyFlow ? 'pi' : 'anthropic')
       const testResult = await window.electronAPI.testLlmConnectionSetup({
         provider: setupTestProvider,
         apiKey: data.apiKey,
