@@ -43,7 +43,7 @@ spec:
             source:
                 source: GITHUB
                 repo: 1172467685
-                branch: main
+                branch: feature/sqlite-storage
                 dockerfile: Dockerfile.server
             ports:
                 - id: web
@@ -79,7 +79,7 @@ spec:
             source:
                 source: GITHUB
                 repo: 1172467685
-                branch: main
+                branch: feature/sqlite-storage
                 dockerfile: Dockerfile.viewer
             ports:
                 - id: web
