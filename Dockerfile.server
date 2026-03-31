@@ -30,8 +30,7 @@ LABEL org.opencontainers.image.description="DataPilot Server — headless AI wor
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        ca-certificates git python3 make g++ && \
+    apt-get install -y --no-install-recommends ca-certificates git && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user (Claude Code SDK refuses to run as root).
