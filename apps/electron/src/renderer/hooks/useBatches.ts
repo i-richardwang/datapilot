@@ -33,6 +33,7 @@ export interface UseBatchesResult {
   batchPendingDelete: string | null
   pendingDeleteBatch: BatchListItem | undefined
   setBatchPendingDelete: (id: string | null) => void
+  handleRetryBatchItem: (batchId: string, itemId: string) => void
   handleDuplicateBatch: (batchId: string) => void
   handleDeleteBatch: (batchId: string) => void
   confirmDeleteBatch: () => void
@@ -192,6 +193,14 @@ export function useBatches(
     }
   }, [activeWorkspaceId])
 
+  // Retry a single failed item
+  const handleRetryBatchItem = useCallback((batchId: string, itemId: string) => {
+    if (!activeWorkspaceId) return
+    window.electronAPI.retryBatchItem(activeWorkspaceId, batchId, itemId)
+      .then(() => { toast.success('Item retry started') })
+      .catch((err: Error) => { toast.error(`Failed to retry item: ${err.message}`) })
+  }, [activeWorkspaceId])
+
   // Duplicate
   const handleDuplicateBatch = useCallback((batchId: string) => {
     if (!activeWorkspaceId) return
@@ -228,6 +237,7 @@ export function useBatches(
     batchPendingDelete,
     pendingDeleteBatch,
     setBatchPendingDelete,
+    handleRetryBatchItem,
     handleDuplicateBatch,
     handleDeleteBatch,
     confirmDeleteBatch,

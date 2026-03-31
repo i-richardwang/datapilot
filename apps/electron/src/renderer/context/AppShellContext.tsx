@@ -179,6 +179,8 @@ export interface AppShellContextType {
   onDuplicateBatch?: (batchId: string) => void
   /** Delete a batch by ID — removes from batches config and state file */
   onDeleteBatch?: (batchId: string) => void
+  /** Retry a single failed batch item */
+  onRetryBatchItem?: (batchId: string, itemId: string) => void
   /** Real-time test progress keyed by parent batchId */
   testProgress?: Record<string, import('@craft-agent/shared/batches').BatchProgress>
   /** Completed test results keyed by parent batchId */

@@ -17,6 +17,7 @@ datapilot-batch create --name "Extraction" --source data.csv --id-field id --pro
 datapilot-batch update <id> --name "Renamed" --concurrency 5
 datapilot-batch update <id> --enabled false
 datapilot-batch update <id> --patch '{"execution":{"retryOnFailure":true}}'
+datapilot-batch retry <id> <item-id>
 datapilot-batch enable <id>
 datapilot-batch disable <id>
 datapilot-batch delete <id>
@@ -27,7 +28,7 @@ datapilot-batch delete <id>
 Batches allow you to process a list of items from a data file (CSV, JSON, or JSONL) by executing a prompt action for each item. You can:
 - Process hundreds of items with configurable concurrency
 - Use template variables to inject item fields into prompts
-- Retry failed items automatically
+- Retry failed items automatically or manually via CLI
 - Pause, resume, and monitor batch progress
 
 ## Data Sources
@@ -94,14 +95,23 @@ These fields control how items are processed. Common ones have dedicated flags; 
 | `model` | `--model <id>` | Workspace default | Model ID for created sessions |
 | `llmConnection` | `--connection <slug>` | Workspace default | LLM connection slug |
 | `permissionMode` | `--permission-mode` | Workspace default | `safe` \| `ask` \| `allow-all` |
-| `retryOnFailure` | `--patch` only | false | Whether to retry failed items |
-| `maxRetries` | `--patch` only | 2 | Max retry attempts per item (0-10) |
+| `retryOnFailure` | `--patch` only | false | Automatically retry failed items |
+| `maxRetries` | `--patch` only | 2 | Max automatic retry attempts per item (0-10) |
 
 Example using `--patch` for fields without dedicated flags:
 
 ```bash
 datapilot-batch update <id> --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
 ```
+
+To manually retry a specific failed item without restarting the entire batch:
+
+```bash
+datapilot-batch status <id> --items    # find failed items
+datapilot-batch retry <id> <item-id>   # reset to pending
+```
+
+If the batch has already completed or failed, `retry` sets it to `paused` — the user resumes the batch to re-execute the item.
 
 ## Output Configuration
 
@@ -300,7 +310,7 @@ Individual items within a batch have their own status:
 | `pending` | Item has not been processed yet |
 | `running` | Item is currently being processed in a session |
 | `completed` | Item was processed successfully |
-| `failed` | Item processing failed (may be retried if configured) |
+| `failed` | Item processing failed (retried automatically if `retryOnFailure` is enabled, or manually via `datapilot-batch retry`) |
 | `skipped` | Item was skipped |
 
 ## Validation

@@ -17,6 +17,7 @@ import { cmdCreate } from './commands/create.ts'
 import { cmdUpdate, type UpdateOptions } from './commands/update.ts'
 import { cmdEnable, cmdDisable } from './commands/enable.ts'
 import { cmdDelete } from './commands/delete.ts'
+import { cmdRetry } from './commands/retry.ts'
 
 const VERSION = '0.7.3'
 
@@ -35,6 +36,7 @@ COMMANDS
   update <id> [flags]           Update a batch (see: update --help)
   enable <id>                   Enable a batch
   disable <id>                  Disable a batch
+  retry <id> <item-id>           Retry a failed item
   delete <id>                   Delete a batch
 
 GLOBAL OPTIONS
@@ -53,6 +55,7 @@ EXAMPLES
   datapilot-batch update abc123 --enabled false
   datapilot-batch enable abc123
   datapilot-batch disable abc123
+  datapilot-batch retry abc123 item-42
   datapilot-batch delete abc123
 `.trim()
 
@@ -390,6 +393,17 @@ function main(): void {
         process.exit(1)
       }
       cmdDisable(workspaceRoot, id, asJson)
+      break
+    }
+
+    case 'retry': {
+      const id = args[0]
+      const itemId = args[1]
+      if (!id || !itemId) {
+        console.error('Usage: craft-agent-batch retry <batch-id> <item-id>')
+        process.exit(1)
+      }
+      cmdRetry(workspaceRoot, id, itemId, asJson)
       break
     }
 
