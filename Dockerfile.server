@@ -89,4 +89,6 @@ ENV CRAFT_WEBUI_DIR=/app/apps/webui/dist
 
 EXPOSE 9100
 
-ENTRYPOINT ["bun", "run", "packages/server/src/index.ts"]
+# --allow-insecure-bind: safe inside Docker — the container network is isolated;
+# external TLS should be handled by a reverse proxy (nginx, Caddy, etc.)
+ENTRYPOINT ["bun", "run", "packages/server/src/index.ts", "--allow-insecure-bind"]
