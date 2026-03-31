@@ -1,5 +1,8 @@
 import { isMac } from '@/lib/platform'
 
+/** True when running inside a browser (web UI) rather than Electron */
+const isWeb = window.electronAPI?.getRuntimeEnvironment() === 'web'
+
 /** Gap between any adjacent panels (sidebar ↔ navigator ↔ content ↔ right sidebar) */
 export const PANEL_GAP = 6
 
@@ -10,7 +13,7 @@ export const PANEL_EDGE_INSET = 6
 export const RADIUS_EDGE = isMac ? 14 : 8
 
 /** Corner radius for interior corners between panels */
-export const RADIUS_INNER = 10
+export const RADIUS_INNER = isWeb ? 0 : 10
 
 /** Minimum width for any content panel */
 export const PANEL_MIN_WIDTH = 440
