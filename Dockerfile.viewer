@@ -43,6 +43,7 @@ COPY packages/session-tools-core/package.json packages/session-tools-core/
 COPY packages/session-mcp-server/package.json packages/session-mcp-server/
 COPY packages/pi-agent-server/package.json packages/pi-agent-server/
 COPY packages/batch-cli/package.json packages/batch-cli/
+COPY packages/craft-cli/package.json packages/craft-cli/
 COPY apps/electron/package.json apps/electron/
 COPY apps/cli/package.json apps/cli/
 COPY apps/webui/package.json apps/webui/
