@@ -21,7 +21,7 @@ services:
     volumes:
       - ${CRAFT_DATA_DIR:-~/.craft-agent}:/home/craftagents/.craft-agent
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9101/ || exit 1"]
+      test: ["CMD-SHELL", "bun -e 'await fetch(\"http://localhost:9101/\")' || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
