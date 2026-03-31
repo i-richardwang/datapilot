@@ -382,7 +382,8 @@ export function ApiKeyInput({
     const isCustomEndpoint = activePreset === 'custom' && !!effectiveBaseUrl
     const customEndpoint = isCustomEndpoint ? { api: customApi } : undefined
     const resolvedPiAuthProvider = isCustomEndpoint
-      ? (customApi === 'anthropic-messages' ? 'anthropic' : 'openai')
+      ? (customApi === 'anthropic-claude-sdk' ? undefined :
+         customApi === 'anthropic-messages' ? 'anthropic' : 'openai')
       : effectivePiAuthProvider
 
     onSubmit({
@@ -501,6 +502,7 @@ export function ApiKeyInput({
             {([
               { value: 'openai-completions' as const, label: 'OpenAI Compatible' },
               { value: 'anthropic-messages' as const, label: 'Anthropic Compatible' },
+              { value: 'anthropic-claude-sdk' as const, label: 'Claude Agent SDK' },
             ]).map(({ value, label }) => (
               <button
                 key={value}
@@ -519,7 +521,7 @@ export function ApiKeyInput({
             ))}
           </div>
           <p className="text-xs text-foreground/30">
-            Most third-party APIs (Ollama, vLLM, DashScope) use OpenAI Compatible.
+            Most third-party APIs (Ollama, vLLM, DashScope) use OpenAI Compatible. Use Claude Agent SDK for endpoints fully compatible with the Anthropic Messages API.
           </p>
         </div>
       )}
