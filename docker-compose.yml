@@ -1,4 +1,4 @@
-# Craft Agent — Docker Compose
+# DataPilot — Docker Compose
 #
 # Quick start:
 #   1. cp .env.docker .env
@@ -19,7 +19,7 @@ services:
       - CRAFT_WEBUI_PASSWORD=${CRAFT_WEBUI_PASSWORD:-}
       - CRAFT_HEALTH_PORT=9101
     volumes:
-      - ${CRAFT_DATA_DIR:-~/.craft-agent}:/home/craftagents/.craft-agent
+      - ${DATAPILOT_DATA_DIR:-~/.datapilot}:/home/craftagents/.datapilot
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9101/ || exit 1"]
       interval: 30s

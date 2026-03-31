@@ -45,6 +45,7 @@
 | 测试文件 | `mode-manager.test.ts`（34 处）等 12 个测试文件 | mock 路径和环境变量 |
 | 文档 | `README.md`、`CLAUDE.md`、`resources/docs/*.md`、release notes 等 | 所有 `.craft-agent` 路径引用（含 `dist/` 编译版本） |
 | 脚本 & 工具 | `electron-dev.ts`、`build-server.ts`、ESLint 规则等 | 多实例开发、Docker、错误信息 |
+| Docker 部署 | `docker-compose.yml`、`.env.docker` | `CRAFT_DATA_DIR` → `DATAPILOT_DATA_DIR`、`~/.craft-agent` → `~/.datapilot`、注释品牌名 |
 
 **未改动：** 加密存储中的 `MAGIC_BYTES`（`CRAFT01`）和密钥派生盐（`craft-agent-v2`）保持原值，仅改了路径。
 
