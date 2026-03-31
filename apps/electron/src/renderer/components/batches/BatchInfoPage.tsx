@@ -47,6 +47,7 @@ export interface BatchInfoPageProps {
   onTest?: () => void
   onDuplicate?: () => void
   onDelete?: () => void
+  onRetryItem?: (itemId: string) => void
   getBatchState?: (batchId: string) => Promise<BatchState | null>
   getBatchItems?: (batchId: string, offset: number, limit: number) => Promise<BatchItemsPage | null>
   testProgress?: BatchProgress
@@ -62,6 +63,7 @@ export function BatchInfoPage({
   onTest,
   onDuplicate,
   onDelete,
+  onRetryItem,
   getBatchState,
   getBatchItems,
   testProgress,
@@ -372,7 +374,7 @@ export function BatchInfoPage({
           title="Items"
           description={itemCount > 0 ? `${itemCount} items in this batch` : undefined}
         >
-          <BatchItemTimeline items={pageItemsRecord} />
+          <BatchItemTimeline items={pageItemsRecord} onRetryItem={onRetryItem} />
           {itemsPage && itemsPage.total > PAGE_SIZE && (
             <div className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground border-t border-border/30">
               <span>

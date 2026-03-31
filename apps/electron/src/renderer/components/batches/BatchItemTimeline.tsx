@@ -9,7 +9,7 @@
  * so this component always receives a small slice — no virtualization needed.
  */
 
-import { CheckCircle2, XCircle, Loader2, Clock, MinusCircle } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, Clock, MinusCircle, RotateCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useNavigation } from '@/contexts/NavigationContext'
 import type { BatchItemState, BatchItemStatus } from '@craft-agent/shared/batches'
@@ -32,10 +32,11 @@ const statusConfig: Record<BatchItemStatus, { icon: React.ElementType; classes: 
 
 export interface BatchItemTimelineProps {
   items: Record<string, BatchItemState>
+  onRetryItem?: (itemId: string) => void
   className?: string
 }
 
-export function BatchItemTimeline({ items, className }: BatchItemTimelineProps) {
+export function BatchItemTimeline({ items, onRetryItem, className }: BatchItemTimelineProps) {
   const { navigateToSession } = useNavigation()
   const entries = Object.entries(items)
 
@@ -67,6 +68,17 @@ export function BatchItemTimeline({ items, className }: BatchItemTimelineProps) 
             <span className="flex-1 min-w-0 truncate text-xs text-foreground/70">
               {item.error || item.summary || '—'}
             </span>
+
+            {/* Retry failed item */}
+            {item.status === 'failed' && onRetryItem && (
+              <button
+                className="shrink-0 text-[11px] text-accent hover:underline cursor-pointer flex items-center gap-0.5"
+                onClick={() => onRetryItem(itemId)}
+              >
+                <RotateCw className="h-3 w-3" />
+                Retry
+              </button>
+            )}
 
             {/* Session deep link */}
             {item.sessionId && (

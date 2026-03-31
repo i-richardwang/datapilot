@@ -369,6 +369,7 @@ export const RPC_CHANNELS = {
     DELETE: 'batches:delete',
     TEST: 'batches:test',
     GET_TEST_RESULT: 'batches:getTestResult',
+    RETRY_ITEM: 'batches:retryItem',
     CHANGED: 'batches:changed',
   },
 } as const
