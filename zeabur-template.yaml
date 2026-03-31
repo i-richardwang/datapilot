@@ -2,18 +2,18 @@
 apiVersion: zeabur.com/v1
 kind: Template
 metadata:
-    name: Craft Agents
+    name: DataPilot
 spec:
-    description: "Craft Agents is an open-source, agent-native workflow platform for intuitive interaction with AI agents. Features multi-session management, MCP service connections, custom skills, and document-centric workflows."
+    description: "DataPilot is an open-source, agent-native workflow platform specialized for data analysis. Built on Craft Agents, it features multi-session management, MCP service connections, custom skills, and document-centric workflows."
     icon: https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/apps/electron/resources/icon.svg
     tags:
         - AI
         - Agent
         - Tool
     readme: |-
-        # Craft Agents
+        # DataPilot
 
-        An open-source, agent-native workflow platform built for intuitive interaction with AI agents (Claude, GPT, Gemini, etc.).
+        An open-source, agent-native workflow platform specialized for data analysis, built on Craft Agents. Supports intuitive interaction with AI agents (Claude, GPT, Gemini, etc.).
 
         ## Features
         - Connect to any API/MCP service (Linear, Gmail, Slack, Postgres, etc.)
@@ -24,7 +24,7 @@ spec:
         - Event-driven automations with cron scheduling
 
         ## Services
-        - **Server**: Main Craft Agents server with WebSocket API and embedded Web UI (port 9100)
+        - **Server**: Main DataPilot server with WebSocket API and embedded Web UI (port 9100)
         - **Viewer**: Lightweight session sharing service for public/shared viewing of agent sessions (port 9101)
 
         ## Usage
@@ -35,6 +35,11 @@ spec:
 
         ## Documentation
         - GitHub: https://github.com/i-richardwang/craft-agents-oss
+    variables:
+        - key: CRAFT_WEBUI_WS_URL
+          type: STRING
+          name: Server WebSocket URL
+          description: "Browser-facing WebSocket URL for the server (e.g. wss://your-domain.com). Required when using a custom domain with HTTPS."
     services:
         - name: server
           icon: https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/apps/electron/resources/icon.svg
@@ -43,7 +48,7 @@ spec:
             source:
                 source: GITHUB
                 repo: 1172467685
-                branch: main
+                branch: feature/data-analysis-agent
                 dockerfile: Dockerfile.server
             ports:
                 - id: web
@@ -51,7 +56,7 @@ spec:
                   type: HTTP
             volumes:
                 - id: server-data
-                  dir: /home/craftagents/.craft-agent
+                  dir: /home/craftagents/.datapilot
             instructions:
                 - type: PASSWORD
                   title: Server Token
@@ -79,7 +84,7 @@ spec:
             source:
                 source: GITHUB
                 repo: 1172467685
-                branch: main
+                branch: feature/data-analysis-agent
                 dockerfile: Dockerfile.viewer
             ports:
                 - id: web
