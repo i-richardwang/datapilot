@@ -19,7 +19,7 @@
  *   DATAPILOT_DEBUG                — 'true' for debug logging
  *   DATAPILOT_WEBUI_DIR            — path to built web UI assets (enables web UI on RPC port)
  *   DATAPILOT_WEBUI_PASSWORD       — optional shorter password for web login (falls back to DATAPILOT_SERVER_TOKEN)
- *   CRAFT_WEBUI_SECURE_COOKIE  — optional true/false override for the session cookie Secure flag
+ *   DATAPILOT_WEBUI_SECURE_COOKIE  — optional true/false override for the session cookie Secure flag
  *   DATAPILOT_WEBUI_WS_URL         — optional browser-facing ws:// or wss:// URL returned by /api/config
  */
 
@@ -118,7 +118,7 @@ if (tlsCertPath || tlsKeyPath) {
 // Web UI configuration
 const webuiDir = process.env.DATAPILOT_WEBUI_DIR || undefined
 const webuiEnabled = webuiDir && existsSync(webuiDir)
-const webuiSecureCookies = parseOptionalBooleanEnv('CRAFT_WEBUI_SECURE_COOKIE', process.env.CRAFT_WEBUI_SECURE_COOKIE)
+const webuiSecureCookies = parseOptionalBooleanEnv('DATAPILOT_WEBUI_SECURE_COOKIE', process.env.DATAPILOT_WEBUI_SECURE_COOKIE)
 const webuiWsUrl = parseOptionalWebSocketUrl('DATAPILOT_WEBUI_WS_URL', process.env.DATAPILOT_WEBUI_WS_URL)
 const serverToken = process.env.DATAPILOT_SERVER_TOKEN
 
@@ -262,7 +262,7 @@ const serverProto = instance.protocol === 'wss' ? 'https' : 'http'
 console.log(`DATAPILOT_SERVER_URL=${instance.protocol}://${instance.host}:${instance.port}`)
 console.log(`DATAPILOT_SERVER_TOKEN=${instance.token}`)
 if (webuiHandler) {
-  console.log(`CRAFT_WEBUI_URL=${serverProto}://0.0.0.0:${instance.port}`)
+  console.log(`DATAPILOT_WEBUI_URL=${serverProto}://0.0.0.0:${instance.port}`)
 }
 
 // Block binding to a non-localhost address without TLS — tokens would be sent in cleartext.
