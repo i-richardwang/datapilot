@@ -1,12 +1,12 @@
 # datapilot-cli — CLI Reference
 
-Terminal client for Craft Agent server. Connects over WebSocket (`ws://` or `wss://`) to a running headless server.
+Terminal client for DataPilot server. Connects over WebSocket (`ws://` or `wss://`) to a running headless server.
 
 ## Prerequisites
 
 - [Bun](https://bun.sh/) runtime installed
 - For `run` and `--validate-server`: an API key via `--api-key`, `$LLM_API_KEY`, or a provider-specific env var (e.g., `$ANTHROPIC_API_KEY`)
-- For all other commands: a running Craft Agent headless server with URL and token
+- For all other commands: a running DataPilot headless server with URL and token
 
 ## Installation
 
@@ -39,11 +39,11 @@ ANTHROPIC_API_KEY=sk-... bun run apps/cli/src/index.ts run "Hello, world!"
 
 | Flag | Env var | Default | Description |
 |------|---------|---------|-------------|
-| `--url <ws[s]://...>` | `CRAFT_SERVER_URL` | — | Server WebSocket URL |
+| `--url <ws[s]://...>` | `DATAPILOT_SERVER_URL` | — | Server WebSocket URL |
 | `--token <secret>` | `DATAPILOT_SERVER_TOKEN` | — | Authentication token |
 | `--workspace <id>` | — | auto-detect | Workspace ID |
 | `--timeout <ms>` | — | `10000` | Request timeout |
-| `--tls-ca <path>` | `CRAFT_TLS_CA` | — | Custom CA cert for self-signed TLS |
+| `--tls-ca <path>` | `DATAPILOT_TLS_CA` | — | Custom CA cert for self-signed TLS |
 | `--json` | — | `false` | Raw JSON output for scripting |
 | `--send-timeout <ms>` | — | `300000` | Timeout for `send` command (5 min) |
 
@@ -227,7 +227,7 @@ datapilot-cli --url wss://server.example.com:9100 ping
 datapilot-cli --url wss://server.example.com:9100 --tls-ca /path/to/ca.pem ping
 ```
 
-The `--tls-ca` flag sets `NODE_EXTRA_CA_CERTS` before connecting. You can also set `CRAFT_TLS_CA` in your environment.
+The `--tls-ca` flag sets `NODE_EXTRA_CA_CERTS` before connecting. You can also set `DATAPILOT_TLS_CA` in your environment.
 
 ## Troubleshooting
 

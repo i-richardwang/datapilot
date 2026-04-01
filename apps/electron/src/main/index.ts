@@ -214,7 +214,7 @@ import { applyConfiguredProxySettings } from './network-proxy'
 void applyConfiguredProxySettings()
 
 // Accept self-signed / untrusted certificates when connecting to a user-configured remote server.
-// Only bypasses cert validation for the exact CRAFT_SERVER_URL origin — all other connections
+// Only bypasses cert validation for the exact DATAPILOT_SERVER_URL origin — all other connections
 // use standard certificate verification. Without this, wss:// to self-signed servers fails with
 // ERR_CERT_AUTHORITY_INVALID because Chromium's WebSocket rejects untrusted certs.
 //
@@ -227,10 +227,10 @@ function normalizeOriginForCert(urlStr: string): string {
   return u.origin
 }
 
-if (process.env.CRAFT_SERVER_URL) {
+if (process.env.DATAPILOT_SERVER_URL) {
   let serverOrigin: string | undefined
   try {
-    serverOrigin = normalizeOriginForCert(process.env.CRAFT_SERVER_URL)
+    serverOrigin = normalizeOriginForCert(process.env.DATAPILOT_SERVER_URL)
   } catch {
     // Invalid URL — will fail later during connection, no need to handle here
   }
@@ -428,14 +428,14 @@ app.whenReady().then(async () => {
     // Create the application menu (needs windowManager for New Window action)
     createApplicationMenu(windowManager)
 
-    // When CRAFT_SERVER_URL is set, this Electron instance is a thin client —
+    // When DATAPILOT_SERVER_URL is set, this Electron instance is a thin client —
     // it only creates windows whose preload connects to the remote server.
     // Skip server-side initialization (SessionManager, model refresh, platform injection).
-    const isClientOnly = !!process.env.CRAFT_SERVER_URL
+    const isClientOnly = !!process.env.DATAPILOT_SERVER_URL
     const isHeadless = !!process.env.CRAFT_HEADLESS
 
     if (isClientOnly) {
-      mainLog.info(`Client-only mode: CRAFT_SERVER_URL=${process.env.CRAFT_SERVER_URL} (server initialization skipped)`)
+      mainLog.info(`Client-only mode: DATAPILOT_SERVER_URL=${process.env.DATAPILOT_SERVER_URL} (server initialization skipped)`)
     }
 
     // Initialize notification service (always — triggered by server push events)
@@ -806,7 +806,7 @@ app.whenReady().then(async () => {
 
       // Headless: print connection details
       if (isHeadless) {
-        console.log(`CRAFT_SERVER_URL=${instance.protocol}://${instance.host}:${instance.port}`)
+        console.log(`DATAPILOT_SERVER_URL=${instance.protocol}://${instance.host}:${instance.port}`)
         console.log(`DATAPILOT_SERVER_TOKEN=${instance.token}`)
       }
     }

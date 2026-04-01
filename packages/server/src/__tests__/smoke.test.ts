@@ -55,8 +55,8 @@ async function spawnTestServer(extraEnv?: Record<string, string>): Promise<Spawn
       const lines = buffer.split('\n')
       buffer = lines.pop() ?? ''
       for (const line of lines) {
-        if (line.startsWith('CRAFT_SERVER_URL=')) {
-          url = line.slice('CRAFT_SERVER_URL='.length).trim()
+        if (line.startsWith('DATAPILOT_SERVER_URL=')) {
+          url = line.slice('DATAPILOT_SERVER_URL='.length).trim()
         }
         if (url) {
           clearTimeout(timer)
@@ -90,7 +90,7 @@ async function spawnTestServer(extraEnv?: Record<string, string>): Promise<Spawn
       }
       clearTimeout(timer)
       if (!url) {
-        reject(new Error('Server exited before printing CRAFT_SERVER_URL'))
+        reject(new Error('Server exited before printing DATAPILOT_SERVER_URL'))
       }
     })()
   })

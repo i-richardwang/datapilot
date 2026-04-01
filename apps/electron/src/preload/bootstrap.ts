@@ -7,7 +7,7 @@
  *   the active workspace (local or remote). Workspace switches swap the
  *   workspace client transparently.
  *
- * Thin-client mode (CRAFT_SERVER_URL):
+ * Thin-client mode (DATAPILOT_SERVER_URL):
  *   Creates a single WsRpcClient connected to the remote server.
  *   All channels go to the remote server.
  *
@@ -53,7 +53,7 @@ interface TransportClient extends RpcClient {
 // ---------------------------------------------------------------------------
 
 const webContentsId: number = ipcRenderer.sendSync('__get-web-contents-id')
-const isClientOnly = !!process.env.CRAFT_SERVER_URL
+const isClientOnly = !!process.env.DATAPILOT_SERVER_URL
 
 let client: TransportClient
 
@@ -62,7 +62,7 @@ if (isClientOnly) {
   // Single WsRpcClient connected directly to the remote server.
   // No local server, no routing — all channels go to remote.
 
-  const wsUrl = process.env.CRAFT_SERVER_URL!
+  const wsUrl = process.env.DATAPILOT_SERVER_URL!
   const wsToken = process.env.DATAPILOT_SERVER_TOKEN ?? ''
 
   // Block unencrypted ws:// to non-localhost servers — tokens would be sent in cleartext

@@ -146,9 +146,9 @@ export function parseArgs(argv: string[]): CliArgs {
   }
 
   // Env var fallbacks
-  if (!url) url = process.env.CRAFT_SERVER_URL ?? ''
+  if (!url) url = process.env.DATAPILOT_SERVER_URL ?? ''
   if (!token) token = process.env.DATAPILOT_SERVER_TOKEN ?? ''
-  if (!tlsCa) tlsCa = process.env.CRAFT_TLS_CA
+  if (!tlsCa) tlsCa = process.env.DATAPILOT_TLS_CA
   if (!provider) provider = process.env.LLM_PROVIDER ?? 'anthropic'
   if (!model) model = process.env.LLM_MODEL ?? ''
   if (!apiKey) apiKey = process.env.LLM_API_KEY ?? ''
@@ -1746,7 +1746,7 @@ function printHelp(): void {
 Usage: datapilot-cli [options] <command> [args...]
 
 Connection:
-  --url <ws[s]://...>    Server URL (default: $CRAFT_SERVER_URL)
+  --url <ws[s]://...>    Server URL (default: $DATAPILOT_SERVER_URL)
   --token <secret>       Auth token (default: $DATAPILOT_SERVER_TOKEN)
   --workspace <id>       Workspace ID (auto-detected if omitted)
   --timeout <ms>         Request timeout (default: 10000)
@@ -1840,7 +1840,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
 
   // All other commands need a server URL
   if (!args.url) {
-    err('No server URL. Use --url <ws://...> or set $CRAFT_SERVER_URL')
+    err('No server URL. Use --url <ws://...> or set $DATAPILOT_SERVER_URL')
     process.exit(1)
   }
 
