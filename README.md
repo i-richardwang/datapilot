@@ -252,7 +252,7 @@ A terminal client that connects to a running Craft Agent server over WebSocket (
 bun run apps/cli/src/index.ts --help
 
 # Or add to your PATH
-alias craft-cli="bun run $(pwd)/apps/cli/src/index.ts"
+alias datapilot-cli="bun run $(pwd)/apps/cli/src/index.ts"
 ```
 
 ### Connection
@@ -265,7 +265,7 @@ export CRAFT_SERVER_URL=ws://127.0.0.1:9100
 export DATAPILOT_SERVER_TOKEN=<your-token>
 
 # Or via flags
-craft-cli --url ws://127.0.0.1:9100 --token <token> ping
+datapilot-cli --url ws://127.0.0.1:9100 --token <token> ping
 ```
 
 For TLS connections (`wss://`), use `--tls-ca <path>` for self-signed certificates.
@@ -312,32 +312,32 @@ The `run` command is fully self-contained — it spawns a headless server, creat
 
 ```bash
 # Quick connectivity check
-craft-cli ping
+datapilot-cli ping
 
 # List sessions (human-readable)
-craft-cli sessions
+datapilot-cli sessions
 
 # Send a message and stream the AI response
-craft-cli send abc-123 "What files are in the current directory?"
+datapilot-cli send abc-123 "What files are in the current directory?"
 
 # Pipe input
-echo "Summarize this" | craft-cli send abc-123
+echo "Summarize this" | datapilot-cli send abc-123
 
 # JSON output for scripting
-craft-cli --json workspaces | jq '.[].name'
+datapilot-cli --json workspaces | jq '.[].name'
 
 # Self-contained run (spawns its own server)
-craft-cli run "Summarize the README"
-craft-cli run --workspace-dir ./my-project --source github "List open PRs"
+datapilot-cli run "Summarize the README"
+datapilot-cli run --workspace-dir ./my-project --source github "List open PRs"
 
 # Multi-provider support
-craft-cli run --provider openai --model gpt-4o "Summarize this repo"
-GOOGLE_API_KEY=... craft-cli run --provider google --model gemini-2.0-flash "Hello"
-craft-cli run --provider anthropic --base-url https://openrouter.ai/api/v1 --api-key $OR_KEY "Hello"
+datapilot-cli run --provider openai --model gpt-4o "Summarize this repo"
+GOOGLE_API_KEY=... datapilot-cli run --provider google --model gemini-2.0-flash "Hello"
+datapilot-cli run --provider anthropic --base-url https://openrouter.ai/api/v1 --api-key $OR_KEY "Hello"
 
 # Validate the server (auto-spawns if no --url)
-craft-cli --validate-server
-craft-cli --validate-server --url ws://127.0.0.1:9100 --token <token>
+datapilot-cli --validate-server
+datapilot-cli --validate-server --url ws://127.0.0.1:9100 --token <token>
 ```
 
 ## Architecture

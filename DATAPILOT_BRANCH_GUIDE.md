@@ -74,7 +74,7 @@
 | 内置文档源 | `builtin-sources.ts`（2 处） | 源名称和 tagline |
 | MCP 日志 | `session-mcp-server/index.ts`（4 处） | Docs proxy 连接状态日志 |
 | 工具描述 | `tool-defs.ts`（2 处） | `config_validate` 和 `send_developer_feedback` 描述 |
-| CLI 帮助文本 | `cli/src/index.ts` | `'craft-cli — Terminal client for DataPilot server'` |
+| CLI 帮助文本 | `cli/src/index.ts` | `'datapilot-cli — Terminal client for DataPilot server'` |
 | Headless 服务器日志 | `headless-start.ts` | 启动监听日志 |
 | 安装脚本 | `install-app.sh`（macOS + Linux，15+ 处）、`install-app.ps1`（Windows，10+ 处） | 所有终端输出文本、APP_NAME、进程检测 |
 | 构建脚本 | `build/darwin.ts`、`afterPack.cjs`、`build-dmg.sh`、`build-linux.sh`、`build-win.ps1` | `.app` 路径（`DataPilot.app`）、构建输出 |
@@ -87,7 +87,7 @@
 | 自部署构建脚本 | `scripts/build-server.ts`（5 处） | help 文本、echo 输出、systemd `Description`、便捷脚本注释 |
 
 **未改动的应用内文本（有意保留）：**
-- `craft-agent`、`craft-agent-batch` — 实际 CLI 可执行文件名，docs 中的命令引用须与 binary 一致
+- `datapilot`、`datapilot-batch`、`datapilot-cli`、`datapilot-server` — 实际 CLI 可执行文件名，已完成品牌适配
 - `craft-agents-docs`、`SearchCraftAgents` — MCP 工具名，属于内部标识符
 - `@craft-agent/*` — 包名，属于 npm 元数据
 - GitHub Issue 标题引用（如 `0.3.4.md` 中 "Craft Agents on Hyprland..."）— 历史记录，改了会与 GitHub 不一致

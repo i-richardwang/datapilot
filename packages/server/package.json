@@ -5,7 +5,7 @@
   "type": "module",
   "main": "src/index.ts",
   "bin": {
-    "craft-server": "src/index.ts"
+    "datapilot-server": "src/index.ts"
   },
   "files": [
     "src/"

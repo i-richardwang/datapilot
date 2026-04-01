@@ -1,5 +1,5 @@
 /**
- * craft-agent-batch delete <id>
+ * datapilot-batch delete <id>
  *
  * Remove a batch from batches.json and clean up its state file.
  */

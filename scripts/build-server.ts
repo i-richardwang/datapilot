@@ -511,7 +511,7 @@ function createRootConfig(config: ServerBuildConfig): void {
 
   // Root package.json with workspaces (Bun resolves @craft-agent/* through this)
   const rootPkg = {
-    name: 'craft-server-dist',
+    name: 'datapilot-server-dist',
     version,
     private: true,
     workspaces: ['packages/*'],
@@ -573,7 +573,7 @@ function createEntryScripts(config: ServerBuildConfig): void {
   const binDir = join(outputDir, 'bin');
   mkdirSync(binDir, { recursive: true });
 
-  // bin/craft-server — main entry wrapper
+  // bin/datapilot-server — main entry wrapper
   const craftServer = `#!/bin/sh
 set -e
 
@@ -597,13 +597,13 @@ export PATH="$ROOT/resources/bin:$ROOT/vendor/bun:$PATH"
 # Use bundled Bun runtime
 exec "$ROOT/vendor/bun/bun" run "$ROOT/packages/server/src/index.ts" "$@"
 `;
-  writeFileSync(join(binDir, 'craft-server'), craftServer);
+  writeFileSync(join(binDir, 'datapilot-server'), craftServer);
 
   // start.sh — convenience entry
   const startSh = `#!/bin/sh
 # DataPilot Server — convenience entry point
 DIR="$(cd "$(dirname "$0")" && pwd)"
-exec "$DIR/bin/craft-server" "$@"
+exec "$DIR/bin/datapilot-server" "$@"
 `;
   writeFileSync(join(outputDir, 'start.sh'), startSh);
 
@@ -617,7 +617,7 @@ echo "=== DataPilot Server Setup ==="
 echo ""
 
 # Make binaries executable
-chmod +x "$DIR/bin/craft-server" "$DIR/start.sh"
+chmod +x "$DIR/bin/datapilot-server" "$DIR/start.sh"
 [ -f "$DIR/vendor/bun/bun" ] && chmod +x "$DIR/vendor/bun/bun"
 [ -f "$DIR/resources/bin/uv" ] && chmod +x "$DIR/resources/bin/uv"
 
@@ -655,7 +655,7 @@ if [ "\${1:-}" = "--systemd" ]; then
   fi
 
   SERVICE_USER="\${CRAFT_USER:-\$(logname 2>/dev/null || echo craft)}"
-  SERVICE_FILE="/etc/systemd/system/craft-server.service"
+  SERVICE_FILE="/etc/systemd/system/datapilot-server.service"
 
   cat > "$SERVICE_FILE" <<UNIT
 [Unit]
@@ -669,7 +669,7 @@ WorkingDirectory=$DIR
 EnvironmentFile=$DIR/.env
 Environment=DATAPILOT_RPC_HOST=127.0.0.1
 Environment=DATAPILOT_RPC_PORT=9100
-ExecStart=$DIR/bin/craft-server
+ExecStart=$DIR/bin/datapilot-server
 Restart=on-failure
 RestartSec=5
 
@@ -678,13 +678,13 @@ WantedBy=multi-user.target
 UNIT
 
   systemctl daemon-reload
-  systemctl enable craft-server
+  systemctl enable datapilot-server
 
   echo ""
   echo "Systemd service installed."
-  echo "  Start:   sudo systemctl start craft-server"
-  echo "  Status:  sudo systemctl status craft-server"
-  echo "  Logs:    journalctl -u craft-server -f"
+  echo "  Start:   sudo systemctl start datapilot-server"
+  echo "  Status:  sudo systemctl status datapilot-server"
+  echo "  Logs:    journalctl -u datapilot-server -f"
   echo ""
   exit 0
 fi
@@ -701,7 +701,7 @@ echo ""
 
   // Make scripts executable at build time
   for (const script of [
-    join(binDir, 'craft-server'),
+    join(binDir, 'datapilot-server'),
     join(outputDir, 'start.sh'),
     join(outputDir, 'install.sh'),
   ]) {
@@ -724,7 +724,7 @@ WORKDIR /app
 COPY . .
 
 # Make binaries executable
-RUN chmod +x bin/craft-server vendor/bun/bun resources/bin/uv && \\
+RUN chmod +x bin/datapilot-server vendor/bun/bun resources/bin/uv && \\
     for f in resources/bin/*; do [ -f "$f" ] && chmod +x "$f"; done
 
 ENV CRAFT_IS_PACKAGED=true
@@ -739,13 +739,13 @@ ENV PATH="/app/resources/bin:/app/vendor/bun:\${PATH}"
 
 EXPOSE 9100
 
-ENTRYPOINT ["/app/bin/craft-server"]
+ENTRYPOINT ["/app/bin/datapilot-server"]
 `;
   writeFileSync(join(outputDir, 'Dockerfile'), dockerfile);
 
   const dockerCompose = `version: "3.8"
 services:
-  craft-server:
+  datapilot-server:
     build: .
     ports:
       - "9100:9100"
@@ -883,7 +883,7 @@ async function main(): Promise<void> {
 
   // Compress if requested
   if (config.compress) {
-    const archiveName = `craft-server-${version}-${platform}-${arch}.tar.gz`;
+    const archiveName = `datapilot-server-${version}-${platform}-${arch}.tar.gz`;
     const archivePath = join(dirname(outputDir), archiveName);
     console.log(`\nCompressing to ${archiveName}...`);
     await $`tar -czf ${archivePath} -C ${outputDir} .`;

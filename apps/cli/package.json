@@ -6,7 +6,7 @@
   "type": "module",
   "main": "src/index.ts",
   "bin": {
-    "craft-cli": "src/index.ts"
+    "datapilot-cli": "src/index.ts"
   },
   "scripts": {
     "start": "bun run src/index.ts",

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * craft-cli — Terminal client for Craft Agent server.
+ * datapilot-cli — Terminal client for Craft Agent server.
  *
  * Connects over WebSocket (ws:// or wss://) to a running Craft Agent server
  * and provides commands for listing resources, managing sessions, sending
@@ -1234,7 +1234,7 @@ export function getValidateSteps(): ValidateStep[] {
 mkdir -p "${skillDir}" && cat > "${skillDir}/SKILL.md" << 'SKILLEOF'
 ---
 name: "CLI Validate Skill"
-description: "Validation skill created by craft-cli"
+description: "Validation skill created by datapilot-cli"
 requiredSources:
   - "${sourceSlug}"
 ---
@@ -1741,9 +1741,9 @@ export async function runValidation(
 // ---------------------------------------------------------------------------
 
 function printHelp(): void {
-  process.stdout.write(`craft-cli — Terminal client for DataPilot server
+  process.stdout.write(`datapilot-cli — Terminal client for DataPilot server
 
-Usage: craft-cli [options] <command> [args...]
+Usage: datapilot-cli [options] <command> [args...]
 
 Connection:
   --url <ws[s]://...>    Server URL (default: $CRAFT_SERVER_URL)
@@ -1786,20 +1786,20 @@ Commands:
                          --verbose, -v       Show server stderr output
 
 Examples:
-  craft-cli run "What files are in the current directory?"
-  craft-cli run --source craft-kb "Summarize today's daily note"
-  craft-cli run --workspace-dir .github/agents --source craft-public "Read the doc"
-  craft-cli run --provider openai --model gpt-4o "Summarize this repo"
-  OPENAI_API_KEY=sk-... craft-cli run --provider openai "Hello"
-  GOOGLE_API_KEY=... craft-cli run --provider google --model gemini-2.0-flash "Hello"
-  echo "Analyze this code" | craft-cli run
-  craft-cli ping
-  craft-cli sessions
-  craft-cli send abc-123 "What files are in the current directory?"
-  echo "Summarize this" | craft-cli send abc-123
-  craft-cli --validate-server
-  craft-cli invoke system:homeDir
-  craft-cli --json workspaces | jq '.[].name'
+  datapilot-cli run "What files are in the current directory?"
+  datapilot-cli run --source craft-kb "Summarize today's daily note"
+  datapilot-cli run --workspace-dir .github/agents --source craft-public "Read the doc"
+  datapilot-cli run --provider openai --model gpt-4o "Summarize this repo"
+  OPENAI_API_KEY=sk-... datapilot-cli run --provider openai "Hello"
+  GOOGLE_API_KEY=... datapilot-cli run --provider google --model gemini-2.0-flash "Hello"
+  echo "Analyze this code" | datapilot-cli run
+  datapilot-cli ping
+  datapilot-cli sessions
+  datapilot-cli send abc-123 "What files are in the current directory?"
+  echo "Summarize this" | datapilot-cli send abc-123
+  datapilot-cli --validate-server
+  datapilot-cli invoke system:homeDir
+  datapilot-cli --json workspaces | jq '.[].name'
 `)
 }
 
