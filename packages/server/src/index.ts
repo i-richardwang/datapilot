@@ -259,7 +259,7 @@ const healthServer = await startHealthHttpServer({
 })
 
 const serverProto = instance.protocol === 'wss' ? 'https' : 'http'
-console.log(`CRAFT_SERVER_URL=${instance.protocol}://${instance.host}:${instance.port}`)
+console.log(`DATAPILOT_SERVER_URL=${instance.protocol}://${instance.host}:${instance.port}`)
 console.log(`DATAPILOT_SERVER_TOKEN=${instance.token}`)
 if (webuiHandler) {
   console.log(`CRAFT_WEBUI_URL=${serverProto}://0.0.0.0:${instance.port}`)

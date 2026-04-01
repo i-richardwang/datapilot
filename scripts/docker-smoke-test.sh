@@ -59,7 +59,7 @@ while [ "$ELAPSED" -lt "$TIMEOUT" ]; do
   fi
 
   # Check for the ready indicator in logs
-  if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "CRAFT_SERVER_URL="; then
+  if docker logs "$CONTAINER_NAME" 2>&1 | grep -q "DATAPILOT_SERVER_URL="; then
     READY=true
     break
   fi

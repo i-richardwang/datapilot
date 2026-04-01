@@ -1,7 +1,7 @@
 /**
  * Server spawner — start a headless Craft Agent server as a child process.
  *
- * Spawns `bun run <serverEntry>`, reads stdout for the `CRAFT_SERVER_URL=`
+ * Spawns `bun run <serverEntry>`, reads stdout for the `DATAPILOT_SERVER_URL=`
  * and `DATAPILOT_SERVER_TOKEN=` lines, and returns a handle to stop the server.
  */
 
@@ -89,7 +89,7 @@ export async function spawnServer(opts?: SpawnServerOptions): Promise<SpawnedSer
     })()
   }
 
-  // Read stdout line by line looking for CRAFT_SERVER_URL=
+  // Read stdout line by line looking for DATAPILOT_SERVER_URL=
   return new Promise<SpawnedServer>((resolve, reject) => {
     const timer = setTimeout(() => {
       proc.kill()
@@ -103,8 +103,8 @@ export async function spawnServer(opts?: SpawnServerOptions): Promise<SpawnedSer
       const lines = buffer.split('\n')
       buffer = lines.pop() ?? '' // keep incomplete last line in buffer
       for (const line of lines) {
-        if (line.startsWith('CRAFT_SERVER_URL=')) {
-          url = line.slice('CRAFT_SERVER_URL='.length).trim()
+        if (line.startsWith('DATAPILOT_SERVER_URL=')) {
+          url = line.slice('DATAPILOT_SERVER_URL='.length).trim()
         }
         if (line.startsWith('DATAPILOT_SERVER_TOKEN=')) {
           // Server echoes the token — we already have it but this confirms ready
@@ -142,7 +142,7 @@ export async function spawnServer(opts?: SpawnServerOptions): Promise<SpawnedSer
       // If we get here without resolving, the process exited before printing the URL
       clearTimeout(timer)
       if (!url) {
-        reject(new Error('Server process exited before printing CRAFT_SERVER_URL'))
+        reject(new Error('Server process exited before printing DATAPILOT_SERVER_URL'))
       }
     })()
   })

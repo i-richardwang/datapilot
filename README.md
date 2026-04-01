@@ -163,7 +163,7 @@ DATAPILOT_SERVER_TOKEN=$(openssl rand -hex 32) bun run packages/server/src/index
 The server prints the connection details on startup:
 
 ```
-CRAFT_SERVER_URL=ws://203.0.113.5:9100
+DATAPILOT_SERVER_URL=ws://203.0.113.5:9100
 DATAPILOT_SERVER_TOKEN=<generated-token>
 ```
 
@@ -174,7 +174,7 @@ Copy these values and use them to connect the desktop app.
 Launch the Electron app in thin-client mode by passing the server URL and token:
 
 ```bash
-CRAFT_SERVER_URL=wss://203.0.113.5:9100 DATAPILOT_SERVER_TOKEN=<token> bun run electron:start
+DATAPILOT_SERVER_URL=wss://203.0.113.5:9100 DATAPILOT_SERVER_TOKEN=<token> bun run electron:start
 ```
 
 In thin-client mode, the desktop app renders the UI but all session logic, tool execution, and LLM calls run on the remote server.
@@ -212,7 +212,7 @@ DATAPILOT_RPC_TLS_KEY=certs/key.pem \
 bun run packages/server/src/index.ts
 ```
 
-The server will print `CRAFT_SERVER_URL=wss://<your-public-ip>:9100`.
+The server will print `DATAPILOT_SERVER_URL=wss://<your-public-ip>:9100`.
 
 **For production**, use certificates from a trusted CA (e.g., Let's Encrypt) or place the server behind a reverse proxy (nginx, Caddy) that terminates TLS.
 
@@ -261,7 +261,7 @@ The CLI reads connection details from flags or environment variables:
 
 ```bash
 # Via environment (set once)
-export CRAFT_SERVER_URL=ws://127.0.0.1:9100
+export DATAPILOT_SERVER_URL=ws://127.0.0.1:9100
 export DATAPILOT_SERVER_TOKEN=<your-token>
 
 # Or via flags
