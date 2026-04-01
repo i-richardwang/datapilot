@@ -400,7 +400,7 @@ function main(): void {
       const id = args[0]
       const itemId = args[1]
       if (!id || !itemId) {
-        console.error('Usage: craft-agent-batch retry <batch-id> <item-id>')
+        console.error('Usage: datapilot-batch retry <batch-id> <item-id>')
         process.exit(1)
       }
       cmdRetry(workspaceRoot, id, itemId, asJson)

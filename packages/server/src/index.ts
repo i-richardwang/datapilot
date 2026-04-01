@@ -89,11 +89,11 @@ function parseOptionalWebSocketUrl(name: string, value: string | undefined): str
 const bundledAssetsRoot = process.env.CRAFT_BUNDLED_ASSETS_ROOT
   ?? join(import.meta.dir, '..', '..', '..', '..')
 
-// Batch CLI entry point — used by the craft-agent-batch wrapper script.
+// Batch CLI entry point — used by the datapilot-batch wrapper script.
 // Use ??= so packaged deployments can override via env.
 process.env.CRAFT_BATCH_CLI_ENTRY ??= join(bundledAssetsRoot, 'packages', 'batch-cli', 'src', 'index.ts')
 
-// Ensure wrapper scripts (craft-agent-batch etc.) are on PATH for agent Bash sessions.
+// Ensure wrapper scripts (datapilot-batch etc.) are on PATH for agent Bash sessions.
 const serverBinDir = join(bundledAssetsRoot, 'apps', 'electron', 'resources', 'bin')
 if (existsSync(serverBinDir)) {
   process.env.PATH = `${serverBinDir}${delimiter}${process.env.PATH}`

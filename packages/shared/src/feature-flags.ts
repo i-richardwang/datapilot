@@ -49,7 +49,7 @@ export function isCraftAgentsCliEnabled(): boolean {
 }
 
 /**
- * Runtime-evaluated check for batch CLI (craft-agent-batch) integration.
+ * Runtime-evaluated check for batch CLI (datapilot-batch) integration.
  *
  * Defaults to enabled (fork-specific feature).
  * Override with CRAFT_FEATURE_BATCH_CLI=1|0.
@@ -105,7 +105,7 @@ export const FEATURE_FLAGS = {
     return isCraftAgentsCliEnabled();
   },
   /**
-   * Enable batch CLI (craft-agent-batch) guidance and guardrails.
+   * Enable batch CLI (datapilot-batch) guidance and guardrails.
    *
    * Defaults to enabled (fork-specific feature).
    * Override with CRAFT_FEATURE_BATCH_CLI=1|0.
