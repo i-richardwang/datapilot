@@ -2441,6 +2441,7 @@ export function ResponseCard({
           {/* Scrollable content area with subtle fade at edges (dark mode only) */}
           <div
             ref={contentRef}
+            data-search-root="response"
             onMouseDown={handleSelectionPointerDown}
             onMouseUp={handleTextSelection}
             className="pl-[22px] pr-[16px] py-3 text-sm overflow-y-auto scrollbar-hover"
@@ -2565,6 +2566,7 @@ export function ResponseCard({
         {/* Subtle fade at top and bottom edges (dark mode only) */}
         <div
           ref={contentRef}
+          data-search-root="response"
           onMouseDown={handleSelectionPointerDown}
           onMouseUp={handleTextSelection}
           className="pl-[22px] pr-4 py-3 text-sm overflow-y-auto scrollbar-hover"

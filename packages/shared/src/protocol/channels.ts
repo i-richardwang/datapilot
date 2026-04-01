@@ -300,6 +300,10 @@ export const RPC_CHANNELS = {
     GET_RICH_TOOL_DESCRIPTIONS: 'appearance:getRichToolDescriptions',
     SET_RICH_TOOL_DESCRIPTIONS: 'appearance:setRichToolDescriptions',
   },
+  tools: {
+    GET_BROWSER_TOOL_ENABLED: 'tools:getBrowserToolEnabled',
+    SET_BROWSER_TOOL_ENABLED: 'tools:setBrowserToolEnabled',
+  },
   caching: {
     GET_EXTENDED_PROMPT_CACHE: 'caching:getExtendedPromptCache',
     SET_EXTENDED_PROMPT_CACHE: 'caching:setExtendedPromptCache',

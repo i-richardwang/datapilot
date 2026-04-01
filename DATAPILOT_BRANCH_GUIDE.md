@@ -302,6 +302,17 @@ grep -rn "Craft Agent" apps/electron/resources/docs/ apps/electron/resources/rel
   - `packages/server/src/index.ts` 补齐 `CRAFT_BATCH_CLI_ENTRY` 和 PATH 配置
 - 无新增 `.craft-agent` 路径引用，无新增用户可见 "Craft Agent" 文本
 
+### 合并记��（2026-04-01，v0.8.2）
+
+- 已合并 `main` 的 2 个新增提交：`692f52e`（upstream v0.8.2 merge）和 `583d5b0`（FORK_MERGE_GUIDE 更新）
+- 2 个冲突：
+  - `apps/webui/src/index.html` — 上游新增 PWA 资源链接（favicon、manifest、apple-touch-icon、theme-color）；保留 DataPilot 标题 + 上游新增 meta 标签
+  - `apps/webui/src/login.html` — 同上，保留 DataPilot 标题 + 上游新增 meta 标签
+- 1 处新增用户可见文本需 DataPilot 替换：
+  - `apps/webui/src/public/manifest.json` — `"name": "Craft Agents"` → `"DataPilot"`、`"short_name"` 同理
+- v0.8.2 上游新增内容：WebUI OAuth 统一、浏览器工具开关（`getBrowserToolEnabled()`）、搜索可靠性（CSS Custom Highlight API 重写）、auth 加固（jose+argon2id）、PWA 资源、文件系统缓存
+- 无新增 `.craft-agent` 路径引用；release-notes/0.8.2.md 无 "Craft Agent" 文本
+
 ---
 
 ## 数据分析场景增强（规划中）
