@@ -30,7 +30,7 @@ LABEL org.opencontainers.image.description="DataPilot Server — headless AI wor
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates git && \
+    apt-get install -y --no-install-recommends ca-certificates git gosu && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user (Claude Code SDK refuses to run as root).
@@ -81,14 +81,22 @@ RUN mkdir -p /home/craftagents/.datapilot
 RUN chmod -R a+rX /app && \
     chmod -R 777 /home/craftagents
 
-USER craftagents
-
 ENV CRAFT_RPC_HOST=0.0.0.0
 ENV CRAFT_RPC_PORT=9100
 ENV CRAFT_WEBUI_DIR=/app/apps/webui/dist
 
 EXPOSE 9100
 
+# Smart entrypoint: drop from root to craftagents when the container platform
+# (e.g. Zeabur) ignores the Dockerfile USER directive and runs as root.
+# Claude Agent SDK refuses --dangerously-skip-permissions under root.
+RUN printf '#!/bin/sh\nset -e\nif [ "$(id -u)" = "0" ]; then\n  chown -R craftagents:craftagents /home/craftagents 2>/dev/null || true\n  export HOME=/home/craftagents\n  exec gosu craftagents "$@"\nfi\nexec "$@"\n' > /usr/local/bin/entrypoint.sh && \
+    chmod +x /usr/local/bin/entrypoint.sh
+
+# Default to non-root, but entrypoint handles root->craftagents fallback
+USER craftagents
+
 # --allow-insecure-bind: safe inside Docker — the container network is isolated;
 # external TLS should be handled by a reverse proxy (nginx, Caddy, etc.)
-ENTRYPOINT ["bun", "run", "packages/server/src/index.ts", "--allow-insecure-bind"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["bun", "run", "packages/server/src/index.ts", "--allow-insecure-bind"]
