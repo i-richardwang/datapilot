@@ -4,7 +4,7 @@
 > Base: `main` (commit `1a3a98f`, includes upstream v0.8.1 merge)
 > Purpose: 将 Craft Agent 改造为面向数据分析场景的垂直 Agent — **DataPilot**
 >
-> **Last updated:** 2026-03-27 (v12, merged main batch-cli-flag-split)
+> **Last updated:** 2026-04-01 (v13, 环境变量/CLI二进制/Agent文档全面品牌适配)
 
 ## 目标
 
@@ -148,27 +148,28 @@ grep -rn "Craft Agent" --include='*.tsx' --include='*.ts' --include='*.html' --i
 
 ## 未来计划的改动
 
-### P1 剩余 — 内部标识层
+### P1 剩余 — 内部标识层（低优先级）
 
 | 改动项 | 涉及范围 | 风险说明 |
 |--------|----------|---------|
 | `@craft-agent/*` 包名 → `@datapilot/*` | 12 个 package.json + 数百个 import + tsconfig path mapping | **极高** — 破坏所有模块解析，需全量修改 |
-| 其余 `CRAFT_*` 环境变量 → `DATAPILOT_*` | 12+ 个环境变量（如 `DATAPILOT_SERVER_TOKEN` 等） | **高** — 需同步修改所有引用点 |
-| CLI wrapper 脚本 `craft-agent` → `datapilot` | `resources/bin/` 下 4 个脚本 | **中** |
+| `packages/craft-cli/` 目录名 | 目录重命名 + 所有引用路径 | **高** — 内部路径，但量大 |
 | `CraftAgent` 类名 | `craft-agent.ts` 中的类和兼容别名 | **中** — 内部 API 变更 |
-| `CRAFT_FEATURE_*` feature flag | `feature-flags.ts` + 引用处（注意：`CRAFT_FEATURE_BATCH_CLI` 是 fork 新增的独立 flag，已默认启用，与上游的 `CRAFT_FEATURE_CRAFT_AGENTS_CLI` 无关） | **中** |
-| 构件文件名 `Craft-Agent-xxx` → `DataPilot-xxx` | `electron-builder.yml` + 安装/构建脚本 | **高** — 需同步服务端下载 URL |
+| `CRAFT_FEATURE_*` feature flag | `feature-flags.ts` + 引用处 | **中** — 内部 flag，用户不直接接触 |
+| 构件文件名 `Craft-Agents-xxx` → `DataPilot-xxx` | `electron-builder.yml` + 安装/构建脚本 | **高** — 需同步服务端下载 URL |
+| `com.lukilabs.craft-agent` bundle ID | 影响签名和数据迁移 | **高** — 依赖外部服务 |
 
-**建议:** 剩余改动作为独立 PR，充分测试后再合并。P1 改动后与上游合并会产生大量冲突，需权衡是否值得。
+**已完成（v13）：** ~~环境变量~~、~~CLI wrapper 脚本~~、~~CLI 二进制名称~~ — 全部已改为 `DATAPILOT_*` / `datapilot-*`
 
-### P2 剩余 — 文档 & 元数据
+### P2 剩余 — 文档 & 元数据（低优先级，用户/Agent 不直接接触）
 
 | 改动项 | 涉及范围 |
 |--------|----------|
-| `README.md` 中的 "Craft Agent(s)" 品牌名 | 标题、描述、示例等 9+ 处 |
+| `README.md` 中的 "Craft Agent(s)" 品牌名 | 标题、描述、示例等 20+ 处 |
 | `SECURITY.md` 安全披露文档 | 品牌名引用 |
 | `CONTRIBUTING.md` 贡献指南 | 品牌名引用 |
-| 根 `package.json` `"name"` 字段 | 元数据 |
+| `NOTICE` 版权文件 | 项目名 |
+| 各 `package.json` 的 `description` 字段 | ~8 个包 |
 
 ### P3 — 暂不改动（依赖外部服务或影响安全）
 
@@ -219,11 +220,15 @@ grep -rn "Craft Agent" --include='*.tsx' --include='*.ts' --include='*.html' --i
    grep -rn '\.craft-agent' --include='*.ts' --include='*.tsx' --include='*.md' . | grep -v node_modules
    ```
 3. **合并后搜索 `CRAFT_CONFIG_DIR`**，确认环境变量已统一为 `DATAPILOT_CONFIG_DIR`
-4. **检查上游是否新增了身份相关的提示词**，如有，需同步改为 DataPilot
-5. **检查上游是否新增了 `@craft-agent/` 引用或 `CRAFT_*` 环境变量**
-6. **检查上游是否新增了 `Craft Agents.app` 路径引用**（已改为 `DataPilot.app`）
-7. **检查上游是否新增了 `resources/docs/*.md` 文档**，新文档中的 "Craft Agent" 需替换为 "DataPilot"
-8. **检查上游是否新增了 `resources/release-notes/*.md`**，每次上游发版都会新增 release notes，需替换其中 "Craft Agent(s)" prose 文本
+4. **合并后搜索 `CRAFT_SERVER_URL`、`CRAFT_TLS_CA`**，确认已统一为 `DATAPILOT_SERVER_URL`、`DATAPILOT_TLS_CA`
+5. **合并后搜索 `CRAFT_CLI_ENTRY`、`CRAFT_BUN` 等内部 CLI 变量**，确认已统一为 `DATAPILOT_*`
+6. **合并后搜索 `craft-cli`（二进制名）**，确认已统一为 `datapilot-cli`；搜索 `craft-server` 确认已统一为 `datapilot-server`
+7. **合并后搜索 `craft-cli.md`（文件名引用）**，确认已统一为 `datapilot-cli.md`
+8. **检查上游是否新增了身份相关的提示词**，如有，需同步改为 DataPilot
+9. **检查上游是否新增了 `@craft-agent/` 引用或 `CRAFT_*` 环境变量**
+10. **检查上游是否新增了 `Craft Agents.app` 路径引用**（已改为 `DataPilot.app`）
+11. **检查上游是否新增了 `resources/docs/*.md` 文档**，新文档中的 "Craft Agent" 需替换为 "DataPilot"
+12. **检查上游是否新增了 `resources/release-notes/*.md`**，每次上游发版都会新增 release notes，需替换其中 "Craft Agent(s)" prose 文本
 
 ### 高频变动区域（每次合并必查）
 
@@ -239,9 +244,19 @@ grep -rn "Craft Agent" --include='*.tsx' --include='*.ts' --include='*.html' --i
 | `scripts/build-server.ts` | 上游增强自部署功能时可能新增 echo/log 输出 | `grep -n "Craft Agent" scripts/build-server.ts` |
 | `install-app.sh` / `install-app.ps1` | 上游修改安装流程时可能新增用户提示 | `grep -n "Craft Agent" scripts/install-app.sh scripts/install-app.ps1` |
 
-**建议：** 每次合并上游后，运行以下一行命令快速审查所有打包进应用的 "Craft Agent" 残留：
+**建议：** 每次合并上游后，运行以下命令快速审查所有品牌残留：
 ```bash
+# 1. 用户可见文本
 grep -rn "Craft Agent" apps/electron/resources/docs/ apps/electron/resources/release-notes/ packages/shared/src/prompts/system.ts apps/electron/src/renderer/ scripts/install-app.sh scripts/install-app.ps1 scripts/build-server.ts | grep -v node_modules | grep -v craft-agents-oss
+
+# 2. 环境变量（排除 CRAFT_FEATURE_* 内部 flag 和 FORK_MERGE_GUIDE）
+grep -rn 'CRAFT_SERVER_\|CRAFT_RPC_\|CRAFT_WEBUI_\|CRAFT_LITE_\|CRAFT_HEALTH_\|CRAFT_DEBUG\|CRAFT_VIEWER_\|CRAFT_CLI_\|CRAFT_BUN\|CRAFT_BATCH_\|CRAFT_COMMANDS_\|CRAFT_TLS_' --include="*.ts" --include="*.sh" --include="*.yaml" --include="*.json" --exclude="FORK_MERGE_GUIDE.md" --exclude-dir=node_modules --exclude-dir=.git . 2>/dev/null
+
+# 3. CLI 二进制名
+grep -rn 'craft-cli\|craft-server\|craft-agent-batch' --include="*.ts" --include="*.json" --include="*.md" --exclude="FORK_MERGE_GUIDE.md" --exclude="SQLITE_MIGRATION_AND_CRAFT_CLI.md" --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=release-notes . 2>/dev/null
+
+# 4. 文档文件名引用
+grep -rn 'craft-cli\.md' --include="*.ts" --include="*.md" --exclude-dir=node_modules --exclude-dir=.git . 2>/dev/null
 ```
 
 ### 合并记录（2026-03-24，v0.7.12）
@@ -312,6 +327,31 @@ grep -rn "Craft Agent" apps/electron/resources/docs/ apps/electron/resources/rel
   - `apps/webui/src/public/manifest.json` — `"name": "Craft Agents"` → `"DataPilot"`、`"short_name"` 同理
 - v0.8.2 上游新增内容：WebUI OAuth 统一、浏览器工具开关（`getBrowserToolEnabled()`）、搜索可靠性（CSS Custom Highlight API 重写）、auth 加固（jose+argon2id）、PWA 资源、文件系统缓存
 - 无新增 `.craft-agent` 路径引用；release-notes/0.8.2.md 无 "Craft Agent" 文本
+
+### 品牌适配记录（2026-04-01，v0.8.2 后续）
+
+v0.8.2 合并完成后，进行全面品牌适配：
+
+**环境变量重命名（37 文件，176 处）：**
+- 13 个用户可见变量：`CRAFT_SERVER_TOKEN` → `DATAPILOT_SERVER_TOKEN`、`CRAFT_RPC_HOST/PORT` → `DATAPILOT_RPC_HOST/PORT`、`CRAFT_WEBUI_*` → `DATAPILOT_WEBUI_*`、`CRAFT_LITE_VERSION` → `DATAPILOT_LITE_VERSION` 等
+- 2 个 CLI 变量：`CRAFT_SERVER_URL` → `DATAPILOT_SERVER_URL`、`CRAFT_TLS_CA` → `DATAPILOT_TLS_CA`
+- 7 个内部 CLI 变量：`CRAFT_CLI_ENTRY` → `DATAPILOT_CLI_ENTRY`、`CRAFT_BUN` → `DATAPILOT_BUN` 等
+
+**CLI 二进制名重命名（11 文件，96 处）：**
+- `craft-cli` → `datapilot-cli`（远程终端客户端）
+- `craft-server` → `datapilot-server`（服务端二进制、systemd 服务名）
+- `craft-agent-batch` 残留 → `datapilot-batch`
+
+**Agent 文档重命名：**
+- `craft-cli.md` → `datapilot-cli.md`（Agent 从系统 prompt 文档表读取的规范文件）
+- 6 个资源文档的交叉引用更新
+
+**其他修复：**
+- ReauthScreen 按钮文本、Dockerfile.viewer 标签、图标组件注释
+- Lite 模式默认开启（Dockerfile.server `ARG CRAFT_LITE_VERSION="1"`，已改为 `DATAPILOT_LITE_VERSION`）
+- Lite 模式恢复 Claude/OpenAI 订阅选项
+- 服务端 Bootstrap 对齐 Electron 初始化（workspace/permissions/themes/docs/icons）
+- Zeabur 模板添加 `DATAPILOT_VIEWER_URL` 变量
 
 ---
 
