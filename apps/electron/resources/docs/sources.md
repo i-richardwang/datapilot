@@ -4,7 +4,7 @@ This guide explains how to configure sources (MCP servers, APIs, local filesyste
 
 > **CLI-first workflow (recommended):** Use `datapilot source ...` commands instead of editing source config files directly.
 > - `datapilot source --help`
-> - Canonical command reference: [craft-cli.md](./craft-cli.md)
+> - Canonical command reference: [datapilot-cli.md](./datapilot-cli.md)
 
 ## Source Setup Process
 

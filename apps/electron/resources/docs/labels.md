@@ -4,7 +4,7 @@ Labels are additive tags that can be applied to sessions. Unlike statuses (which
 
 > **CLI-first workflow (recommended):** Use `datapilot label ...` commands instead of editing JSON directly.
 > - `datapilot label --help`
-> - Canonical command reference: [craft-cli.md](./craft-cli.md)
+> - Canonical command reference: [datapilot-cli.md](./datapilot-cli.md)
 
 ## Storage Locations
 

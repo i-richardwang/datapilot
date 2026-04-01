@@ -299,7 +299,7 @@ grep -rn "Craft Agent" apps/electron/resources/docs/ apps/electron/resources/rel
   - `system.ts` 中 batch CLI 指导从 `craftAgentsCli` 块独立出来
   - `pre-tool-use.ts` 中护栏逻辑按 namespace 分别检查对应 flag
   - `permissions-config.ts` 中 batch bash pattern 由 `batchCli` 独立控制
-  - `packages/server/src/index.ts` 补齐 `CRAFT_BATCH_CLI_ENTRY` 和 PATH 配置
+  - `packages/server/src/index.ts` 补齐 `DATAPILOT_BATCH_CLI_ENTRY` 和 PATH 配置
 - 无新增 `.craft-agent` 路径引用，无新增用户可见 "Craft Agent" 文本
 
 ### 合并记��（2026-04-01，v0.8.2）

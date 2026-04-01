@@ -4,7 +4,7 @@ This guide explains how to configure custom permission rules for Explore mode.
 
 > **CLI-first workflow (recommended):** Use `datapilot permission ...` commands instead of editing JSON directly.
 > - `datapilot permission --help`
-> - Canonical command reference: [craft-cli.md](./craft-cli.md)
+> - Canonical command reference: [datapilot-cli.md](./datapilot-cli.md)
 
 ## Overview
 

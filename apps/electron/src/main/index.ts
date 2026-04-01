@@ -138,23 +138,23 @@ if (isDebugMode) {
   // Bun runtime (packaged builds should prefer bundled runtime over PATH)
   const bunBinary = join(resourcesBase, 'vendor', 'bun', process.platform === 'win32' ? 'bun.exe' : 'bun')
   if (existsSync(bunBinary)) {
-    process.env.CRAFT_BUN = bunBinary
+    process.env.DATAPILOT_BUN = bunBinary
   }
 
   process.env.CRAFT_SCRIPTS = scriptsDir
-  process.env.CRAFT_COMMANDS_ENTRY = app.isPackaged
+  process.env.DATAPILOT_COMMANDS_ENTRY = app.isPackaged
     ? join(app.getAppPath(), 'packages', 'craft-agents-commands', 'src', 'main.ts')
     : join(process.cwd(), 'packages', 'craft-agents-commands', 'src', 'main.ts')
-  process.env.CRAFT_CLI_ENTRY = app.isPackaged
+  process.env.DATAPILOT_CLI_ENTRY = app.isPackaged
     ? join(app.getAppPath(), 'packages', 'craft-cli', 'src', 'cli.ts')
     : join(process.cwd(), 'packages', 'craft-cli', 'src', 'cli.ts')
-  process.env.CRAFT_BATCH_CLI_ENTRY = app.isPackaged
+  process.env.DATAPILOT_BATCH_CLI_ENTRY = app.isPackaged
     ? join(app.getAppPath(), 'packages', 'batch-cli', 'src', 'index.ts')
     : join(process.cwd(), 'packages', 'batch-cli', 'src', 'index.ts')
-  process.env.CRAFT_COMMANDS_DOC_PATH = app.isPackaged
-    ? join(resourcesBase, 'resources', 'docs', 'craft-cli.md')
-    : join(process.cwd(), 'apps', 'electron', 'resources', 'docs', 'craft-cli.md')
-  process.env.CRAFT_CLI_DOC_PATH = process.env.CRAFT_COMMANDS_DOC_PATH
+  process.env.DATAPILOT_COMMANDS_DOC_PATH = app.isPackaged
+    ? join(resourcesBase, 'resources', 'docs', 'datapilot-cli.md')
+    : join(process.cwd(), 'apps', 'electron', 'resources', 'docs', 'datapilot-cli.md')
+  process.env.DATAPILOT_CLI_DOC_PATH = process.env.DATAPILOT_COMMANDS_DOC_PATH
   process.env.CRAFT_AGENT_VERSION = app.getVersion()
   // Prepend both generic wrappers dir and platform uv dir:
   // - binDir exposes wrapper commands (pdf-tool, docx-tool, ...)

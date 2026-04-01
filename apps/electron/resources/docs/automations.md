@@ -4,7 +4,7 @@ This guide explains how to configure automations in DataPilot to automate workfl
 
 > **CLI-first workflow (recommended):** Use `datapilot automation ...` commands instead of editing JSON directly.
 > - `datapilot automation --help`
-> - Canonical command reference: [craft-cli.md](./craft-cli.md)
+> - Canonical command reference: [datapilot-cli.md](./datapilot-cli.md)
 
 ## What Are Automations?
 

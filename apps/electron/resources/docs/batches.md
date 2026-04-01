@@ -2,7 +2,7 @@
 
 This guide explains batch processing in DataPilot — running actions across large lists of items.
 
-> **Always use CLI commands** to manage batches. See [craft-cli.md](./craft-cli.md) for the full command reference.
+> **Always use CLI commands** to manage batches. See [datapilot-cli.md](./datapilot-cli.md) for the full command reference.
 
 ## CLI Commands
 
