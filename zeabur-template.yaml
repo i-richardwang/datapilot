@@ -40,6 +40,10 @@ spec:
           type: STRING
           name: Server WebSocket URL
           description: "Browser-facing WebSocket URL for the server (e.g. wss://your-domain.com). Required when using a custom domain with HTTPS."
+        - key: CRAFT_VIEWER_URL
+          type: STRING
+          name: Viewer Public URL
+          description: "Public URL of the Viewer service (e.g. https://viewer-xxx.zeabur.app). Required for session sharing to work correctly."
     services:
         - name: server
           icon: https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/apps/electron/resources/icon.svg
@@ -98,3 +102,5 @@ spec:
                     default: "9101"
                 VIEWER_HOST:
                     default: 0.0.0.0
+                VIEWER_BASE_URL:
+                    default: ${CRAFT_VIEWER_URL}
