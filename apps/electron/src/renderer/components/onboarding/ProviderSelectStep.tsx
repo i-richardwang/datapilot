@@ -22,7 +22,7 @@ interface ProviderOption {
 }
 
 /** Provider IDs hidden in lite version */
-const LITE_HIDDEN_PROVIDERS: Set<ProviderChoice> = new Set(['claude', 'chatgpt', 'copilot', 'local'])
+const LITE_HIDDEN_PROVIDERS: Set<ProviderChoice> = new Set(['copilot', 'local'])
 
 const ALL_PROVIDER_OPTIONS: ProviderOption[] = [
   {
