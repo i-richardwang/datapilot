@@ -151,7 +151,7 @@ function validatePackagedEnvRuntime(command: string, label: string): string {
  * Resolve runtime command and fixed argument prefix for script execution tools.
  *
  * Resolution order:
- * - env override (CRAFT_UV / CRAFT_NODE / CRAFT_BUN)
+ * - env override (CRAFT_UV / CRAFT_NODE / DATAPILOT_BUN)
  * - bundled binary path (when available)
  * - PATH fallback (dev only)
  */
@@ -228,10 +228,10 @@ export function resolveScriptRuntime(
     );
   }
 
-  if (process.env.CRAFT_BUN) {
+  if (process.env.DATAPILOT_BUN) {
     const cmd = isPackaged
-      ? validatePackagedEnvRuntime(process.env.CRAFT_BUN, 'Bun')
-      : process.env.CRAFT_BUN;
+      ? validatePackagedEnvRuntime(process.env.DATAPILOT_BUN, 'Bun')
+      : process.env.DATAPILOT_BUN;
     return { command: cmd, argsPrefix: [], source: 'env' };
   }
 
@@ -250,6 +250,6 @@ export function resolveScriptRuntime(
   throw new Error(
     isPackaged
       ? 'Bun runtime unavailable in packaged app: bun was not found in env or bundled resources.'
-      : 'Bun runtime unavailable: configure CRAFT_BUN or install bun on PATH.'
+      : 'Bun runtime unavailable: configure DATAPILOT_BUN or install bun on PATH.'
   );
 }

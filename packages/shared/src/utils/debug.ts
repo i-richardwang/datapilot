@@ -3,7 +3,7 @@
 let debugEnabled = typeof process !== 'undefined' && process.env?.DATAPILOT_DEBUG === '1';
 
 function isCliJsonOnlyMode(): boolean {
-  return typeof process !== 'undefined' && process.env?.CRAFT_CLI_JSON_ONLY === '1';
+  return typeof process !== 'undefined' && process.env?.DATAPILOT_CLI_JSON_ONLY === '1';
 }
 
 /**

@@ -1,2 +1,2 @@
 #!/bin/sh
-exec "${CRAFT_BUN:-bun}" run "${CRAFT_BATCH_CLI_ENTRY}" "$@"
+exec "${DATAPILOT_BUN:-bun}" run "${DATAPILOT_BATCH_CLI_ENTRY}" "$@"

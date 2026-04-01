@@ -75,9 +75,9 @@ describe('resolveScriptRuntime', () => {
     }
   });
 
-  it('prefers CRAFT_BUN for bun in dev', () => {
-    const prev = process.env.CRAFT_BUN;
-    process.env.CRAFT_BUN = '/tmp/custom-bun';
+  it('prefers DATAPILOT_BUN for bun in dev', () => {
+    const prev = process.env.DATAPILOT_BUN;
+    process.env.DATAPILOT_BUN = '/tmp/custom-bun';
 
     try {
       const resolved = resolveScriptRuntime('bun', { isPackaged: false });
@@ -85,8 +85,8 @@ describe('resolveScriptRuntime', () => {
       expect(resolved.argsPrefix).toEqual([]);
       expect(resolved.source).toBe('env');
     } finally {
-      if (prev === undefined) delete process.env.CRAFT_BUN;
-      else process.env.CRAFT_BUN = prev;
+      if (prev === undefined) delete process.env.DATAPILOT_BUN;
+      else process.env.DATAPILOT_BUN = prev;
     }
   });
 });
