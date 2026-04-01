@@ -1,10 +1,14 @@
 import { writeFileSync, readFileSync, unlinkSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { OAuthFlowStore } from '@craft-agent/shared/auth'
-import { ensureConfigDir, loadStoredConfig, saveConfig } from '@craft-agent/shared/config'
+import { ensureConfigDir, loadStoredConfig, saveConfig, getWorkspaces, addWorkspace, ensureToolIcons, ensurePresetThemes } from '@craft-agent/shared/config'
 import { CONFIG_DIR } from '@craft-agent/shared/config/paths'
 import { setBundledAssetsRoot } from '@craft-agent/shared/utils'
 import { autoRegisterDriver } from '@craft-agent/shared/db'
+import { getDefaultWorkspacesDir } from '@craft-agent/shared/workspaces'
+import { initializeDocs } from '@craft-agent/shared/docs'
+import { initializeReleaseNotes } from '@craft-agent/shared/release-notes'
+import { ensureDefaultPermissions } from '@craft-agent/shared/agent/permissions-config'
 import { WsRpcServer, type WsRpcTlsOptions } from '../transport/server'
 import type { EventSink, RpcServer } from '../transport/types'
 import { createHeadlessPlatform } from '../runtime/platform-headless'
@@ -212,6 +216,24 @@ export async function bootstrapServer<TSessionManager, THandlerDeps>(
 
   bootstrapConfigArtifacts(platform)
   ensureGlobalConfigExists(platform)
+
+  // Seed bundled assets (matches Electron's first-run initialization)
+  initializeDocs()
+  initializeReleaseNotes()
+  ensureDefaultPermissions()
+  ensureToolIcons()
+  ensurePresetThemes()
+
+  // Create default workspace on first run (same as Electron)
+  const workspaces = getWorkspaces()
+  if (workspaces.length === 0) {
+    const defaultPath = join(getDefaultWorkspacesDir(), 'my-workspace')
+    addWorkspace({ rootPath: defaultPath, name: 'My Workspace' })
+    platform.logger.info('[bootstrap] Created default workspace on first run')
+  }
+
+  platform.logger.info('[bootstrap] Bundled assets initialized')
+
   acquireServerLock(platform.logger)
 
   const modelRefreshService = options.initModelRefreshService()
