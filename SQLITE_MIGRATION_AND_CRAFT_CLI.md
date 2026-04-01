@@ -230,3 +230,9 @@ The SQLite migration impacts Docker builds:
 - **`better-sqlite3` native build:** This package requires `python3`, `make`, and `g++` to compile. However, the Docker server image runs on Bun which uses the built-in `bun:sqlite` driver (see `driver.ts` auto-detection). The `better-sqlite3` native binary is never loaded at runtime.
 - **`--ignore-scripts` flag:** `Dockerfile.server` uses `bun install --frozen-lockfile --ignore-scripts` to skip `better-sqlite3`'s native compilation, keeping the image slim (no build toolchain needed).
 - **`packages/craft-cli`:** This branch adds a `COPY packages/craft-cli/package.json` line to both Dockerfiles that does not exist on `main` or `feature/data-analysis-agent`.
+
+## Merge History
+
+| Version | Date | Conflicts | Notes |
+|---------|------|-----------|-------|
+| v0.8.2 | 2026-04-01 | 1 | WebUI OAuth, browser tool toggle, search reliability, auth hardening, PWA assets. Only conflict: `bun.lock` (took main's version). No upstream changes to SQLite-migrated storage modules (labels, sources, statuses, sessions). `credential-manager.ts` auto-merged cleanly (OAuth relay additions don't overlap with our changes). |
