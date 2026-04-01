@@ -46,7 +46,7 @@ describe('getTransportBannerCopy', () => {
     }))
 
     expect(copy.title).toContain('Cannot connect')
-    expect(copy.description).toContain('CRAFT_SERVER_TOKEN')
+    expect(copy.description).toContain('DATAPILOT_SERVER_TOKEN')
     expect(copy.showRetry).toBe(true)
     expect(copy.tone).toBe('error')
   })

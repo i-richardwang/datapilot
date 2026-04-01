@@ -24,7 +24,7 @@ function parseBooleanEnv(value: string | undefined): boolean | undefined {
  */
 export function isDevRuntime(): boolean {
   const nodeEnv = (getEnv('NODE_ENV') || '').toLowerCase();
-  return nodeEnv === 'development' || nodeEnv === 'dev' || getEnv('CRAFT_DEBUG') === '1';
+  return nodeEnv === 'development' || nodeEnv === 'dev' || getEnv('DATAPILOT_DEBUG') === '1';
 }
 
 /**
@@ -76,10 +76,10 @@ export function isEmbeddedServerEnabled(): boolean {
  *
  * When enabled, hides non-essential UI elements (What's New, Help menu,
  * subscription providers, extra statuses) for a streamlined experience.
- * Set CRAFT_LITE_VERSION=1 at build time to enable.
+ * Set DATAPILOT_LITE_VERSION=1 at build time to enable.
  */
 export function isLiteVersion(): boolean {
-  const override = parseBooleanEnv(process.env.CRAFT_LITE_VERSION);
+  const override = parseBooleanEnv(process.env.DATAPILOT_LITE_VERSION);
   if (override !== undefined) return override;
   return false;
 }
@@ -116,7 +116,7 @@ export const FEATURE_FLAGS = {
   /**
    * Lite version — hides non-essential UI elements.
    *
-   * Defaults to disabled. Set CRAFT_LITE_VERSION=1 at build time to enable.
+   * Defaults to disabled. Set DATAPILOT_LITE_VERSION=1 at build time to enable.
    */
   get liteVersion(): boolean {
     return isLiteVersion();

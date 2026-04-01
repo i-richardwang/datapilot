@@ -33,10 +33,10 @@ async function spawnTestServer(extraEnv?: Record<string, string>): Promise<Spawn
     env: {
       ...parentEnv,
       ...extraEnv,
-      CRAFT_SERVER_TOKEN: token,
-      CRAFT_RPC_PORT: '0',
-      CRAFT_RPC_HOST: '127.0.0.1',
-      CRAFT_HEALTH_PORT: '0', // random port
+      DATAPILOT_SERVER_TOKEN: token,
+      DATAPILOT_RPC_PORT: '0',
+      DATAPILOT_RPC_HOST: '127.0.0.1',
+      DATAPILOT_HEALTH_PORT: '0', // random port
     },
     stdout: 'pipe',
     stderr: 'pipe',
@@ -154,9 +154,9 @@ describe('headless server smoke test', () => {
     const proc = Bun.spawn(['bun', 'run', SERVER_ENTRY], {
       env: {
         ...parentEnv,
-        CRAFT_SERVER_TOKEN: token,
-        CRAFT_RPC_PORT: '0',
-        CRAFT_RPC_HOST: '127.0.0.1',
+        DATAPILOT_SERVER_TOKEN: token,
+        DATAPILOT_RPC_PORT: '0',
+        DATAPILOT_RPC_HOST: '127.0.0.1',
       },
       stdout: 'pipe',
       stderr: 'pipe',

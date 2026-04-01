@@ -8,16 +8,16 @@
 #   docker run --rm -p 9100:9100 \
 #     --user $(id -u):$(id -g) \
 #     -e HOME=/home/craftagents \
-#     -e CRAFT_SERVER_TOKEN=<secret> \
+#     -e DATAPILOT_SERVER_TOKEN=<secret> \
 #     craft-agent-server
 #
 # Run with TLS + mounted config:
 #   docker run --rm -p 9100:9100 \
 #     --user $(id -u):$(id -g) \
 #     -e HOME=/home/craftagents \
-#     -e CRAFT_SERVER_TOKEN=<secret> \
-#     -e CRAFT_RPC_TLS_CERT=/certs/cert.pem \
-#     -e CRAFT_RPC_TLS_KEY=/certs/key.pem \
+#     -e DATAPILOT_SERVER_TOKEN=<secret> \
+#     -e DATAPILOT_RPC_TLS_CERT=/certs/cert.pem \
+#     -e DATAPILOT_RPC_TLS_KEY=/certs/key.pem \
 #     -v /path/to/certs:/certs:ro \
 #     -v ~/.datapilot:/home/craftagents/.datapilot \
 #     craft-agent-server
@@ -69,9 +69,9 @@ RUN bun build packages/session-mcp-server/src/index.ts \
       --outfile packages/pi-agent-server/dist/index.js --target node --format cjs
 
 # Build web UI assets (served by the server on the RPC port)
-# Pass --build-arg CRAFT_LITE_VERSION=1 to enable lite mode.
-ARG CRAFT_LITE_VERSION="1"
-ENV CRAFT_LITE_VERSION=$CRAFT_LITE_VERSION
+# Pass --build-arg DATAPILOT_LITE_VERSION=1 to enable lite mode.
+ARG DATAPILOT_LITE_VERSION="1"
+ENV DATAPILOT_LITE_VERSION=$DATAPILOT_LITE_VERSION
 RUN bunx vite build --config apps/webui/vite.config.ts
 
 # Pre-create .datapilot so Docker named volumes inherit the correct permissions.
@@ -81,9 +81,9 @@ RUN mkdir -p /home/craftagents/.datapilot
 RUN chmod -R a+rX /app && \
     chmod -R 777 /home/craftagents
 
-ENV CRAFT_RPC_HOST=0.0.0.0
-ENV CRAFT_RPC_PORT=9100
-ENV CRAFT_WEBUI_DIR=/app/apps/webui/dist
+ENV DATAPILOT_RPC_HOST=0.0.0.0
+ENV DATAPILOT_RPC_PORT=9100
+ENV DATAPILOT_WEBUI_DIR=/app/apps/webui/dist
 
 EXPOSE 9100
 

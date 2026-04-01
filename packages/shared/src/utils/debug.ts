@@ -1,6 +1,6 @@
-// Check CRAFT_DEBUG env var at module load (for SDK subprocess)
+// Check DATAPILOT_DEBUG env var at module load (for SDK subprocess)
 // Guard against browser/renderer contexts where process is undefined
-let debugEnabled = typeof process !== 'undefined' && process.env?.CRAFT_DEBUG === '1';
+let debugEnabled = typeof process !== 'undefined' && process.env?.DATAPILOT_DEBUG === '1';
 
 function isCliJsonOnlyMode(): boolean {
   return typeof process !== 'undefined' && process.env?.CRAFT_CLI_JSON_ONLY === '1';

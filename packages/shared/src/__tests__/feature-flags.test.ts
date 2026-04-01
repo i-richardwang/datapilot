@@ -3,7 +3,7 @@ import { isDevRuntime, isDeveloperFeedbackEnabled, isCraftAgentsCliEnabled, isBa
 
 const ORIGINAL_ENV = {
   NODE_ENV: process.env.NODE_ENV,
-  CRAFT_DEBUG: process.env.CRAFT_DEBUG,
+  DATAPILOT_DEBUG: process.env.DATAPILOT_DEBUG,
   CRAFT_FEATURE_DEVELOPER_FEEDBACK: process.env.CRAFT_FEATURE_DEVELOPER_FEEDBACK,
   CRAFT_FEATURE_CRAFT_AGENTS_CLI: process.env.CRAFT_FEATURE_CRAFT_AGENTS_CLI,
   CRAFT_FEATURE_BATCH_CLI: process.env.CRAFT_FEATURE_BATCH_CLI,
@@ -14,8 +14,8 @@ afterEach(() => {
   if (ORIGINAL_ENV.NODE_ENV === undefined) delete process.env.NODE_ENV;
   else process.env.NODE_ENV = ORIGINAL_ENV.NODE_ENV;
 
-  if (ORIGINAL_ENV.CRAFT_DEBUG === undefined) delete process.env.CRAFT_DEBUG;
-  else process.env.CRAFT_DEBUG = ORIGINAL_ENV.CRAFT_DEBUG;
+  if (ORIGINAL_ENV.DATAPILOT_DEBUG === undefined) delete process.env.DATAPILOT_DEBUG;
+  else process.env.DATAPILOT_DEBUG = ORIGINAL_ENV.DATAPILOT_DEBUG;
 
   if (ORIGINAL_ENV.CRAFT_FEATURE_DEVELOPER_FEEDBACK === undefined) delete process.env.CRAFT_FEATURE_DEVELOPER_FEEDBACK;
   else process.env.CRAFT_FEATURE_DEVELOPER_FEEDBACK = ORIGINAL_ENV.CRAFT_FEATURE_DEVELOPER_FEEDBACK;
@@ -33,14 +33,14 @@ afterEach(() => {
 describe('feature-flags runtime helpers', () => {
   it('isDevRuntime returns true for explicit dev NODE_ENV', () => {
     process.env.NODE_ENV = 'development';
-    delete process.env.CRAFT_DEBUG;
+    delete process.env.DATAPILOT_DEBUG;
 
     expect(isDevRuntime()).toBe(true);
   });
 
-  it('isDevRuntime returns true for CRAFT_DEBUG override', () => {
+  it('isDevRuntime returns true for DATAPILOT_DEBUG override', () => {
     process.env.NODE_ENV = 'production';
-    process.env.CRAFT_DEBUG = '1';
+    process.env.DATAPILOT_DEBUG = '1';
 
     expect(isDevRuntime()).toBe(true);
   });
@@ -54,7 +54,7 @@ describe('feature-flags runtime helpers', () => {
 
   it('isDeveloperFeedbackEnabled honors explicit override true', () => {
     process.env.NODE_ENV = 'production';
-    delete process.env.CRAFT_DEBUG;
+    delete process.env.DATAPILOT_DEBUG;
     process.env.CRAFT_FEATURE_DEVELOPER_FEEDBACK = '1';
 
     expect(isDeveloperFeedbackEnabled()).toBe(true);
@@ -62,7 +62,7 @@ describe('feature-flags runtime helpers', () => {
 
   it('isDeveloperFeedbackEnabled falls back to dev runtime when no override', () => {
     process.env.NODE_ENV = 'production';
-    process.env.CRAFT_DEBUG = '1';
+    process.env.DATAPILOT_DEBUG = '1';
     delete process.env.CRAFT_FEATURE_DEVELOPER_FEEDBACK;
 
     expect(isDeveloperFeedbackEnabled()).toBe(true);

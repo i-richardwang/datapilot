@@ -54,11 +54,11 @@ describe('parseArgs', () => {
 
   it('falls back to env vars for url and token', () => {
     const prevUrl = process.env.CRAFT_SERVER_URL
-    const prevToken = process.env.CRAFT_SERVER_TOKEN
+    const prevToken = process.env.DATAPILOT_SERVER_TOKEN
     const prevCa = process.env.CRAFT_TLS_CA
 
     process.env.CRAFT_SERVER_URL = 'ws://env-server:8080'
-    process.env.CRAFT_SERVER_TOKEN = 'env-token'
+    process.env.DATAPILOT_SERVER_TOKEN = 'env-token'
     process.env.CRAFT_TLS_CA = '/env/ca.pem'
 
     try {
@@ -69,8 +69,8 @@ describe('parseArgs', () => {
     } finally {
       if (prevUrl === undefined) delete process.env.CRAFT_SERVER_URL
       else process.env.CRAFT_SERVER_URL = prevUrl
-      if (prevToken === undefined) delete process.env.CRAFT_SERVER_TOKEN
-      else process.env.CRAFT_SERVER_TOKEN = prevToken
+      if (prevToken === undefined) delete process.env.DATAPILOT_SERVER_TOKEN
+      else process.env.DATAPILOT_SERVER_TOKEN = prevToken
       if (prevCa === undefined) delete process.env.CRAFT_TLS_CA
       else process.env.CRAFT_TLS_CA = prevCa
     }

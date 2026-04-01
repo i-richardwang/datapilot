@@ -24,7 +24,7 @@ function createConsoleLogger(): Logger {
     warn: (...args) => console.warn(fmt('warn', args)),
     error: (...args) => console.error(fmt('error', args)),
     debug: (...args) => {
-      if (process.env.CRAFT_DEBUG === 'true' || process.env.CRAFT_IS_PACKAGED !== 'true') {
+      if (process.env.DATAPILOT_DEBUG === 'true' || process.env.CRAFT_IS_PACKAGED !== 'true') {
         console.debug(fmt('debug', args))
       }
     },
@@ -39,11 +39,11 @@ function createConsoleLogger(): Logger {
  * - CRAFT_RESOURCES_PATH — override resourcesPath (default: cwd/resources)
  * - CRAFT_IS_PACKAGED — 'true' for production (default: false)
  * - CRAFT_VERSION — app version string (default: '0.0.0-dev')
- * - CRAFT_DEBUG — 'true' to enable debug logging
+ * - DATAPILOT_DEBUG — 'true' to enable debug logging
  */
 export function createHeadlessPlatform(options?: { appVersion?: string }): PlatformServices {
   const logger = createConsoleLogger()
-  const isDebugMode = process.env.CRAFT_DEBUG === 'true' || process.env.CRAFT_IS_PACKAGED !== 'true'
+  const isDebugMode = process.env.DATAPILOT_DEBUG === 'true' || process.env.CRAFT_IS_PACKAGED !== 'true'
 
   return {
     appRootPath: process.env.CRAFT_APP_ROOT || process.cwd(),

@@ -192,7 +192,7 @@ export function buildClaudeSubprocessEnv(
         ...getProxyEnvVars(),
         ...envOverrides,
         // Propagate debug mode from argv flag OR existing env var
-        CRAFT_DEBUG: (process.argv.includes('--debug') || process.env.CRAFT_DEBUG === '1') ? '1' : '0',
+        DATAPILOT_DEBUG: (process.argv.includes('--debug') || process.env.DATAPILOT_DEBUG === '1') ? '1' : '0',
     };
 
     // Bedrock must never be routed through the Claude SDK path.
