@@ -45,7 +45,11 @@ export function SessionItem({
   const { hotkey: nextHotkey } = useActionLabel('chat.nextSearchMatch')
   const { hotkey: prevHotkey } = useActionLabel('chat.prevSearchMatch')
   const title = getSessionTitle(item)
-  const chatMatchCount = ctx.contentSearchResults.get(item.id)?.matchCount
+  // For the active session, prefer logical match count over ripgrep count
+  const activeMatch = ctx.activeChatMatchInfo
+  const isActiveSession = isSelected && activeMatch?.sessionId === item.id
+  const ripgrepMatchCount = ctx.contentSearchResults.get(item.id)?.matchCount
+  const chatMatchCount = isActiveSession ? activeMatch!.count : ripgrepMatchCount
   const hasMatch = chatMatchCount != null && chatMatchCount > 0
   const hasLabels = !!(item.labels && item.labels.length > 0 && ctx.flatLabels.length > 0 && item.labels.some(entry => {
     const labelId = extractLabelId(entry)

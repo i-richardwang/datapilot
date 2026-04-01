@@ -144,7 +144,7 @@ export interface AppShellContextType {
   /** Ref to ChatDisplay for navigation between matches */
   chatDisplayRef?: React.RefObject<ChatDisplayHandle>
   /** Callback when ChatDisplay match info changes (for immediate UI updates) */
-  onChatMatchInfoChange?: (info: { count: number; index: number }) => void
+  onChatMatchInfoChange?: (info: { sessionId: string | null; count: number; index: number; isHighlighting: boolean }) => void
 
   // Automation management
   /** Test an automation by ID — executes its actions and returns results */
