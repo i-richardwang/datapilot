@@ -145,6 +145,16 @@ export const LOCAL_ONLY_CHANNELS = new Set<string>([
   RPC_CHANNELS.appearance.GET_RICH_TOOL_DESCRIPTIONS,
   RPC_CHANNELS.appearance.SET_RICH_TOOL_DESCRIPTIONS,
 
+  // caching — prompt cache and context settings
+  RPC_CHANNELS.caching.GET_EXTENDED_PROMPT_CACHE,
+  RPC_CHANNELS.caching.SET_EXTENDED_PROMPT_CACHE,
+  RPC_CHANNELS.caching.GET_ENABLE_1M_CONTEXT,
+  RPC_CHANNELS.caching.SET_ENABLE_1M_CONTEXT,
+
+  // tools — local tool settings
+  RPC_CHANNELS.tools.GET_BROWSER_TOOL_ENABLED,
+  RPC_CHANNELS.tools.SET_BROWSER_TOOL_ENABLED,
+
   // browserPane — Electron BrowserView
   RPC_CHANNELS.browserPane.CREATE,
   RPC_CHANNELS.browserPane.DESTROY,

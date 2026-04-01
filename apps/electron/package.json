@@ -1,6 +1,6 @@
 {
   "name": "@craft-agent/electron",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Electron desktop app for Craft Agents",
   "main": "dist/main.cjs",
   "private": true,
@@ -9,7 +9,7 @@
     "email": "support@craft.do"
   },
   "homepage": "https://agents.craft.do",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "engines": {
     "node": ">=18.0.0"

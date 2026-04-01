@@ -63,6 +63,8 @@ export interface UseSessionSearchResult {
   isSearchMode: boolean
   highlightQuery: string | undefined
   isSearchingContent: boolean
+  /** Whether the search service is unavailable (e.g. ripgrep not found on remote server) */
+  isSearchUnavailable: boolean
   /** Raw content search results — needed by SessionItem for `chatMatchCount` */
   contentSearchResults: Map<string, ContentSearchResult>
 
@@ -298,6 +300,7 @@ export function useSessionSearch({
 
   const [contentSearchResults, setContentSearchResults] = useState<Map<string, ContentSearchResult>>(new Map())
   const [isSearchingContent, setIsSearchingContent] = useState(false)
+  const [isSearchUnavailable, setIsSearchUnavailable] = useState(false)
   const [displayLimit, setDisplayLimit] = useState(INITIAL_DISPLAY_LIMIT)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -318,6 +321,7 @@ export function useSessionSearch({
 
     let cancelled = false
     setIsSearchingContent(true)
+    setIsSearchUnavailable(false)
 
     const timer = setTimeout(async () => {
       try {
@@ -348,7 +352,14 @@ export function useSessionSearch({
         })
       } catch (error) {
         if (cancelled) return
-        console.error('[useSessionSearch] Content search error:', error)
+        // Detect search unavailable (ripgrep not found) vs transient errors
+        const message = error instanceof Error ? error.message : String(error)
+        if (message.includes('SearchUnavailableError') || message.includes('ripgrep')) {
+          console.warn('[useSessionSearch] Search unavailable:', message)
+          setIsSearchUnavailable(true)
+        } else {
+          console.error('[useSessionSearch] Content search error:', error)
+        }
         setContentSearchResults(new Map())
       } finally {
         if (!cancelled) {
@@ -521,6 +532,7 @@ export function useSessionSearch({
     isSearchMode,
     highlightQuery,
     isSearchingContent,
+    isSearchUnavailable,
     contentSearchResults,
     matchingFilterItems,
     otherResultItems,

@@ -38,6 +38,7 @@ import { createSpawnSessionTool, type SpawnSessionFn } from './spawn-session-too
 import { createBatchTestTool, type BatchTestFn } from './batch-test-tool.ts';
 import { createBrowserTools, type BrowserPaneFns } from './browser-tools.ts';
 import { FEATURE_FLAGS } from '../feature-flags.ts';
+import { getBrowserToolEnabled } from '../config/storage.ts';
 
 // Re-export types for backward compatibility
 export type {
@@ -276,6 +277,14 @@ function convertResult(result: ToolResult): { content: Array<{ type: 'text'; tex
 const sessionToolsCache = new Map<string, ReturnType<typeof tool>[]>();
 
 /**
+ * Invalidate ALL session tool caches (e.g., when a global setting like browserToolEnabled changes).
+ * This forces tools to be rebuilt on the next message for every session.
+ */
+export function invalidateAllSessionToolsCaches(): void {
+  sessionToolsCache.clear();
+}
+
+/**
  * Clean up cached tools for a session
  */
 export function cleanupSessionScopedTools(sessionId: string): void {
@@ -403,15 +412,20 @@ export function getSessionScopedTools(
         }),
       );
 
-      tools.push(
-        ...createBrowserTools({
-          sessionId,
-          getBrowserPaneFns: () => {
-            const callbacks = getSessionScopedToolCallbacks(sessionId);
-            return callbacks?.browserPaneFns;
-          },
-        }),
-      );
+      // Add browser_* tools — backend-specific (requires BrowserPaneManager in Electron)
+      // Gated by the "Built-in browser" setting so users with external browser tools
+      // (Playwright, Puppeteer, etc.) can disable the built-in one.
+      if (getBrowserToolEnabled()) {
+        tools.push(
+          ...createBrowserTools({
+            sessionId,
+            getBrowserPaneFns: () => {
+              const callbacks = getSessionScopedToolCallbacks(sessionId);
+              return callbacks?.browserPaneFns;
+            },
+          }),
+        );
+      }
     }
 
     sessionToolsCache.set(cacheKey, tools);

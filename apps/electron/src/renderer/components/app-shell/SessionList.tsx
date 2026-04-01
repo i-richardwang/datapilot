@@ -87,6 +87,8 @@ interface SessionListProps {
   onNavigateToSession?: (sessionId: string) => void
   /** Session-level pending prompt marker (permission/admin approval) */
   hasPendingPrompt?: (sessionId: string) => boolean
+  /** DOM-verified match info for the active session (from ChatDisplay) */
+  activeChatMatchInfo?: { sessionId: string | null; count: number; isHighlighting?: boolean }
 }
 
 // Re-export SessionStatusId for use by parent components
@@ -135,6 +137,7 @@ export function SessionList({
   focusedSessionId,
   onNavigateToSession,
   hasPendingPrompt,
+  activeChatMatchInfo,
 }: SessionListProps) {
   const setSendToWorkspace = useSetAtom(sendToWorkspaceAtom)
 
@@ -228,6 +231,7 @@ export function SessionList({
     isSearchMode,
     highlightQuery,
     isSearchingContent,
+    isSearchUnavailable,
     contentSearchResults,
     matchingFilterItems,
     otherResultItems,
@@ -578,6 +582,7 @@ export function SessionList({
     isMultiSelectActive,
     sessionOptions,
     contentSearchResults,
+    activeChatMatchInfo,
     hasPendingPrompt,
   }), [
     handleRenameClick, onSessionStatusChange,
@@ -587,7 +592,7 @@ export function SessionList({
     handleSelectSessionById, handleOpenInNewWindow, setSendToWorkspace, handleFocusZone, handleKeyDown,
     sessionStatuses, flatLabels, labels, resolvedSearchQuery,
     focusedSessionId, selectionStore.state.selected, isMultiSelectActive,
-    sessionOptions, contentSearchResults, hasPendingPrompt,
+    sessionOptions, contentSearchResults, activeChatMatchInfo, hasPendingPrompt,
   ])
 
   // --- Empty state (non-search) — render before EntityList ---
@@ -672,6 +677,7 @@ export function SessionList({
                 onFocus={() => setIsSearchInputFocused(true)}
                 onBlur={() => setIsSearchInputFocused(false)}
                 isSearching={isSearchingContent}
+                isUnavailable={isSearchUnavailable}
                 resultCount={matchingFilterItems.length + otherResultItems.length}
                 exceededLimit={exceededSearchLimit}
                 inputRef={searchInputRef}
