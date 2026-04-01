@@ -47,7 +47,7 @@ export function ReauthScreen({ onLogin, onReset }: ReauthScreenProps) {
           title="Session Expired"
           description={
             <>
-              Your Craft session has expired or is no longer valid.
+              Your session has expired or is no longer valid.
               <br />
               Please log in again to continue using DataPilot.
               <br />
@@ -72,7 +72,7 @@ export function ReauthScreen({ onLogin, onReset }: ReauthScreenProps) {
                 ) : (
                   <>
                     <RefreshCw className="mr-2 size-4" />
-                    Log In with Craft
+                    Log In
                   </>
                 )}
               </Button>

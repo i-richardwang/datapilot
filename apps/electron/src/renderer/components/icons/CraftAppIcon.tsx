@@ -6,7 +6,7 @@ interface CraftAppIconProps {
 }
 
 /**
- * CraftAppIcon - Displays the Craft logo (colorful "C" icon)
+ * CraftAppIcon - Displays the DataPilot logo (colorful "C" icon)
  */
 export function CraftAppIcon({ className, size = 64 }: CraftAppIconProps) {
   return (
