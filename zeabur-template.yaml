@@ -4,7 +4,7 @@ kind: Template
 metadata:
     name: DataPilot
 spec:
-    description: "DataPilot is an open-source, agent-native workflow platform specialized for data analysis. Built on Craft Agents, it features multi-session management, MCP service connections, custom skills, and document-centric workflows."
+    description: "DataPilot is an open-source, agent-native workflow platform specialized for data analysis. DataPilot features multi-session management, MCP service connections, custom skills, and document-centric workflows."
     icon: https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/apps/electron/resources/icon.svg
     tags:
         - AI

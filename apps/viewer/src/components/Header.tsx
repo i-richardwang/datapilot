@@ -5,7 +5,7 @@
 import { Sun, Moon, X } from 'lucide-react'
 
 /**
- * CraftAgentLogo - The Craft Agent "C" logo
+ * CraftAgentLogo - The DataPilot "C" logo
  */
 function CraftAgentLogo({ className }: { className?: string }) {
   return (

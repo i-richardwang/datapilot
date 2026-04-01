@@ -1,5 +1,5 @@
 # =============================================================================
-# Craft Agents Viewer Server — lightweight session sharing service
+# DataPilot Viewer Server — lightweight session sharing service
 #
 # Build:
 #   docker buildx build -f Dockerfile.viewer -t craft-viewer-server .
@@ -24,7 +24,7 @@
 FROM oven/bun:1.3-slim
 
 LABEL org.opencontainers.image.source="https://github.com/lukilabs/craft-agents-oss"
-LABEL org.opencontainers.image.description="Craft Agents Viewer — shared session hosting service"
+LABEL org.opencontainers.image.description="DataPilot Viewer — shared session hosting service"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 WORKDIR /app
