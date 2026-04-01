@@ -368,7 +368,7 @@ export class PiAgent extends BaseAgent {
         // Pass session dir for cross-process toolMetadataStore
         ...(sessionDir ? { CRAFT_SESSION_DIR: sessionDir } : {}),
         // Propagate debug mode
-        CRAFT_DEBUG: (process.argv.includes('--debug') || process.env.CRAFT_DEBUG === '1') ? '1' : '0',
+        DATAPILOT_DEBUG: (process.argv.includes('--debug') || process.env.DATAPILOT_DEBUG === '1') ? '1' : '0',
       },
     });
 

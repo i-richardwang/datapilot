@@ -2,7 +2,7 @@
 #
 # Quick start:
 #   1. cp .env.docker .env
-#   2. Edit .env — set CRAFT_SERVER_TOKEN
+#   2. Edit .env — set DATAPILOT_SERVER_TOKEN
 #      (or generate one: docker compose run --rm server --generate-token)
 #   3. docker compose up --build
 #   4. Open http://localhost:9100
@@ -13,13 +13,13 @@ services:
       context: .
       dockerfile: Dockerfile.server
       args:
-        - CRAFT_LITE_VERSION=${CRAFT_LITE_VERSION:-}
+        - DATAPILOT_LITE_VERSION=${DATAPILOT_LITE_VERSION:-}
     ports:
-      - "${CRAFT_RPC_PORT:-9100}:9100"
+      - "${DATAPILOT_RPC_PORT:-9100}:9100"
     environment:
-      - CRAFT_SERVER_TOKEN=${CRAFT_SERVER_TOKEN}
-      - CRAFT_WEBUI_PASSWORD=${CRAFT_WEBUI_PASSWORD:-}
-      - CRAFT_HEALTH_PORT=9101
+      - DATAPILOT_SERVER_TOKEN=${DATAPILOT_SERVER_TOKEN}
+      - DATAPILOT_WEBUI_PASSWORD=${DATAPILOT_WEBUI_PASSWORD:-}
+      - DATAPILOT_HEALTH_PORT=9101
     volumes:
       - ${DATAPILOT_DATA_DIR:-~/.datapilot}:/home/craftagents/.datapilot
     healthcheck:

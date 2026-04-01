@@ -36,11 +36,11 @@ spec:
         ## Documentation
         - GitHub: https://github.com/i-richardwang/craft-agents-oss
     variables:
-        - key: CRAFT_WEBUI_WS_URL
+        - key: DATAPILOT_WEBUI_WS_URL
           type: STRING
           name: Server WebSocket URL
           description: "Browser-facing WebSocket URL for the server (e.g. wss://your-domain.com). Required when using a custom domain with HTTPS."
-        - key: CRAFT_VIEWER_URL
+        - key: DATAPILOT_VIEWER_URL
           type: STRING
           name: Viewer Public URL
           description: "Public URL of the Viewer service (e.g. https://viewer-xxx.zeabur.app). Required for session sharing to work correctly."
@@ -64,19 +64,19 @@ spec:
             instructions:
                 - type: PASSWORD
                   title: Server Token
-                  content: ${CRAFT_SERVER_TOKEN}
+                  content: ${DATAPILOT_SERVER_TOKEN}
                   category: Credentials
             env:
-                CRAFT_SERVER_TOKEN:
+                DATAPILOT_SERVER_TOKEN:
                     default: ${PASSWORD}
                     expose: true
-                CRAFT_HEALTH_PORT:
+                DATAPILOT_HEALTH_PORT:
                     default: "9101"
-                CRAFT_RPC_HOST:
+                DATAPILOT_RPC_HOST:
                     default: 0.0.0.0
-                CRAFT_RPC_PORT:
+                DATAPILOT_RPC_PORT:
                     default: "9100"
-                CRAFT_LITE_VERSION:
+                DATAPILOT_LITE_VERSION:
                     default: "1"
 
         - name: viewer
@@ -103,4 +103,4 @@ spec:
                 VIEWER_HOST:
                     default: 0.0.0.0
                 VIEWER_BASE_URL:
-                    default: ${CRAFT_VIEWER_URL}
+                    default: ${DATAPILOT_VIEWER_URL}

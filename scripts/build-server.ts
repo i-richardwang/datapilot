@@ -629,22 +629,22 @@ done
 echo "Binaries configured."
 
 # Generate token if not set
-if [ -z "\${CRAFT_SERVER_TOKEN:-}" ]; then
+if [ -z "\${DATAPILOT_SERVER_TOKEN:-}" ]; then
   TOKEN=\$(openssl rand -hex 32)
   cat > "$DIR/.env" <<ENVFILE
-CRAFT_SERVER_TOKEN=$TOKEN
+DATAPILOT_SERVER_TOKEN=$TOKEN
 
 # TLS — uncomment and set paths to enable wss://
-# CRAFT_RPC_TLS_CERT=/path/to/cert.pem
-# CRAFT_RPC_TLS_KEY=/path/to/key.pem
-# CRAFT_RPC_TLS_CA=/path/to/ca.pem
+# DATAPILOT_RPC_TLS_CERT=/path/to/cert.pem
+# DATAPILOT_RPC_TLS_KEY=/path/to/key.pem
+# DATAPILOT_RPC_TLS_CA=/path/to/ca.pem
 ENVFILE
   echo ""
   echo "Generated server token (saved to $DIR/.env)"
 else
-  TOKEN="\$CRAFT_SERVER_TOKEN"
+  TOKEN="\$DATAPILOT_SERVER_TOKEN"
   echo ""
-  echo "Using CRAFT_SERVER_TOKEN from environment."
+  echo "Using DATAPILOT_SERVER_TOKEN from environment."
 fi
 
 # Systemd installation
@@ -667,8 +667,8 @@ Type=simple
 User=$SERVICE_USER
 WorkingDirectory=$DIR
 EnvironmentFile=$DIR/.env
-Environment=CRAFT_RPC_HOST=127.0.0.1
-Environment=CRAFT_RPC_PORT=9100
+Environment=DATAPILOT_RPC_HOST=127.0.0.1
+Environment=DATAPILOT_RPC_PORT=9100
 ExecStart=$DIR/bin/craft-server
 Restart=on-failure
 RestartSec=5
@@ -691,7 +691,7 @@ fi
 
 echo ""
 echo "Quick start:"
-echo "  CRAFT_SERVER_TOKEN=$TOKEN $DIR/start.sh"
+echo "  DATAPILOT_SERVER_TOKEN=$TOKEN $DIR/start.sh"
 echo ""
 echo "Or with systemd:"
 echo "  sudo $DIR/install.sh --systemd"
@@ -733,8 +733,8 @@ ENV CRAFT_APP_ROOT=/app
 ENV CRAFT_RESOURCES_PATH=/app/resources
 ENV CRAFT_UV=/app/resources/bin/uv
 ENV CRAFT_SCRIPTS=/app/resources/scripts
-ENV CRAFT_RPC_HOST=0.0.0.0
-ENV CRAFT_RPC_PORT=9100
+ENV DATAPILOT_RPC_HOST=0.0.0.0
+ENV DATAPILOT_RPC_PORT=9100
 ENV PATH="/app/resources/bin:/app/vendor/bun:\${PATH}"
 
 EXPOSE 9100
@@ -750,11 +750,11 @@ services:
     ports:
       - "9100:9100"
     environment:
-      - CRAFT_SERVER_TOKEN=\${CRAFT_SERVER_TOKEN:?Set CRAFT_SERVER_TOKEN}
-      - CRAFT_RPC_PORT=9100
+      - DATAPILOT_SERVER_TOKEN=\${DATAPILOT_SERVER_TOKEN:?Set DATAPILOT_SERVER_TOKEN}
+      - DATAPILOT_RPC_PORT=9100
       # TLS — uncomment to enable wss://
-      # - CRAFT_RPC_TLS_CERT=/certs/cert.pem
-      # - CRAFT_RPC_TLS_KEY=/certs/key.pem
+      # - DATAPILOT_RPC_TLS_CERT=/certs/cert.pem
+      # - DATAPILOT_RPC_TLS_KEY=/certs/key.pem
     volumes:
       - craft-data:/root/.datapilot
       # TLS — mount cert directory
@@ -894,7 +894,7 @@ async function main(): Promise<void> {
 
   console.log('\n  Build completed successfully!');
   console.log(`\nQuick start:`);
-  console.log(`  CRAFT_SERVER_TOKEN=<secret> ${outputDir}/start.sh`);
+  console.log(`  DATAPILOT_SERVER_TOKEN=<secret> ${outputDir}/start.sh`);
 }
 
 main();

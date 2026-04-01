@@ -63,7 +63,7 @@ if (isClientOnly) {
   // No local server, no routing — all channels go to remote.
 
   const wsUrl = process.env.CRAFT_SERVER_URL!
-  const wsToken = process.env.CRAFT_SERVER_TOKEN ?? ''
+  const wsToken = process.env.DATAPILOT_SERVER_TOKEN ?? ''
 
   // Block unencrypted ws:// to non-localhost servers — tokens would be sent in cleartext
   const parsed = new URL(wsUrl)
@@ -72,7 +72,7 @@ if (isClientOnly) {
     throw new Error(
       `Refusing to connect to remote server over unencrypted ws://. ` +
       `Use wss:// (TLS) for non-localhost connections. ` +
-      `Set CRAFT_RPC_TLS_CERT/KEY on the server to enable TLS.`
+      `Set DATAPILOT_RPC_TLS_CERT/KEY on the server to enable TLS.`
     )
   }
 

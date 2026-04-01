@@ -153,7 +153,7 @@ grep -rn "Craft Agent" --include='*.tsx' --include='*.ts' --include='*.html' --i
 | 改动项 | 涉及范围 | 风险说明 |
 |--------|----------|---------|
 | `@craft-agent/*` 包名 → `@datapilot/*` | 12 个 package.json + 数百个 import + tsconfig path mapping | **极高** — 破坏所有模块解析，需全量修改 |
-| 其余 `CRAFT_*` 环境变量 → `DATAPILOT_*` | 12+ 个环境变量（如 `CRAFT_SERVER_TOKEN` 等） | **高** — 需同步修改所有引用点 |
+| 其余 `CRAFT_*` 环境变量 → `DATAPILOT_*` | 12+ 个环境变量（如 `DATAPILOT_SERVER_TOKEN` 等） | **高** — 需同步修改所有引用点 |
 | CLI wrapper 脚本 `craft-agent` → `datapilot` | `resources/bin/` 下 4 个脚本 | **中** |
 | `CraftAgent` 类名 | `craft-agent.ts` 中的类和兼容别名 | **中** — 内部 API 变更 |
 | `CRAFT_FEATURE_*` feature flag | `feature-flags.ts` + 引用处（注意：`CRAFT_FEATURE_BATCH_CLI` 是 fork 新增的独立 flag，已默认启用，与上游的 `CRAFT_FEATURE_CRAFT_AGENTS_CLI` 无关） | **中** |
@@ -286,7 +286,7 @@ grep -rn "Craft Agent" apps/electron/resources/docs/ apps/electron/resources/rel
 ### 合并记录（2026-03-27，viewer-server）
 
 - 已合并 `main` 的 1 个新增提交：`dcf9209`（self-hosted viewer server）
-- 无冲突，`branding.ts` 自动合并（main 加 `CRAFT_VIEWER_URL` env var，本分支改品牌注释，不重叠）
+- 无冲突，`branding.ts` 自动合并（main 加 `DATAPILOT_VIEWER_URL` env var，本分支改品牌注释，不重叠）
 - 新增文件均为全新（`apps/viewer-server/`、`Dockerfile.viewer`），无品牌文本需替换
 - 无新增 `.craft-agent` 路径引用，无新增用户可见 "Craft Agent" 文本
 

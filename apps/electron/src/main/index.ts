@@ -105,7 +105,7 @@ log.initialize()
 
 // Enable debug/perf in dev mode (running from source)
 if (isDebugMode) {
-  process.env.CRAFT_DEBUG = '1'
+  process.env.DATAPILOT_DEBUG = '1'
   enableDebug()
   setPerfEnabled(true)
 }
@@ -567,10 +567,10 @@ app.whenReady().then(async () => {
       const serverToken = serverModeEnabled && embeddedServerConfig.token
         ? embeddedServerConfig.token
         : randomUUID()
-      const rpcHost = process.env.CRAFT_RPC_HOST
+      const rpcHost = process.env.DATAPILOT_RPC_HOST
         ?? (serverModeEnabled ? '0.0.0.0' : '127.0.0.1')
-      const rpcPort = process.env.CRAFT_RPC_PORT
-        ? parseInt(process.env.CRAFT_RPC_PORT, 10)
+      const rpcPort = process.env.DATAPILOT_RPC_PORT
+        ? parseInt(process.env.DATAPILOT_RPC_PORT, 10)
         : (serverModeEnabled ? embeddedServerConfig.port : 0)
 
       // Load TLS certificates if configured
@@ -807,7 +807,7 @@ app.whenReady().then(async () => {
       // Headless: print connection details
       if (isHeadless) {
         console.log(`CRAFT_SERVER_URL=${instance.protocol}://${instance.host}:${instance.port}`)
-        console.log(`CRAFT_SERVER_TOKEN=${instance.token}`)
+        console.log(`DATAPILOT_SERVER_TOKEN=${instance.token}`)
       }
     }
 

@@ -2,7 +2,7 @@
  * Server spawner — start a headless Craft Agent server as a child process.
  *
  * Spawns `bun run <serverEntry>`, reads stdout for the `CRAFT_SERVER_URL=`
- * and `CRAFT_SERVER_TOKEN=` lines, and returns a handle to stop the server.
+ * and `DATAPILOT_SERVER_TOKEN=` lines, and returns a handle to stop the server.
  */
 
 import { resolve, join } from 'node:path'
@@ -64,9 +64,9 @@ export async function spawnServer(opts?: SpawnServerOptions): Promise<SpawnedSer
     env: {
       ...parentEnv,
       ...opts?.env,
-      CRAFT_SERVER_TOKEN: token,
-      CRAFT_RPC_PORT: '0',
-      CRAFT_RPC_HOST: '127.0.0.1',
+      DATAPILOT_SERVER_TOKEN: token,
+      DATAPILOT_RPC_PORT: '0',
+      DATAPILOT_RPC_HOST: '127.0.0.1',
     },
     stdout: 'pipe',
     stderr: 'pipe',
@@ -106,7 +106,7 @@ export async function spawnServer(opts?: SpawnServerOptions): Promise<SpawnedSer
         if (line.startsWith('CRAFT_SERVER_URL=')) {
           url = line.slice('CRAFT_SERVER_URL='.length).trim()
         }
-        if (line.startsWith('CRAFT_SERVER_TOKEN=')) {
+        if (line.startsWith('DATAPILOT_SERVER_TOKEN=')) {
           // Server echoes the token — we already have it but this confirms ready
         }
         // Once we have the URL, the server is ready

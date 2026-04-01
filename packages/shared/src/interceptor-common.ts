@@ -24,7 +24,7 @@ export const IS_PACKAGED = process.argv.some(arg => arg.includes('app.asar'));
 export const INTERCEPTOR_LOGGING_ENABLED = !IS_PACKAGED;
 
 export const DEBUG = INTERCEPTOR_LOGGING_ENABLED &&
-  (process.argv.includes('--debug') || process.env.CRAFT_DEBUG === '1');
+  (process.argv.includes('--debug') || process.env.DATAPILOT_DEBUG === '1');
 
 /** Config file path for reading settings in the SDK subprocess */
 export const CONFIG_FILE = join(homedir(), '.datapilot', 'config.json');
