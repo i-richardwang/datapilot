@@ -132,7 +132,7 @@ function acquireServerLock(logger: PlatformServices['logger']): void {
     try {
       const content = readFileSync(LOCK_FILE, 'utf-8').trim()
       const pid = parseInt(content, 10)
-      if (!isNaN(pid) && isProcessAlive(pid)) {
+      if (!isNaN(pid) && pid !== process.pid && isProcessAlive(pid)) {
         throw new Error(
           `Another server instance is already running (PID ${pid}). ` +
           `If this is stale, delete ${LOCK_FILE} and retry.`
