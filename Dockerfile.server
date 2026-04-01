@@ -70,7 +70,7 @@ RUN bun build packages/session-mcp-server/src/index.ts \
 
 # Build web UI assets (served by the server on the RPC port)
 # Pass --build-arg CRAFT_LITE_VERSION=1 to enable lite mode.
-ARG CRAFT_LITE_VERSION=""
+ARG CRAFT_LITE_VERSION="1"
 ENV CRAFT_LITE_VERSION=$CRAFT_LITE_VERSION
 RUN bunx vite build --config apps/webui/vite.config.ts
 
