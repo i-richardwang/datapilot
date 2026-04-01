@@ -527,6 +527,10 @@ export interface ElectronAPI {
   getKeepAwakeWhileRunning(): Promise<boolean>
   setKeepAwakeWhileRunning(enabled: boolean): Promise<void>
 
+  // Tools settings
+  getBrowserToolEnabled(): Promise<boolean>
+  setBrowserToolEnabled(enabled: boolean): Promise<void>
+
   // Appearance settings
   getRichToolDescriptions(): Promise<boolean>
   setRichToolDescriptions(enabled: boolean): Promise<void>

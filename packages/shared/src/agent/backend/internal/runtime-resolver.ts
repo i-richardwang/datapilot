@@ -175,6 +175,17 @@ function resolveRipgrepPath(hostRuntime: BackendHostRuntimeContext): string | un
   const cwdFallback = join(process.cwd(), ripgrepRelative);
   if (existsSync(cwdFallback)) return cwdFallback;
 
+  // Non-packaged (headless server, dev mode): fall back to system rg via PATH.
+  // Packaged apps must use vendored binary only — never resolve from PATH
+  // to avoid picking up an incompatible system install.
+  if (!hostRuntime.isPackaged) {
+    try {
+      const whichCmd = process.platform === 'win32' ? 'where' : 'which';
+      const systemRg = execFileSync(whichCmd, ['rg'], { encoding: 'utf-8' }).trim();
+      if (systemRg && existsSync(systemRg)) return systemRg;
+    } catch { /* system rg not found */ }
+  }
+
   return undefined;
 }
 

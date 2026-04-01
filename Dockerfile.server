@@ -30,7 +30,7 @@ LABEL org.opencontainers.image.description="Craft Agents Server — headless AI 
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates git gosu && \
+    apt-get install -y --no-install-recommends ca-certificates git gosu ripgrep && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user (Claude Code SDK refuses to run as root).

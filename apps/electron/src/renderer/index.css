@@ -10,8 +10,13 @@
 @source "../renderer/pages/**/*.{ts,tsx,jsx}";
 @source "../renderer/tabs/**/*.{ts,tsx,jsx}";
 @source "../renderer/playground/**/*.{ts,tsx,jsx}";
+@source "../renderer/utils/**/*.{ts,tsx,jsx}";
+@source "../renderer/config/**/*.{ts,tsx,jsx}";
 @source "../../../../packages/ui/src/components/**/*.{ts,tsx,jsx}";
 @source "../../../../packages/ui/src/lib/**/*.{ts,tsx,jsx}";
+
+/* CSS Custom Highlight API styles are injected at runtime via ChatDisplay.tsx
+   to avoid LightningCSS warnings (::highlight is not yet recognized by the optimizer) */
 
 /* =============================================================================
    ANIMATABLE CSS CUSTOM PROPERTIES
@@ -237,22 +242,22 @@
 
 /* Dark Mode */
 .dark {
-  /* === 6 BASE COLORS === */
-  --background: oklch(0.2 0.005 270);
+  /* === 6 BASE COLORS (must match DEFAULT_THEME.dark in theme.ts) === */
+  --background: oklch(0.145 0.015 270);
   --background-elevated: color-mix(in srgb, var(--foreground) 1.5%, var(--background));
-  --foreground: oklch(0.92 0.005 270);
+  --foreground: oklch(0.95 0.01 270);
   --foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background)); /* unfocused panel text */
-  --foreground-rgb: 227, 226, 229;           /* RGB for shadow borders */
+  --foreground-rgb: 237, 236, 240;           /* RGB for shadow borders */
   --user-message-bubble: oklch(from var(--foreground) l c h / 0.05);
   --user-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.03);
-  --accent: oklch(0.7214 0.1337 49.9802);    /* brighter in dark */
-  --accent-rgb: 162, 97, 58;                 /* darkened RGB for shadow-tinted (70% of accent) */
-  --info: oklch(0.70 0.16 70);               /* amber */
-  --info-rgb: 200, 140, 60;                  /* RGB for shadow-tinted */
+  --accent: oklch(0.65 0.22 293);            /* brighter purple in dark */
+  --accent-rgb: 130, 75, 185;               /* darkened RGB for shadow-tinted (70% of accent) */
+  --info: oklch(0.78 0.14 70);               /* amber */
+  --info-rgb: 210, 155, 55;                  /* RGB for shadow-tinted */
   --success: oklch(0.60 0.17 145);           /* green */
-  --success-rgb: 50, 140, 80;                /* RGB for shadow-tinted */
-  --destructive: oklch(0.70 0.19 22);        /* brighter red in dark */
-  --destructive-rgb: 200, 80, 70;            /* RGB for shadow-tinted */
+  --success-rgb: 50, 140, 80;               /* RGB for shadow-tinted */
+  --destructive: oklch(0.65 0.22 28);        /* brighter red in dark */
+  --destructive-rgb: 200, 70, 60;            /* RGB for shadow-tinted */
 
   /* === SHADOW OPACITY (stronger in dark mode for visibility) === */
   --shadow-border-opacity: 0.15;

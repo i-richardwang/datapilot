@@ -33,6 +33,8 @@ export interface SessionListContextValue {
   // Per-session lookup maps
   sessionOptions?: Map<string, SessionOptions>
   contentSearchResults: Map<string, ContentSearchResult>
+  /** DOM-verified match info for the active session (count, highlighting state) */
+  activeChatMatchInfo?: { sessionId: string | null; count: number; isHighlighting?: boolean }
   /** Whether a session currently has a pending permission/admin prompt */
   hasPendingPrompt?: (sessionId: string) => boolean
 }
