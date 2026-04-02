@@ -41,7 +41,7 @@ Handler + tests: coerces stringified JSON, validates against output schema via *
 
 ### Batch RPC Handlers — `packages/server-core/src/handlers/rpc/batches.ts`
 
-9 RPC handlers (LIST, START, PAUSE, RESUME, GET_STATUS, GET_STATE, SET_ENABLED, DUPLICATE, DELETE). Mirrors `automations.ts` structure.
+13 RPC handlers (LIST, START, PAUSE, RESUME, GET_STATUS, GET_STATE, GET_ITEMS, SET_ENABLED, DUPLICATE, DELETE, TEST, GET_TEST_RESULT, RETRY_ITEM). Mirrors `automations.ts` structure. All handlers use `ensureBatchProcessor()` (lazy-init-on-demand) instead of `getBatchProcessor()` to guarantee the processor is available. Mutation handlers (SET_ENABLED, DUPLICATE, DELETE) call `notifyBatchesChanged()` after writing to disk.
 
 ### Batch UI — `apps/electron/src/renderer/components/batches/`
 
@@ -86,6 +86,8 @@ These files are frequently touched by upstream and have substantial fork modific
 - Modified `executePromptAutomation()`: added `isBatch`, `batchContext`, and `workingDirectory` params (coexist with upstream's `automationName`)
 - Session completion handler notifies batch processors
 - Added `getBatchProcessor()`, `broadcastBatchesChanged()`, cleanup in `dispose()`
+- **Eager initialization:** Extracted `ensureBatchProcessor()` and `ensureAutomationSystem()` as public idempotent methods. Called from `initialize()` (server startup — all workspaces), `createSession()` (before agent starts), and batch RPC handlers. Fixes race conditions where sessions/RPCs arrive before `setupConfigWatcher` is triggered by the UI
+- **Mutation broadcasting:** Added public `notifyBatchesChanged()` and `notifyAutomationsChanged()` methods that wrap the private broadcast methods. Called by RPC mutation handlers to push changes to the UI without relying on ConfigWatcher's `fs.watch()`
 - v0.7.12 upstream also changed Claude session bootstrapping: restores managed Anthropic env vars via `resetManagedAnthropicAuthEnvVars()`, adds branch-fork fallback message plumbing, and reads `enable1MContext` from global config storage instead of workspace defaults
 
 **Pattern:** Mirrors automationSystems management. `automationName` passthrough follows upstream's naming flow.
@@ -153,8 +155,24 @@ Extended `ClaudeContextOptions` with `batchContext?: BatchContext`; added `valid
 
 #### `packages/server-core/src/handlers/session-manager-interface.ts`
 
-Added `getBatchProcessor?()` method; extended `executePromptAutomation()` with `isBatch` + `batchContext` + `workingDirectory` params.
+Added `getBatchProcessor?()` method; extended `executePromptAutomation()` with `isBatch` + `batchContext` + `workingDirectory` params. Added `ensureBatchProcessor()` (returns `BatchProcessor`, creates if needed), `notifyBatchesChanged()`, and `notifyAutomationsChanged()` for explicit mutation broadcasting.
 **Note:** This was a 3-way conflict in v0.7.1 merge. Future upstream signature changes will conflict.
+
+#### `packages/server-core/src/handlers/rpc/automations.ts`
+
+Added `automations:list` RPC handler (reads `automations.json`, returns raw config for UI parsing). Mutation handlers (SET_ENABLED, DUPLICATE, DELETE) now call `notifyAutomationsChanged()` after writing to disk, so changes push to the UI immediately without relying on ConfigWatcher.
+
+#### `apps/electron/src/renderer/hooks/useAutomations.ts`
+
+Changed data loading from direct `readFile(rootPath + '/automations.json')` to `listAutomations(workspaceId)` RPC call. This fixes automations not showing in web deployments where the client may not have access to `rootPath`. Subscription to live updates unchanged (still listens for `automations:changed` event).
+
+#### `packages/shared/src/protocol/channels.ts`
+
+Added `automations.LIST` channel (`'automations:list'`).
+
+#### `apps/electron/src/transport/channel-map.ts`
+
+Added `listAutomations` mapping for `automations.LIST` channel.
 
 #### `packages/shared/src/config/validators.ts`
 
