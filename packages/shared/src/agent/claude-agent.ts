@@ -828,7 +828,13 @@ export class ClaudeAgent extends BaseAgent {
       // - EnterPlanMode/ExitPlanMode: We use safe mode instead (user-controlled via UI)
       // - AskUserQuestion: Requires interactive UI to show question options to user
       // Note: Mini agents use a minimal tool list directly, so no additional blocking needed
-      const disallowedTools: string[] = ['EnterPlanMode', 'ExitPlanMode', 'AskUserQuestion', 'Skill'];
+      // Disable SDK built-in cron tools — DataPilot has its own persistent Automations system
+      // (automations.json + SchedulerTick). CronCreate/Delete/List are in-memory session-only
+      // tools that vanish when the session ends, confusing users who expect persistent schedules.
+      const disallowedTools: string[] = [
+        'EnterPlanMode', 'ExitPlanMode', 'AskUserQuestion', 'Skill',
+        'CronCreate', 'CronDelete', 'CronList',
+      ];
 
       // Build MCP servers config
       // Mini agents: only session tools (config_validate) to minimize token usage
