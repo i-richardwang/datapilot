@@ -351,6 +351,7 @@ export const RPC_CHANNELS = {
     INTERACTED: 'browser-pane:interacted',
   },
   automations: {
+    LIST: 'automations:list',
     TEST: 'automations:test',
     SET_ENABLED: 'automations:setEnabled',
     DUPLICATE: 'automations:duplicate',

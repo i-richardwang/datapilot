@@ -364,6 +364,7 @@ export const CHANNEL_MAP = {
   setWorkspaceDefaultLlmConnection: invoke(RPC_CHANNELS.llmConnections.SET_WORKSPACE_DEFAULT),
 
   // Automations
+  listAutomations: invoke(RPC_CHANNELS.automations.LIST),
   testAutomation: invoke(RPC_CHANNELS.automations.TEST),
   setAutomationEnabled: invoke(RPC_CHANNELS.automations.SET_ENABLED),
   duplicateAutomation: invoke(RPC_CHANNELS.automations.DUPLICATE),
