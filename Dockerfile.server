@@ -29,6 +29,10 @@ LABEL org.opencontainers.image.source="https://github.com/lukilabs/craft-agents-
 LABEL org.opencontainers.image.description="Craft Agents Server — headless AI workflow server"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
+# Install uv (Python package manager) — doc tools use uv to run Python scripts.
+# Pinned to the same version used by build-server.ts (scripts/build/common.ts).
+COPY --from=ghcr.io/astral-sh/uv:0.10.6 /uv /usr/local/bin/uv
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates git gosu ripgrep && \
     rm -rf /var/lib/apt/lists/*
@@ -84,7 +88,14 @@ RUN chmod -R a+rX /app && \
 ENV CRAFT_RPC_HOST=0.0.0.0
 ENV CRAFT_RPC_PORT=9100
 ENV CRAFT_WEBUI_DIR=/app/apps/webui/dist
+# Resource resolution — aligned with build-server.ts production entry script
 ENV CRAFT_BUNDLED_ASSETS_ROOT=/app/apps/electron
+ENV CRAFT_IS_PACKAGED=false
+ENV CRAFT_APP_ROOT=/app
+ENV CRAFT_RESOURCES_PATH=/app/apps/electron/resources
+ENV CRAFT_UV=/usr/local/bin/uv
+ENV CRAFT_SCRIPTS=/app/apps/electron/resources/scripts
+ENV PATH="/app/apps/electron/resources/bin:${PATH}"
 
 EXPOSE 9100
 
