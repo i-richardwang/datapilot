@@ -84,17 +84,17 @@ function parseOptionalWebSocketUrl(name: string, value: string | undefined): str
   }
 }
 
-// In dev (monorepo), bundled assets root is the repo root (4 levels up from this file).
-// In packaged mode, use CRAFT_BUNDLED_ASSETS_ROOT env or cwd.
-const bundledAssetsRoot = process.env.CRAFT_BUNDLED_ASSETS_ROOT
-  ?? join(import.meta.dir, '..', '..', '..', '..')
+// Two distinct roots:
+// - appRoot: monorepo root — for resolving top-level packages and repo-relative paths
+// - bundledAssetsRoot: may point to apps/electron — for setBundledAssetsRoot / getBundledAssetsDir
+const appRoot = process.env.CRAFT_APP_ROOT ?? join(import.meta.dir, '..', '..', '..', '..')
+const bundledAssetsRoot = process.env.CRAFT_BUNDLED_ASSETS_ROOT ?? appRoot
 
-// Batch CLI entry point — used by the craft-agent-batch wrapper script.
-// Use ??= so packaged deployments can override via env.
-process.env.CRAFT_BATCH_CLI_ENTRY ??= join(bundledAssetsRoot, 'packages', 'batch-cli', 'src', 'index.ts')
+// Batch CLI entry point — lives at the monorepo top level, not under apps/electron.
+process.env.CRAFT_BATCH_CLI_ENTRY ??= join(appRoot, 'packages', 'batch-cli', 'src', 'index.ts')
 
 // Ensure wrapper scripts (craft-agent-batch etc.) are on PATH for agent Bash sessions.
-const serverBinDir = join(bundledAssetsRoot, 'apps', 'electron', 'resources', 'bin')
+const serverBinDir = join(appRoot, 'apps', 'electron', 'resources', 'bin')
 if (existsSync(serverBinDir)) {
   process.env.PATH = `${serverBinDir}${delimiter}${process.env.PATH}`
 }
