@@ -223,4 +223,5 @@ export interface ISessionManager {
   // ---------------------------------------------------------------------------
 
   getBatchProcessor?(workspaceRootPath: string): import('@craft-agent/shared/batches').BatchProcessor | undefined
+  ensureBatchProcessor(workspaceRootPath: string, workspaceId: string): import('@craft-agent/shared/batches').BatchProcessor
 }
