@@ -162,6 +162,15 @@ export function resolveScriptRuntime(
   const isPackaged = inferPackagedMode(ctx);
 
   if (language === 'python3') {
+    // Direct Python path (e.g. Docker venv with pre-installed data packages).
+    // Takes priority over uv so scripts can import pandas/numpy/etc. directly.
+    if (process.env.CRAFT_PYTHON) {
+      const cmd = isPackaged
+        ? validatePackagedEnvRuntime(process.env.CRAFT_PYTHON, 'Python')
+        : process.env.CRAFT_PYTHON;
+      return { command: cmd, argsPrefix: [], source: 'env' };
+    }
+
     if (process.env.CRAFT_UV) {
       const cmd = isPackaged
         ? validatePackagedEnvRuntime(process.env.CRAFT_UV, 'Python/uv')
