@@ -1667,13 +1667,13 @@ export class SessionManager implements ISessionManager {
       // Load existing sessions from disk
       this.loadSessionsFromDisk()
 
-      // Eagerly initialise AutomationSystem and BatchProcessor for every workspace
-      // so they are available immediately (not just after the UI opens a workspace).
-      // This fixes race conditions where sessions or RPC calls arrive before
-      // setupConfigWatcher is triggered by the renderer.
+      // Eagerly set up ConfigWatcher, AutomationSystem, and BatchProcessor for
+      // every workspace so they are available immediately (not just after the UI
+      // opens a workspace). This fixes race conditions where sessions or RPC
+      // calls arrive before the renderer triggers setupConfigWatcher, and
+      // ensures file-change detection (fs.watch) starts at server boot.
       for (const workspace of getWorkspaces()) {
-        this.ensureAutomationSystem(workspace.rootPath, workspace.id!)
-        this.ensureBatchProcessor(workspace.rootPath, workspace.id!)
+        this.setupConfigWatcher(workspace.rootPath, workspace.id!)
       }
 
       // Signal that initialization is complete — IPC handlers waiting on initGate will proceed
