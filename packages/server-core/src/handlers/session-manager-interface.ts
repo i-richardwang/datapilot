@@ -224,4 +224,11 @@ export interface ISessionManager {
 
   getBatchProcessor?(workspaceRootPath: string): import('@craft-agent/shared/batches').BatchProcessor | undefined
   ensureBatchProcessor(workspaceRootPath: string, workspaceId: string): import('@craft-agent/shared/batches').BatchProcessor
+
+  // ---------------------------------------------------------------------------
+  // Change notifications — used by RPC handlers to push updates to the UI
+  // ---------------------------------------------------------------------------
+
+  notifyBatchesChanged(workspaceId: string): void
+  notifyAutomationsChanged(workspaceId: string): void
 }
