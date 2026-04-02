@@ -68,9 +68,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (!workspace) throw new Error('Workspace not found')
 
-    const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
-    if (!processor) return []
-
+    const processor = deps.sessionManager.ensureBatchProcessor(workspace.rootPath, workspaceId)
     return processor.listBatches()
   })
 
@@ -78,9 +76,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (!workspace) throw new Error('Workspace not found')
 
-    const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
-    if (!processor) throw new Error('Batch processor not initialized')
-
+    const processor = deps.sessionManager.ensureBatchProcessor(workspace.rootPath, workspaceId)
     return processor.start(batchId)
   })
 
@@ -88,9 +84,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (!workspace) throw new Error('Workspace not found')
 
-    const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
-    if (!processor) throw new Error('Batch processor not initialized')
-
+    const processor = deps.sessionManager.ensureBatchProcessor(workspace.rootPath, workspaceId)
     return processor.pause(batchId)
   })
 
@@ -98,9 +92,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (!workspace) throw new Error('Workspace not found')
 
-    const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
-    if (!processor) throw new Error('Batch processor not initialized')
-
+    const processor = deps.sessionManager.ensureBatchProcessor(workspace.rootPath, workspaceId)
     return processor.resume(batchId)
   })
 
@@ -108,9 +100,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (!workspace) throw new Error('Workspace not found')
 
-    const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
-    if (!processor) return null
-
+    const processor = deps.sessionManager.ensureBatchProcessor(workspace.rootPath, workspaceId)
     return processor.getProgress(batchId)
   })
 
@@ -118,9 +108,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (!workspace) throw new Error('Workspace not found')
 
-    const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
-    if (!processor) return null
-
+    const processor = deps.sessionManager.ensureBatchProcessor(workspace.rootPath, workspaceId)
     return processor.getState(batchId)
   })
 
@@ -128,9 +116,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (!workspace) throw new Error('Workspace not found')
 
-    const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
-    if (!processor) return null
-
+    const processor = deps.sessionManager.ensureBatchProcessor(workspace.rootPath, workspaceId)
     return processor.getItems(batchId, offset, limit)
   })
 
@@ -163,7 +149,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
 
     // Stop after config mutation succeeds
     const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
-    processor?.stop(batchId)
+    processor?.stop(batchId) // optional — only stop if processor was already running
 
     // Clean up state file, test result file, and test state file
     const cleanupFiles = [
@@ -180,9 +166,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (!workspace) throw new Error('Workspace not found')
 
-    const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
-    if (!processor) throw new Error('Batch processor not initialized')
-
+    const processor = deps.sessionManager.ensureBatchProcessor(workspace.rootPath, workspaceId)
     return processor.test(batchId, sampleSize ?? undefined)
   })
 
@@ -190,9 +174,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (!workspace) throw new Error('Workspace not found')
 
-    const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
-    if (!processor) return null
-
+    const processor = deps.sessionManager.ensureBatchProcessor(workspace.rootPath, workspaceId)
     return processor.getTestResult(batchId)
   })
 
@@ -200,9 +182,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (!workspace) throw new Error('Workspace not found')
 
-    const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
-    if (!processor) throw new Error('Batch processor not initialized')
-
+    const processor = deps.sessionManager.ensureBatchProcessor(workspace.rootPath, workspaceId)
     return processor.retryItem(batchId, itemId)
   })
 }

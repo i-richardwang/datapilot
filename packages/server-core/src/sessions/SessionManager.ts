@@ -1352,111 +1352,129 @@ export class SessionManager implements ISessionManager {
     watcher.start()
     this.configWatchers.set(workspaceRootPath, watcher)
 
-    // Initialize AutomationSystem for this workspace (includes scheduler, handlers, and event logging)
-    if (!this.automationSystems.has(workspaceRootPath)) {
-      const automationSystem = new AutomationSystem({
-        workspaceRootPath,
-        workspaceId,
-        enableScheduler: true,
-        onPromptsReady: async (prompts) => {
-          // Execute prompt automations by creating new sessions
-          const settled = await Promise.allSettled(
-            prompts.map((pending) =>
-              this.executePromptAutomation(
-                workspaceId,
-                workspaceRootPath,
-                pending.prompt,
-                pending.labels,
-                pending.permissionMode,
-                pending.mentions,
-                pending.llmConnection,
-                pending.model,
-                undefined,
-                undefined,
-                pending.automationName,
-              )
+    // Initialize AutomationSystem and BatchProcessor for this workspace
+    this.ensureAutomationSystem(workspaceRootPath, workspaceId)
+    this.ensureBatchProcessor(workspaceRootPath, workspaceId)
+  }
+
+  /**
+   * Ensure an AutomationSystem exists for the given workspace. Idempotent —
+   * returns the existing instance if already initialised.
+   */
+  ensureAutomationSystem(workspaceRootPath: string, workspaceId: string): AutomationSystem {
+    const existing = this.automationSystems.get(workspaceRootPath)
+    if (existing) return existing
+
+    const automationSystem = new AutomationSystem({
+      workspaceRootPath,
+      workspaceId,
+      enableScheduler: true,
+      onPromptsReady: async (prompts) => {
+        // Execute prompt automations by creating new sessions
+        const settled = await Promise.allSettled(
+          prompts.map((pending) =>
+            this.executePromptAutomation(
+              workspaceId,
+              workspaceRootPath,
+              pending.prompt,
+              pending.labels,
+              pending.permissionMode,
+              pending.mentions,
+              pending.llmConnection,
+              pending.model,
+              undefined,
+              undefined,
+              pending.automationName,
             )
           )
+        )
 
-          // Write enriched history entries (with session IDs and prompt summaries)
-          for (const [idx, result] of settled.entries()) {
-            const pending = prompts[idx]
-            if (!pending.matcherId) continue
+        // Write enriched history entries (with session IDs and prompt summaries)
+        for (const [idx, result] of settled.entries()) {
+          const pending = prompts[idx]
+          if (!pending.matcherId) continue
 
-            const entry = createPromptHistoryEntry({
-              matcherId: pending.matcherId,
-              ok: result.status === 'fulfilled',
-              sessionId: result.status === 'fulfilled' ? result.value.sessionId : undefined,
-              prompt: pending.prompt,
-              error: result.status === 'rejected' ? String(result.reason) : undefined,
-            })
+          const entry = createPromptHistoryEntry({
+            matcherId: pending.matcherId,
+            ok: result.status === 'fulfilled',
+            sessionId: result.status === 'fulfilled' ? result.value.sessionId : undefined,
+            prompt: pending.prompt,
+            error: result.status === 'rejected' ? String(result.reason) : undefined,
+          })
 
-            appendAutomationHistoryEntry(workspaceRootPath, entry).catch(e => sessionLog.warn('[Automations] Failed to write history:', e))
+          appendAutomationHistoryEntry(workspaceRootPath, entry).catch(e => sessionLog.warn('[Automations] Failed to write history:', e))
 
-            if (result.status === 'rejected') {
-              sessionLog.error(`[Automations] Failed to execute prompt action ${idx + 1}:`, result.reason)
-            } else {
-              sessionLog.info(`[Automations] Created session ${result.value.sessionId} from prompt action`)
-            }
+          if (result.status === 'rejected') {
+            sessionLog.error(`[Automations] Failed to execute prompt action ${idx + 1}:`, result.reason)
+          } else {
+            sessionLog.info(`[Automations] Created session ${result.value.sessionId} from prompt action`)
           }
-        },
-        onError: (event, error) => {
-          sessionLog.error(`Automation failed for ${event}:`, error.message)
-        },
-      })
-      this.automationSystems.set(workspaceRootPath, automationSystem)
-      sessionLog.info(`Initialized AutomationSystem for workspace ${workspaceId}`)
-    }
+        }
+      },
+      onError: (event, error) => {
+        sessionLog.error(`Automation failed for ${event}:`, error.message)
+      },
+    })
+    this.automationSystems.set(workspaceRootPath, automationSystem)
+    sessionLog.info(`Initialized AutomationSystem for workspace ${workspaceId}`)
+    return automationSystem
+  }
 
-    // Initialize BatchProcessor for this workspace (batch item processing)
-    if (!this.batchProcessors.has(workspaceRootPath)) {
-      const batchProcessor = new BatchProcessor({
-        workspaceRootPath,
-        workspaceId,
-        onExecutePrompt: async (params) => {
-          return this.executePromptAutomation(
-            params.workspaceId,
-            params.workspaceRootPath,
-            params.prompt,
-            params.labels,
-            params.permissionMode,
-            params.mentions,
-            params.llmConnection,
-            params.model,
-            true,
-            params.batchContext,
-            params.automationName,
-            params.workingDirectory,
-            params.onSessionCreated,
-          )
-        },
-        onProgress: (progress) => {
-          this.sendEvent({
-            type: 'batch_progress',
-            batchId: progress.batchId,
-            status: progress.status,
-            totalItems: progress.totalItems,
-            completedItems: progress.completedItems,
-            failedItems: progress.failedItems,
-            runningItems: progress.runningItems,
-            pendingItems: progress.pendingItems,
-          }, workspaceId)
-        },
-        onBatchComplete: (batchId, status) => {
-          this.sendEvent({
-            type: 'batch_complete',
-            batchId,
-            status,
-          }, workspaceId)
-        },
-        onError: (batchId, error) => {
-          sessionLog.error(`[Batch] Error in batch ${batchId}:`, error.message)
-        },
-      })
-      batchProcessor.ensureConfigIds()
-      this.batchProcessors.set(workspaceRootPath, batchProcessor)
-      sessionLog.info(`Initialized BatchProcessor for workspace ${workspaceId}`)
-    }
+  /**
+   * Ensure a BatchProcessor exists for the given workspace. Idempotent —
+   * returns the existing instance if already initialised.
+   */
+  ensureBatchProcessor(workspaceRootPath: string, workspaceId: string): BatchProcessor {
+    const existing = this.batchProcessors.get(workspaceRootPath)
+    if (existing) return existing
+
+    const batchProcessor = new BatchProcessor({
+      workspaceRootPath,
+      workspaceId,
+      onExecutePrompt: async (params) => {
+        return this.executePromptAutomation(
+          params.workspaceId,
+          params.workspaceRootPath,
+          params.prompt,
+          params.labels,
+          params.permissionMode,
+          params.mentions,
+          params.llmConnection,
+          params.model,
+          true,
+          params.batchContext,
+          params.automationName,
+          params.workingDirectory,
+          params.onSessionCreated,
+        )
+      },
+      onProgress: (progress) => {
+        this.sendEvent({
+          type: 'batch_progress',
+          batchId: progress.batchId,
+          status: progress.status,
+          totalItems: progress.totalItems,
+          completedItems: progress.completedItems,
+          failedItems: progress.failedItems,
+          runningItems: progress.runningItems,
+          pendingItems: progress.pendingItems,
+        }, workspaceId)
+      },
+      onBatchComplete: (batchId, status) => {
+        this.sendEvent({
+          type: 'batch_complete',
+          batchId,
+          status,
+        }, workspaceId)
+      },
+      onError: (batchId, error) => {
+        sessionLog.error(`[Batch] Error in batch ${batchId}:`, error.message)
+      },
+    })
+    batchProcessor.ensureConfigIds()
+    this.batchProcessors.set(workspaceRootPath, batchProcessor)
+    sessionLog.info(`Initialized BatchProcessor for workspace ${workspaceId}`)
+    return batchProcessor
   }
 
   /**
@@ -1638,6 +1656,15 @@ export class SessionManager implements ISessionManager {
 
       // Load existing sessions from disk
       this.loadSessionsFromDisk()
+
+      // Eagerly initialise AutomationSystem and BatchProcessor for every workspace
+      // so they are available immediately (not just after the UI opens a workspace).
+      // This fixes race conditions where sessions or RPC calls arrive before
+      // setupConfigWatcher is triggered by the renderer.
+      for (const workspace of getWorkspaces()) {
+        this.ensureAutomationSystem(workspace.rootPath, workspace.id!)
+        this.ensureBatchProcessor(workspace.rootPath, workspace.id!)
+      }
 
       // Signal that initialization is complete — IPC handlers waiting on initGate will proceed
       this.initGate.markReady()
@@ -2210,9 +2237,15 @@ export class SessionManager implements ISessionManager {
       throw new Error(`Workspace ${workspaceId} not found`)
     }
 
+    // Ensure workspace-level services are initialised before creating the session.
+    // This covers the case where createSession is called before setupConfigWatcher
+    // (e.g. agent-spawned sessions, server restart, headless mode).
+    const workspaceRootPath = workspace.rootPath
+    this.ensureAutomationSystem(workspaceRootPath, workspaceId)
+    this.ensureBatchProcessor(workspaceRootPath, workspaceId)
+
     // Get new session defaults from workspace config (with global fallback)
     // Options.permissionMode overrides the workspace default (used by EditPopover for auto-execute)
-    const workspaceRootPath = workspace.rootPath
     const wsConfig = loadWorkspaceConfig(workspaceRootPath)
     const globalDefaults = loadConfigDefaults()
 
@@ -3491,8 +3524,7 @@ export class SessionManager implements ISessionManager {
       // Wire up onBatchTest to delegate to BatchProcessor.test()
       managed.agent.onBatchTest = async (batchId, sampleSize) => {
         sessionLog.info(`Batch test request from session ${managed.id}: batch="${batchId}" sampleSize=${sampleSize ?? 'default'}`)
-        const processor = this.getBatchProcessor(managed.workspace.rootPath)
-        if (!processor) throw new Error('Batch processor not initialized for this workspace')
+        const processor = this.ensureBatchProcessor(managed.workspace.rootPath, managed.workspace.id!)
         return processor.test(batchId, sampleSize)
       }
 
