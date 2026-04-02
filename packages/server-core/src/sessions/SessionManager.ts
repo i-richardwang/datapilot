@@ -1521,6 +1521,16 @@ export class SessionManager implements ISessionManager {
     this.eventSink(RPC_CHANNELS.batches.CHANGED, { to: 'workspace', workspaceId }, workspaceId)
   }
 
+  /** Public notification — called by RPC handlers after mutations. */
+  notifyBatchesChanged(workspaceId: string): void {
+    this.broadcastBatchesChanged(workspaceId)
+  }
+
+  /** Public notification — called by RPC handlers after mutations. */
+  notifyAutomationsChanged(workspaceId: string): void {
+    this.broadcastAutomationsChanged(workspaceId)
+  }
+
 
   private broadcastAppThemeChanged(theme: import('@craft-agent/shared/config').ThemeOverrides | null): void {
     if (!this.eventSink) return

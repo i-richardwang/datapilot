@@ -55,6 +55,7 @@ async function withAutomationMatcher(workspaceId: string, eventName: string, mat
 }
 
 export const HANDLED_CHANNELS = [
+  RPC_CHANNELS.automations.LIST,
   RPC_CHANNELS.automations.TEST,
   RPC_CHANNELS.automations.SET_ENABLED,
   RPC_CHANNELS.automations.DUPLICATE,
@@ -66,6 +67,22 @@ export const HANDLED_CHANNELS = [
 
 export function registerAutomationsHandlers(server: RpcServer, deps: HandlerDeps): void {
   const log = deps.platform.logger
+
+  // List automations — reads automations.json and returns raw config.
+  // The UI parses this into AutomationListItem[].
+  server.handle(RPC_CHANNELS.automations.LIST, async (_ctx, workspaceId: string) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error('Workspace not found')
+
+    const { resolveAutomationsConfigPath } = await import('@craft-agent/shared/automations/resolve-config-path')
+    const configPath = resolveAutomationsConfigPath(workspace.rootPath)
+    try {
+      const raw = await readFile(configPath, 'utf-8')
+      return JSON.parse(raw)
+    } catch {
+      return null // File doesn't exist yet
+    }
+  })
 
   server.handle(RPC_CHANNELS.automations.TEST, async (_ctx, payload: import('@craft-agent/shared/protocol').TestAutomationPayload) => {
     const workspace = getWorkspaceByNameOrId(payload.workspaceId)
@@ -176,6 +193,7 @@ export function registerAutomationsHandlers(server: RpcServer, deps: HandlerDeps
         matchers[idx].enabled = false
       }
     })
+    deps.sessionManager.notifyAutomationsChanged(workspaceId)
   })
 
   // Duplicate an automation matcher
@@ -186,6 +204,7 @@ export function registerAutomationsHandlers(server: RpcServer, deps: HandlerDeps
       clone.name = clone.name ? `${clone.name} Copy` : 'Untitled Copy'
       matchers.splice(idx + 1, 0, clone)
     })
+    deps.sessionManager.notifyAutomationsChanged(workspaceId)
   })
 
   // Delete an automation matcher
@@ -197,6 +216,7 @@ export function registerAutomationsHandlers(server: RpcServer, deps: HandlerDeps
         if (eventMap) delete eventMap[eventName]
       }
     })
+    deps.sessionManager.notifyAutomationsChanged(workspaceId)
   })
 
   // Read execution history for a specific automation

@@ -128,6 +128,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
         batches[idx].enabled = false
       }
     })
+    deps.sessionManager.notifyBatchesChanged(workspaceId)
   })
 
   server.handle(RPC_CHANNELS.batches.DUPLICATE, async (_ctx, workspaceId: string, batchId: string) => {
@@ -137,6 +138,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
       clone.name = clone.name ? `${clone.name} Copy` : 'Untitled Copy'
       batches.splice(idx + 1, 0, clone)
     })
+    deps.sessionManager.notifyBatchesChanged(workspaceId)
   })
 
   server.handle(RPC_CHANNELS.batches.DELETE, async (_ctx, workspaceId: string, batchId: string) => {
@@ -160,6 +162,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     for (const f of cleanupFiles) {
       try { await unlink(f) } catch { /* file may not exist */ }
     }
+    deps.sessionManager.notifyBatchesChanged(workspaceId)
   })
 
   server.handle(RPC_CHANNELS.batches.TEST, async (_ctx, workspaceId: string, batchId: string, sampleSize?: number) => {
