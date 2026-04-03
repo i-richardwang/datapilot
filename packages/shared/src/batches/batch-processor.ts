@@ -239,8 +239,9 @@ export class BatchProcessor {
   }
 
   /**
-   * Retry a single failed item. Resets it to pending and dispatches if the
-   * batch is running. If the batch already completed/failed, it is reactivated.
+   * Retry a single item (failed, completed, or skipped). Resets it to pending
+   * and dispatches if the batch is running. If the batch already completed/failed,
+   * it is reactivated. Running and pending items cannot be retried.
    */
   retryItem(batchId: string, itemId: string): BatchProgress {
     // Load into memory if needed (cold restart / completed batch on disk only)
@@ -253,8 +254,8 @@ export class BatchProcessor {
     if (!itemState) {
       throw new Error(`Item "${itemId}" not found in batch "${batchId}"`)
     }
-    if (itemState.status !== 'failed') {
-      throw new Error(`Item "${itemId}" is not failed (status: ${itemState.status})`)
+    if (itemState.status === 'running' || itemState.status === 'pending') {
+      throw new Error(`Item "${itemId}" cannot be retried (status: ${itemState.status})`)
     }
 
     // Reset item to pending — preserve retryCount for historical tracking
