@@ -69,8 +69,8 @@ export function BatchItemTimeline({ items, onRetryItem, className }: BatchItemTi
               {item.error || item.summary || '—'}
             </span>
 
-            {/* Retry failed item */}
-            {item.status === 'failed' && onRetryItem && (
+            {/* Retry completed/failed/skipped item */}
+            {(item.status === 'failed' || item.status === 'completed' || item.status === 'skipped') && onRetryItem && (
               <button
                 className="shrink-0 text-[11px] text-accent hover:underline cursor-pointer flex items-center gap-0.5"
                 onClick={() => onRetryItem(itemId)}
