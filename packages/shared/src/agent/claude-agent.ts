@@ -24,7 +24,7 @@ import type { McpClientPool } from '../mcp/mcp-pool.ts';
 import { loadPlanFromPath, type SessionConfig as Session } from '../sessions/storage.db.ts';
 import { DEFAULT_MODEL, isClaudeModel, getDefaultSummarizationModel, getModelContextWindow } from '../config/models.ts';
 import { getCredentialManager } from '../credentials/index.ts';
-import { loadPreferences, formatPreferencesForPrompt } from '../config/preferences.ts';
+import { loadPreferences, formatPreferencesForPrompt, getCoAuthorPreference } from '../config/preferences.ts';
 import type { FileAttachment } from '../utils/files.ts';
 import type { LLMQueryRequest, LLMQueryResult } from './llm-tool.ts';
 import { debug } from '../utils/debug.ts';
@@ -136,7 +136,7 @@ export function resolveClaudeThinkingOptions(args: {
   const isClaude = isClaudeModel(model);
   const effort = THINKING_TO_EFFORT[thinkingLevel];
   const isHaiku = model.toLowerCase().includes('haiku');
-  const supportsAdaptiveThinking = isClaude && !isHaiku && providerType !== 'anthropic_compat';
+  const supportsAdaptiveThinking = isClaude && !isHaiku;
 
   if (minimizeThinking || !isClaude || !effort) {
     return supportsAdaptiveThinking
@@ -466,6 +466,7 @@ export class ClaudeAgent extends BaseAgent {
   // Thinking level is managed by BaseAgent
   // Pinned system prompt components (captured on first chat, used for consistency after compaction)
   private pinnedPreferencesPrompt: string | null = null;
+  private pinnedIncludeCoAuthoredBy: boolean | null = null;
   // Track if preference drift notification has been shown this session
   private preferencesDriftNotified: boolean = false;
   // Captured stderr from SDK subprocess (for error diagnostics when process exits with code 1)
@@ -791,10 +792,12 @@ export class ClaudeAgent extends BaseAgent {
       // Pin system prompt components on first chat() call for consistency after compaction
       // The SDK's resume mechanism expects system prompt consistency within a session
       const currentPreferencesPrompt = formatPreferencesForPrompt();
+      const currentCoAuthorPref = getCoAuthorPreference();
 
       if (this.pinnedPreferencesPrompt === null) {
         // First chat in this session - pin current values
         this.pinnedPreferencesPrompt = currentPreferencesPrompt;
+        this.pinnedIncludeCoAuthoredBy = currentCoAuthorPref;
         debug('[chat] Pinned system prompt components for session consistency');
       } else {
         // Detect drift: warn user if context has changed since session started
@@ -958,7 +961,10 @@ export class ClaudeAgent extends BaseAgent {
                 this.pinnedPreferencesPrompt ?? undefined,
                 this.config.debugMode,
                 this.workspaceRootPath,
-                this.config.session?.workingDirectory
+                this.config.session?.workingDirectory,
+                undefined, // preset
+                undefined, // backendName
+                this.pinnedIncludeCoAuthoredBy ?? undefined
               ),
             },
         // Use sdkCwd for SDK session storage - this is set once at session creation and never changes.
@@ -1579,6 +1585,7 @@ This is a branched conversation. All prior messages in this conversation are par
           this.config.onSdkSessionIdCleared?.();
           // Clear pinned state for fresh start
           this.pinnedPreferencesPrompt = null;
+          this.pinnedIncludeCoAuthoredBy = null;
           this.preferencesDriftNotified = false;
 
           // Build fallback context: for branch failures, summarize parent conversation
@@ -1790,6 +1797,7 @@ This is a branched conversation. All prior messages in this conversation are par
           this.config.onSdkSessionIdCleared?.(); // persist cleared ID to JSONL header
           // Clear pinned state so retry captures fresh values
           this.pinnedPreferencesPrompt = null;
+          this.pinnedIncludeCoAuthoredBy = null;
           this.preferencesDriftNotified = false;
 
           // Inject fallback context for branch failures, recovery context for regular resume
@@ -1925,6 +1933,7 @@ This is a branched conversation. All prior messages in this conversation are par
           this.config.onSdkSessionIdCleared?.(); // persist cleared ID to JSONL header
           // Clear pinned state so retry captures fresh values
           this.pinnedPreferencesPrompt = null;
+          this.pinnedIncludeCoAuthoredBy = null;
           this.preferencesDriftNotified = false;
 
           // Inject fallback context for branch failures, recovery context for regular resume
@@ -2334,6 +2343,7 @@ This is a branched conversation. All prior messages in this conversation are par
     this.sessionId = null;
     // Clear pinned state so next chat() will capture fresh values
     this.pinnedPreferencesPrompt = null;
+    this.pinnedIncludeCoAuthoredBy = null;
     this.preferencesDriftNotified = false;
   }
 
@@ -2504,6 +2514,7 @@ This is a branched conversation. All prior messages in this conversation are par
 
     // Clear pinned system prompt state
     this.pinnedPreferencesPrompt = null;
+    this.pinnedIncludeCoAuthoredBy = null;
     this.preferencesDriftNotified = false;
 
     // Clear Claude-specific callbacks (not handled by BaseAgent)
