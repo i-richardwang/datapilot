@@ -132,7 +132,11 @@ function acquireServerLock(logger: PlatformServices['logger']): void {
     try {
       const content = readFileSync(LOCK_FILE, 'utf-8').trim()
       const pid = parseInt(content, 10)
-      if (!isNaN(pid) && pid !== process.pid && isProcessAlive(pid)) {
+      // In Docker, PID 1 is reused across container restarts.
+      // If the lock holds our own PID, it's stale from a previous run.
+      if (!isNaN(pid) && pid === process.pid) {
+        logger.warn(`[bootstrap] Lock file holds current PID ${pid} (stale from previous container lifecycle), overwriting`)
+      } else if (!isNaN(pid) && isProcessAlive(pid)) {
         throw new Error(
           `Another server instance is already running (PID ${pid}). ` +
           `If this is stale, delete ${LOCK_FILE} and retry.`

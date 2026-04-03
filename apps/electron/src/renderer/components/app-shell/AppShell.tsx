@@ -1625,6 +1625,7 @@ function AppShellContent({
     sessionStatuses: effectiveSessionStatuses,
     onSessionSourcesChange: handleSessionSourcesChange,
     rightSidebarButton: null,
+    isCompactMode: isAutoCompact,
     // Search state for ChatDisplay highlighting
     sessionListSearchQuery: searchActive ? searchQuery : undefined,
     isSearchModeActive: searchActive,
@@ -1648,7 +1649,7 @@ function AppShellContent({
     onRetryBatchItem: handleRetryBatchItem,
     testProgress,
     testResults,
-  }), [contextValue, handleDeleteSession, sources, skills, activeSessionWorkingDirectory, displayLabelConfigs, handleSessionLabelsChange, enabledModes, effectiveSessionStatuses, handleSessionSourcesChange, searchActive, searchQuery, handleChatMatchInfoChange, handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, automationTestResults, getAutomationHistory, handleReplayAutomation, handleStartBatch, handlePauseBatch, handleResumeBatch, handleTestBatch, getBatchState, getBatchItems, handleRetryBatchItem, handleDuplicateBatch, handleDeleteBatch, testProgress, testResults])
+  }), [contextValue, handleDeleteSession, sources, skills, activeSessionWorkingDirectory, displayLabelConfigs, handleSessionLabelsChange, enabledModes, effectiveSessionStatuses, handleSessionSourcesChange, isAutoCompact, searchActive, searchQuery, handleChatMatchInfoChange, handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, automationTestResults, getAutomationHistory, handleReplayAutomation, handleStartBatch, handlePauseBatch, handleResumeBatch, handleTestBatch, getBatchState, getBatchItems, handleRetryBatchItem, handleDuplicateBatch, handleDeleteBatch, testProgress, testResults])
 
   // Persist expanded folders to localStorage (workspace-scoped)
   React.useEffect(() => {
