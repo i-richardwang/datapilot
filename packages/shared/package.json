@@ -75,7 +75,6 @@
     "./automations/history-store.db": "./src/automations/history-store.db.ts",
     "./batches/batch-state-manager.db": "./src/batches/batch-state-manager.db.ts",
     "./agent/backend": "./src/agent/backend/index.ts",
-    "./agent/permissions-config": "./src/agent/permissions-config.ts",
     "./auth/callback-server": "./src/auth/callback-server.ts",
     "./auth/chatgpt-oauth-config": "./src/auth/chatgpt-oauth-config.ts",
     "./automations/constants": "./src/automations/constants.ts",
