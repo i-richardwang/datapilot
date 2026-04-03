@@ -1,4 +1,4 @@
-import { formatPreferencesForPrompt } from '../config/preferences.ts';
+import { formatPreferencesForPrompt, getCoAuthorPreference } from '../config/preferences.ts';
 import { debug } from '../utils/debug.ts';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join, relative, basename } from 'path';
@@ -352,7 +352,8 @@ export function getSystemPrompt(
   workspaceRootPath?: string,
   workingDirectory?: string,
   preset?: SystemPromptPreset | string,
-  backendName?: string
+  backendName?: string,
+  includeCoAuthoredBy?: boolean
 ): string {
   // Use mini agent prompt for quick edits (pass workspace root for config paths)
   if (preset === 'mini') {
@@ -370,7 +371,7 @@ export function getSystemPrompt(
   // Note: Date/time context is now added to user messages instead of system prompt
   // to enable prompt caching. The system prompt stays static and cacheable.
   // Safe Mode context is also in user messages for the same reason.
-  const basePrompt = getCraftAssistantPrompt(workspaceRootPath, backendName);
+  const basePrompt = getCraftAssistantPrompt(workspaceRootPath, backendName, includeCoAuthoredBy);
   const fullPrompt = `${basePrompt}${preferences}${debugContext}${projectContextFiles}`;
 
   debug('[getSystemPrompt] full prompt length:', fullPrompt.length);
@@ -446,8 +447,9 @@ function getCraftAgentEnvironmentMarker(): string {
  *
  * @param workspaceRootPath - Root path of the workspace
  * @param backendName - Backend name for "powered by X" text (default: 'Claude Code')
+ * @param includeCoAuthoredBy - Whether to include the Co-Authored-By git trailer instruction (default: true)
  */
-function getCraftAssistantPrompt(workspaceRootPath?: string, backendName: string = 'Claude Code'): string {
+function getCraftAssistantPrompt(workspaceRootPath?: string, backendName: string = 'Claude Code', includeCoAuthoredBy: boolean = true): string {
   // Default to ${APP_ROOT}/workspaces/{id} if no path provided
   const workspacePath = workspaceRootPath || `${APP_ROOT}/workspaces/{id}`;
 
@@ -569,15 +571,14 @@ When you learn information about the user (their name, timezone, location, langu
 
 !!IMPORTANT!!. You must refer to yourself as Craft Agent when asked. You can acknowledge that you are powered by ${backendName}.
 
-## Git Conventions
+${includeCoAuthoredBy ? `## Git Conventions
 
 When creating git commits, include Craft Agent as a co-author:
 
 \`\`\`
 Co-Authored-By: Craft Agent <agents-noreply@craft.do>
 \`\`\`
-
-## Permission Modes
+` : ''}## Permission Modes
 
 | Mode | Description |
 |------|-------------|
@@ -850,6 +851,30 @@ Use the browser as an **alternative/fallback** path when source setup is fragile
 - \`close\` — task fully complete, browser no longer needed (destroys window)
 - \`release\` — you're done but user may want to keep browsing the page
 - \`hide\` — temporarily done, may need browser again later in conversation` : ''}
+
+## Session Self-Management
+
+You can manage your own session's metadata and query other sessions in the workspace.
+
+**Introspecting your session:**
+\`get_session_info\` — returns your current labels, status, permission mode, and other metadata. Pass a \`sessionId\` to query a different session.
+
+**Setting labels:**
+\`set_session_labels\` — replaces all labels on the current session. Use it to tag your work or to trigger label-based automations (\`LabelAdd\` events).
+
+**Setting status:**
+\`set_session_status\` — changes the session status (e.g., "done", "in_progress"). Use it to signal completion or trigger status-based automations (\`SessionStatusChange\` events).
+
+**Querying sessions:**
+\`list_sessions\` — returns \`{ total, returned, sessions }\` with pagination. Always use filters (status, label, search) to narrow results. Default limit is 20 sessions.
+- Use \`get_session_info\` for full details on a specific session (list-then-detail pattern).
+- Do NOT call \`list_sessions\` with a high limit just to scan all sessions — filter first.
+
+**Automation integration:**
+Setting labels or status triggers the corresponding automation events (\`LabelAdd\`/\`LabelRemove\`, \`SessionStatusChange\`). This enables self-closing workflows:
+1. Scheduled automation creates a session
+2. Agent completes work
+3. Agent calls \`set_session_status\` with "done" → triggers downstream webhook/notification
 
 ## Diagrams and Visualization
 

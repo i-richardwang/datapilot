@@ -85,6 +85,13 @@ export interface ClaudeContextOptions {
   onAuthRequest: (request: unknown) => void;
   /** Batch context for batch-spawned sessions (enables batch_output tool) */
   batchContext?: BatchContext;
+  // Session self-management callbacks (optional — injected by backend)
+  setSessionLabels?: (sessionId: string | undefined, labels: string[]) => void | Promise<void>;
+  setSessionStatus?: (sessionId: string | undefined, status: string) => void | Promise<void>;
+  getSessionInfo?: (sessionId?: string) => import('@craft-agent/session-tools-core').SessionInfo | null;
+  listSessions?: (options?: import('@craft-agent/session-tools-core').ListSessionsOptions) => import('@craft-agent/session-tools-core').ListSessionsResult;
+  resolveLabels?: (labels: string[]) => import('@craft-agent/session-tools-core').ResolvedLabelsResult;
+  resolveStatus?: (status: string) => import('@craft-agent/session-tools-core').ResolvedStatusResult;
 }
 
 /**
@@ -327,6 +334,14 @@ export function createClaudeContext(options: ClaudeContextOptions): SessionToolC
       }
       return null;
     },
+
+    // Session self-management
+    setSessionLabels: options.setSessionLabels,
+    setSessionStatus: options.setSessionStatus,
+    getSessionInfo: options.getSessionInfo,
+    listSessions: options.listSessions,
+    resolveLabels: options.resolveLabels,
+    resolveStatus: options.resolveStatus,
   };
 
   return context;

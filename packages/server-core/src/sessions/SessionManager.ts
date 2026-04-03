@@ -88,9 +88,11 @@ import { getDefaultSummarizationModel } from '@craft-agent/shared/config/models'
 import type { SummarizeCallback } from '@craft-agent/shared/sources'
 import { type ThinkingLevel, DEFAULT_THINKING_LEVEL, normalizeThinkingLevel } from '@craft-agent/shared/agent/thinking-levels'
 import { evaluateAutoLabels } from '@craft-agent/shared/labels/auto'
-import { listLabels } from '@craft-agent/shared/labels/storage'
+import { listLabels, loadLabelConfig } from '@craft-agent/shared/labels/storage'
 import { extractLabelId } from '@craft-agent/shared/labels'
 import { ensureLabelsExist } from '@craft-agent/shared/labels/crud'
+import { flattenLabels } from '@craft-agent/shared/labels/tree'
+import { loadStatusConfig } from '@craft-agent/shared/statuses/storage'
 import { AutomationSystem, createPromptHistoryEntry, appendAutomationHistoryEntry, type AutomationSystemMetadataSnapshot } from '@craft-agent/shared/automations'
 import { BatchProcessor } from '@craft-agent/shared/batches'
 
@@ -829,6 +831,9 @@ interface ManagedSession {
   turnStartFinalMessageId?: string
   // External session metadata updates seen while processing (applied after turn stop)
   pendingExternalMetadata?: SessionHeader
+  // Guard: suppress external metadata revert after programmatic writes (setSessionStatus/setSessionLabels).
+  // fs.watch fires during atomic write (unlink+rename) and can read stale data, reverting in-memory state.
+  _metadataWriteGuardUntil?: number
   // Whether an async operation is ongoing (sharing, updating share, revoking, title regeneration)
   // Used for shimmer effect on session title
   isAsyncOperationOngoing?: boolean
@@ -1207,7 +1212,9 @@ export class SessionManager implements ISessionManager {
   /**
    * Set up ConfigWatcher for a workspace to broadcast live updates
    * (sources added/removed, guide.md changes, etc.)
-   * Called during window init (GET_WINDOW_WORKSPACE) and workspace switch.
+   * Called eagerly at boot for all workspaces (automations/scheduler) and
+   * on client connect (GET_WORKSPACE / SWITCH_WORKSPACE).
+   * Idempotent — returns immediately if already watching.
    * workspaceId must be the global config ID (what the renderer knows).
    */
   setupConfigWatcher(workspaceRootPath: string, workspaceId: string): void {
@@ -1323,9 +1330,18 @@ export class SessionManager implements ISessionManager {
         // Skip for self-writes to avoid feedback loops (especially on Windows
         // where fs.watch fires aggressively: unlink + rename = 2+ events).
         if (!isSelfWrite) {
-          if (managed.isProcessing) {
+          // Defer external metadata application when:
+          // 1. Session is actively processing (agent running), OR
+          // 2. Session was just written programmatically (set_session_status/labels tool)
+          //    — fs.watch fires during atomic write (unlink+rename) and can read stale data
+          const hasWriteGuard = managed._metadataWriteGuardUntil && Date.now() < managed._metadataWriteGuardUntil
+          if (managed.isProcessing || hasWriteGuard) {
             managed.pendingExternalMetadata = header
-            sessionLog.info(`Deferred external metadata update for session ${sessionId} (processing active)`)
+            if (hasWriteGuard) {
+              sessionLog.info(`Deferred external metadata update for session ${sessionId} (recent programmatic write)`)
+            } else {
+              sessionLog.info(`Deferred external metadata update for session ${sessionId} (processing active)`)
+            }
           } else {
             this.applyExternalSessionMetadata(managed, header)
           }
@@ -1663,6 +1679,15 @@ export class SessionManager implements ISessionManager {
 
       // Set up authentication environment variables (critical for SDK to work)
       await this.reinitializeAuth()
+
+      // Eagerly activate ConfigWatcher + AutomationSystem for every workspace so
+      // the scheduler and event handlers start at boot — not lazily on first
+      // client connect. This is critical for headless servers where no UI may
+      // ever connect, yet scheduled/event-driven automations must still fire.
+      const workspaces = getWorkspaces()
+      for (const workspace of workspaces) {
+        this.setupConfigWatcher(workspace.rootPath, workspace.id)
+      }
 
       // Load existing sessions from disk
       this.loadSessionsFromDisk()
@@ -3538,6 +3563,114 @@ export class SessionManager implements ISessionManager {
         return processor.test(batchId, sampleSize)
       }
 
+      // Wire up session self-management tools (set_session_labels, set_session_status, etc.)
+      mergeSessionScopedToolCallbacks(managed.id, {
+        setSessionLabelsFn: (sessionId: string | undefined, labels: string[]) => {
+          this.setSessionLabels(sessionId ?? managed.id, labels)
+        },
+        setSessionStatusFn: async (sessionId: string | undefined, status: string) => {
+          await this.setSessionStatus(sessionId ?? managed.id, status as SessionStatus)
+        },
+        getSessionInfoFn: (sessionId?: string) => {
+          const targetId = sessionId ?? managed.id
+          const session = this.sessions.get(targetId)
+          if (!session) return null
+          return {
+            id: session.id,
+            name: session.name ?? session.id,
+            labels: session.labels ?? [],
+            status: session.sessionStatus ?? 'todo',
+            permissionMode: session.permissionMode ?? 'ask',
+            createdAt: session.createdAt ?? 0,
+            workingDirectory: session.workingDirectory,
+            llmConnection: session.llmConnection,
+            model: session.model,
+            isActive: session.agent != null,
+          }
+        },
+        listSessionsFn: (options) => {
+          const DEFAULT_LIMIT = 20
+          const MAX_LIMIT = 100
+          const limit = Math.min(options?.limit ?? DEFAULT_LIMIT, MAX_LIMIT)
+          const offset = options?.offset ?? 0
+
+          let sessions = this.getSessions(managed.workspace.id)
+
+          // Filter
+          if (options?.status) {
+            sessions = sessions.filter(s => s.sessionStatus === options.status)
+          }
+          if (options?.label) {
+            sessions = sessions.filter(s => s.labels?.includes(options.label!))
+          }
+          if (options?.search) {
+            const needle = options.search.toLowerCase()
+            sessions = sessions.filter(s => s.name?.toLowerCase().includes(needle))
+          }
+
+          // Sort
+          const sortBy = options?.sortBy ?? 'recent'
+          if (sortBy === 'recent') {
+            sessions.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+          } else if (sortBy === 'name') {
+            sessions.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
+          } else if (sortBy === 'status') {
+            sessions.sort((a, b) => (a.sessionStatus ?? '').localeCompare(b.sessionStatus ?? ''))
+          }
+
+          const total = sessions.length
+
+          // Paginate
+          const page = sessions.slice(offset, offset + limit)
+
+          return {
+            total,
+            returned: page.length,
+            sessions: page.map(s => ({
+              id: s.id,
+              name: s.name ?? s.id,
+              labels: s.labels ?? [],
+              status: s.sessionStatus ?? 'todo',
+              createdAt: s.createdAt ?? 0,
+            })),
+          }
+        },
+        resolveLabelsFn: (labels: string[]) => {
+          const labelConfig = loadLabelConfig(managed.workspace.rootPath)
+          const allLabels = flattenLabels(labelConfig.labels)
+          const available = allLabels.map(l => l.id)
+
+          const resolved: string[] = []
+          const unknown: string[] = []
+
+          for (const input of labels) {
+            // Exact ID match
+            const byId = allLabels.find(l => l.id === input)
+            if (byId) { resolved.push(byId.id); continue }
+            // Case-insensitive name → ID
+            const byName = allLabels.find(l => l.name.toLowerCase() === input.toLowerCase())
+            if (byName) { resolved.push(byName.id); continue }
+            unknown.push(input)
+          }
+
+          return { resolved, unknown, available }
+        },
+        resolveStatusFn: (status: string) => {
+          const statusConfig = loadStatusConfig(managed.workspace.rootPath)
+          const allStatuses = statusConfig.statuses
+          const available = allStatuses.map(s => s.id)
+
+          // Exact ID match
+          const byId = allStatuses.find(s => s.id === status)
+          if (byId) return { resolved: byId.id, available }
+          // Case-insensitive label → ID
+          const byLabel = allStatuses.find(s => s.label.toLowerCase() === status.toLowerCase())
+          if (byLabel) return { resolved: byLabel.id, available }
+
+          return { resolved: null, available }
+        },
+      })
+
       // Wire up onSourceActivationRequest to auto-enable sources when agent tries to use them
       managed.agent.onSourceActivationRequest = async (sourceSlug: string): Promise<boolean> => {
         sessionLog.info(`Source activation request for session ${managed.id}:`, sourceSlug)
@@ -3715,6 +3848,8 @@ export class SessionManager implements ISessionManager {
     const managed = this.sessions.get(sessionId)
     if (managed) {
       managed.sessionStatus = sessionStatus
+      // Guard: suppress external metadata revert from fs.watch during atomic write
+      managed._metadataWriteGuardUntil = Date.now() + 5000
       // Persist in-memory state directly to avoid race with pending queue writes
       this.persistSession(managed)
       await this.flushSession(managed.id)
@@ -5945,6 +6080,8 @@ export class SessionManager implements ISessionManager {
     const managed = this.sessions.get(sessionId)
     if (managed) {
       managed.labels = labels
+      // Guard: suppress external metadata revert from fs.watch during atomic write
+      managed._metadataWriteGuardUntil = Date.now() + 5000
 
       this.sendEvent({
         type: 'labels_changed',
