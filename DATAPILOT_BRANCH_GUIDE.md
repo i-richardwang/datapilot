@@ -328,6 +328,18 @@ grep -rn 'craft-cli\.md' --include="*.ts" --include="*.md" --exclude-dir=node_mo
 - v0.8.2 上游新增内容：WebUI OAuth 统一、浏览器工具开关（`getBrowserToolEnabled()`）、搜索可靠性（CSS Custom Highlight API 重写）、auth 加固（jose+argon2id）、PWA 资源、文件系统缓存
 - 无新增 `.craft-agent` 路径引用；release-notes/0.8.2.md 无 "Craft Agent" 文本
 
+### 合并记录（2026-04-03，v0.8.3）
+
+- 已合并 `main` 的 3 个新增提交：`e3b661f`（upstream v0.8.3 merge）、`688d832`（FORK_MERGE_GUIDE 更新）、`710b6b7`（server env fix）
+- 4 个冲突：
+  - `Dockerfile.server` — 上游用 `find` 替代 `chmod -R` 提升 Docker 构建速度，保留 `.datapilot` 路径 + 上游优化
+  - `apps/electron/package.json` — 版本号 0.8.2 → 0.8.3，保留 DataPilot 描述
+  - `packages/server/package.json` — 同上
+  - `apps/electron/src/renderer/pages/settings/AiSettingsPage.tsx` — 上游移除了 `bedrock`/`vertex` provider 分支（legacy cleanup），保留 DataPilot 品牌名
+- **无新增品牌适配需求：** v0.8.3 新文件（SessionInfoPopover、CompactPermissionModeSelector、session tools、provider-metadata）均不含 "Craft Agent" 文本或 `.craft-agent` 路径
+- release-notes/0.8.3.md 无 "Craft Agent" 文本，无需修改
+- **重要：** 上游移除了 `anthropic_compat`、`bedrock`、`vertex` 作为 legacy provider types，但 fork 在 main 分支恢复了 `anthropic_compat`（用于 Claude SDK 自定义端点路由）。AiSettingsPage 中相应移除了已废弃的 `bedrock`/`vertex` 显示分支
+
 ### 品牌适配记录（2026-04-01，v0.8.2 后续）
 
 v0.8.2 合并完成后，进行全面品牌适配：
