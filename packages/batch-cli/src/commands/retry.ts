@@ -53,8 +53,8 @@ export function cmdRetry(workspaceRoot: string, batchIdOrName: string, itemId: s
     process.exit(1)
   }
 
-  if (itemState.status !== 'failed') {
-    console.error(`Item "${itemId}" is not failed (status: ${itemState.status}). Only failed items can be retried.`)
+  if (itemState.status === 'running' || itemState.status === 'pending') {
+    console.error(`Item "${itemId}" cannot be retried (status: ${itemState.status}). Only completed, failed, or skipped items can be retried.`)
     process.exit(1)
   }
 
