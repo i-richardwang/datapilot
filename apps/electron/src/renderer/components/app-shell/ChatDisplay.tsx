@@ -1580,18 +1580,22 @@ export const ChatDisplay = React.forwardRef<ChatDisplayHandle, ChatDisplayProps>
               }}
             >
               <ScrollArea className="h-full min-w-0" viewportRef={scrollViewportRef}>
-              <div className={cn(CHAT_LAYOUT.maxWidth, "mx-auto", CHAT_LAYOUT.containerPadding, CHAT_LAYOUT.messageSpacing, "min-w-0")}>
+              <div className={cn(
+                CHAT_LAYOUT.maxWidth,
+                "mx-auto min-w-0",
+                compactMode ? "px-3 py-4 space-y-2" : [CHAT_LAYOUT.containerPadding, CHAT_LAYOUT.messageSpacing]
+              )}>
                 {/* Session-level AnimatePresence: Prevents layout jump when switching sessions */}
-                <AnimatePresence mode="wait" initial={false}>
+                <AnimatePresence mode={compactMode ? "sync" : "wait"} initial={false}>
                   <motion.div
-                    key={session?.id}
+                    key={compactMode ? 'compact-session' : session?.id}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.1, ease: 'easeOut' }}
+                    transition={compactMode ? { duration: 0 } : { duration: 0.1, ease: 'easeOut' }}
                   >
                     {/* Loading/Content AnimatePresence: Handles spinner ↔ content transition */}
-                    <AnimatePresence mode="wait" initial={false}>
+                    <AnimatePresence mode={compactMode ? "sync" : "wait"} initial={false}>
                     {messagesLoading ? (
                       /* Loading State: Show spinner while messages are being lazy loaded */
                       <motion.div
@@ -1599,7 +1603,7 @@ export const ChatDisplay = React.forwardRef<ChatDisplayHandle, ChatDisplayProps>
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        transition={{ duration: 0.1 }}
+                        transition={compactMode ? { duration: 0 } : { duration: 0.1 }}
                         className="flex items-center justify-center h-64"
                       >
                         <Spinner className="text-foreground/30" />
@@ -1608,11 +1612,11 @@ export const ChatDisplay = React.forwardRef<ChatDisplayHandle, ChatDisplayProps>
                     /* Turn-based Message Display - memoized to avoid re-grouping on every render */
                     /* AnimatePresence handles the fade-in animation when transitioning from loading */
                     <motion.div
-                      key={`loaded-${session?.id}`}
+                      key={compactMode ? 'loaded-compact' : `loaded-${session?.id}`}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      transition={{ duration: 0.1, ease: 'easeOut' }}
+                      transition={compactMode ? { duration: 0 } : { duration: 0.1, ease: 'easeOut' }}
                     >
                   {/* Scroll to bottom before paint - fires via useLayoutEffect */}
                   {/* Skip when search is active on session switch - scroll to first match instead */}
@@ -1650,7 +1654,7 @@ export const ChatDisplay = React.forwardRef<ChatDisplayHandle, ChatDisplayProps>
                           key={turnKey}
                           ref={el => { if (el) turnRefs.current.set(turnKey, el); else turnRefs.current.delete(turnKey) }}
                           className={cn(
-                            CHAT_LAYOUT.userMessagePadding,
+                            compactMode ? "pt-2 pb-1" : CHAT_LAYOUT.userMessagePadding,
                             "rounded-lg transition-all duration-200",
                             isCurrentMatch && "ring-2 ring-info ring-offset-2 ring-offset-background",
                             isAnyMatch && !isCurrentMatch && "ring-1 ring-info/30"
@@ -2160,9 +2164,13 @@ interface MessageBubbleProps {
 /**
  * ErrorMessage - Separate component for error messages to allow useState hook
  */
-function ErrorMessage({ message }: { message: Message }) {
+function ErrorMessage({ message, onOpenUrl }: { message: Message; onOpenUrl?: (url: string) => void }) {
   const hasDetails = (message.errorDetails && message.errorDetails.length > 0) || message.errorOriginal
   const [detailsOpen, setDetailsOpen] = React.useState(false)
+  const actions = message.errorActions?.filter(a => {
+    if (a.action === 'open_url') return !!a.url && !!onOpenUrl
+    return true
+  })
 
   return (
     <div className="flex justify-start mt-4">
@@ -2178,6 +2186,26 @@ function ErrorMessage({ message }: { message: Message }) {
           {message.errorTitle || 'Error'}
         </div>
         <p className="text-sm text-destructive">{message.content}</p>
+
+        {/* Action buttons */}
+        {actions && actions.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {actions.map((action) => (
+              <button
+                key={action.key}
+                onClick={() => {
+                  if (action.action === 'open_url' && action.url && onOpenUrl) {
+                    onOpenUrl(action.url)
+                  }
+                  // retry, settings, reauth are handled by existing mechanisms via keyboard shortcuts
+                }}
+                className="text-xs px-2 py-0.5 rounded border border-destructive/20 text-destructive/70 hover:text-destructive hover:border-destructive/40 transition-colors"
+              >
+                {action.label}{action.action === 'open_url' ? ' ↗' : ''}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Collapsible Details Toggle */}
         {hasDetails && (
@@ -2276,7 +2304,7 @@ function MessageBubble({
 
   // === ERROR MESSAGE: Red bordered bubble with warning icon and collapsible details ===
   if (message.role === 'error') {
-    return <ErrorMessage message={message} />
+    return <ErrorMessage message={message} onOpenUrl={onOpenUrl} />
   }
 
   // === STATUS MESSAGE: Matches ProcessingIndicator layout for visual consistency ===

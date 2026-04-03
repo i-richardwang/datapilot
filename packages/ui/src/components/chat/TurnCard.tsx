@@ -523,6 +523,10 @@ function getToolDisplayName(name: string): string {
   // Friendly display names for specific tools
   const displayNames: Record<string, string> = {
     'TodoWrite': 'Todo List Updated',
+    'set_session_labels': 'Set Session Labels',
+    'set_session_status': 'Set Session Status',
+    'get_session_info': 'Get Session Info',
+    'list_sessions': 'List Sessions',
   }
 
   return displayNames[stripped] || stripped
@@ -2409,7 +2413,8 @@ export function ResponseCard({
     return (
       <>
         <div className="bg-background shadow-minimal rounded-lg overflow-hidden relative group">
-          {/* Fullscreen button - top right corner, visible on hover */}
+          {/* Fullscreen button - desktop only; compact mode keeps message chrome minimal */}
+          {!compactMode && (
           <button
             onClick={() => setIsFullscreen(true)}
             className={cn(
@@ -2423,6 +2428,7 @@ export function ResponseCard({
           >
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
+          )}
 
           {/* Plan header - only shown for plan variant */}
           {isPlan && (

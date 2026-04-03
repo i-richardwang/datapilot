@@ -254,11 +254,9 @@ export function providerTypeToAgentProvider(providerType: LlmProviderType): Agen
     // Anthropic SDK backends
     case 'anthropic':
     case 'anthropic_compat':
-    case 'bedrock':    // Bedrock uses Anthropic SDK with different auth
-    case 'vertex':     // Vertex uses Anthropic SDK with different auth
       return 'anthropic';
 
-    // Pi backends
+    // Pi backends (includes former bedrock/vertex via migration)
     case 'pi':
     case 'pi_compat':
       return 'pi';
@@ -395,6 +393,12 @@ export function resolveSetupTestConnectionHint(args: {
 }): Pick<LlmConnection, 'providerType' | 'piAuthProvider' | 'customEndpoint'> {
   if (args.provider === 'pi') {
     if (args.customEndpoint && args.baseUrl?.trim()) {
+      if (args.customEndpoint.api === 'anthropic-claude-sdk') {
+        return {
+          providerType: 'anthropic_compat',
+          customEndpoint: args.customEndpoint,
+        };
+      }
       return {
         providerType: 'pi_compat',
         piAuthProvider: args.customEndpoint.api === 'anthropic-messages' ? 'anthropic' : 'openai',
@@ -409,7 +413,7 @@ export function resolveSetupTestConnectionHint(args: {
   }
 
   return {
-    providerType: args.baseUrl ? 'anthropic_compat' : 'anthropic',
+    providerType: args.baseUrl ? 'pi_compat' : 'anthropic',
   };
 }
 
