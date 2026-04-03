@@ -160,7 +160,7 @@ export function getProviderIcon(
   piAuthProvider?: string | null
 ): string | null {
   // For compatible providers, try to detect from URL first
-  if (baseUrl && (providerType === 'openai_compat' || providerType === 'pi_compat')) {
+  if (baseUrl && (providerType === 'openai_compat' || providerType === 'pi_compat' || providerType === 'anthropic_compat')) {
     const detectedProvider = detectProviderFromUrl(baseUrl)
     if (detectedProvider) {
       return providerIcons[detectedProvider]
@@ -170,6 +170,7 @@ export function getProviderIcon(
   // Map provider type to icon
   switch (providerType) {
     case 'anthropic':
+    case 'anthropic_compat':
       return providerIcons.anthropic
     case 'openai':
     case 'openai_compat':
