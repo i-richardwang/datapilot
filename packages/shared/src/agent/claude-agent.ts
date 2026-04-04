@@ -972,7 +972,7 @@ export class ClaudeAgent extends BaseAgent {
                 undefined, // preset
                 undefined, // backendName
                 this.pinnedIncludeCoAuthoredBy ?? undefined,
-                isMinimalBatch
+                batchContext ? (isMinimalBatch ? 'minimal' : 'default') : undefined
               ),
             },
         // Use sdkCwd for SDK session storage - this is set once at session creation and never changes.
