@@ -9,6 +9,7 @@
 // ============================================================================
 
 export type {
+  BatchToolProfile,
   BatchSourceType,
   BatchSource,
   BatchExecution,

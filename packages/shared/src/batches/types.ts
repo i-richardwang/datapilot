@@ -7,6 +7,17 @@
 import type { PermissionMode } from '../agent/mode-types.ts';
 
 // ============================================================================
+// Tool Profile Types
+// ============================================================================
+
+/**
+ * Tool profile for batch sessions.
+ * - 'default': Full Claude Code toolset (minus batch-excluded tools)
+ * - 'minimal': Only WebSearch, WebFetch, Read, Bash + batch_output
+ */
+export type BatchToolProfile = 'default' | 'minimal'
+
+// ============================================================================
 // Data Source Types
 // ============================================================================
 
@@ -33,6 +44,8 @@ export interface BatchExecution {
   maxRetries?: number
   /** Permission mode for created sessions */
   permissionMode?: PermissionMode
+  /** Tool profile: 'default' (full toolset) or 'minimal' (web research + output only) */
+  toolProfile?: BatchToolProfile
   /** Model ID for created sessions */
   model?: string
   /** LLM connection slug for created sessions */
@@ -163,14 +176,17 @@ export interface BatchExecutePromptParams {
   mentions?: string[]
   llmConnection?: string
   model?: string
+  /** Tool profile for the batch session */
+  toolProfile?: BatchToolProfile
   /** Working directory for the created session (absolute path). Omit to use workspace default. */
   workingDirectory?: string
-  /** Batch context for structured output collection */
+  /** Batch context for structured output collection and tool profile */
   batchContext?: {
     batchId: string
     itemId: string
     outputPath: string
     outputSchema?: Record<string, unknown>
+    toolProfile?: string
   }
   /** Human-readable name for the session (used as title and triggeredBy metadata) */
   automationName?: string
