@@ -78,7 +78,7 @@
     "./auth/callback-server": "./src/auth/callback-server.ts",
     "./auth/chatgpt-oauth-config": "./src/auth/chatgpt-oauth-config.ts",
     "./automations/constants": "./src/automations/constants.ts",
-    "./automations/history-store": "./src/automations/history-store.ts",
+    "./automations/history-store": "./src/automations/history-store.db.ts",
     "./config/llm-connections": "./src/config/llm-connections.ts",
     "./config/models": "./src/config/models.ts",
     "./config/paths": "./src/config/paths.ts",
@@ -89,7 +89,7 @@
     "./prompts/system": "./src/prompts/system.ts",
     "./release-notes": "./src/release-notes/index.ts",
     "./statuses": "./src/statuses/index.ts",
-    "./statuses/storage": "./src/statuses/storage.ts",
+    "./statuses/storage": "./src/statuses/storage.db.ts",
     "./utils/debug": "./src/utils/debug.ts",
     "./utils/files": "./src/utils/files.ts"
   },
