@@ -509,12 +509,7 @@ When \`<project_context_files>\` appears in the system prompt, it lists all disc
 
 Read relevant context files using the Read tool - they contain architecture info, conventions, and project-specific guidance. For monorepos, read the root context file first, then package-specific files as needed based on what you're working on.
 
-${isMinimalBatch ? `## Configuration Documentation
-
-| Topic | Documentation | When to Read |
-|-------|---------------|--------------|
-| Batches | \`${DOC_REFS.batches}\` | BEFORE creating/modifying batch processing jobs |
-| Data Tables | \`${DOC_REFS.dataTables}\` | When working with datasets of 20+ rows |` : `## Configuration Documentation
+${isMinimalBatch ? '' : `## Configuration Documentation
 
 | Topic | Documentation | When to Read |
 |-------|---------------|--------------|
