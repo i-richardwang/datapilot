@@ -564,6 +564,7 @@ export class BatchProcessor {
         prompt: expandedPrompt,
         labels: config.action.labels,
         permissionMode: config.execution?.permissionMode,
+        toolProfile: config.execution?.toolProfile,
         mentions: config.action.mentions,
         llmConnection: config.execution?.llmConnection,
         model: config.execution?.model,
@@ -571,14 +572,13 @@ export class BatchProcessor {
         automationName: `Batch: ${config.name} — ${itemId}`,
       }
 
-      // Attach batch context for output collection
-      if (config.output) {
-        params.batchContext = {
-          batchId: batchId,
-          itemId: itemId,
-          outputPath: resolve(this.options.workspaceRootPath, config.output.path),
-          outputSchema: config.output.schema as Record<string, unknown> | undefined,
-        }
+      // Attach batch context (always present for batch sessions)
+      params.batchContext = {
+        batchId: batchId,
+        itemId: itemId,
+        outputPath: config.output ? resolve(this.options.workspaceRootPath, config.output.path) : '',
+        outputSchema: config.output?.schema as Record<string, unknown> | undefined,
+        toolProfile: config.execution?.toolProfile,
       }
 
       const result = await this.options.onExecutePrompt(params)

@@ -124,6 +124,7 @@ export {
   // Mini agent configuration (centralized for all backends)
   type MiniAgentConfig,
   MINI_AGENT_TOOLS,
+  MINIMAL_BATCH_TOOLS,
   MINI_AGENT_MCP_KEYS,
 } from './base-agent.ts';
 

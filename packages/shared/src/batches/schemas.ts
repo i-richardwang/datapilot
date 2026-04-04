@@ -22,6 +22,7 @@ export const BatchExecutionSchema = z.object({
   retryOnFailure: z.boolean().optional(),
   maxRetries: z.number().int().min(0).max(10).optional(),
   permissionMode: z.enum(['safe', 'ask', 'allow-all']).optional(),
+  toolProfile: z.enum(['default', 'minimal']).optional(),
   model: z.string().min(1).optional(),
   llmConnection: z.string().min(1).optional(),
 })

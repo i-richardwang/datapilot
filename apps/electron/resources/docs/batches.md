@@ -95,6 +95,7 @@ These fields control how items are processed. Common ones have dedicated flags; 
 | `model` | `--model <id>` | Workspace default | Model ID for created sessions |
 | `llmConnection` | `--connection <slug>` | Workspace default | LLM connection slug |
 | `permissionMode` | `--permission-mode` | Workspace default | `safe` \| `ask` \| `allow-all` |
+| `toolProfile` | `--patch` only | `default` | `default` (full toolset) \| `minimal` (WebSearch, WebFetch, Read, Bash + batch_output) |
 | `retryOnFailure` | `--patch` only | false | Automatically retry failed items |
 | `maxRetries` | `--patch` only | 2 | Max automatic retry attempts per item (0-10) |
 

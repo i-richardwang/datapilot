@@ -133,6 +133,9 @@ export interface SpawnSessionHelpResult {
 /** Tool list for mini agents - quick config edits only */
 export const MINI_AGENT_TOOLS = ['Read', 'Edit', 'Write', 'Glob', 'Grep', 'Bash'] as const;
 
+/** Tool list for minimal batch profile - web research + context reading only */
+export const MINIMAL_BATCH_TOOLS = ['WebSearch', 'WebFetch', 'Read', 'Bash'] as const;
+
 /** MCP servers for mini agents - minimal set (docs tools are now bundled in session) */
 export const MINI_AGENT_MCP_KEYS = ['session'] as const;
 
