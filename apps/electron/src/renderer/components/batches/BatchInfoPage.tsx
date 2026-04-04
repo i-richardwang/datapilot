@@ -244,7 +244,7 @@ export function BatchInfoPage({
             )}
             {batch.execution?.toolProfile && batch.execution.toolProfile !== 'default' && (
               <Info_Table.Row label="Tool Profile">
-                <Info_Badge color="info">{batch.execution.toolProfile}</Info_Badge>
+                <Info_Badge color="default">{batch.execution.toolProfile}</Info_Badge>
               </Info_Table.Row>
             )}
             {batch.execution?.model && (
