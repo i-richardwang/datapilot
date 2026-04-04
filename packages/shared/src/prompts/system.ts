@@ -350,7 +350,7 @@ export function getSystemPrompt(
   preset?: SystemPromptPreset | string,
   backendName?: string,
   includeCoAuthoredBy?: boolean,
-  isMinimalBatch?: boolean
+  batchMode?: 'default' | 'minimal'
 ): string {
   // Use mini agent prompt for quick edits (pass workspace root for config paths)
   if (preset === 'mini') {
@@ -368,7 +368,7 @@ export function getSystemPrompt(
   // Note: Date/time context is now added to user messages instead of system prompt
   // to enable prompt caching. The system prompt stays static and cacheable.
   // Safe Mode context is also in user messages for the same reason.
-  const basePrompt = getCraftAssistantPrompt(workspaceRootPath, backendName, includeCoAuthoredBy, isMinimalBatch);
+  const basePrompt = getCraftAssistantPrompt(workspaceRootPath, backendName, includeCoAuthoredBy, batchMode);
   const fullPrompt = `${basePrompt}${preferences}${debugContext}${projectContextFiles}`;
 
   debug('[getSystemPrompt] full prompt length:', fullPrompt.length);
@@ -446,7 +446,13 @@ function getCraftAgentEnvironmentMarker(): string {
  * @param backendName - Backend name for "powered by X" text (default: 'Claude Code')
  * @param includeCoAuthoredBy - Whether to include the Co-Authored-By git trailer instruction (default: true)
  */
-function getCraftAssistantPrompt(workspaceRootPath?: string, backendName: string = 'Claude Code', includeCoAuthoredBy: boolean = true, isMinimalBatch: boolean = false): string {
+function getCraftAssistantPrompt(workspaceRootPath?: string, backendName: string = 'Claude Code', includeCoAuthoredBy: boolean = true, batchMode?: 'default' | 'minimal'): string {
+  // Batch prompt trimming flags:
+  // - isBatch: removes sections for tools excluded from ALL batch sessions (sources, call_llm, etc.)
+  // - isMinimalBatch: additionally removes sections only needed for full-toolset batches
+  const isBatch = !!batchMode;
+  const isMinimalBatch = batchMode === 'minimal';
+
   // Default to ${APP_ROOT}/workspaces/{id} if no path provided
   const workspacePath = workspaceRootPath || `${APP_ROOT}/workspaces/{id}`;
 
@@ -468,7 +474,7 @@ You are Craft Agent - an AI assistant that helps users connect and work across t
 - **Automate workflows** - Combine data from multiple sources to create unique, powerful workflows.
 - **Code** - You are powered by ${backendName}, so you can write and execute code (Python, Bash) to manipulate data, call APIs, and automate tasks.
 
-${!isMinimalBatch ? `## External Sources
+${!isBatch ? `## External Sources
 
 Sources are external data connections. Each source has:
 - \`config.json\` - Connection settings and authentication
@@ -509,7 +515,7 @@ When \`<project_context_files>\` appears in the system prompt, it lists all disc
 
 Read relevant context files using the Read tool - they contain architecture info, conventions, and project-specific guidance. For monorepos, read the root context file first, then package-specific files as needed based on what you're working on.
 
-${isMinimalBatch ? '' : `## Configuration Documentation
+${isBatch ? '' : `## Configuration Documentation
 
 | Topic | Documentation | When to Read |
 |-------|---------------|--------------|
@@ -549,7 +555,7 @@ Use the batch CLI for batch processing operations.
 
 - Batches help: \`craft-agent-batch --help\`` : ''}
 
-${!isMinimalBatch ? `## User preferences
+${!isBatch ? `## User preferences
 
 You can store and update user preferences using the \`update_user_preferences\` tool.
 When you learn information about the user (their name, timezone, location, language preference, or other relevant context), proactively offer to save it for future conversations.
@@ -572,7 +578,7 @@ When creating git commits, include Craft Agent as a co-author:
 \`\`\`
 Co-Authored-By: Craft Agent <agents-noreply@craft.do>
 \`\`\`
-` : ''}${!isMinimalBatch ? `## Permission Modes
+` : ''}${!isBatch ? `## Permission Modes
 
 | Mode | Description |
 |------|-------------|
@@ -723,7 +729,7 @@ Use \`spreadsheet\` for Excel-style grids with row numbers and column letters. B
 - \`boolean\` — \`true\`/\`false\`, rendered as Yes/No
 - \`badge\` — string rendered as a colored status pill
 
-### File-Backed Tables (Large Datasets)
+${!isBatch ? `### File-Backed Tables (Large Datasets)
 
 For datasets with 20+ rows, use the \`transform_data\` tool to write data to a file and reference it via \`"src"\` instead of inlining all rows. This saves tokens and cost.
 
@@ -762,16 +768,16 @@ transform_data({
   outputFile: "transactions.json"
 })
 \`\`\`
-
+` : ''}
 **When to use which:**
 - **datatable** — query results, API responses, comparisons, any data the user may want to sort/filter
 - **spreadsheet** — financial reports, exported data, anything the user may want to download as .xlsx
-- **markdown table** — only for small, simple tables (3-4 rows) where interactivity isn't needed
+- **markdown table** — only for small, simple tables (3-4 rows) where interactivity isn't needed${!isBatch ? `
 - **transform_data + src** — large datasets (20+ rows) to avoid inlining all data as JSON tokens
 
-**IMPORTANT:** When working with larger datasets (20+ rows), always read \`${DOC_REFS.dataTables}\` first for patterns, recipes, and best practices.
+**IMPORTANT:** When working with larger datasets (20+ rows), always read \`${DOC_REFS.dataTables}\` first for patterns, recipes, and best practices.` : ''}
 
-${!isMinimalBatch ? `## LLM Tool (\`call_llm\`)
+${!isBatch ? `## LLM Tool (\`call_llm\`)
 
 Use the \`call_llm\` tool to invoke a secondary LLM for focused subtasks. It runs a single completion (no tools, no multi-turn) and returns text or structured JSON.
 
