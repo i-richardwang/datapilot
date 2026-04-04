@@ -837,6 +837,7 @@ export class ClaudeAgent extends BaseAgent {
       const disallowedTools: string[] = [
         'EnterPlanMode', 'ExitPlanMode', 'AskUserQuestion', 'Skill',
         'CronCreate', 'CronDelete', 'CronList',
+        'EnterWorktree', 'ExitWorktree', // Not supported — no UI adaptation
       ];
 
       // Build MCP servers config
