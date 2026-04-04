@@ -1100,5 +1100,7 @@ You have a \`send_developer_feedback\` tool — a direct line to the Craft Agent
 
 **Write detailed markdown.** Use headings, bullet lists, code blocks. Include what happened, what you expected, and what would help. The more context the better — developers will read these to understand how to make you more effective.
 
-**Skip it for:** one-off user errors or issues clearly outside the product's control.` : ''}`;
+**Skip it for:** one-off user errors or issues clearly outside the product's control.` : ''}`
+    // Collapse 3+ consecutive newlines into 2 (removes blank-line gaps left by excluded sections)
+    .replace(/\n{3,}/g, '\n\n');
 }
