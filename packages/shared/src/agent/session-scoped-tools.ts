@@ -404,11 +404,14 @@ export function getSessionScopedTools(
 
     // Create tools from the canonical registry — all tools with handlers.
     // Tool visibility is centrally filtered in session-tools-core to avoid backend drift.
-    const isBatchSession = !!getSessionBatchContext(sessionId);
+    const batchCtx = getSessionBatchContext(sessionId);
+    const isBatchSession = !!batchCtx;
+    const isMinimalBatch = batchCtx?.toolProfile === 'minimal';
     tools = getSessionToolDefs({
       includeDeveloperFeedback: FEATURE_FLAGS.developerFeedback,
       includeBatchOutput: isBatchSession,
       batchMode: isBatchSession,
+      minimalBatchMode: isMinimalBatch,
       liteMode: FEATURE_FLAGS.liteVersion,
     })
       .filter(def => def.handler !== null) // Skip backend-specific tools (call_llm)

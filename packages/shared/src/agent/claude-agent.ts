@@ -8,7 +8,7 @@ type ContentBlockParam =
   | { type: 'document'; source: { type: 'base64'; media_type: string; data: string } };
 import { z } from 'zod';
 import { getSystemPrompt } from '../prompts/system.ts';
-import { BaseAgent, type MiniAgentConfig, MINI_AGENT_TOOLS, MINI_AGENT_MCP_KEYS } from './base-agent.ts';
+import { BaseAgent, type MiniAgentConfig, MINI_AGENT_TOOLS, MINIMAL_BATCH_TOOLS, MINI_AGENT_MCP_KEYS } from './base-agent.ts';
 import type { BackendConfig, PostInitResult, PermissionRequestType, SdkMcpServerConfig } from './backend/types.ts';
 // Plan types are used by UI components; not needed in craft-agent.ts since Safe Mode is user-controlled
 import { parseError, type AgentError } from './errors.ts';
@@ -827,6 +827,10 @@ export class ClaudeAgent extends BaseAgent {
       // This ensures Claude and Codex agents use the same detection and constants
       const miniConfig = this.getMiniAgentConfig();
 
+      // Check if this is a minimal batch session (toolProfile: 'minimal')
+      const batchContext = getSessionBatchContext(sessionId);
+      const isMinimalBatch = batchContext?.toolProfile === 'minimal';
+
       // Block SDK tools that require UI we don't have:
       // - EnterPlanMode/ExitPlanMode: We use safe mode instead (user-controlled via UI)
       // - AskUserQuestion: Requires interactive UI to show question options to user
@@ -867,11 +871,13 @@ export class ClaudeAgent extends BaseAgent {
         ...sourceProxies,
       };
 
-      // Mini agents: filter to minimal set using centralized keys
+      // Mini agents / minimal batch: filter to minimal MCP set
       // Regular agents: use full set including docs and user sources
       const mcpServers: Options['mcpServers'] = miniConfig.enabled
         ? this.filterMcpServersForMiniAgent(fullMcpServers, miniConfig.mcpServerKeys)
-        : fullMcpServers;
+        : isMinimalBatch
+          ? this.filterMcpServersForMiniAgent(fullMcpServers, MINI_AGENT_MCP_KEYS)
+          : fullMcpServers;
       
       // Configure SDK options
       // Model is always set by caller via connection config
@@ -981,11 +987,14 @@ export class ClaudeAgent extends BaseAgent {
         includePartialMessages: true,
         // Tools configuration:
         // - Mini agents: minimal set for quick config edits (reduces token count ~70%)
+        // - Minimal batch: web research + context reading only
         // - Regular agents: full Claude Code toolset
         tools: (() => {
           const toolsValue = miniConfig.enabled
-            ? [...miniConfig.tools]  // Use centralized tool list
-            : { type: 'preset' as const, preset: 'claude_code' as const };
+            ? [...miniConfig.tools]
+            : isMinimalBatch
+              ? [...MINIMAL_BATCH_TOOLS]
+              : { type: 'preset' as const, preset: 'claude_code' as const };
           debug('[ClaudeAgent] 🔧 Tools configuration:', JSON.stringify(toolsValue));
           return toolsValue;
         })(),

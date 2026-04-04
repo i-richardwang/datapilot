@@ -155,6 +155,8 @@ export interface BatchContext {
   outputPath: string
   /** JSON Schema for output validation (if configured) */
   outputSchema?: Record<string, unknown>
+  /** Tool profile: 'minimal' restricts to WebSearch/WebFetch/Read/Bash + batch_output */
+  toolProfile?: string
 }
 
 // ============================================================

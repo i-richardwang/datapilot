@@ -596,6 +596,11 @@ export const BATCH_EXCLUDED_TOOLS = new Set([
   'spawn_session',
 ]);
 
+/** Session tools allowed in minimal batch profile (everything else is excluded) */
+export const MINIMAL_BATCH_SESSION_TOOLS = new Set([
+  'batch_output',
+]);
+
 export interface SessionToolFilterOptions {
   /** Include the experimental send_developer_feedback tool. */
   includeDeveloperFeedback?: boolean;
@@ -605,6 +610,8 @@ export interface SessionToolFilterOptions {
   liteMode?: boolean;
   /** Exclude UI/interaction tools for batch-spawned sessions. Defaults to false. */
   batchMode?: boolean;
+  /** Minimal batch profile: only include tools in MINIMAL_BATCH_SESSION_TOOLS. Defaults to false. */
+  minimalBatchMode?: boolean;
 }
 
 /**
@@ -618,6 +625,7 @@ export function getSessionToolDefs(options?: SessionToolFilterOptions): SessionT
   const includeBatchOutput = options?.includeBatchOutput ?? false;
   const liteMode = options?.liteMode ?? false;
   const batchMode = options?.batchMode ?? false;
+  const minimalBatchMode = options?.minimalBatchMode ?? false;
 
   return SESSION_TOOL_DEFS.filter(def => {
     if (!includeDeveloperFeedback && def.name === 'send_developer_feedback') {
@@ -628,6 +636,9 @@ export function getSessionToolDefs(options?: SessionToolFilterOptions): SessionT
     }
     if (liteMode && LITE_EXCLUDED_TOOLS.has(def.name)) {
       return false;
+    }
+    if (minimalBatchMode) {
+      return MINIMAL_BATCH_SESSION_TOOLS.has(def.name);
     }
     if (batchMode && BATCH_EXCLUDED_TOOLS.has(def.name)) {
       return false;
