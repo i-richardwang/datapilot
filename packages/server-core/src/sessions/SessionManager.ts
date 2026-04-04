@@ -6966,10 +6966,31 @@ export class SessionManager implements ISessionManager {
     // onSessionComplete (fired from onProcessingStopped) can find it.
     onSessionCreated?.(session.id)
 
-    // Send the prompt
-    await this.sendMessage(session.id, prompt, undefined, undefined, {
-      skillSlugs: resolved?.skillSlugs,
-    })
+    // Send the prompt.
+    // For batch sessions, fire-and-forget: sendMessage runs the full chat loop
+    // and only resolves after processing completes. If we await it here, the
+    // BatchProcessor.dispatchItem() won't register its session-to-item mapping
+    // until after onSessionComplete has already fired (and missed the mapping),
+    // leaving the batch item stuck in 'running' status forever.
+    // By returning the sessionId immediately, dispatchItem sets the mapping
+    // before any completion callback can fire.
+    if (isBatch) {
+      this.sendMessage(session.id, prompt, undefined, undefined, {
+        skillSlugs: resolved?.skillSlugs,
+      }).catch((err) => {
+        sessionLog.error(`[Batch] sendMessage failed for session ${session.id}:`, err)
+        // If sendMessage rejects before the chat loop starts (e.g., agent creation
+        // failure), onProcessingStopped won't fire. Notify batch processors directly
+        // so the item transitions from 'running' to 'failed'.
+        for (const processor of this.batchProcessors.values()) {
+          if (processor.onSessionComplete(session.id, 'error')) break
+        }
+      })
+    } else {
+      await this.sendMessage(session.id, prompt, undefined, undefined, {
+        skillSlugs: resolved?.skillSlugs,
+      })
+    }
 
     return { sessionId: session.id }
   }
