@@ -6905,7 +6905,7 @@ export class SessionManager implements ISessionManager {
     llmConnection?: string,
     model?: string,
     isBatch?: boolean,
-    batchContext?: { batchId: string; itemId: string; outputPath: string; outputSchema?: Record<string, unknown> },
+    batchContext?: { batchId: string; itemId: string; outputPath: string; outputSchema?: Record<string, unknown>; toolProfile?: string },
     automationName?: string,
     workingDirectory?: string,
     onSessionCreated?: (sessionId: string) => void,
