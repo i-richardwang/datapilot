@@ -85,10 +85,30 @@ if [ "$UPLOAD" = true ]; then
     echo "Will upload to S3 after build"
 fi
 
+# Packages that need to be physically present under apps/electron/node_modules/
+# at runtime — esbuild can't bundle them away. Currently this list covers ajv:
+# ajv compiles JSON schemas into validator functions whose body contains literal
+# require() strings like 'require("ajv/dist/runtime/equal").default'. esbuild
+# can't follow strings inside generated code, so the validator's require()
+# calls hit the disk at runtime. Without these packages on disk, batch_output
+# (session-tools-core/handlers/batch-output.ts) crashes the moment the LLM
+# supplies a schema with enum / format / minLength / $async constraints.
+NATIVE_MODULE_DEPS=(
+    "ajv"
+    "ajv-formats"
+    "fast-deep-equal"
+    "fast-uri"
+    "json-schema-traverse"
+    "require-from-string"
+)
+
 # 1. Clean previous build artifacts
 echo "Cleaning previous builds..."
 rm -rf "$ELECTRON_DIR/vendor"
 rm -rf "$ELECTRON_DIR/node_modules/@anthropic-ai"
+for mod in "${NATIVE_MODULE_DEPS[@]}"; do
+    rm -rf "$ELECTRON_DIR/node_modules/$mod"
+done
 rm -rf "$ELECTRON_DIR/packages"
 rm -rf "$ELECTRON_DIR/release"
 
@@ -129,6 +149,18 @@ require_path "$SDK_SOURCE" "SDK" "Run 'bun install' from the repository root fir
 echo "Copying SDK..."
 mkdir -p "$ELECTRON_DIR/node_modules/@anthropic-ai"
 cp -r "$SDK_SOURCE" "$ELECTRON_DIR/node_modules/@anthropic-ai/"
+
+# 4b. Copy NATIVE_MODULE_DEPS from root node_modules.
+# Same reason as the SDK above: bun hoists them to the repo root, but
+# electron-builder only sees inside apps/electron/. Without this copy step
+# the runtime require() calls inside ajv-generated validators fail.
+mkdir -p "$ELECTRON_DIR/node_modules"
+for mod in "${NATIVE_MODULE_DEPS[@]}"; do
+    SRC="$ROOT_DIR/node_modules/$mod"
+    require_path "$SRC" "$mod" "Run 'bun install' from the repository root first."
+    echo "Copying $mod..."
+    cp -r "$SRC" "$ELECTRON_DIR/node_modules/"
+done
 
 # 5. Copy interceptor
 INTERCEPTOR_SOURCE="$ROOT_DIR/packages/shared/src/unified-network-interceptor.ts"
