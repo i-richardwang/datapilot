@@ -85,11 +85,25 @@ if [ "$UPLOAD" = true ]; then
     echo "Will upload to S3 after build"
 fi
 
+# Native modules (and their runtime require() deps) that must be copied from
+# the monorepo root into apps/electron/node_modules/ before electron-builder
+# runs. better-sqlite3 is the real native module we use; bindings +
+# file-uri-to-path are its runtime transitive deps that bun hoists to the
+# repo root and electron-builder can't see from apps/electron/.
+# Add new entries here if better-sqlite3 ever pulls in more transitive deps.
+NATIVE_MODULE_DEPS=(
+    "better-sqlite3"
+    "bindings"
+    "file-uri-to-path"
+)
+
 # 1. Clean previous build artifacts
 echo "Cleaning previous builds..."
 rm -rf "$ELECTRON_DIR/vendor"
 rm -rf "$ELECTRON_DIR/node_modules/@anthropic-ai"
-rm -rf "$ELECTRON_DIR/node_modules/better-sqlite3"
+for mod in "${NATIVE_MODULE_DEPS[@]}"; do
+    rm -rf "$ELECTRON_DIR/node_modules/$mod"
+done
 rm -rf "$ELECTRON_DIR/packages"
 rm -rf "$ELECTRON_DIR/release"
 
@@ -131,15 +145,19 @@ echo "Copying SDK..."
 mkdir -p "$ELECTRON_DIR/node_modules/@anthropic-ai"
 cp -r "$SDK_SOURCE" "$ELECTRON_DIR/node_modules/@anthropic-ai/"
 
-# 4b. Copy better-sqlite3 from root node_modules (monorepo hoisting)
-# Same reason as the SDK above: bun hoists it to the repo root, but electron-builder
-# only looks inside apps/electron/. Placing it here also lets @electron/rebuild
-# (invoked by electron-builder) compile the .node binary against Electron's ABI
-# instead of Node.js's — the prebuilt binary from bun install is Node-only.
-SQLITE_SOURCE="$ROOT_DIR/node_modules/better-sqlite3"
-require_path "$SQLITE_SOURCE" "better-sqlite3" "Run 'bun install' from the repository root first."
-echo "Copying better-sqlite3..."
-cp -r "$SQLITE_SOURCE" "$ELECTRON_DIR/node_modules/"
+# 4b. Copy better-sqlite3 and its runtime deps from root node_modules.
+# Same reason as the SDK above: bun hoists them to the repo root, but
+# electron-builder only looks inside apps/electron/. Placing them here also
+# lets @electron/rebuild (invoked by electron-builder) compile the .node
+# binary against Electron's ABI — the prebuilt binary from bun install is
+# built for Node.js and will fail to load inside Electron.
+mkdir -p "$ELECTRON_DIR/node_modules"
+for mod in "${NATIVE_MODULE_DEPS[@]}"; do
+    SRC="$ROOT_DIR/node_modules/$mod"
+    require_path "$SRC" "$mod" "Run 'bun install' from the repository root first."
+    echo "Copying $mod..."
+    cp -r "$SRC" "$ELECTRON_DIR/node_modules/"
+done
 
 # 5. Copy interceptor
 INTERCEPTOR_SOURCE="$ROOT_DIR/packages/shared/src/unified-network-interceptor.ts"
