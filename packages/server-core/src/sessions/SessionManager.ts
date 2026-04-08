@@ -2699,11 +2699,14 @@ export class SessionManager implements ISessionManager {
         sessionLog.warn(`No LLM connection found for session ${managed.id}, using default anthropic provider`)
       }
 
-      // Set session directory for tool metadata cross-process sharing.
-      // The SDK subprocess reads CRAFT_SESSION_DIR to write tool-metadata.json;
-      // the main process reads it via toolMetadataStore.setSessionDir().
+      // Tool metadata cross-process sharing:
+      // - SDK subprocess receives CRAFT_SESSION_DIR via per-session envOverrides below
+      //   (see buildClaudeSubprocessEnv in options.ts and spawn env in pi-agent.ts).
+      //   Using the per-session override instead of mutating process.env globally
+      //   prevents a race where a newer session's creation clobbers the env var and
+      //   an older session's next SDK subprocess spawn inherits the wrong session dir.
+      // - Main process reads tool-metadata.json via toolMetadataStore.setSessionDir().
       const sessionDirForMetadata = getSessionStoragePath(managed.workspace.rootPath, managed.id)
-      process.env.CRAFT_SESSION_DIR = sessionDirForMetadata
       toolMetadataStore.setSessionDir(sessionDirForMetadata)
 
       // Set up agentReady promise so title generation can await agent creation
@@ -2739,6 +2742,10 @@ export class SessionManager implements ISessionManager {
       const miniModel = connection ? (getMiniModel(connection) ?? connection.defaultModel) : undefined
       const envOverrides: Record<string, string> = {
         CRAFT_WORKSPACE_PATH: managed.workspace.rootPath,
+        // Scope tool metadata file writes to this session's directory.
+        // Must be passed per-session (not via process.env) so concurrent sessions
+        // don't clobber each other's subprocess env at spawn time.
+        CRAFT_SESSION_DIR: sessionDirForMetadata,
         // Pass mini model to SDK subprocess so built-in tools like WebFetch
         // use the correct model for summarization (instead of hardcoded Haiku)
         ...(miniModel ? { ANTHROPIC_DEFAULT_HAIKU_MODEL: miniModel } : {}),
