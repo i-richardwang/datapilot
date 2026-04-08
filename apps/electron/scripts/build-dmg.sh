@@ -162,12 +162,13 @@ echo "Copying SDK..."
 mkdir -p "$ELECTRON_DIR/node_modules/@anthropic-ai"
 cp -r "$SDK_SOURCE" "$ELECTRON_DIR/node_modules/@anthropic-ai/"
 
-# 4b. Copy better-sqlite3 and its runtime deps from root node_modules.
+# 4b. Copy NATIVE_MODULE_DEPS from root node_modules.
 # Same reason as the SDK above: bun hoists them to the repo root, but
-# electron-builder only looks inside apps/electron/. Placing them here also
-# lets @electron/rebuild (invoked by electron-builder) compile the .node
-# binary against Electron's ABI — the prebuilt binary from bun install is
-# built for Node.js and will fail to load inside Electron.
+# electron-builder only looks inside apps/electron/. Placing better-sqlite3
+# here also lets @electron/rebuild (invoked by electron-builder) compile its
+# .node binary against Electron's ABI — the prebuilt binary from bun install
+# is built for Node.js and will fail to load inside Electron. The ajv group
+# is needed because ajv-generated validators resolve require() from disk.
 mkdir -p "$ELECTRON_DIR/node_modules"
 for mod in "${NATIVE_MODULE_DEPS[@]}"; do
     SRC="$ROOT_DIR/node_modules/$mod"
