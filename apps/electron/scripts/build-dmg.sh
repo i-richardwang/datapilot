@@ -89,6 +89,7 @@ fi
 echo "Cleaning previous builds..."
 rm -rf "$ELECTRON_DIR/vendor"
 rm -rf "$ELECTRON_DIR/node_modules/@anthropic-ai"
+rm -rf "$ELECTRON_DIR/node_modules/better-sqlite3"
 rm -rf "$ELECTRON_DIR/packages"
 rm -rf "$ELECTRON_DIR/release"
 
@@ -129,6 +130,16 @@ require_path "$SDK_SOURCE" "SDK" "Run 'bun install' from the repository root fir
 echo "Copying SDK..."
 mkdir -p "$ELECTRON_DIR/node_modules/@anthropic-ai"
 cp -r "$SDK_SOURCE" "$ELECTRON_DIR/node_modules/@anthropic-ai/"
+
+# 4b. Copy better-sqlite3 from root node_modules (monorepo hoisting)
+# Same reason as the SDK above: bun hoists it to the repo root, but electron-builder
+# only looks inside apps/electron/. Placing it here also lets @electron/rebuild
+# (invoked by electron-builder) compile the .node binary against Electron's ABI
+# instead of Node.js's — the prebuilt binary from bun install is Node-only.
+SQLITE_SOURCE="$ROOT_DIR/node_modules/better-sqlite3"
+require_path "$SQLITE_SOURCE" "better-sqlite3" "Run 'bun install' from the repository root first."
+echo "Copying better-sqlite3..."
+cp -r "$SQLITE_SOURCE" "$ELECTRON_DIR/node_modules/"
 
 # 5. Copy interceptor
 INTERCEPTOR_SOURCE="$ROOT_DIR/packages/shared/src/unified-network-interceptor.ts"
