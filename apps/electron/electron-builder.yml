@@ -125,6 +125,29 @@ mac:
       to: app/node_modules/bindings
     - from: node_modules/file-uri-to-path
       to: app/node_modules/file-uri-to-path
+    # ajv + helpers — referenced as require() strings inside the validator
+    # functions ajv compiles at runtime (see batch-output handler). esbuild
+    # can't follow strings, so the packages must exist on disk.
+    - from: node_modules/ajv
+      to: app/node_modules/ajv
+      filter:
+        - "**/*"
+        - "!lib/**"
+        - "!src/**"
+    - from: node_modules/ajv-formats
+      to: app/node_modules/ajv-formats
+      filter:
+        - "**/*"
+        - "!node_modules/**"
+        - "!src/**"
+    - from: node_modules/fast-deep-equal
+      to: app/node_modules/fast-deep-equal
+    - from: node_modules/fast-uri
+      to: app/node_modules/fast-uri
+    - from: node_modules/json-schema-traverse
+      to: app/node_modules/json-schema-traverse
+    - from: node_modules/require-from-string
+      to: app/node_modules/require-from-string
   # Exclude binaries for other platforms
   files:
     - "!**/vendor/codex/linux-*/**"
@@ -209,6 +232,27 @@ win:
       to: app/node_modules/bindings
     - from: node_modules/file-uri-to-path
       to: app/node_modules/file-uri-to-path
+    # ajv + helpers — see mac.extraResources above for the rationale.
+    - from: node_modules/ajv
+      to: app/node_modules/ajv
+      filter:
+        - "**/*"
+        - "!lib/**"
+        - "!src/**"
+    - from: node_modules/ajv-formats
+      to: app/node_modules/ajv-formats
+      filter:
+        - "**/*"
+        - "!node_modules/**"
+        - "!src/**"
+    - from: node_modules/fast-deep-equal
+      to: app/node_modules/fast-deep-equal
+    - from: node_modules/fast-uri
+      to: app/node_modules/fast-uri
+    - from: node_modules/json-schema-traverse
+      to: app/node_modules/json-schema-traverse
+    - from: node_modules/require-from-string
+      to: app/node_modules/require-from-string
     - from: vendor/bun/bun.exe
       to: vendor/bun/bun.exe
     - from: vendor/codex/win32-x64
@@ -256,6 +300,27 @@ linux:
       to: app/node_modules/bindings
     - from: node_modules/file-uri-to-path
       to: app/node_modules/file-uri-to-path
+    # ajv + helpers — see mac.extraResources above for the rationale.
+    - from: node_modules/ajv
+      to: app/node_modules/ajv
+      filter:
+        - "**/*"
+        - "!lib/**"
+        - "!src/**"
+    - from: node_modules/ajv-formats
+      to: app/node_modules/ajv-formats
+      filter:
+        - "**/*"
+        - "!node_modules/**"
+        - "!src/**"
+    - from: node_modules/fast-deep-equal
+      to: app/node_modules/fast-deep-equal
+    - from: node_modules/fast-uri
+      to: app/node_modules/fast-uri
+    - from: node_modules/json-schema-traverse
+      to: app/node_modules/json-schema-traverse
+    - from: node_modules/require-from-string
+      to: app/node_modules/require-from-string
   # Exclude binaries for other platforms
   files:
     - "!**/vendor/codex/darwin-*/**"

@@ -85,16 +85,33 @@ if [ "$UPLOAD" = true ]; then
     echo "Will upload to S3 after build"
 fi
 
-# Native modules (and their runtime require() deps) that must be copied from
-# the monorepo root into apps/electron/node_modules/ before electron-builder
-# runs. better-sqlite3 is the real native module we use; bindings +
-# file-uri-to-path are its runtime transitive deps that bun hoists to the
-# repo root and electron-builder can't see from apps/electron/.
-# Add new entries here if better-sqlite3 ever pulls in more transitive deps.
+# Packages that need to be physically present under apps/electron/node_modules/
+# at runtime — esbuild can't bundle them away. Two reasons land things here:
+#
+#   1. Native modules whose .node binary must be loaded by Electron.
+#      better-sqlite3 is the real one; bindings + file-uri-to-path are its
+#      JS-level helpers that locate the .node file.
+#
+#   2. Packages that ajv compiles into runtime-eval'd validator strings
+#      ('require("ajv/dist/runtime/equal").default' etc.). These references
+#      only execute when the validator runs, so esbuild can't follow them and
+#      they have to resolve from disk. ajv-formats has the same trick for its
+#      formats helper. Triggered by session-tools-core/handlers/batch-output.ts
+#      whenever the LLM-supplied schema uses enum / format / minLength / $async.
+#
+# Add new entries here if more transitive deps surface.
 NATIVE_MODULE_DEPS=(
+    # better-sqlite3 + helpers
     "better-sqlite3"
     "bindings"
     "file-uri-to-path"
+    # ajv (and its runtime-eval'd deps)
+    "ajv"
+    "ajv-formats"
+    "fast-deep-equal"
+    "fast-uri"
+    "json-schema-traverse"
+    "require-from-string"
 )
 
 # 1. Clean previous build artifacts
