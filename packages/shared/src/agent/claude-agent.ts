@@ -838,8 +838,11 @@ export class ClaudeAgent extends BaseAgent {
       // Disable SDK built-in cron tools — DataPilot has its own persistent Automations system
       // (automations.json + SchedulerTick). CronCreate/Delete/List are in-memory session-only
       // tools that vanish when the session ends, confusing users who expect persistent schedules.
+      // NOTE: 'Skill' is intentionally NOT blocked — we enable user + project skill
+      // auto-loading via settingSources below, and the model needs the Skill tool to
+      // dispatch to them.
       const disallowedTools: string[] = [
-        'EnterPlanMode', 'ExitPlanMode', 'AskUserQuestion', 'Skill',
+        'EnterPlanMode', 'ExitPlanMode', 'AskUserQuestion',
         'CronCreate', 'CronDelete', 'CronList',
         'EnterWorktree', 'ExitWorktree',
       ];
@@ -975,6 +978,22 @@ export class ClaudeAgent extends BaseAgent {
                 batchContext ? (isMinimalBatch ? 'minimal' : 'default') : undefined
               ),
             },
+        // settingSources controls whether the SDK auto-loads filesystem settings
+        // (CLAUDE.md, skills, hooks, permissions) from ~/.claude/ and ./.claude/.
+        // We enable "user" + "project" on the normal Claude path so that:
+        //   - ~/.claude/CLAUDE.md and {project}/CLAUDE.md are appended to the system prompt
+        //   - ~/.claude/skills/ and {project}/.claude/skills/ are discovered and dispatchable
+        //     via the built-in Skill tool
+        //   - hooks from both settings.json files are merged with DataPilot's internal hooks
+        // "project" resolves relative to the SDK cwd. When the user picks a working directory
+        // for a session, sdkCwd is set to that directory (see sessions/storage.ts:204), so
+        // "project" lands on the user's actual project. Sessions without a working directory
+        // fall back to the DataPilot session storage path, where no .claude/ exists — harmless.
+        // Mini agents and minimal batches stay lean (no settingSources) to preserve their
+        // token-optimization goal.
+        ...((!miniConfig.enabled && !isMinimalBatch)
+          ? { settingSources: ['user' as const, 'project' as const] }
+          : {}),
         // Use sdkCwd for SDK session storage - this is set once at session creation and never changes.
         // This ensures SDK can always find session transcripts regardless of workingDirectory changes.
         // Note: workingDirectory is still used for context injection and shown to the agent.
@@ -1318,8 +1337,11 @@ export class ClaudeAgent extends BaseAgent {
         },
         // Selectively disable tools - file tools are disabled (use MCP), web/code controlled by settings
         disallowedTools,
-        // No plugins — skills are handled by BaseAgent.chat() via read-before-execute
-        // (the model reads SKILL.md files directly, enforced by PrerequisiteManager)
+        // No plugins. Skills are loaded two ways, both active:
+        //   1. SDK auto-discovery from ~/.claude/skills/ and {project}/.claude/skills/ via
+        //      settingSources: ['user', 'project'] above (model dispatches them via Skill tool)
+        //   2. BaseAgent.chat() read-before-execute via PrerequisiteManager, which forces
+        //      the model to Read SKILL.md before running a skill's steps
         plugins: [],
       };
 
