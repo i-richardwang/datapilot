@@ -106,6 +106,19 @@ mac:
         - "!vendor/ripgrep/arm64-linux/**"
         - "!vendor/ripgrep/x64-linux/**"
         - "!vendor/ripgrep/x64-win32/**"
+    # better-sqlite3 is hoisted to the repo root by bun; copy it into the bundle so
+    # runtime require('better-sqlite3') resolves. The build script places it under
+    # apps/electron/node_modules/ before electron-builder runs, so @electron/rebuild
+    # compiles the .node binary against Electron's ABI.
+    - from: node_modules/better-sqlite3
+      to: app/node_modules/better-sqlite3
+      filter:
+        - "**/*"
+        - "!deps/**"
+        - "!src/**"
+        - "!binding.gyp"
+        - "!build/Release/obj.target/**"
+        - "!build/Release/.deps/**"
   # Exclude binaries for other platforms
   files:
     - "!**/vendor/codex/linux-*/**"
@@ -176,6 +189,16 @@ win:
         - "!vendor/ripgrep/x64-darwin/**"
         - "!vendor/ripgrep/arm64-linux/**"
         - "!vendor/ripgrep/x64-linux/**"
+    # See mac.extraResources above for why better-sqlite3 is here instead of via files.
+    - from: node_modules/better-sqlite3
+      to: app/node_modules/better-sqlite3
+      filter:
+        - "**/*"
+        - "!deps/**"
+        - "!src/**"
+        - "!binding.gyp"
+        - "!build/Release/obj.target/**"
+        - "!build/Release/.deps/**"
     - from: vendor/bun/bun.exe
       to: vendor/bun/bun.exe
     - from: vendor/codex/win32-x64
@@ -209,6 +232,16 @@ linux:
         - "!vendor/ripgrep/arm64-darwin/**"
         - "!vendor/ripgrep/x64-darwin/**"
         - "!vendor/ripgrep/x64-win32/**"
+    # See mac.extraResources above for why better-sqlite3 is here instead of via files.
+    - from: node_modules/better-sqlite3
+      to: app/node_modules/better-sqlite3
+      filter:
+        - "**/*"
+        - "!deps/**"
+        - "!src/**"
+        - "!binding.gyp"
+        - "!build/Release/obj.target/**"
+        - "!build/Release/.deps/**"
   # Exclude binaries for other platforms
   files:
     - "!**/vendor/codex/darwin-*/**"
