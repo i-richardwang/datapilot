@@ -5,8 +5,9 @@ import { EntityPanel } from '@/components/ui/entity-panel'
 import { EntityListEmptyScreen } from '@/components/ui/entity-list-empty'
 import { skillSelection } from '@/hooks/useEntitySelection'
 import { SkillMenu } from './SkillMenu'
+import { SendResourceToWorkspaceDialog } from './SendResourceToWorkspaceDialog'
 import { EditPopover, getEditConfig } from '@/components/ui/EditPopover'
-import { useActiveWorkspace } from '@/context/AppShellContext'
+import { useActiveWorkspace, useAppShellContext } from '@/context/AppShellContext'
 import type { LoadedSkill } from '../../../shared/types'
 
 export interface SkillsListPanelProps {
@@ -30,8 +31,16 @@ export function SkillsListPanel({
 }: SkillsListPanelProps) {
   const activeWorkspace = useActiveWorkspace()
   const canRevealLocally = !activeWorkspace?.remoteServer
+  const { workspaces, activeWorkspaceId } = useAppShellContext()
+  const hasOtherWorkspaces = workspaces.length > 1
+
+  // Send to Workspace dialog state
+  const [sendDialogOpen, setSendDialogOpen] = React.useState(false)
+  const [sendResourceSlug, setSendResourceSlug] = React.useState<string | null>(null)
+  const [sendResourceLabel, setSendResourceLabel] = React.useState('')
 
   return (
+    <>
     <EntityPanel<LoadedSkill>
       items={skills}
       getId={(s) => s.slug}
@@ -86,9 +95,28 @@ export function SkillsListPanel({
             onDelete={skill.source === 'workspace' ? () => onDeleteSkill(skill.slug) : undefined}
             canDelete={skill.source === 'workspace'}
             deleteLabel={skill.source === 'workspace' ? 'Delete Skill' : 'Managed by project'}
+            onSendToWorkspace={hasOtherWorkspaces && skill.source === 'workspace' ? () => {
+              setSendResourceSlug(skill.slug)
+              setSendResourceLabel(skill.metadata.name)
+              setSendDialogOpen(true)
+            } : undefined}
           />
         ),
       })}
     />
+
+    {/* Send to Workspace dialog */}
+    {sendResourceSlug && (
+      <SendResourceToWorkspaceDialog
+        open={sendDialogOpen}
+        onOpenChange={setSendDialogOpen}
+        resourceType="skill"
+        resourceIds={[sendResourceSlug]}
+        resourceLabel={sendResourceLabel}
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
+      />
+    )}
+    </>
   )
 }

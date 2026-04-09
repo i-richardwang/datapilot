@@ -68,7 +68,7 @@ import { useBackgroundTasks } from "@/hooks/useBackgroundTasks"
 import { useTurnCardExpansion } from "@/hooks/useTurnCardExpansion"
 import { useNavigation } from "@/contexts/NavigationContext"
 import { useAppShellContext } from "@/context/AppShellContext"
-import { routes } from "@/lib/navigate"
+import { navigate, routes } from "@/lib/navigate"
 import { CHAT_LAYOUT } from "@/config/layout"
 import { resolveBranchNewPanelOption } from "./branching"
 
@@ -2196,8 +2196,12 @@ function ErrorMessage({ message, onOpenUrl }: { message: Message; onOpenUrl?: (u
                 onClick={() => {
                   if (action.action === 'open_url' && action.url && onOpenUrl) {
                     onOpenUrl(action.url)
+                  } else if (action.action === 'settings') {
+                    navigate(routes.view.settings())
+                  } else if (action.action === 'retry') {
+                    // Focus the chat input so user can re-send
+                    document.querySelector<HTMLTextAreaElement>('[data-chat-input]')?.focus()
                   }
-                  // retry, settings, reauth are handled by existing mechanisms via keyboard shortcuts
                 }}
                 className="text-xs px-2 py-0.5 rounded border border-destructive/20 text-destructive/70 hover:text-destructive hover:border-destructive/40 transition-colors"
               >

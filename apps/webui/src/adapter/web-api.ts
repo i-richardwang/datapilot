@@ -141,16 +141,17 @@ export function createWebApi(options: WebApiOptions): {
       window.open(`${window.location.origin}/?session=${sessionId}`, '_blank')
     },
 
-    // Auto-update — not applicable to web
-    checkForUpdates: () => Promise.resolve({ available: false, version: '', releaseNotes: '' } as any),
-    getUpdateInfo: () => Promise.resolve({ available: false, version: '', releaseNotes: '' } as any),
+    // Auto-update — not applicable to web (but expose server version for About page)
+    checkForUpdates: () => Promise.resolve({ available: false, currentVersion: client.getServerVersion() ?? '' } as any),
+    getUpdateInfo: () => Promise.resolve({ available: false, currentVersion: client.getServerVersion() ?? '' } as any),
     installUpdate: () => Promise.resolve(),
     dismissUpdate: () => Promise.resolve(),
     getDismissedUpdateVersion: () => Promise.resolve(null),
     onUpdateAvailable: () => () => {},
     onUpdateDownloadProgress: () => () => {},
-    getReleaseNotes: () => Promise.resolve(''),
-    getLatestReleaseVersion: () => Promise.resolve(undefined),
+    // Release notes — serve from server via RPC (same content as Electron)
+    getReleaseNotes: () => client.invoke('releaseNotes:get') as Promise<string>,
+    getLatestReleaseVersion: () => client.invoke('releaseNotes:getLatestVersion') as Promise<string | undefined>,
 
     // Menu events — register as keyboard shortcuts
     onMenuNewChat: () => () => {},

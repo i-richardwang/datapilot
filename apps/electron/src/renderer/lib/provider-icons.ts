@@ -170,7 +170,6 @@ export function getProviderIcon(
   // Map provider type to icon
   switch (providerType) {
     case 'anthropic':
-    case 'anthropic_compat':
       return providerIcons.anthropic
     case 'openai':
     case 'openai_compat':

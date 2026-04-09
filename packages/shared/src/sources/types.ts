@@ -196,10 +196,25 @@ export function isOAuthSource(source: LoadedSource): boolean {
 
   // API OAuth sources (Google, Slack, Microsoft)
   if (source.config.type === 'api') {
-    return isApiOAuthProvider(source.config.provider);
+    if (isApiOAuthProvider(source.config.provider)) return true;
+    // Generic OAuth API sources (e.g. GitHub, Linear)
+    if (isGenericOAuthSource(source)) return true;
   }
 
   return false;
+}
+
+/**
+ * Check if a source uses generic OAuth (not Google/Slack/Microsoft provider-specific).
+ * Matches API sources with authType 'oauth' — either explicit oauth config block
+ * or auto-discovery from baseUrl via RFC 9728/8414.
+ */
+export function isGenericOAuthSource(source: LoadedSource): boolean {
+  return (
+    source.config.type === 'api' &&
+    source.config.api?.authType === 'oauth' &&
+    !isApiOAuthProvider(source.config.provider)
+  );
 }
 
 /**
@@ -280,6 +295,28 @@ export interface ApiTestEndpoint {
 }
 
 /**
+ * Generic OAuth configuration for API sources.
+ * Allows any OAuth 2.0 provider to be configured via config.json
+ * without needing an MCP server or manual PAT.
+ */
+export interface ApiOAuthConfig {
+  /** OAuth authorization endpoint URL (REQUIRED) */
+  authorizationUrl: string;
+  /** OAuth token exchange endpoint URL (REQUIRED) */
+  tokenUrl: string;
+  /** OAuth client ID (REQUIRED) */
+  clientId: string;
+  /** OAuth client secret (optional for public PKCE clients) */
+  clientSecret?: string;
+  /** Requested OAuth scopes */
+  scopes?: string[];
+  /** Auth0-style audience parameter */
+  audience?: string;
+  /** Additional parameters to include in the authorization URL */
+  extraParams?: Record<string, string>;
+}
+
+/**
  * API-specific configuration
  */
 export interface ApiSourceConfig {
@@ -307,6 +344,9 @@ export interface ApiSourceConfig {
   // Microsoft OAuth fields (used when provider is 'microsoft')
   microsoftService?: MicrosoftService; // Predefined service for scope selection
   microsoftScopes?: string[]; // Custom scopes (overrides microsoftService)
+
+  // Generic OAuth config (used when authType is 'oauth' and provider is not google/slack/microsoft)
+  oauth?: ApiOAuthConfig;
 }
 
 /**

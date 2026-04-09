@@ -129,7 +129,7 @@ export interface StoredCredential {
 const CREDENTIAL_DELIMITER = '::';
 
 /** Source credential types */
-const SOURCE_CREDENTIAL_TYPES = [
+export const SOURCE_CREDENTIAL_TYPES = [
   'source_oauth',
   'source_bearer',
   'source_apikey',

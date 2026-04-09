@@ -375,6 +375,7 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   RPC_CHANNELS.logo.GET_URL,
 
   // automations — workspace automations
+  RPC_CHANNELS.automations.LIST,
   RPC_CHANNELS.automations.TEST,
   RPC_CHANNELS.automations.SET_ENABLED,
   RPC_CHANNELS.automations.DUPLICATE,
@@ -401,6 +402,10 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
 
   // git — workspace filesystem
   RPC_CHANNELS.git.GET_BRANCH,
+
+  // resources — workspace resource export/import
+  RPC_CHANNELS.resources.EXPORT,
+  RPC_CHANNELS.resources.IMPORT,
 ])
 
 // ---------------------------------------------------------------------------

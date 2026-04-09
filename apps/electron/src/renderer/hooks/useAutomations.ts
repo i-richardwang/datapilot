@@ -38,7 +38,6 @@ export interface UseAutomationsResult {
 
 export function useAutomations(
   activeWorkspaceId: string | null | undefined,
-  activeWorkspaceRootPath: string | undefined,
 ): UseAutomationsResult {
   const [automations, setAutomations] = useState<AutomationListItem[]>([])
   const [automationTestResults, setAutomationTestResults] = useState<Record<string, TestResult>>({})

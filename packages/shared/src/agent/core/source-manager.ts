@@ -367,6 +367,10 @@ export class SourceManager {
         case 'microsoft':
           return 'source_microsoft_oauth_trigger';
         default:
+          // Generic OAuth API sources → OAuth trigger (static config or auto-discovery)
+          if (api?.authType === 'oauth') {
+            return 'source_oauth_trigger';
+          }
           return 'source_credential_prompt';
       }
     }

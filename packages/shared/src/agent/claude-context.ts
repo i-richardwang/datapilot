@@ -335,13 +335,8 @@ export function createClaudeContext(options: ClaudeContextOptions): SessionToolC
       return null;
     },
 
-    // Session self-management
-    setSessionLabels: options.setSessionLabels,
-    setSessionStatus: options.setSessionStatus,
-    getSessionInfo: options.getSessionInfo,
-    listSessions: options.listSessions,
-    resolveLabels: options.resolveLabels,
-    resolveStatus: options.resolveStatus,
+    // Session self-management bindings are attached externally via
+    // attachSessionSelfManagementBindings() — not part of the factory.
   };
 
   return context;
