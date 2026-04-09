@@ -8,7 +8,7 @@
  * The client's only job is to open the browser and forward the code.
  */
 
-export type OAuthProvider = 'mcp' | 'google' | 'slack' | 'microsoft'
+export type OAuthProvider = 'mcp' | 'google' | 'slack' | 'microsoft' | 'generic'
 
 /**
  * Everything the server produces during the "prepare" phase.

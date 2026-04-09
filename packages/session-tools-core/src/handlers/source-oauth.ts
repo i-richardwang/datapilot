@@ -44,15 +44,13 @@ export async function handleSourceOAuthTrigger(
     return errorResponse(`Source '${sourceSlug}' not found.`);
   }
 
-  if (source.type !== 'mcp') {
-    return errorResponse(
-      `Source '${sourceSlug}' is not an MCP source. OAuth is only for MCP sources.`
-    );
-  }
+  // Validate source uses OAuth — supports MCP OAuth and generic API OAuth (with or without oauth config block)
+  const isMcpOAuth = source.type === 'mcp' && source.mcp?.authType === 'oauth';
+  const isApiOAuth = source.type === 'api' && source.api?.authType === 'oauth';
 
-  if (source.mcp?.authType !== 'oauth') {
-    return successResponse(
-      `Source '${sourceSlug}' does not use OAuth authentication.`
+  if (!isMcpOAuth && !isApiOAuth) {
+    return errorResponse(
+      `Source '${sourceSlug}' is not configured for OAuth authentication.`
     );
   }
 

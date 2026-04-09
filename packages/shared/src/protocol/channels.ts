@@ -377,6 +377,10 @@ export const RPC_CHANNELS = {
     RETRY_ITEM: 'batches:retryItem',
     CHANGED: 'batches:changed',
   },
+  resources: {
+    EXPORT: 'resources:export',
+    IMPORT: 'resources:import',
+  },
 } as const
 
 // IPC_CHANNELS compat alias removed — all consumers now use RPC_CHANNELS

@@ -389,4 +389,8 @@ export const CHANNEL_MAP = {
   testBatch: invoke(RPC_CHANNELS.batches.TEST),
   getBatchTestResult: invoke(RPC_CHANNELS.batches.GET_TEST_RESULT),
   onBatchesChanged: listener(RPC_CHANNELS.batches.CHANGED),
+
+  // Resources (cross-workspace export/import)
+  exportResources: invoke(RPC_CHANNELS.resources.EXPORT),
+  importResources: invoke(RPC_CHANNELS.resources.IMPORT),
 } satisfies ChannelMap

@@ -251,7 +251,7 @@ export function isProviderAvailable(provider: AgentProvider): boolean {
  */
 export function providerTypeToAgentProvider(providerType: LlmProviderType): AgentProvider {
   switch (providerType) {
-    // Anthropic SDK backends
+    // Anthropic SDK backend (direct API only)
     case 'anthropic':
     case 'anthropic_compat':
       return 'anthropic';
@@ -728,7 +728,7 @@ export async function testBackendConnection(args: {
     const providerType = args.connection?.providerType ?? getDefaultProviderType(args.provider);
     const now = Date.now();
     const authType: LlmAuthType = (
-      providerType === 'anthropic_compat' || providerType === 'pi_compat'
+      providerType === 'pi_compat'
     )
       ? 'api_key_with_endpoint'
       : 'api_key';
