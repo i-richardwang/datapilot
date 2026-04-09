@@ -845,7 +845,7 @@ function AppShellContent({
     automationPendingDelete, pendingDeleteAutomation, setAutomationPendingDelete,
     handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, confirmDeleteAutomation,
     getAutomationHistory, handleReplayAutomation,
-  } = useAutomations(activeWorkspaceId, activeWorkspace?.rootPath)
+  } = useAutomations(activeWorkspaceId)
 
   // Batches — state, handlers
   const {

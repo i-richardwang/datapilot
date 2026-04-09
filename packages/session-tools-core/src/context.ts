@@ -445,6 +445,73 @@ export interface ListSessionsResult {
 }
 
 // ============================================================
+// Session Self-Management Types — Resolution
+// ============================================================
+
+/** Result of resolving label names/IDs against configured labels. */
+export interface ResolvedLabelsResult {
+  /** Resolved label IDs (ready to store) */
+  resolved: string[];
+  /** Labels that couldn't be matched to any configured label */
+  unknown: string[];
+  /** All valid label IDs (for error messages) */
+  available: string[];
+}
+
+/** Result of resolving a status name/ID against configured statuses. */
+export interface ResolvedStatusResult {
+  /** Matched status ID, or null if unknown */
+  resolved: string | null;
+  /** All valid status IDs (for error messages) */
+  available: string[];
+}
+
+// ============================================================
+// Session Self-Management Types
+// ============================================================
+
+/** Full metadata for a single session (returned by get_session_info). */
+export interface SessionInfo {
+  id: string;
+  name: string;
+  labels: string[];
+  status: string;
+  permissionMode: string;
+  createdAt: number;
+  updatedAt?: number;
+  workingDirectory?: string;
+  llmConnection?: string;
+  model?: string;
+  isActive: boolean;
+}
+
+/** Compact session summary (returned by list_sessions). */
+export interface SessionListItem {
+  id: string;
+  name: string;
+  labels: string[];
+  status: string;
+  createdAt: number;
+}
+
+/** Options for list_sessions filtering and pagination. */
+export interface ListSessionsOptions {
+  status?: string;
+  label?: string;
+  search?: string;
+  sortBy?: 'recent' | 'name' | 'status';
+  limit?: number;
+  offset?: number;
+}
+
+/** Paginated result from list_sessions. */
+export interface ListSessionsResult {
+  total: number;
+  returned: number;
+  sessions: SessionListItem[];
+}
+
+// ============================================================
 // MCP Validation Types
 // ============================================================
 

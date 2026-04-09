@@ -398,12 +398,24 @@ const McpSourceConfigSchema = z.object({
   }
 );
 
+const ApiOAuthConfigSchema = z.object({
+  authorizationUrl: z.string().url(),
+  tokenUrl: z.string().url(),
+  clientId: z.string().min(1),
+  clientSecret: z.string().optional(),
+  scopes: z.array(z.string()).optional(),
+  audience: z.string().optional(),
+  extraParams: z.record(z.string(), z.string()).optional(),
+});
+
 const ApiSourceConfigSchema = z.object({
   baseUrl: z.string().url(),
-  authType: z.enum(['bearer', 'header', 'query', 'basic', 'none']),
+  authType: z.enum(['bearer', 'header', 'query', 'basic', 'oauth', 'none']),
   headerName: z.string().optional(),
+  headerNames: z.array(z.string()).optional(),
   queryParam: z.string().optional(),
   authScheme: z.string().optional(),
+  defaultHeaders: z.record(z.string(), z.string()).optional(),
   testEndpoint: z
     .object({
       method: z.enum(['GET', 'POST']),
@@ -414,6 +426,13 @@ const ApiSourceConfigSchema = z.object({
     .optional(),
   googleService: z.enum(['gmail', 'calendar', 'drive', 'docs', 'sheets', 'youtube', 'searchconsole']).optional(),
   googleScopes: z.array(z.string()).optional(),
+  googleOAuthClientId: z.string().optional(),
+  googleOAuthClientSecret: z.string().optional(),
+  slackService: z.enum(['messaging', 'channels', 'users', 'files', 'full']).optional(),
+  slackUserScopes: z.array(z.string()).optional(),
+  microsoftService: z.enum(['outlook', 'microsoft-calendar', 'onedrive', 'teams', 'sharepoint']).optional(),
+  microsoftScopes: z.array(z.string()).optional(),
+  oauth: ApiOAuthConfigSchema.optional(),
 });
 
 const LocalSourceConfigSchema = z.object({

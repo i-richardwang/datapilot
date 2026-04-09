@@ -203,6 +203,18 @@ export class SourceServerBuilder {
       return createApiServer(config, getToken, sessionPath, summarize);
     }
 
+    // Generic OAuth APIs — use token getter with auto-refresh
+    // Order matters: provider-specific checks (google, slack) come first
+    if (authType === 'oauth') {
+      if (!source.config.isAuthenticated || !getToken) {
+        debug(`[SourceServerBuilder] Generic OAuth source ${source.config.slug} not authenticated`);
+        return null;
+      }
+      debug(`[SourceServerBuilder] Building generic OAuth API server for ${source.config.slug}`);
+      const config = this.buildApiConfig(source);
+      return createApiServer(config, getToken, sessionPath, summarize);
+    }
+
     // Public APIs (no auth) can be used immediately
     if (authType === 'none') {
       debug(`[SourceServerBuilder] Building public API server for ${source.config.slug}`);
@@ -247,6 +259,10 @@ export class SourceServerBuilder {
         break;
       case 'basic':
         config.auth = { type: 'basic' };
+        break;
+      case 'oauth':
+        // Generic OAuth tokens are sent as Bearer tokens
+        config.auth = { type: 'bearer', authScheme: api.authScheme ?? 'Bearer' };
         break;
       case 'none':
       default:

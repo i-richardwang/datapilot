@@ -7,6 +7,8 @@ import { EntityListBadge } from '@/components/ui/entity-list-badge'
 import { EntityListEmptyScreen } from '@/components/ui/entity-list-empty'
 import { sourceSelection } from '@/hooks/useEntitySelection'
 import { SourceMenu } from './SourceMenu'
+import { SendResourceToWorkspaceDialog } from './SendResourceToWorkspaceDialog'
+import { useAppShellContext } from '@/context/AppShellContext'
 import { EditPopover, getEditConfig, type EditContextKey } from '@/components/ui/EditPopover'
 import type { LoadedSource, SourceConnectionStatus, SourceFilter } from '../../../shared/types'
 
@@ -51,6 +53,14 @@ export function SourcesListPanel({
   localMcpEnabled = true,
   className,
 }: SourcesListPanelProps) {
+  const { workspaces, activeWorkspaceId } = useAppShellContext()
+  const hasOtherWorkspaces = workspaces.length > 1
+
+  // Send to Workspace dialog state
+  const [sendDialogOpen, setSendDialogOpen] = React.useState(false)
+  const [sendResourceSlug, setSendResourceSlug] = React.useState<string | null>(null)
+  const [sendResourceLabel, setSendResourceLabel] = React.useState('')
+
   const filteredSources = React.useMemo(() => {
     if (!sourceFilter) return sources
     return sources.filter(s => s.config.type === sourceFilter.sourceType)
@@ -64,6 +74,7 @@ export function SourcesListPanel({
   }, [sourceFilter])
 
   return (
+    <>
     <EntityPanel<LoadedSource>
       items={filteredSources}
       getId={(s) => s.config.slug}
@@ -120,10 +131,29 @@ export function SourcesListPanel({
               onOpenInNewWindow={() => window.electronAPI.openUrl(`craftagents://sources/source/${source.config.slug}?window=focused`)}
               onShowInFinder={() => window.electronAPI.showInFolder(source.folderPath)}
               onDelete={() => onDeleteSource(source.config.slug)}
+              onSendToWorkspace={hasOtherWorkspaces ? () => {
+                setSendResourceSlug(source.config.slug)
+                setSendResourceLabel(source.config.name)
+                setSendDialogOpen(true)
+              } : undefined}
             />
           ),
         }
       }}
     />
+
+    {/* Send to Workspace dialog */}
+    {sendResourceSlug && (
+      <SendResourceToWorkspaceDialog
+        open={sendDialogOpen}
+        onOpenChange={setSendDialogOpen}
+        resourceType="source"
+        resourceIds={[sendResourceSlug]}
+        resourceLabel={sendResourceLabel}
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
+      />
+    )}
+    </>
   )
 }
