@@ -7,20 +7,20 @@
  * This is the foundation for session dispatch (move/fork), backup, and sharing.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
-import { join, relative } from 'path'
-import { readFile } from 'fs/promises'
+import { existsSync, readFileSync } from 'fs'
 import type { SessionHeader, StoredMessage, SessionConfig } from './types.ts'
 import type { StoredSession } from './types.ts'
 import { readSessionJsonl } from './jsonl.ts'
 import { getSessionPath, getSessionFilePath } from './storage.db.ts'
 import { debug } from '../utils/debug.ts'
+import {
+  type BundleFile,
+  MAX_BUNDLE_SIZE_BYTES,
+  collectDirectoryFiles,
+} from '../utils/bundle-files.ts'
 
-/**
- * Maximum bundle size in bytes (~100MB).
- * Sessions exceeding this should use a streaming format (future).
- */
-export const MAX_BUNDLE_SIZE_BYTES = 100 * 1024 * 1024
+// Re-export BundleFile and MAX_BUNDLE_SIZE_BYTES for backward compatibility
+export { type BundleFile, MAX_BUNDLE_SIZE_BYTES } from '../utils/bundle-files.ts'
 
 /**
  * Directories to skip when collecting session files for export.
@@ -29,22 +29,15 @@ export const MAX_BUNDLE_SIZE_BYTES = 100 * 1024 * 1024
 const SKIP_DIRS = new Set(['tmp'])
 
 /**
+ * Files to skip when collecting session files for export.
+ * session.jsonl is in the bundle as structured data.
+ */
+const SKIP_SESSION_FILES = new Set(['session.jsonl', 'session.jsonl.tmp'])
+
+/**
  * Dispatch mode determines how the imported session relates to the original.
  */
 export type DispatchMode = 'move' | 'fork'
-
-/**
- * A file entry in the session bundle.
- * Contains the relative path within the session directory and base64-encoded content.
- */
-export interface BundleFile {
-  /** Relative path within the session directory (e.g., "attachments/image.png") */
-  relativePath: string
-  /** Base64-encoded file content */
-  contentBase64: string
-  /** Original file size in bytes (for validation) */
-  size: number
-}
 
 /**
  * Branch info for fork operations.
@@ -110,7 +103,10 @@ export function serializeSession(
   }
 
   // Collect all files from session directory (except session.jsonl and tmp/)
-  const files = collectSessionFiles(sessionDir)
+  const files = collectDirectoryFiles(sessionDir, {
+    skipDirs: SKIP_DIRS,
+    skipFiles: SKIP_SESSION_FILES,
+  })
 
   // Validate total bundle size
   const totalSize = files.reduce((sum, f) => sum + f.size, 0)
@@ -139,53 +135,6 @@ export function serializeSession(
     },
     files,
   }
-}
-
-/**
- * Collect all files from a session directory for bundling.
- * Walks the directory tree, skipping tmp/, dotfiles, and session.jsonl.
- * Returns files with base64-encoded content.
- */
-function collectSessionFiles(sessionDir: string): BundleFile[] {
-  const files: BundleFile[] = []
-
-  function walk(dir: string): void {
-    if (!existsSync(dir)) return
-
-    const entries = readdirSync(dir, { withFileTypes: true })
-    for (const entry of entries) {
-      // Skip dotfiles and dotdirs
-      if (entry.name.startsWith('.')) continue
-
-      const fullPath = join(dir, entry.name)
-      const relPath = relative(sessionDir, fullPath)
-
-      if (entry.isDirectory()) {
-        // Skip excluded directories
-        if (SKIP_DIRS.has(entry.name)) continue
-        walk(fullPath)
-      } else if (entry.isFile()) {
-        // Skip the session.jsonl itself (it's in the bundle as structured data)
-        if (entry.name === 'session.jsonl' || entry.name === 'session.jsonl.tmp') continue
-
-        try {
-          const content = readFileSync(fullPath)
-          const stat = statSync(fullPath)
-          files.push({
-            relativePath: relPath,
-            contentBase64: content.toString('base64'),
-            size: stat.size,
-          })
-        } catch (err) {
-          debug(`[bundle] Failed to read file ${fullPath}:`, err)
-          // Skip unreadable files rather than failing the entire export
-        }
-      }
-    }
-  }
-
-  walk(sessionDir)
-  return files
 }
 
 /**

@@ -1,6 +1,6 @@
 {
   "name": "@craft-agent/shared",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "license": "Apache-2.0",
   "description": "Shared business logic for Craft Agents - agent, auth, config, credentials, MCP integration",
   "type": "module",
@@ -74,6 +74,7 @@
     "./sessions/storage.db": "./src/sessions/storage.db.ts",
     "./automations/history-store.db": "./src/automations/history-store.db.ts",
     "./batches/batch-state-manager.db": "./src/batches/batch-state-manager.db.ts",
+    "./resources": "./src/resources/index.ts",
     "./agent/backend": "./src/agent/backend/index.ts",
     "./auth/callback-server": "./src/auth/callback-server.ts",
     "./auth/chatgpt-oauth-config": "./src/auth/chatgpt-oauth-config.ts",

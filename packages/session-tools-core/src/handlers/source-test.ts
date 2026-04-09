@@ -463,6 +463,8 @@ async function testApiConnectionWithAuth(
 
   switch (source.api!.authType) {
     case 'bearer':
+    case 'oauth':
+      // Generic OAuth tokens are sent as Bearer tokens
       headers['Authorization'] = `Bearer ${token}`;
       break;
     case 'basic':

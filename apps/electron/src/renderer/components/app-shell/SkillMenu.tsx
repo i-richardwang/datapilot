@@ -19,6 +19,7 @@ import {
   Trash2,
   FolderOpen,
   AppWindow,
+  Send,
 } from 'lucide-react'
 import { useMenuComponents } from '@/components/ui/menu-context'
 import { getFileManagerName } from '@/lib/platform'
@@ -35,6 +36,8 @@ export interface SkillMenuProps {
   canShowInFinder?: boolean
   canDelete?: boolean
   deleteLabel?: string
+  /** Send to another workspace (omit to hide the option) */
+  onSendToWorkspace?: () => void
 }
 
 /**
@@ -50,6 +53,7 @@ export function SkillMenu({
   canShowInFinder = true,
   canDelete = true,
   deleteLabel = 'Delete Skill',
+  onSendToWorkspace,
 }: SkillMenuProps) {
   // Get menu components from context (works with both DropdownMenu and ContextMenu)
   const { MenuItem, Separator } = useMenuComponents()
@@ -67,6 +71,14 @@ export function SkillMenu({
         <FolderOpen className="h-3.5 w-3.5" />
         <span className="flex-1">{`Show in ${getFileManagerName()}`}</span>
       </MenuItem>
+
+      {/* Send to another workspace */}
+      {onSendToWorkspace && (
+        <MenuItem onClick={onSendToWorkspace}>
+          <Send className="h-3.5 w-3.5" />
+          <span className="flex-1">Send to Workspace</span>
+        </MenuItem>
+      )}
 
       <Separator />
 

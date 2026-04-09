@@ -273,7 +273,7 @@ Each source folder contains:
   // For API sources:
   "api": {
     "baseUrl": "https://api.example.com/",  // MUST have trailing slash
-    "authType": "bearer" | "header" | "query" | "basic" | "none",
+    "authType": "bearer" | "header" | "query" | "basic" | "oauth" | "none",
     "headerName": "X-API-Key",      // For single header auth
     "headerNames": ["X-API-KEY", "X-APP-KEY"],  // For multi-header auth (2+ headers)
     "queryParam": "api_key",         // For query auth
@@ -508,6 +508,61 @@ Common multi-header use cases:
 - **Datadog**: `DD-API-KEY` + `DD-APPLICATION-KEY`
 - **APIs with identity + signing keys**: Separate API key and secret
 - **Services with app + user credentials**: Application key plus user token
+
+**Generic OAuth (authType: 'oauth'):**
+
+For API sources that use OAuth 2.0 but aren't Google, Slack, or Microsoft. Two modes:
+
+**Auto-discovery (recommended):** If the API supports RFC 9728 (OAuth Protected Resource Metadata), just set `authType: "oauth"` — endpoints and client registration are discovered automatically:
+
+```json
+{
+  "name": "Craft Connect",
+  "type": "api",
+  "provider": "craft",
+  "api": {
+    "baseUrl": "https://connect.craft.do/my/api/v1/",
+    "authType": "oauth"
+  }
+}
+```
+
+**Explicit config:** For APIs without standard OAuth metadata (GitHub, Linear, etc.), provide endpoints manually:
+
+```json
+{
+  "name": "GitHub",
+  "type": "api",
+  "provider": "github",
+  "api": {
+    "baseUrl": "https://api.github.com/",
+    "authType": "oauth",
+    "oauth": {
+      "authorizationUrl": "https://github.com/login/oauth/authorize",
+      "tokenUrl": "https://github.com/login/oauth/access_token",
+      "clientId": "Iv1.your_client_id",
+      "clientSecret": "your_client_secret",
+      "scopes": ["repo", "read:user"]
+    }
+  }
+}
+```
+
+The `oauth` block fields (only needed for explicit config):
+- `authorizationUrl` (required): The OAuth authorization endpoint
+- `tokenUrl` (required): The OAuth token exchange endpoint
+- `clientId` (required): Your OAuth app's client ID
+- `clientSecret` (optional): Client secret — not required for public PKCE clients
+- `scopes` (optional): Requested OAuth scopes
+- `audience` (optional): Auth0-style audience parameter
+- `extraParams` (optional): Additional query params for the authorization URL (e.g. `{"access_type": "offline"}`)
+
+To trigger OAuth authentication, use `source_oauth_trigger` (the same tool used for MCP OAuth):
+```typescript
+source_oauth_trigger({ sourceSlug: "github" })
+```
+
+Tokens are sent as `Authorization: Bearer {token}` on every request. Token refresh is automatic when a refresh token is available.
 
 **Basic auth with optional password:**
 

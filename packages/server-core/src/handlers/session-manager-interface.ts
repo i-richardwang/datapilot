@@ -185,6 +185,11 @@ export interface ISessionManager {
   /** Return client-safe workspace list (no rootPath) for remote clients. */
   getWorkspacesInfo(): WorkspaceInfo[]
   setupConfigWatcher(workspaceRootPath: string, workspaceId: string): void
+  /**
+   * Manually notify the ConfigWatcher of a file change.
+   * Workaround for Bun's fs.watch on Linux not detecting atomic renames.
+   */
+  notifyConfigFileChange(workspaceRootPath: string, relativePath: string): void
 
   // ---------------------------------------------------------------------------
   // Server-level observability

@@ -302,6 +302,22 @@ describe('getValidateSteps', () => {
     expect(names).toContain('automation:cleanup')
   })
 
+  it('includes session tool validation steps', () => {
+    const names = getValidateSteps().map((s) => s.name)
+    expect(names).toContain('session-tools:set_session_labels')
+    expect(names).toContain('session-tools:get_session_info')
+    expect(names).toContain('session-tools:list_sessions')
+  })
+
+  it('session tool steps come after tool use and before branching', () => {
+    const names = getValidateSteps().map((s) => s.name)
+    const toolUse = names.indexOf('send message + tool use')
+    const labels = names.indexOf('session-tools:set_session_labels')
+    const branch = names.indexOf('sessions:branch')
+    expect(labels).toBeGreaterThan(toolUse)
+    expect(branch).toBeGreaterThan(labels)
+  })
+
   it('includes session branching steps', () => {
     const names = getValidateSteps().map((s) => s.name)
     expect(names).toContain('sessions:branch')

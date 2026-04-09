@@ -11,6 +11,7 @@ export type {
   ApiAuthType,
   KnownProvider,
   ApiOAuthProvider,
+  ApiOAuthConfig,
   McpSourceConfig,
   ApiSourceConfig,
   LocalSourceConfig,
@@ -25,6 +26,7 @@ export type {
 export {
   API_OAUTH_PROVIDERS,
   isApiOAuthProvider,
+  isGenericOAuthSource,
 } from './types.ts';
 
 // Storage functions

@@ -71,16 +71,28 @@ export function registerAutomationsHandlers(server: RpcServer, deps: HandlerDeps
   // List automations — reads automations.json and returns raw config.
   // The UI parses this into AutomationListItem[].
   server.handle(RPC_CHANNELS.automations.LIST, async (_ctx, workspaceId: string) => {
+    log.info(`AUTOMATIONS_LIST: Loading automations for workspace: ${workspaceId}`)
     const workspace = getWorkspaceByNameOrId(workspaceId)
-    if (!workspace) throw new Error('Workspace not found')
-
-    const { resolveAutomationsConfigPath } = await import('@craft-agent/shared/automations/resolve-config-path')
-    const configPath = resolveAutomationsConfigPath(workspace.rootPath)
+    if (!workspace) {
+      log.error(`AUTOMATIONS_LIST: Workspace not found: ${workspaceId}`)
+      return null
+    }
     try {
-      const raw = await readFile(configPath, 'utf-8')
-      return JSON.parse(raw)
-    } catch {
-      return null // File doesn't exist yet
+      const { resolveAutomationsConfigPath } = await import('@craft-agent/shared/automations/resolve-config-path')
+      const configPath = resolveAutomationsConfigPath(workspace.rootPath)
+      log.info(`AUTOMATIONS_LIST: Reading config from: ${configPath}`)
+      const content = await readFile(configPath, 'utf-8')
+      const parsed = JSON.parse(content)
+      const eventCount = parsed?.automations ? Object.keys(parsed.automations).length : 0
+      log.info(`AUTOMATIONS_LIST: Loaded ${eventCount} event type(s) from ${configPath}`)
+      return parsed
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        log.info(`AUTOMATIONS_LIST: No automations.json found for workspace ${workspaceId}`)
+        return null // No automations configured yet
+      }
+      log.error(`AUTOMATIONS_LIST: Error loading automations:`, error)
+      throw error
     }
   })
 

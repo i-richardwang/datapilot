@@ -527,6 +527,7 @@ const PROVIDER_ENV_KEYS: Record<string, string> = {
 
 function resolveApiKey(provider: string, explicit: string): string {
   if (explicit) return explicit
+  if (provider === 'amazon-bedrock') return '' // IAM credentials, not API key
   const envKey = PROVIDER_ENV_KEYS[provider]
   if (envKey && process.env[envKey]) return process.env[envKey]!
   throw new Error(
@@ -560,6 +561,24 @@ async function setupLlmConnection(
   } else if (provider === 'anthropic') {
     providerType = 'anthropic'
     authType = 'api_key'
+  } else if (provider === 'amazon-bedrock') {
+    // Bedrock uses IAM credentials, not a single API key
+    const accessKeyId = process.env.AWS_ACCESS_KEY_ID
+    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY
+    const region = process.env.AWS_REGION || 'us-east-1'
+    const sessionToken = process.env.AWS_SESSION_TOKEN
+    if (!accessKeyId || !secretAccessKey) {
+      throw new Error(
+        'Amazon Bedrock requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables',
+      )
+    }
+    providerType = 'pi'
+    authType = 'iam_credentials'
+    setupPayload.piAuthProvider = 'amazon-bedrock'
+    setupPayload.bedrockAuthMethod = 'iam_credentials'
+    setupPayload.iamCredentials = { accessKeyId, secretAccessKey, sessionToken }
+    setupPayload.awsRegion = region
+    delete setupPayload.credential // IAM credentials go through iamCredentials field
   } else {
     providerType = 'pi'
     authType = 'api_key'
@@ -797,6 +816,8 @@ export interface ValidateContext {
   /** Backup of existing automations-history.jsonl before overwrite (undefined = didn't exist) */
   automationsHistoryBackup?: string | null
   branchedSessionId?: string
+  /** Label ID for e2e-test label created for session tool validation */
+  e2eTestLabelId?: string
   onEvent?: (ev: { type: string; [key: string]: unknown }) => void
 }
 
@@ -845,6 +866,7 @@ async function waitForSendEvents(
   expectTool: boolean,
   sendOptions?: Record<string, unknown>,
   onEvent?: (ev: { type: string; [key: string]: unknown }) => void,
+  expectToolName?: string,
 ): Promise<string> {
   const seen = new Set<string>()
   let textChunks = 0
@@ -881,6 +903,9 @@ async function waitForSendEvents(
     if (expectTool) {
       if (!seen.has('tool_start')) throw new Error('No tool_start event received')
       if (!seen.has('tool_result')) throw new Error('No tool_result event received')
+      if (expectToolName && !toolName.includes(expectToolName)) {
+        throw new Error(`Expected tool containing "${expectToolName}", got "${toolName}"`)
+      }
       return `tool=${toolName}, ${textChunks} text deltas, events: ${[...seen].join(', ')}`
     }
 
@@ -1050,6 +1075,36 @@ export function getValidateSteps(): ValidateStep[] {
           return `${r?.length ?? 0} existing + custom endpoint via ${ctx.baseUrl}`
         }
 
+        // Amazon Bedrock: IAM credential setup
+        if (ctx.provider === 'amazon-bedrock') {
+          const accessKeyId = process.env.AWS_ACCESS_KEY_ID
+          const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY
+          const region = process.env.AWS_REGION || 'us-east-1'
+          const sessionToken = process.env.AWS_SESSION_TOKEN
+          if (!accessKeyId || !secretAccessKey) {
+            return '0 connections (missing AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)'
+          }
+          const slug = 'amazon-bedrock-cli'
+          await client.invoke('LLM_Connection:save', {
+            slug,
+            name: 'Amazon Bedrock',
+            providerType: 'pi',
+            authType: 'iam_credentials',
+            piAuthProvider: 'amazon-bedrock',
+            createdAt: Date.now(),
+          })
+          const result = await client.invoke('settings:setupLlmConnection', {
+            slug,
+            piAuthProvider: 'amazon-bedrock',
+            bedrockAuthMethod: 'iam_credentials',
+            iamCredentials: { accessKeyId, secretAccessKey, sessionToken },
+            awsRegion: region,
+          }) as { success: boolean; error?: string }
+          if (!result?.success) return `setup failed: ${result?.error ?? 'unknown'}`
+          await client.invoke('LLM_Connection:setDefault', slug)
+          return `${r?.length ?? 0} existing + Bedrock IAM (${region})`
+        }
+
         if (r?.length > 0) return `${r.length} connections`
         // Auto-setup from env for CI environments
         const envKey = process.env.ANTHROPIC_API_KEY
@@ -1111,6 +1166,53 @@ export function getValidateSteps(): ValidateStep[] {
         if (!ctx.createdSessionId) return 'skipped (no session)'
         return await waitForSendEvents(client, ctx.createdSessionId,
           'Use the Bash tool to run: echo TOOL_VALIDATION_OK', 90_000, true, undefined, ctx.onEvent)
+      },
+    },
+    // ----- Session tool validation (guards against #511 regression) -----
+    {
+      name: 'labels:create (e2e-test)',
+      fn: async (client, ctx) => {
+        if (!ctx.workspaceId) return 'skipped (no workspace)'
+        const r = (await client.invoke('labels:create', ctx.workspaceId, {
+          name: 'e2e-test',
+          color: 'gray',
+        })) as any
+        ctx.e2eTestLabelId = r?.id
+        return `label created: ${r?.id}`
+      },
+    },
+    {
+      name: 'session-tools:set_session_labels',
+      fn: async (client, ctx) => {
+        if (!ctx.createdSessionId) return 'skipped (no session)'
+        if (!ctx.e2eTestLabelId) return 'skipped (no e2e-test label)'
+        const result = await waitForSendEvents(client, ctx.createdSessionId,
+          'Use the set_session_labels tool to set labels: ["e2e-test"] on the current session. Do NOT use any other tool.',
+          90_000, true, undefined, ctx.onEvent, 'set_session_labels')
+        // Verify labels were actually applied
+        const sessions = (await client.invoke('sessions:get', ctx.workspaceId)) as any[]
+        const session = sessions?.find((s: any) => s.id === ctx.createdSessionId)
+        const labels = session?.labels ?? session?.labelIds ?? []
+        if (!labels.length) throw new Error('Labels not applied to session')
+        return `${result} — labels verified: ${JSON.stringify(labels)}`
+      },
+    },
+    {
+      name: 'session-tools:get_session_info',
+      fn: async (client, ctx) => {
+        if (!ctx.createdSessionId) return 'skipped (no session)'
+        return await waitForSendEvents(client, ctx.createdSessionId,
+          'Use the get_session_info tool to get info about the current session. Do NOT use any other tool.',
+          90_000, true, undefined, ctx.onEvent, 'get_session_info')
+      },
+    },
+    {
+      name: 'session-tools:list_sessions',
+      fn: async (client, ctx) => {
+        if (!ctx.createdSessionId) return 'skipped (no session)'
+        return await waitForSendEvents(client, ctx.createdSessionId,
+          'Use the list_sessions tool to list all sessions. Do NOT use any other tool.',
+          90_000, true, undefined, ctx.onEvent, 'list_sessions')
       },
     },
     // ----- Session branching -----
@@ -1535,6 +1637,14 @@ SKILLEOF`, 90_000, true, undefined, ctx.onEvent)
         if (!ctx.workspaceId || !ctx.createdSourceSlug) return 'skipped (no source)'
         await client.invoke('sources:delete', ctx.workspaceId, ctx.createdSourceSlug)
         return `deleted source: ${ctx.createdSourceSlug}`
+      },
+    },
+    {
+      name: 'labels:delete (e2e-test)',
+      fn: async (client, ctx) => {
+        if (!ctx.workspaceId || !ctx.e2eTestLabelId) return 'skipped (no e2e-test label)'
+        await client.invoke('labels:delete', ctx.workspaceId, ctx.e2eTestLabelId)
+        return `deleted label: ${ctx.e2eTestLabelId}`
       },
     },
     {

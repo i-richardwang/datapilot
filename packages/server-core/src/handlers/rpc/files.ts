@@ -42,7 +42,7 @@ export function registerFilesHandlers(server: RpcServer, deps: HandlerDeps): voi
       if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
         deps.platform.logger.debug('readFile: file not found:', path)
       } else {
-        deps.platform.logger.error('readFile error:', message)
+        deps.platform.logger.error('readFile error:', path, message)
       }
       throw new Error(`Failed to read file: ${message}`)
     }
