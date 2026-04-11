@@ -9,6 +9,7 @@
  */
 
 import { atom } from 'jotai'
+import type { Getter, Setter } from 'jotai/vanilla'
 import { atomFamily } from 'jotai-family'
 import type { Session, Message } from '../../shared/types'
 
@@ -442,86 +443,129 @@ export const syncSessionsToAtomsAtom = atom(
  * NEW badge on session view) get clobbered by async message loading that reads
  * older state from disk.
  */
-export const ensureSessionMessagesLoadedAtom = atom(
-  null,
-  async (get, set, sessionId: string): Promise<Session | null> => {
+async function loadSessionMessages(
+  get: Getter,
+  set: Setter,
+  sessionId: string,
+  options?: { force?: boolean },
+): Promise<Session | null> {
+  const force = options?.force ?? false
+
+  if (force) {
+    const nextLoadedSessions = new Set(get(loadedSessionsAtom))
+    nextLoadedSessions.delete(sessionId)
+    set(loadedSessionsAtom, nextLoadedSessions)
+
+    // Clear any stale in-flight request so the caller gets a fresh fetch.
+    sessionLoadingPromises.delete(sessionId)
+  } else {
     const loadedSessions = get(loadedSessionsAtom)
 
     // Already loaded, return current session
     if (loadedSessions.has(sessionId)) {
       return get(sessionAtomFamily(sessionId))
     }
+  }
 
-    // Check if already loading - return existing promise to deduplicate concurrent calls
-    const existingPromise = sessionLoadingPromises.get(sessionId)
-    if (existingPromise) {
-      return existingPromise
+  // Check if already loading - return existing promise to deduplicate concurrent calls
+  const existingPromise = sessionLoadingPromises.get(sessionId)
+  if (existingPromise) {
+    return existingPromise
+  }
+
+  // Create the loading promise with all the fetch and update logic
+  const loadPromise = (async (): Promise<Session | null> => {
+    // Fetch messages from main process
+    const loadedSession = await window.electronAPI.getSessionMessages(sessionId)
+    if (!loadedSession) {
+      return get(sessionAtomFamily(sessionId))
     }
 
-    // Create the loading promise with all the fetch and update logic
-    const loadPromise = (async (): Promise<Session | null> => {
-      // Fetch messages from main process
-      const loadedSession = await window.electronAPI.getSessionMessages(sessionId)
-      if (!loadedSession) {
-        return get(sessionAtomFamily(sessionId))
-      }
+    // Merge messages and disk-only fields into existing session, preserving in-memory UI state.
+    // The renderer's atom is authoritative for UI fields (hasUnread, isFlagged, etc.)
+    // because optimistic updates may have changed them since the disk write.
+    // tokenUsage and sessionFolderPath are only returned by getSession() (not getSessions()),
+    // so they must be explicitly merged here to be available after app restart.
+    const existingSession = get(sessionAtomFamily(sessionId))
+    const preservedStaleMessages = !!existingSession
+      && existingSession.messages.length > 0
+      && (!loadedSession.messages || loadedSession.messages.length === 0)
 
-      // Merge messages and disk-only fields into existing session, preserving in-memory UI state.
-      // The renderer's atom is authoritative for UI fields (hasUnread, isFlagged, etc.)
-      // because optimistic updates may have changed them since the disk write.
-      // tokenUsage and sessionFolderPath are only returned by getSession() (not getSessions()),
-      // so they must be explicitly merged here to be available after app restart.
-      const existingSession = get(sessionAtomFamily(sessionId))
-      const mergedSession = existingSession
-        ? {
-            ...existingSession,
-            // CRITICAL: Don't clobber messages if session is actively streaming
-            // AND already has messages in the atom. Streaming events update the atom
-            // directly and may contain messages the IPC response doesn't know about
-            // (race window between IPC request and response).
-            // The `messages.length > 0` guard ensures Cmd+R reload works: after reload,
-            // the atom starts with messages=[] from getSessions(), so IPC response
-            // (which has full history from main process memory) must be used.
-            messages: existingSession.isProcessing && existingSession.messages.length > 0
+    const mergedSession = existingSession
+      ? {
+          ...existingSession,
+          // CRITICAL: Don't clobber messages if session is actively streaming
+          // AND already has messages in the atom. Streaming events update the atom
+          // directly and may contain messages the IPC response doesn't know about
+          // (race window between IPC request and response).
+          // The `messages.length > 0` guard ensures Cmd+R reload works: after reload,
+          // the atom starts with messages=[] from getSessions(), so IPC response
+          // (which has full history from main process memory) must be used.
+          // Also guard against sleep/wake edge case: the server may return
+          // empty messages if the session subprocess hasn't finished lazy-loading.
+          messages: preservedStaleMessages
+            ? existingSession.messages
+            : existingSession.isProcessing && existingSession.messages.length > 0
               ? existingSession.messages
               : loadedSession.messages,
-            tokenUsage: loadedSession.tokenUsage ?? existingSession.tokenUsage,
-            sessionFolderPath: loadedSession.sessionFolderPath ?? existingSession.sessionFolderPath,
-          }
-        : loadedSession
-      set(sessionAtomFamily(sessionId), mergedSession)
-
-      // Update only lastFinalMessageId in metadata (now computable from loaded messages).
-      // Don't replace the full meta entry — other fields are maintained through
-      // optimistic updates and IPC events, and may be ahead of disk state.
-      const lastFinalMessageId = findLastFinalMessageId(loadedSession.messages)
-      if (lastFinalMessageId) {
-        const metaMap = get(sessionMetaMapAtom)
-        const existingMeta = metaMap.get(sessionId)
-        if (existingMeta && existingMeta.lastFinalMessageId !== lastFinalMessageId) {
-          const newMetaMap = new Map(metaMap)
-          newMetaMap.set(sessionId, { ...existingMeta, lastFinalMessageId })
-          set(sessionMetaMapAtom, newMetaMap)
+          tokenUsage: loadedSession.tokenUsage ?? existingSession.tokenUsage,
+          sessionFolderPath: loadedSession.sessionFolderPath ?? existingSession.sessionFolderPath,
         }
-      }
+      : loadedSession
+    set(sessionAtomFamily(sessionId), mergedSession)
 
-      // Mark as loaded
+    // Update only lastFinalMessageId in metadata (now computable from loaded messages).
+    // Don't replace the full meta entry — other fields are maintained through
+    // optimistic updates and IPC events, and may be ahead of disk state.
+    const lastFinalMessageId = findLastFinalMessageId(loadedSession.messages)
+    if (lastFinalMessageId) {
+      const metaMap = get(sessionMetaMapAtom)
+      const existingMeta = metaMap.get(sessionId)
+      if (existingMeta && existingMeta.lastFinalMessageId !== lastFinalMessageId) {
+        const newMetaMap = new Map(metaMap)
+        newMetaMap.set(sessionId, { ...existingMeta, lastFinalMessageId })
+        set(sessionMetaMapAtom, newMetaMap)
+      }
+    }
+
+    // Mark as loaded only when we received a fresh payload.
+    // If we had to preserve stale in-memory messages because the backend returned
+    // an empty array during lazy-load recovery, keep the session reloadable.
+    if (!preservedStaleMessages) {
       const newLoadedSessions = new Set(get(loadedSessionsAtom))
       newLoadedSessions.add(sessionId)
       set(loadedSessionsAtom, newLoadedSessions)
-
-      return mergedSession
-    })()
-
-    // Cache the promise before awaiting
-    sessionLoadingPromises.set(sessionId, loadPromise)
-
-    try {
-      return await loadPromise
-    } finally {
-      // Always clean up the cache, whether success or failure
-      sessionLoadingPromises.delete(sessionId)
     }
+
+    return mergedSession
+  })()
+
+  // Cache the promise before awaiting
+  sessionLoadingPromises.set(sessionId, loadPromise)
+
+  try {
+    return await loadPromise
+  } finally {
+    // Always clean up the cache, whether success or failure
+    sessionLoadingPromises.delete(sessionId)
+  }
+}
+
+export const ensureSessionMessagesLoadedAtom = atom(
+  null,
+  async (get, set, sessionId: string): Promise<Session | null> => {
+    return loadSessionMessages(get, set, sessionId)
+  }
+)
+
+/**
+ * Force-refresh session messages even if the session is currently marked as loaded.
+ * Used by reconnect recovery when a session atom is stuck in an empty-but-loaded state.
+ */
+export const forceSessionMessagesReloadAtom = atom(
+  null,
+  async (get, set, sessionId: string): Promise<Session | null> => {
+    return loadSessionMessages(get, set, sessionId, { force: true })
   }
 )
 
