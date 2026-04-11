@@ -244,6 +244,10 @@ export interface ElectronAPI {
   removeWorkspace(workspaceId: string): Promise<boolean>
   invokeOnServer(url: string, token: string, channel: string, ...args: any[]): Promise<any>
 
+  // Remote session transfer (main-process orchestrated, supports chunked upload)
+  transferSessionToWorkspace(sessionId: string, targetWorkspaceId: string, sessionIndex?: number, sessionCount?: number): Promise<{ sessionId: string }>
+  onTransferProgress(callback: (progress: { sessionIndex: number; sessionCount: number; chunkSent: number; chunkTotal: number }) => void): () => void
+
   // Session export/import (cross-workspace transfer)
   exportSession(sessionId: string): Promise<unknown>
   importSession(targetWorkspaceId: string, bundle: unknown, mode: 'move' | 'fork'): Promise<{ sessionId: string; warnings?: string[] }>
@@ -251,7 +255,7 @@ export interface ElectronAPI {
   importRemoteSessionTransfer(targetWorkspaceId: string, payload: RemoteSessionTransferPayload): Promise<ImportRemoteSessionTransferResult>
 
   // Pending plan execution (for reload recovery)
-  getPendingPlanExecution(sessionId: string): Promise<{ planPath: string; draftInputSnapshot?: string; awaitingCompaction: boolean } | null>
+  getPendingPlanExecution(sessionId: string): Promise<{ planPath: string; draftInputSnapshot?: string; awaitingCompaction: boolean; executionDispatched: boolean } | null>
   // Permission mode reconciliation
   getSessionPermissionModeState(sessionId: string): Promise<PermissionModeState | null>
 
@@ -620,7 +624,7 @@ export interface ElectronAPI {
   setWorkspaceDefaultLlmConnection(workspaceId: string, slug: string | null): Promise<{ success: boolean; error?: string }>
 
   // Automations
-  getAutomations(workspaceId: string): Promise<unknown>
+  listAutomations(workspaceId: string): Promise<unknown>
 
   // Automation testing (manual trigger)
   testAutomation(payload: TestAutomationPayload): Promise<TestAutomationResult>
@@ -657,6 +661,9 @@ export interface ElectronAPI {
 
   // Batches change listener (live updates when batches.json changes on disk)
   onBatchesChanged(callback: (workspaceId: string) => void): () => void
+
+  // Language
+  changeLanguage(lang: string): Promise<void>
 
   // Resources (cross-workspace export/import)
   exportResources(workspaceId: string, options: ExportResourcesOptions): Promise<ExportResult>
