@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { StoredSession } from '../types.ts'
+import { autoRegisterDriver } from '../../db/driver.ts'
 import {
   getPendingPlanExecution,
   markCompactionComplete,
@@ -10,6 +11,10 @@ import {
   saveSession,
   setPendingPlanExecution,
 } from '../storage.db.ts'
+
+beforeAll(async () => {
+  await autoRegisterDriver()
+})
 
 function makeTmpDir(): string {
   const dir = join(tmpdir(), `pending-plan-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
