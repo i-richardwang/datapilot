@@ -90,6 +90,26 @@ describe('SourceCredentialManager.prepareOAuth relay wrapping', () => {
     });
   });
 
+  it('uses the relay for desktop Google flows (callbackUrl)', async () => {
+    const result = await credManager.prepareOAuth(createApiSource(), {
+      callbackUrl: 'http://localhost:6477/callback',
+    });
+
+    expect(result.redirectUri).toBe(OAUTH_RELAY_CALLBACK_URL);
+    expect(result.state).toBeTruthy();
+
+    const authUrl = new URL(result.authUrl);
+    expect(authUrl.searchParams.get('redirect_uri')).toBe(OAUTH_RELAY_CALLBACK_URL);
+
+    const outerState = authUrl.searchParams.get('state');
+    expect(outerState).toBeTruthy();
+    expect(isOAuthRelayState(outerState!)).toBe(true);
+    expect(decodeOAuthRelayState(outerState!)).toEqual({
+      returnTo: 'http://localhost:6477/callback',
+      innerState: result.state,
+    });
+  });
+
   it('passes the stable relay redirect URI into MCP prepare-time metadata flow', async () => {
     const result = await credManager.prepareOAuth(createMcpSource(), {
       callbackUrl: 'https://ghalmos.craftdocs-cf-t1.com/api/oauth/callback',

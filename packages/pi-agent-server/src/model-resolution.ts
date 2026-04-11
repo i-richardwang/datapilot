@@ -43,14 +43,24 @@ export function resolvePiModel(
     }
   }
 
-  // Fallback: search all available models
+  // Fallback: search all available models.
+  // When piAuthProvider is set, only return models from the same provider
+  // (or 'custom-endpoint'). Without this guard, a model that exists under
+  // a different provider (e.g. "gpt-5.4" under "azure-openai-responses"
+  // when authed as "github-copilot") would be returned, and the Pi SDK
+  // would fail with "No API key found for <wrong-provider>".
   const allModels = modelRegistry.getAll();
-  const match = allModels.find(m => m.id === bareId || m.name === bareId);
+  const match = allModels.find(m =>
+    (m.id === bareId || m.name === bareId) &&
+    (!piAuthProvider || (m as any).provider === piAuthProvider || (m as any).provider === 'custom-endpoint'),
+  );
   if (match) return match;
 
   // Try common providers with the model ID
   const providers = ['custom-endpoint', 'anthropic', 'openai', 'google'];
   for (const provider of providers) {
+    // Skip providers incompatible with the authenticated provider
+    if (piAuthProvider && provider !== piAuthProvider && provider !== 'custom-endpoint') continue;
     const model = modelRegistry.find(provider, bareId);
     if (model) return model;
   }

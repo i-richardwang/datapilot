@@ -11,6 +11,7 @@
  */
 
 import * as React from 'react'
+import { useTranslation } from "react-i18next"
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Cloud, CloudOff, Send } from 'lucide-react'
 import { toast } from 'sonner'
@@ -49,9 +50,28 @@ export function SendToWorkspaceDialog({
   activeWorkspaceId,
   onTransferComplete,
 }: SendToWorkspaceDialogProps) {
+  const { t } = useTranslation()
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
   const [isTransferring, setIsTransferring] = useState(false)
+  // Normalized overall progress (0–1) across all sessions in the batch
+  const [overallProgress, setOverallProgress] = useState(0)
   const workspaceIconMap = useWorkspaceIcons(workspaces)
+
+  // Listen for chunk upload progress from main process and normalize across batch
+  useEffect(() => {
+    if (!isTransferring) {
+      setOverallProgress(0)
+      return
+    }
+    const cleanup = window.electronAPI.onTransferProgress((p) => {
+      // Each session contributes 1/sessionCount to the total.
+      // Within a session, chunkSent/chunkTotal fills that slice.
+      const sessionSlice = 1 / p.sessionCount
+      const withinSession = p.chunkTotal > 0 ? p.chunkSent / p.chunkTotal : 1
+      setOverallProgress(p.sessionIndex * sessionSlice + withinSession * sessionSlice)
+    })
+    return cleanup
+  }, [isTransferring])
 
   // Health check results for remote workspaces (checked on dialog open)
   const [remoteHealthMap, setRemoteHealthMap] = useState<Map<string, 'ok' | 'error' | 'checking'>>(new Map())
@@ -106,48 +126,23 @@ export function SendToWorkspaceDialog({
     setIsTransferring(true)
     const targetName = targetWorkspace.name
     const count = sessionIds.length
-    const label = count === 1 ? 'session' : 'sessions'
-    const { url, token, remoteWorkspaceId } = targetWorkspace.remoteServer
 
-    const toastId = toast.loading(`Sending ${count} ${label} to ${targetName}...`)
+    const toastId = toast.loading(t('sendToWorkspace.sending', { count, target: targetName }))
 
     try {
       const newSessionIds: string[] = []
 
-      for (const sessionId of sessionIds) {
-        // 1. Export full session bundle (messages + metadata for UI)
-        const bundle = await window.electronAPI.exportSession(sessionId) as any
-        if (!bundle) throw new Error(`Failed to export session ${sessionId}`)
-
-        // 2. Generate conversation summary so the AI has context after fork
-        //    (forked sessions lose SDK context — the AI starts fresh without this)
-        try {
-          console.log(`[SendToWorkspace] Generating summary for session ${sessionId}...`)
-          const transferPayload = await window.electronAPI.exportRemoteSessionTransfer(sessionId)
-          console.log(`[SendToWorkspace] Summary result: ${transferPayload?.summary ? `${transferPayload.summary.length} chars` : 'null/empty'}`)
-          if (transferPayload?.summary && bundle.session?.header) {
-            bundle.session.header.transferredSessionSummary = transferPayload.summary
-            bundle.session.header.transferredSessionSummaryApplied = false
-          }
-        } catch (err) {
-          console.error('[SendToWorkspace] Summary generation failed:', err)
-          // Summary generation failed — transfer without AI context (messages still visible)
-        }
-
-        // 3. Import full bundle on remote server via cross-server RPC (fork mode)
-        const result = await window.electronAPI.invokeOnServer(
-          url, token,
-          'sessions:import',
-          remoteWorkspaceId, bundle, 'fork',
-        ) as { sessionId: string }
-
+      for (let i = 0; i < sessionIds.length; i++) {
+        const sessionId = sessionIds[i]
+        // Main process handles export + summary + transport (chunked for large bundles)
+        const result = await window.electronAPI.transferSessionToWorkspace(sessionId, selectedWorkspaceId, i, sessionIds.length)
         newSessionIds.push(result.sessionId)
       }
 
-      toast.success(`Sent ${count} ${label} to ${targetName}`, {
+      toast.success(t('sendToWorkspace.sent', { count, target: targetName }), {
         id: toastId,
         action: onTransferComplete ? {
-          label: 'Open',
+          label: t('sendToWorkspace.open'),
           onClick: () => onTransferComplete(selectedWorkspaceId, newSessionIds),
         } : undefined,
       })
@@ -156,7 +151,7 @@ export function SendToWorkspaceDialog({
       setSelectedWorkspaceId(null)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
-      toast.error(`Failed to send ${label}`, {
+      toast.error(t('sendToWorkspace.failedToSend', { count }), {
         id: toastId,
         description: message,
       })
@@ -166,7 +161,6 @@ export function SendToWorkspaceDialog({
   }, [selectedWorkspaceId, sessionIds, workspaces, onOpenChange, onTransferComplete])
 
   const count = sessionIds.length
-  const label = count === 1 ? 'session' : 'sessions'
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => {
@@ -179,10 +173,10 @@ export function SendToWorkspaceDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Send className="h-4 w-4" />
-            Send to Workspace
+            {t("sendToWorkspace.title")}
           </DialogTitle>
           <DialogDescription>
-            Send {count} {label} to a remote workspace.
+            {t("sendToWorkspace.description", { count })}
           </DialogDescription>
         </DialogHeader>
 
@@ -190,7 +184,7 @@ export function SendToWorkspaceDialog({
         <div className="flex flex-col gap-1 max-h-64 overflow-y-auto py-1">
           {remoteWorkspaces.length === 0 ? (
             <p className="text-sm text-muted-foreground px-2 py-4 text-center">
-              No remote workspaces available.
+              {t("sendToWorkspace.noRemoteWorkspaces")}
             </p>
           ) : (
             remoteWorkspaces.map(workspace => {
@@ -234,7 +228,7 @@ export function SendToWorkspaceDialog({
           )}
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
@@ -242,14 +236,61 @@ export function SendToWorkspaceDialog({
           >
             Cancel
           </Button>
-          <Button
+          <TransferButton
             onClick={handleTransfer}
             disabled={!selectedWorkspaceId || isTransferring}
-          >
-            {isTransferring ? 'Sending...' : 'Send'}
-          </Button>
+            isTransferring={isTransferring}
+            progress={overallProgress}
+          />
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** Send button with purple LED border that traces around it during transfer */
+function TransferButton({ onClick, disabled, isTransferring, progress }: {
+  onClick: () => void
+  disabled: boolean
+  isTransferring: boolean
+  progress: number
+}) {
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const rectRef = useRef<SVGRectElement>(null)
+  const [perim, setPerim] = useState(0)
+
+  useEffect(() => {
+    if (rectRef.current && isTransferring) {
+      setPerim(rectRef.current.getTotalLength())
+    }
+  }, [isTransferring])
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <Button onClick={onClick} disabled={disabled}>
+        {isTransferring ? 'Sending...' : 'Send'}
+      </Button>
+      {isTransferring && (
+        <svg
+          className="absolute pointer-events-none"
+          style={{ inset: '-3px', width: 'calc(100% + 6px)', height: 'calc(100% + 6px)', overflow: 'visible' }}
+        >
+          <rect
+            ref={rectRef}
+            x="1.5" y="1.5"
+            width="calc(100% - 3px)" height="calc(100% - 3px)"
+            rx="10" ry="10"
+            fill="none"
+            stroke="#8B5CF6"
+            strokeWidth="2"
+            strokeDasharray={perim > 0 ? `${progress * perim} ${perim}` : '0 999'}
+            style={{
+              transition: 'stroke-dasharray 0.2s ease-out',
+              filter: 'drop-shadow(0 0 3px #8B5CF6) drop-shadow(0 0 6px rgba(139,92,246,0.3))',
+            }}
+          />
+        </svg>
+      )}
+    </div>
   )
 }
