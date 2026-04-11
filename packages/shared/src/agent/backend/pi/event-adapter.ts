@@ -24,7 +24,7 @@ import { parseError } from '../../errors.ts';
 
 /**
  * Combined event type the adapter can handle.
- * AgentSessionEvent is a superset of PiAgentEvent (adds auto_compaction_*, auto_retry_*).
+ * AgentSessionEvent is a superset of PiAgentEvent (adds compaction_*, auto_retry_*, queue_update).
  */
 type PiEvent = PiAgentEvent | AgentSessionEvent;
 
@@ -37,10 +37,11 @@ type PiEvent = PiAgentEvent | AgentSessionEvent;
  * - tool_execution_start → tool_start
  * - tool_execution_end → tool_result
  * - agent_end → complete
- * - auto_compaction_start → status (with "Compacting" keyword)
- * - auto_compaction_end → info/error
+ * - compaction_start → status (with "Compacting" keyword)
+ * - compaction_end → info/error
  * - auto_retry_start → status
  * - auto_retry_end → status
+ * - queue_update → ignored (no current UI consumer)
  */
 export class PiEventAdapter extends BaseEventAdapter {
   // Track tool names from execution_start for proper tool_result correlation
@@ -374,13 +375,13 @@ export class PiEventAdapter extends BaseEventAdapter {
       // Session-level events (AgentSessionEvent extensions)
       // ============================================================
 
-      case 'auto_compaction_start':
+      case 'compaction_start':
         // Use "Compacting" keyword so session handler detects statusType: 'compacting'
         yield { type: 'status', message: 'Compacting context...' };
         break;
 
-      case 'auto_compaction_end': {
-        const compactionEvent = event as Extract<AgentSessionEvent, { type: 'auto_compaction_end' }>;
+      case 'compaction_end': {
+        const compactionEvent = event as Extract<AgentSessionEvent, { type: 'compaction_end' }>;
         if (compactionEvent.result && !compactionEvent.aborted) {
           // Use "Compacted" keyword so session handler detects statusType: 'compaction_complete'
           yield { type: 'info', message: 'Compacted context to fit within limits' };
@@ -406,6 +407,12 @@ export class PiEventAdapter extends BaseEventAdapter {
         }
         break;
       }
+
+      case 'queue_update':
+        // Queue contents are currently reflected by existing session/message state.
+        // Ignore the event explicitly so newer Pi SDK sessions don't log noisy
+        // "Unknown Pi event" warnings until we add a dedicated UI consumer.
+        break;
 
       default:
         this.log.warn(`Unknown Pi event type: ${(event as { type: string }).type}`);
@@ -471,6 +478,23 @@ export class PiEventAdapter extends BaseEventAdapter {
         normalized.file_path = normalized.path;
         delete normalized.path;
       }
+
+      // Pi SDK >= 0.63.2 uses edits[] array instead of top-level oldText/newText.
+      // Preserve the full edits[] payload so the renderer can expand and display
+      // every replacement block. Also derive the first edit into flat old/new
+      // fields as a compatibility bridge for UI paths that still expect them.
+      const edits = normalized.edits as Array<{ oldText?: string; newText?: string }> | undefined;
+      if (Array.isArray(edits) && edits.length > 0 && edits[0]) {
+        const first = edits[0];
+        if (first.oldText != null && !('old_string' in normalized)) {
+          normalized.old_string = first.oldText;
+        }
+        if (first.newText != null && !('new_string' in normalized)) {
+          normalized.new_string = first.newText;
+        }
+      }
+
+      // Legacy path: top-level oldText/newText (Pi SDK < 0.63.2 or resumed sessions)
       if ('oldText' in normalized && !('old_string' in normalized)) {
         normalized.old_string = normalized.oldText;
         delete normalized.oldText;

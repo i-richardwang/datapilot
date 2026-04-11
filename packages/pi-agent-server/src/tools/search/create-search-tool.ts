@@ -62,6 +62,8 @@ export function createSearchTool(
     label: 'Web Search',
     description:
       'Search the web for current information. Returns titles, URLs, and snippets. Use for current information, documentation lookups, or fact-checking.',
+    promptSnippet:
+      'Use web_search for up-to-date information, documentation lookups, or fact-checking. Returns titles, URLs, and snippets. Accepts a query string and optional count (1-10).',
     parameters: schema,
     async execute(toolCallId, params) {
       const { query } = params;

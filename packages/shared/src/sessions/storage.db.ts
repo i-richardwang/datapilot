@@ -806,6 +806,33 @@ export async function markCompactionComplete(
 }
 
 /**
+ * Mark pending plan execution as already dispatched from the UI.
+ * This prevents reload recovery from sending the same approval message twice
+ * if cleanup fails after the send has already been kicked off.
+ */
+export async function markPendingPlanExecutionDispatched(
+  workspaceRootPath: string,
+  sessionId: string
+): Promise<void> {
+  const db = getWorkspaceDb(workspaceRootPath);
+  const row = db.select()
+    .from(sessionsTable)
+    .where(eq(sessionsTable.id, sessionId))
+    .get();
+
+  if (!row?.pendingPlanExecution) return;
+
+  const pending = row.pendingPlanExecution as SessionConfig['pendingPlanExecution'];
+  if (pending) {
+    pending.executionDispatched = true;
+    db.update(sessionsTable)
+      .set({ pendingPlanExecution: pending })
+      .where(eq(sessionsTable.id, sessionId))
+      .run();
+  }
+}
+
+/**
  * Clear pending plan execution state.
  */
 export async function clearPendingPlanExecution(
@@ -825,14 +852,19 @@ export async function clearPendingPlanExecution(
 export function getPendingPlanExecution(
   workspaceRootPath: string,
   sessionId: string
-): { planPath: string; draftInputSnapshot?: string; awaitingCompaction: boolean } | null {
+): { planPath: string; draftInputSnapshot?: string; awaitingCompaction: boolean; executionDispatched: boolean } | null {
   const db = getWorkspaceDb(workspaceRootPath);
   const row = db.select()
     .from(sessionsTable)
     .where(eq(sessionsTable.id, sessionId))
     .get();
 
-  return (row?.pendingPlanExecution as SessionConfig['pendingPlanExecution']) ?? null;
+  const pending = row?.pendingPlanExecution as SessionConfig['pendingPlanExecution'];
+  if (!pending) return null;
+  return {
+    ...pending,
+    executionDispatched: pending.executionDispatched === true,
+  };
 }
 
 /**
