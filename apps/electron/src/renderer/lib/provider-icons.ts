@@ -47,6 +47,7 @@ export type ProviderIconKey = keyof typeof providerIcons
 /** Human-readable provider names */
 const providerDisplayNames: Record<string, string> = {
   anthropic: 'Anthropic',
+  anthropic_compat: 'Anthropic',
   openai: 'OpenAI',
   openai_compat: 'OpenAI',
   copilot: 'GitHub Copilot',
@@ -170,6 +171,7 @@ export function getProviderIcon(
   // Map provider type to icon
   switch (providerType) {
     case 'anthropic':
+    case 'anthropic_compat':
       return providerIcons.anthropic
     case 'openai':
     case 'openai_compat':
