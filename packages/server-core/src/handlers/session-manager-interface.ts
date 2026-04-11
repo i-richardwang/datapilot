@@ -89,14 +89,14 @@ export interface ISessionManager {
   cancelProcessing(sessionId: string, silent?: boolean): Promise<void>
   killShell(sessionId: string, shellId: string): Promise<{ success: boolean; error?: string }>
   getTaskOutput(taskId: string): Promise<string | null>
-  addMessageAnnotation(sessionId: string, messageId: string, annotation: AnnotationV1): void
-  removeMessageAnnotation(sessionId: string, messageId: string, annotationId: string): void
+  addMessageAnnotation(sessionId: string, messageId: string, annotation: AnnotationV1): Promise<void>
+  removeMessageAnnotation(sessionId: string, messageId: string, annotationId: string): Promise<void>
   updateMessageAnnotation(
     sessionId: string,
     messageId: string,
     annotationId: string,
     patch: Partial<AnnotationV1>,
-  ): void
+  ): Promise<void>
 
   // ---------------------------------------------------------------------------
   // Permissions & credentials

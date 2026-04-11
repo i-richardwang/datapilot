@@ -4612,12 +4612,15 @@ export class SessionManager implements ISessionManager {
    * Update the content of a specific message in a session
    * Used by preview window to save edited content back to the original message
    */
-  updateMessageContent(sessionId: string, messageId: string, content: string): void {
+  async updateMessageContent(sessionId: string, messageId: string, content: string): Promise<void> {
     const managed = this.sessions.get(sessionId)
     if (!managed) {
       sessionLog.warn(`Cannot update message: session ${sessionId} not found`)
       return
     }
+
+    // Hibernated sessions have messages={}; reload from disk before lookup.
+    await this.ensureMessagesLoaded(managed)
 
     const message = managed.messages.find(m => m.id === messageId)
     if (!message) {
@@ -4635,12 +4638,15 @@ export class SessionManager implements ISessionManager {
   /**
    * Add an annotation to a message and persist the session.
    */
-  addMessageAnnotation(sessionId: string, messageId: string, annotation: NonNullable<Message['annotations']>[number]): void {
+  async addMessageAnnotation(sessionId: string, messageId: string, annotation: NonNullable<Message['annotations']>[number]): Promise<void> {
     const managed = this.sessions.get(sessionId)
     if (!managed) {
       sessionLog.warn(`Cannot add annotation: session ${sessionId} not found`)
       return
     }
+
+    // Hibernated sessions have messages={}; reload from disk before lookup.
+    await this.ensureMessagesLoaded(managed)
 
     const message = managed.messages.find(m => m.id === messageId)
     if (!message) {
@@ -4696,17 +4702,20 @@ export class SessionManager implements ISessionManager {
   /**
    * Patch an existing annotation on a message.
    */
-  updateMessageAnnotation(
+  async updateMessageAnnotation(
     sessionId: string,
     messageId: string,
     annotationId: string,
     patch: Partial<NonNullable<Message['annotations']>[number]>
-  ): void {
+  ): Promise<void> {
     const managed = this.sessions.get(sessionId)
     if (!managed) {
       sessionLog.warn(`Cannot update annotation: session ${sessionId} not found`)
       return
     }
+
+    // Hibernated sessions have messages={}; reload from disk before lookup.
+    await this.ensureMessagesLoaded(managed)
 
     const message = managed.messages.find(m => m.id === messageId)
     if (!message) {
@@ -4775,12 +4784,15 @@ export class SessionManager implements ISessionManager {
   /**
    * Remove an annotation from a message and persist the session.
    */
-  removeMessageAnnotation(sessionId: string, messageId: string, annotationId: string): void {
+  async removeMessageAnnotation(sessionId: string, messageId: string, annotationId: string): Promise<void> {
     const managed = this.sessions.get(sessionId)
     if (!managed) {
       sessionLog.warn(`Cannot remove annotation: session ${sessionId} not found`)
       return
     }
+
+    // Hibernated sessions have messages={}; reload from disk before lookup.
+    await this.ensureMessagesLoaded(managed)
 
     const message = managed.messages.find(m => m.id === messageId)
     if (!message) {
@@ -4889,7 +4901,63 @@ export class SessionManager implements ISessionManager {
   }
 
   /**
-   * Hibernate a completed batch session: release heavy runtime resources (agent,
+   * Whether a session should be eagerly hibernated right after completion
+   * (vs left loaded in memory for the user to follow up on).
+   *
+   * Eager-hibernate types are background/headless sessions that typically have
+   * no UI observer — leaving them loaded causes unbounded memory growth in
+   * long-running headless deployments (primarily via scheduled automations).
+   */
+  private shouldHibernateOnComplete(managed: ManagedSession): boolean {
+    // Batch processor sessions (pre-existing behavior).
+    if (managed.isBatch) return true
+    // Automation-triggered sessions — created by SchedulerService / event
+    // automations and are the main source of memory growth in headless mode.
+    if (managed.triggeredBy) return true
+    // Mini-agent sessions (EditPopover quick edits) are already auto-completed
+    // to 'done' status — no reason to keep heavy state in memory.
+    if (managed.systemPromptPreset === 'mini') return true
+    return false
+  }
+
+  /**
+   * Whether hibernating this session right now is safe.
+   *
+   * Returns false if in-flight operations rely on runtime state that
+   * hibernation would drop (messages, agent, pending auth/permission flows).
+   * Callers should check this before invoking hibernateSession().
+   */
+  private isHibernationSafe(managed: ManagedSession): boolean {
+    // Actively running — agent loop must finish first.
+    if (managed.isProcessing) return false
+    if (managed.stopRequested) return false
+    // Queued messages would be lost on hibernate.
+    if (managed.messageQueue.length > 0) return false
+    // Mid-flight auth flows need their ephemeral state intact.
+    if (managed.pendingAuthRequestId) return false
+    if (managed.authRetryInProgress) return false
+    // Pending tool permission requests must resolve against the live agent.
+    if (this.hasPendingPermissionRequestsForSession(managed.id)) return false
+    // One-shot context injection for the next turn would be lost.
+    if (managed.wasInterrupted) return false
+    // External metadata update deferred until processing ends.
+    if (managed.pendingExternalMetadata) return false
+    return true
+  }
+
+  /**
+   * Whether there are any pending tool permission requests bound to this
+   * session. Used as a hibernation safety gate.
+   */
+  private hasPendingPermissionRequestsForSession(sessionId: string): boolean {
+    for (const metadata of this.pendingPermissionRequests.values()) {
+      if (metadata.sessionId === sessionId) return true
+    }
+    return false
+  }
+
+  /**
+   * Hibernate a completed session: release heavy runtime resources (agent,
    * MCP pool, pool server, messages, tool caches) while keeping the lightweight
    * metadata in `this.sessions` for UI visibility.
    *
@@ -4898,6 +4966,7 @@ export class SessionManager implements ISessionManager {
    * - `agent: null` → `getOrCreateAgent()` recreates from scratch on demand
    *
    * Must be called AFTER `persistSession()` so data is safely on disk.
+   * Callers should gate invocation through `isHibernationSafe()`.
    */
   private async hibernateSession(sessionId: string): Promise<void> {
     const managed = this.sessions.get(sessionId)
@@ -5753,12 +5822,17 @@ export class SessionManager implements ISessionManager {
     // 6. Always persist
     this.persistSession(managed)
 
-    // 7. Hibernate completed batch sessions to release heavy resources.
+    // 7. Hibernate completed background sessions to release heavy resources.
     // The session metadata stays in the Map for UI visibility; messages
     // and agent are lazy-loaded from disk if the user opens the session later.
-    if (managed.isBatch && !managed.isProcessing && managed.messageQueue.length === 0) {
+    //
+    // Applies to batch sessions, automation-triggered sessions (the main
+    // source of memory growth in headless deployments), and mini-agent
+    // sessions. Interactive sessions stay loaded for user follow-up and
+    // rely on the periodic idle sweep (future work) for reclamation.
+    if (this.shouldHibernateOnComplete(managed) && this.isHibernationSafe(managed)) {
       this.hibernateSession(sessionId).catch(err => {
-        sessionLog.error(`Failed to hibernate batch session ${sessionId}:`, err)
+        sessionLog.error(`Failed to hibernate session ${sessionId}:`, err)
       })
     }
   }
