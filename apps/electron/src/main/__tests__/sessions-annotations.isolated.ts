@@ -49,6 +49,9 @@ function createHarness(initialAnnotations: AnnotationV1[] = []) {
   const managed = {
     workspace: { id: 'ws-1' },
     messages: [{ id: 'msg-1', content: 'hello world', annotations: initialAnnotations }],
+    // Mark messages as loaded so ensureMessagesLoaded short-circuits
+    // (the real load path reads from disk via workspace.rootPath).
+    messagesLoaded: true,
   }
 
   let persistCalls = 0
@@ -72,33 +75,33 @@ function createHarness(initialAnnotations: AnnotationV1[] = []) {
 }
 
 describe('SessionManager annotation validation', () => {
-  it('rejects add when per-message annotation limit is reached', () => {
+  it('rejects add when per-message annotation limit is reached', async () => {
     const existing = Array.from({ length: 200 }, (_, i) => makeAnnotation(`ann-${i}`))
     const h = createHarness(existing)
 
-    h.manager.addMessageAnnotation('session-1', 'msg-1', makeAnnotation('ann-over-limit'))
+    await h.manager.addMessageAnnotation('session-1', 'msg-1', makeAnnotation('ann-over-limit'))
 
     expect(h.managed.messages[0].annotations).toHaveLength(200)
     expect(h.persistCalls).toBe(0)
     expect(h.events).toHaveLength(0)
   })
 
-  it('rejects add for oversized annotation payload', () => {
+  it('rejects add for oversized annotation payload', async () => {
     const h = createHarness([])
     const oversizedMeta = { blob: 'x'.repeat(40 * 1024) }
 
-    h.manager.addMessageAnnotation('session-1', 'msg-1', makeAnnotation('ann-big', oversizedMeta))
+    await h.manager.addMessageAnnotation('session-1', 'msg-1', makeAnnotation('ann-big', oversizedMeta))
 
     expect(h.managed.messages[0].annotations).toHaveLength(0)
     expect(h.persistCalls).toBe(0)
     expect(h.events).toHaveLength(0)
   })
 
-  it('rejects update patch with empty selectors array', () => {
+  it('rejects update patch with empty selectors array', async () => {
     const existing = [makeAnnotation('ann-1')]
     const h = createHarness(existing)
 
-    h.manager.updateMessageAnnotation('session-1', 'msg-1', 'ann-1', {
+    await h.manager.updateMessageAnnotation('session-1', 'msg-1', 'ann-1', {
       target: {
         source: { sessionId: 'session-1', messageId: 'msg-1' },
         selectors: [],
