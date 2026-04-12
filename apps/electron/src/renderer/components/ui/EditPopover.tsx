@@ -571,6 +571,8 @@ const EDIT_CONFIGS: Record<EditContextKey, (location: string) => EditConfig> = {
         'After editing, confirm clearly what changed.',
     },
     example: 'Add a new batch that processes users from users.csv',
+    displayLabelKey: 'editPopover.label.batchConfiguration',
+    exampleKey: 'editPopover.example.batchConfig',
     model: 'default',
     systemPromptPreset: 'mini',
     inlineExecution: true,
