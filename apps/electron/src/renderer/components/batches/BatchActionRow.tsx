@@ -7,6 +7,7 @@
  */
 
 import { MessageSquare } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 
 export interface BatchActionRowProps {
@@ -19,7 +20,8 @@ export interface BatchActionRowProps {
  * Mirrors the PromptText helper in AutomationActionRow.
  */
 function PromptText({ text }: { text: string }) {
-  if (!text) return <span className="text-sm text-muted-foreground italic">Empty prompt</span>
+  const { t } = useTranslation()
+  if (!text) return <span className="text-sm text-muted-foreground italic">{t('automations.emptyPrompt')}</span>
   const parts = text.split(/(@\w[\w-]*)/g)
   return (
     <span className="text-sm break-words">

@@ -35,15 +35,19 @@ export const BATCH_STATUS_TO_FILTER_KIND: Record<string, BatchFilterKind> = {
 }
 
 // ============================================================================
-// Display Names & Colors
+// Display Keys & Colors
 // ============================================================================
 
-export const BATCH_STATUS_DISPLAY: Record<BatchStatus, string> = {
-  pending: 'Pending',
-  running: 'Running',
-  paused: 'Paused',
-  completed: 'Completed',
-  failed: 'Failed',
+/**
+ * i18n key lookup for batch status display text.
+ * Resolve with `t(BATCH_STATUS_DISPLAY_KEY[status])` in components.
+ */
+export const BATCH_STATUS_DISPLAY_KEY: Record<BatchStatus, string> = {
+  pending: 'batches.statusPending',
+  running: 'batches.statusRunning',
+  paused: 'batches.statusPaused',
+  completed: 'batches.statusCompleted',
+  failed: 'batches.statusFailed',
 }
 
 /** Color mapping for MicroBadge and BatchAvatar (raw bg/text classes). */
@@ -65,16 +69,19 @@ export const BATCH_STATUS_BADGE_COLOR: Record<BatchStatus, BadgeColor> = {
 }
 
 // ============================================================================
-// Permission Display (shared with automations)
+// Permission Display (delegates to shared mode.* i18n keys)
 // ============================================================================
 
-const PERMISSION_DISPLAY_NAMES: Record<PermissionMode, string> = {
-  'safe':      'Explore',
-  'ask':       'Ask',
-  'allow-all': 'Execute',
-}
-
-export function getPermissionDisplayName(mode?: PermissionMode): string {
-  if (!mode) return 'Explore'
-  return PERMISSION_DISPLAY_NAMES[mode] ?? mode
+/**
+ * Returns the i18n key for a permission mode's display name.
+ * Resolve with `t(getPermissionModeKey(mode))` in components.
+ * Keys live in the shared `mode.*` namespace already populated by upstream.
+ */
+export function getPermissionModeKey(mode?: PermissionMode): string {
+  switch (mode) {
+    case 'safe': return 'mode.safe'
+    case 'ask': return 'mode.ask'
+    case 'allow-all': return 'mode.allow-all'
+    default: return 'mode.safe'
+  }
 }

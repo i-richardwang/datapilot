@@ -10,6 +10,7 @@
  */
 
 import { CheckCircle2, XCircle, Loader2, Clock, MinusCircle, RotateCw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { useNavigation } from '@/contexts/NavigationContext'
 import type { BatchItemState, BatchItemStatus } from '@craft-agent/shared/batches'
@@ -37,13 +38,14 @@ export interface BatchItemTimelineProps {
 }
 
 export function BatchItemTimeline({ items, onRetryItem, className }: BatchItemTimelineProps) {
+  const { t } = useTranslation()
   const { navigateToSession } = useNavigation()
   const entries = Object.entries(items)
 
   if (entries.length === 0) {
     return (
       <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-        No items processed yet.
+        {t('batches.noItemsProcessed')}
       </div>
     )
   }
@@ -76,7 +78,7 @@ export function BatchItemTimeline({ items, onRetryItem, className }: BatchItemTi
                 onClick={() => onRetryItem(itemId)}
               >
                 <RotateCw className="h-3 w-3" />
-                Retry
+                {t('common.retry')}
               </button>
             )}
 
@@ -86,7 +88,7 @@ export function BatchItemTimeline({ items, onRetryItem, className }: BatchItemTi
                 className="shrink-0 text-[11px] text-accent hover:underline cursor-pointer"
                 onClick={() => navigateToSession(item.sessionId!)}
               >
-                Open session
+                {t('batches.openSession')}
               </button>
             )}
           </div>
