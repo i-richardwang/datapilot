@@ -8,6 +8,7 @@
 
 import * as React from 'react'
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Layers } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { EntityListEmptyScreen } from '@/components/ui/entity-list-empty'
@@ -17,7 +18,7 @@ import { SessionSearchHeader } from '@/components/app-shell/SessionSearchHeader'
 import { BatchAvatar } from './BatchAvatar'
 import { BatchMenu } from './BatchMenu'
 import { cn } from '@/lib/utils'
-import { BATCH_STATUS_DISPLAY, BATCH_STATUS_COLOR, type BatchFilterKind } from './types'
+import { BATCH_STATUS_DISPLAY_KEY, BATCH_STATUS_COLOR, type BatchFilterKind } from './types'
 import type { BatchListItem } from './types'
 import type { BatchProgress, BatchStatus } from '@craft-agent/shared/batches'
 
@@ -61,6 +62,7 @@ function BatchItem({
   onDuplicate,
   onDelete,
 }: BatchItemProps) {
+  const { t } = useTranslation()
   const status: BatchStatus = batch.progress?.status ?? 'pending'
   const statusColors = BATCH_STATUS_COLOR[status]
   const progressText = batch.progress
@@ -79,11 +81,11 @@ function BatchItem({
       badges={
         <>
           <MicroBadge colorClass={`${statusColors.bg} ${statusColors.text}`}>
-            {BATCH_STATUS_DISPLAY[status]}
+            {t(BATCH_STATUS_DISPLAY_KEY[status])}
           </MicroBadge>
           {isTesting && (
             <MicroBadge colorClass="bg-info/10 text-info">
-              Testing
+              {t('batches.badgeTesting')}
             </MicroBadge>
           )}
         </>
@@ -146,6 +148,7 @@ export function BatchesListPanel({
   testProgress,
   className,
 }: BatchesListPanelProps) {
+  const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState('')
   const [searchActive, setSearchActive] = useState(false)
 
@@ -176,8 +179,8 @@ export function BatchesListPanel({
       <div className={cn('flex flex-col flex-1 min-h-0', className)}>
         <EntityListEmptyScreen
           icon={<Layers />}
-          title="No batches configured"
-          description="Batches process lists of items in bulk — create a batches.json file in your workspace root to get started."
+          title={t('batches.emptyTitle')}
+          description={t('batches.emptyDescription')}
           docKey="batches"
         >
           {workspaceRootPath && (
@@ -185,7 +188,7 @@ export function BatchesListPanel({
               align="center"
               trigger={
                 <button className="inline-flex items-center h-7 px-3 text-xs font-medium rounded-lg bg-background shadow-minimal hover:bg-foreground/[0.03] transition-colors">
-                  Add Batch
+                  {t('batches.addBatch')}
                 </button>
               }
               {...getEditConfig('batch-config', workspaceRootPath)}
@@ -207,7 +210,7 @@ export function BatchesListPanel({
             setSearchActive(false)
             setSearchQuery('')
           }}
-          placeholder="Search batches..."
+          placeholder={t('batches.searchPlaceholder')}
           resultCount={isSearchMode ? filteredBatches.length : undefined}
         />
       )}
@@ -216,14 +219,14 @@ export function BatchesListPanel({
       {filteredBatches.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-1">
           <p className="text-sm text-muted-foreground">
-            {isSearchMode ? 'No batches found' : 'No batches match this filter.'}
+            {isSearchMode ? t('batches.noBatchesFound') : t('batches.noBatchesMatchFilter')}
           </p>
           {isSearchMode && (
             <button
               onClick={() => setSearchQuery('')}
               className="text-xs text-foreground hover:underline"
             >
-              Clear search
+              {t('batches.clearSearch')}
             </button>
           )}
         </div>

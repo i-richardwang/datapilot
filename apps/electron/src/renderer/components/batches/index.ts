@@ -20,5 +20,5 @@ export type { BatchesListPanelProps } from './BatchesListPanel'
 export { BatchInfoPage } from './BatchInfoPage'
 export type { BatchInfoPageProps } from './BatchInfoPage'
 
-export { BATCH_STATUS_DISPLAY, BATCH_STATUS_COLOR, BATCH_STATUS_BADGE_COLOR, BATCH_STATUS_TO_FILTER_KIND, getPermissionDisplayName } from './types'
+export { BATCH_STATUS_DISPLAY_KEY, BATCH_STATUS_COLOR, BATCH_STATUS_BADGE_COLOR, BATCH_STATUS_TO_FILTER_KIND, getPermissionModeKey } from './types'
 export type { BatchListItem, BatchFilterKind, BatchListFilter } from './types'
