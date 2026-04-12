@@ -7,6 +7,7 @@
  */
 
 import { Play, Pause, RotateCcw, Copy, Trash2, FlaskConical } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useMenuComponents } from '@/components/ui/menu-context'
 import type { BatchStatus } from '@craft-agent/shared/batches'
 
@@ -31,6 +32,7 @@ export function BatchMenu({
   onDuplicate,
   onDelete,
 }: BatchMenuProps) {
+  const { t } = useTranslation()
   const { MenuItem, Separator } = useMenuComponents()
 
   return (
@@ -39,7 +41,7 @@ export function BatchMenu({
       {status === 'pending' && onStart && (
         <MenuItem onClick={onStart}>
           <Play className="h-3.5 w-3.5" />
-          <span className="flex-1">Start</span>
+          <span className="flex-1">{t('batches.menuStart')}</span>
         </MenuItem>
       )}
 
@@ -47,7 +49,7 @@ export function BatchMenu({
       {status === 'running' && onPause && (
         <MenuItem onClick={onPause}>
           <Pause className="h-3.5 w-3.5" />
-          <span className="flex-1">Pause</span>
+          <span className="flex-1">{t('batches.menuPause')}</span>
         </MenuItem>
       )}
 
@@ -55,7 +57,7 @@ export function BatchMenu({
       {status === 'paused' && onResume && (
         <MenuItem onClick={onResume}>
           <RotateCcw className="h-3.5 w-3.5" />
-          <span className="flex-1">Resume</span>
+          <span className="flex-1">{t('batches.menuResume')}</span>
         </MenuItem>
       )}
 
@@ -63,7 +65,7 @@ export function BatchMenu({
       {status !== 'running' && onTest && (
         <MenuItem onClick={onTest}>
           <FlaskConical className="h-3.5 w-3.5" />
-          <span className="flex-1">Test</span>
+          <span className="flex-1">{t('batches.menuTest')}</span>
         </MenuItem>
       )}
 
@@ -71,7 +73,7 @@ export function BatchMenu({
       {onDuplicate && (
         <MenuItem onClick={onDuplicate}>
           <Copy className="h-3.5 w-3.5" />
-          <span className="flex-1">Duplicate</span>
+          <span className="flex-1">{t('batches.menuDuplicate')}</span>
         </MenuItem>
       )}
 
@@ -81,7 +83,7 @@ export function BatchMenu({
       {onDelete && (
         <MenuItem onClick={onDelete} variant="destructive">
           <Trash2 className="h-3.5 w-3.5" />
-          <span className="flex-1">Delete</span>
+          <span className="flex-1">{t('batches.menuDelete')}</span>
         </MenuItem>
       )}
     </>

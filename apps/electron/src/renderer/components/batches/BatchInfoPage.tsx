@@ -11,6 +11,7 @@
 
 import * as React from 'react'
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Info_Page,
   Info_Section,
@@ -24,7 +25,7 @@ import { BatchAvatar } from './BatchAvatar'
 import { BatchMenu } from './BatchMenu'
 import { BatchActionRow } from './BatchActionRow'
 import { BatchItemTimeline } from './BatchItemTimeline'
-import { BATCH_STATUS_DISPLAY, BATCH_STATUS_BADGE_COLOR, getPermissionDisplayName } from './types'
+import { BATCH_STATUS_DISPLAY_KEY, BATCH_STATUS_BADGE_COLOR, getPermissionModeKey } from './types'
 import { TEST_BATCH_SUFFIX } from '@craft-agent/shared/batches/constants'
 import type { BatchListItem } from './types'
 import type { BatchState, BatchStatus, BatchProgress, BatchItemState, BatchItemsPage, TestBatchResult } from '@craft-agent/shared/batches'
@@ -70,6 +71,7 @@ export function BatchInfoPage({
   testResult,
   className,
 }: BatchInfoPageProps) {
+  const { t } = useTranslation()
   const workspace = useActiveWorkspace()
   const status: BatchStatus = batch.progress?.status ?? 'pending'
 
@@ -77,7 +79,7 @@ export function BatchInfoPage({
     <EditPopover
       trigger={<EditButton />}
       {...getEditConfig('batch-config', workspace.rootPath)}
-      secondaryAction={{ label: 'Edit File', filePath: `${workspace.rootPath}/batches.json` }}
+      secondaryAction={{ label: t('common.editFile'), filePath: `${workspace.rootPath}/batches.json` }}
     />
   ) : undefined
 
@@ -193,23 +195,26 @@ export function BatchInfoPage({
           <Info_Page.Hero
             avatar={<BatchAvatar status={status} fluid />}
             title={batch.name}
-            tagline={`${BATCH_STATUS_DISPLAY[status]} batch — ${batch.source.type.toUpperCase()} source`}
+            tagline={t('batches.heroTagline', {
+              status: t(BATCH_STATUS_DISPLAY_KEY[status]),
+              sourceType: batch.source.type.toUpperCase(),
+            })}
           />
           {editActions}
         </div>
 
         {/* Section: Source */}
-        <Info_Section title="Source" description="Where to read items from" actions={editActions}>
+        <Info_Section title={t('batches.sectionSource')} description={t('batches.sectionSourceDesc')} actions={editActions}>
           <Info_Table>
-            <Info_Table.Row label="Format">
+            <Info_Table.Row label={t('batches.labelFormat')}>
               <Info_Badge color="default">{batch.source.type.toUpperCase()}</Info_Badge>
             </Info_Table.Row>
-            <Info_Table.Row label="Path">
+            <Info_Table.Row label={t('batches.labelPath')}>
               <code className="text-xs font-mono bg-foreground/5 px-1.5 py-0.5 rounded">
                 {batch.source.path}
               </code>
             </Info_Table.Row>
-            <Info_Table.Row label="ID Field">
+            <Info_Table.Row label={t('batches.labelIdField')}>
               <code className="text-xs font-mono bg-foreground/5 px-1.5 py-0.5 rounded">
                 {batch.source.idField}
               </code>
@@ -218,43 +223,43 @@ export function BatchInfoPage({
         </Info_Section>
 
         {/* Section: Action */}
-        <Info_Section title="Action" description="Prompt sent for each item" actions={editActions}>
+        <Info_Section title={t('batches.sectionAction')} description={t('batches.sectionActionDesc')} actions={editActions}>
           <BatchActionRow prompt={batch.action.prompt} />
         </Info_Section>
 
         {/* Section: Execution */}
-        <Info_Section title="Execution" description="How items are processed" actions={editActions}>
+        <Info_Section title={t('batches.sectionExecution')} description={t('batches.sectionExecutionDesc')} actions={editActions}>
           <Info_Table>
-            <Info_Table.Row label="Concurrency" value={String(batch.execution?.maxConcurrency ?? 3)} />
-            <Info_Table.Row label="Retry">
+            <Info_Table.Row label={t('batches.labelConcurrency')} value={String(batch.execution?.maxConcurrency ?? 3)} />
+            <Info_Table.Row label={t('batches.labelRetry')}>
               <Info_Badge color={batch.execution?.retryOnFailure ? 'success' : 'muted'}>
-                {batch.execution?.retryOnFailure ? 'Enabled' : 'Disabled'}
+                {batch.execution?.retryOnFailure ? t('batches.enabled') : t('batches.disabled')}
               </Info_Badge>
             </Info_Table.Row>
             {batch.execution?.retryOnFailure && (
-              <Info_Table.Row label="Max Retries" value={String(batch.execution?.maxRetries ?? 2)} />
+              <Info_Table.Row label={t('batches.labelMaxRetries')} value={String(batch.execution?.maxRetries ?? 2)} />
             )}
-            <Info_Table.Row label="Access Level" value={getPermissionDisplayName(batch.execution?.permissionMode)} />
+            <Info_Table.Row label={t('batches.labelAccessLevel')} value={t(getPermissionModeKey(batch.execution?.permissionMode))} />
             {batch.workingDirectory && (
-              <Info_Table.Row label="Working Directory">
+              <Info_Table.Row label={t('batches.labelWorkingDirectory')}>
                 <code className="text-xs font-mono bg-foreground/5 px-1.5 py-0.5 rounded">
                   {batch.workingDirectory}
                 </code>
               </Info_Table.Row>
             )}
             {batch.execution?.toolProfile && batch.execution.toolProfile !== 'default' && (
-              <Info_Table.Row label="Tool Profile">
+              <Info_Table.Row label={t('batches.labelToolProfile')}>
                 <Info_Badge color="default">{batch.execution.toolProfile}</Info_Badge>
               </Info_Table.Row>
             )}
             {batch.execution?.model && (
-              <Info_Table.Row label="Model" value={batch.execution.model} />
+              <Info_Table.Row label={t('batches.labelModel')} value={batch.execution.model} />
             )}
             {batch.execution?.llmConnection && (
-              <Info_Table.Row label="LLM Connection" value={batch.execution.llmConnection} />
+              <Info_Table.Row label={t('batches.labelLlmConnection')} value={batch.execution.llmConnection} />
             )}
             {batch.action.labels && batch.action.labels.length > 0 && (
-              <Info_Table.Row label="Labels">
+              <Info_Table.Row label={t('batches.labelLabels')}>
                 <div className="flex gap-1.5 flex-wrap">
                   {batch.action.labels.map(label => (
                     <Info_Badge key={label} color="muted">{label}</Info_Badge>
@@ -263,7 +268,7 @@ export function BatchInfoPage({
               </Info_Table.Row>
             )}
             {batch.action.mentions && batch.action.mentions.length > 0 && (
-              <Info_Table.Row label="Mentions">
+              <Info_Table.Row label={t('batches.labelMentions')}>
                 <div className="flex gap-1.5 flex-wrap">
                   {batch.action.mentions.map(mention => (
                     <Info_Badge key={mention} color="default">@{mention}</Info_Badge>
@@ -276,20 +281,20 @@ export function BatchInfoPage({
 
         {/* Section: Output (only when configured) */}
         {batch.output && (
-          <Info_Section title="Output" description="Structured result collection" actions={editActions}>
+          <Info_Section title={t('batches.sectionOutput')} description={t('batches.sectionOutputDesc')} actions={editActions}>
             <Info_Table>
-              <Info_Table.Row label="Path">
+              <Info_Table.Row label={t('batches.labelPath')}>
                 <code className="text-xs font-mono bg-foreground/5 px-1.5 py-0.5 rounded">
                   {batch.output.path}
                 </code>
               </Info_Table.Row>
-              <Info_Table.Row label="Schema">
+              <Info_Table.Row label={t('batches.labelSchema')}>
                 <Info_Badge color={batch.output.schema ? 'success' : 'muted'}>
-                  {batch.output.schema ? 'Defined' : 'Freeform'}
+                  {batch.output.schema ? t('batches.schemaDefined') : t('batches.schemaFreeform')}
                 </Info_Badge>
               </Info_Table.Row>
               {batch.output.schema?.properties && Object.keys(batch.output.schema.properties).length > 0 && (
-                <Info_Table.Row label="Fields">
+                <Info_Table.Row label={t('batches.labelFields')}>
                   <div className="flex gap-1.5 flex-wrap">
                     {Object.entries(batch.output.schema.properties).map(([key, _prop]) => {
                       const isRequired = batch.output?.schema?.required?.includes(key)
@@ -309,26 +314,29 @@ export function BatchInfoPage({
         {/* Section: Test Run (only when test data exists) */}
         {testDisplayProgress && testStatus && (
           <Info_Section
-            title="Test Run"
-            description={`${testDisplayProgress.completedItems + testDisplayProgress.failedItems} of ${testDisplayProgress.totalItems} items processed`}
+            title={t('batches.sectionTestRun')}
+            description={t('batches.itemsProcessed', {
+              done: testDisplayProgress.completedItems + testDisplayProgress.failedItems,
+              total: testDisplayProgress.totalItems,
+            })}
           >
             <Info_Table>
-              <Info_Table.Row label="Status">
+              <Info_Table.Row label={t('batches.labelStatus')}>
                 <Info_Badge color={BATCH_STATUS_BADGE_COLOR[testStatus]}>
-                  {BATCH_STATUS_DISPLAY[testStatus]}
+                  {t(BATCH_STATUS_DISPLAY_KEY[testStatus])}
                 </Info_Badge>
               </Info_Table.Row>
-              <Info_Table.Row label="Total" value={`${testDisplayProgress.totalItems} items`} />
-              <Info_Table.Row label="Completed">
+              <Info_Table.Row label={t('batches.labelTotal')} value={t('batches.totalItems', { count: testDisplayProgress.totalItems })} />
+              <Info_Table.Row label={t('batches.statusCompleted')}>
                 <Info_Badge color="success">{testDisplayProgress.completedItems}</Info_Badge>
               </Info_Table.Row>
-              <Info_Table.Row label="Failed">
+              <Info_Table.Row label={t('batches.statusFailed')}>
                 <Info_Badge color="destructive">{testDisplayProgress.failedItems}</Info_Badge>
               </Info_Table.Row>
-              <Info_Table.Row label="Running">
+              <Info_Table.Row label={t('batches.statusRunning')}>
                 <Info_Badge color="warning">{testDisplayProgress.runningItems}</Info_Badge>
               </Info_Table.Row>
-              <Info_Table.Row label="Pending">
+              <Info_Table.Row label={t('batches.statusPending')}>
                 <Info_Badge color="muted">{testDisplayProgress.pendingItems}</Info_Badge>
               </Info_Table.Row>
             </Info_Table>
@@ -338,8 +346,8 @@ export function BatchInfoPage({
         {/* Section: Test Items (only when test data exists) */}
         {(isTestRunning || hasTestResult) && (
           <Info_Section
-            title="Test Items"
-            description={testItemCount > 0 ? `${testItemCount} items sampled` : undefined}
+            title={t('batches.sectionTestItems')}
+            description={testItemCount > 0 ? t('batches.itemsSampled', { count: testItemCount }) : undefined}
           >
             <BatchItemTimeline items={testState?.items ?? {}} />
           </Info_Section>
@@ -348,26 +356,29 @@ export function BatchInfoPage({
         {/* Section: Progress */}
         {batch.progress && (
           <Info_Section
-            title="Progress"
-            description={`${batch.progress.completedItems + batch.progress.failedItems} of ${batch.progress.totalItems} items processed`}
+            title={t('batches.sectionProgress')}
+            description={t('batches.itemsProcessed', {
+              done: batch.progress.completedItems + batch.progress.failedItems,
+              total: batch.progress.totalItems,
+            })}
           >
             <Info_Table>
-              <Info_Table.Row label="Status">
+              <Info_Table.Row label={t('batches.labelStatus')}>
                 <Info_Badge color={BATCH_STATUS_BADGE_COLOR[status]}>
-                  {BATCH_STATUS_DISPLAY[status]}
+                  {t(BATCH_STATUS_DISPLAY_KEY[status])}
                 </Info_Badge>
               </Info_Table.Row>
-              <Info_Table.Row label="Total" value={`${batch.progress.totalItems} items`} />
-              <Info_Table.Row label="Completed">
+              <Info_Table.Row label={t('batches.labelTotal')} value={t('batches.totalItems', { count: batch.progress.totalItems })} />
+              <Info_Table.Row label={t('batches.statusCompleted')}>
                 <Info_Badge color="success">{batch.progress.completedItems}</Info_Badge>
               </Info_Table.Row>
-              <Info_Table.Row label="Failed">
+              <Info_Table.Row label={t('batches.statusFailed')}>
                 <Info_Badge color="destructive">{batch.progress.failedItems}</Info_Badge>
               </Info_Table.Row>
-              <Info_Table.Row label="Running">
+              <Info_Table.Row label={t('batches.statusRunning')}>
                 <Info_Badge color="warning">{batch.progress.runningItems}</Info_Badge>
               </Info_Table.Row>
-              <Info_Table.Row label="Pending">
+              <Info_Table.Row label={t('batches.statusPending')}>
                 <Info_Badge color="muted">{batch.progress.pendingItems}</Info_Badge>
               </Info_Table.Row>
             </Info_Table>
@@ -376,15 +387,19 @@ export function BatchInfoPage({
 
         {/* Section: Items (paginated) */}
         <Info_Section
-          title="Items"
-          description={itemCount > 0 ? `${itemCount} items in this batch` : undefined}
+          title={t('batches.sectionItems')}
+          description={itemCount > 0 ? t('batches.itemsInBatch', { count: itemCount }) : undefined}
         >
           <BatchItemTimeline items={pageItemsRecord} onRetryItem={onRetryItem} />
           {itemsPage && itemsPage.total > PAGE_SIZE && (
             <div className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground border-t border-border/30">
               <span>
-                {itemsPage.offset + 1}–{Math.min(itemsPage.offset + PAGE_SIZE, itemsPage.total)} of {itemsPage.total}
-                {totalPages > 1 && ` · page ${currentPage} of ${totalPages}`}
+                {t('batches.pageRange', {
+                  start: itemsPage.offset + 1,
+                  end: Math.min(itemsPage.offset + PAGE_SIZE, itemsPage.total),
+                  total: itemsPage.total,
+                })}
+                {totalPages > 1 && ` · ${t('batches.pageIndicator', { current: currentPage, total: totalPages })}`}
               </span>
               <div className="flex items-center gap-1.5">
                 {frontierPage >= 0 && !isOnFrontierPage && (
@@ -392,7 +407,7 @@ export function BatchInfoPage({
                     onClick={() => setPageOffset(frontierPage)}
                     className="text-accent hover:underline cursor-pointer"
                   >
-                    Go to active
+                    {t('batches.goToActive')}
                   </button>
                 )}
                 <button
@@ -400,14 +415,14 @@ export function BatchInfoPage({
                   disabled={pageOffset === 0}
                   className="px-2 py-1 rounded hover:bg-muted disabled:opacity-30 cursor-pointer disabled:cursor-default"
                 >
-                  Prev
+                  {t('batches.prev')}
                 </button>
                 <button
                   onClick={() => setPageOffset(p => p + PAGE_SIZE)}
                   disabled={pageOffset + PAGE_SIZE >= itemsPage.total}
                   className="px-2 py-1 rounded hover:bg-muted disabled:opacity-30 cursor-pointer disabled:cursor-default"
                 >
-                  Next
+                  {t('batches.next')}
                 </button>
               </div>
             </div>
@@ -415,7 +430,7 @@ export function BatchInfoPage({
         </Info_Section>
 
         {/* Section: Raw config (JSON) */}
-        <Info_Section title="Raw config">
+        <Info_Section title={t('batches.sectionRawConfig')}>
           <div className="rounded-lg shadow-minimal overflow-hidden [&_pre]:!bg-transparent [&_.relative]:!bg-transparent [&_.relative]:!border-0 [&_.relative>div:first-child]:!bg-transparent [&_.relative>div:first-child]:!border-0">
             <Info_Markdown maxHeight={300} fullscreen>
               {`\`\`\`json\n${JSON.stringify(batch, null, 2)}\n\`\`\``}
