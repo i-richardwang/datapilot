@@ -17,6 +17,7 @@
 
 import * as React from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAtomValue } from 'jotai'
 import { Panel } from './Panel'
 import { MultiSelectPanel } from './MultiSelectPanel'
@@ -64,6 +65,7 @@ export function MainContentPanel({
   className,
   navStateOverride,
 }: MainContentPanelProps) {
+  const { t } = useTranslation()
   const globalNavState = useNavigationState()
   const navState = navStateOverride ?? globalNavState
   const {
@@ -393,7 +395,7 @@ export function MainContentPanel({
     return wrapWithStoplight(
       <Panel variant="grow" className={className}>
         <div className="flex items-center justify-center h-full text-muted-foreground">
-          <p className="text-sm">No batches configured</p>
+          <p className="text-sm">{t('batches.emptyTitle')}</p>
         </div>
       </Panel>
     )
