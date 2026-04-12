@@ -2400,7 +2400,7 @@ function AppShellContent({
                         // Batch Sessions (trailing, non-sortable)
                         {
                           id: "nav:batchSessions",
-                          title: "Batch Sessions",
+                          title: t('sidebar.batchSessions'),
                           label: batchSessionCount > 0 ? String(batchSessionCount) : undefined,
                           icon: Layers,
                           variant: (sessionFilter?.kind === 'batch' ? "default" : "ghost") as "default" | "ghost",
@@ -2545,7 +2545,7 @@ function AppShellContent({
                     },
                     {
                       id: "nav:batches",
-                      title: "Batches",
+                      title: t('sidebar.batches'),
                       label: String(batches.length),
                       icon: Layers,
                       variant: isBatchesNavigation(navState) ? "default" : "ghost",
@@ -3216,7 +3216,7 @@ function AppShellContent({
                       trigger={
                         <HeaderIconButton
                           icon={<Plus className="h-4 w-4" />}
-                          tooltip="Add Batch"
+                          tooltip={t('batches.addBatch')}
                         />
                       }
                       {...getEditConfig('batch-config', activeWorkspace.rootPath)}
@@ -3630,14 +3630,14 @@ function AppShellContent({
       <Dialog open={!!batchPendingDelete} onOpenChange={(open) => { if (!open) setBatchPendingDelete(null) }}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle>Delete Batch</DialogTitle>
+            <DialogTitle>{t('batches.deleteTitle')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete <strong>{pendingDeleteBatch?.name}</strong>? This will remove the batch configuration and its state file.
+              {t('batches.deleteConfirm', { name: pendingDeleteBatch?.name })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBatchPendingDelete(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={confirmDeleteBatch}>Delete</Button>
+            <Button variant="outline" onClick={() => setBatchPendingDelete(null)}>{t('common.cancel')}</Button>
+            <Button variant="destructive" onClick={confirmDeleteBatch}>{t('common.delete')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
