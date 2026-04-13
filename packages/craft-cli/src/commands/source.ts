@@ -29,7 +29,10 @@ export async function routeSource(
   positionals: string[],
   flags: Record<string, string | boolean | string[]>,
 ): Promise<void> {
-  if (!action) fail('USAGE_ERROR', 'Missing action', 'datapilot source <list|get|create|update|delete|validate|test|init-guide|init-permissions|auth-help>')
+  if (!action) ok({
+    usage: 'datapilot source <action> [args] [--flags]',
+    actions: ['list', 'get', 'create', 'update', 'delete', 'validate', 'test', 'init-guide', 'init-permissions', 'auth-help'],
+  })
 
   switch (action) {
     case 'list': return cmdList(ws, flags)

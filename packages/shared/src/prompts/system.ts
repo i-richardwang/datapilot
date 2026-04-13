@@ -553,13 +553,8 @@ ${!FEATURE_FLAGS.liteVersion ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When creat
 - Automations: \`datapilot automation --help\`
 - Permissions: \`datapilot permission --help\`
 - Themes: \`datapilot theme --help\`
-- Canonical reference: \`${DOC_REFS.craftCli}\`` : ''}${FEATURE_FLAGS.batchCli && !isBatch ? `
-
-## Batch CLI
-
-Use the batch CLI for batch processing operations.
-
-- Batches help: \`datapilot-batch --help\`` : ''}
+- Batches: \`datapilot batch --help\`
+- Canonical reference: \`${DOC_REFS.craftCli}\`` : ''}
 
 ${!isBatch ? `## User preferences
 

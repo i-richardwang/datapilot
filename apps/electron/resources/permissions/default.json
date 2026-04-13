@@ -126,32 +126,24 @@
       "comment": "datapilot theme read-only operations"
     },
     {
-      "pattern": "^datapilot-batch\\s+(list|get|validate|status)\\b",
-      "comment": "datapilot-batch read-only operations"
+      "pattern": "^datapilot\\s+batch\\s+(list|get|validate|status)\\b",
+      "comment": "datapilot batch read-only operations"
     },
     {
       "pattern": "^datapilot\\s*$",
       "comment": "datapilot bare invocation (prints help)"
     },
     {
-      "pattern": "^datapilot\\s+(label|source|skill|automation|permission|theme)\\s*$",
+      "pattern": "^datapilot\\s+(label|source|skill|automation|permission|theme|batch)\\s*$",
       "comment": "datapilot entity help"
     },
     {
-      "pattern": "^datapilot\\s+(label|source|skill|automation|permission|theme)\\s+--help\\b",
+      "pattern": "^datapilot\\s+(label|source|skill|automation|permission|theme|batch)\\s+--help\\b",
       "comment": "datapilot entity help flags"
     },
     {
-      "pattern": "^datapilot\\s+--(help|version|discover)\\b",
+      "pattern": "^datapilot\\s+--(help|version)\\b",
       "comment": "datapilot global flags"
-    },
-    {
-      "pattern": "^datapilot-batch\\s*$",
-      "comment": "datapilot-batch bare invocation (prints help)"
-    },
-    {
-      "pattern": "^datapilot-batch\\s+--(help|version)\\b",
-      "comment": "datapilot-batch global flags"
     },
     {
       "pattern": "^find\\b",

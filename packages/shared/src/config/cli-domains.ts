@@ -97,20 +97,19 @@ const POLICIES: Record<CliDomainNamespace, CliDomainPolicy> = {
   },
   batch: {
     namespace: 'batch',
-    helpCommand: 'datapilot-batch --help',
+    helpCommand: 'datapilot batch --help',
     workspacePathScopes: ['batches.json', 'batch-state-*.json'],
     readActions: ['list', 'get', 'validate', 'status'],
     quickExamples: [
-      'datapilot-batch list',
-      'datapilot-batch get <id>',
-      'datapilot-batch validate',
-      'datapilot-batch status <id>',
-      'datapilot-batch create --name "My batch" --source data.csv --id-field id --prompt-file prompt.txt',
-      'datapilot-batch update <id> --name "Renamed" --concurrency 5',
-      'datapilot-batch update <id> --enabled false',
+      'datapilot batch list',
+      'datapilot batch get <id>',
+      'datapilot batch validate',
+      'datapilot batch status <id>',
+      'datapilot batch create --name "My batch" --source data.csv --id-field id --prompt-file prompt.txt',
+      'datapilot batch update <id> --name "Renamed" --concurrency 5',
+      'datapilot batch update <id> --enabled false',
     ],
     bashGuardPaths: ['batches.json', 'batch-state-*.json'],
-    patternPrefix: 'datapilot-batch',
   },
 }
 
@@ -189,7 +188,7 @@ export function getCraftAgentReadOnlyBashPatterns(): BashPatternRule[] {
     { pattern: '^datapilot\\s*$', comment: 'datapilot bare invocation (prints help)' },
     { pattern: `^datapilot\\s+(${mainAlternation})\\s*$`, comment: 'datapilot entity help' },
     { pattern: `^datapilot\\s+(${mainAlternation})\\s+--help\\b`, comment: 'datapilot entity help flags' },
-    { pattern: '^datapilot\\s+--(help|version|discover)\\b', comment: 'datapilot global flags' },
+    { pattern: '^datapilot\\s+--(help|version)\\b', comment: 'datapilot global flags' },
   )
 
   // Help patterns for separate-binary namespaces

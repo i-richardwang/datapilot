@@ -20,15 +20,9 @@ import { routeAutomation } from './commands/automation.ts'
 import { routeSkill } from './commands/skill.ts'
 import { routePermission } from './commands/permission.ts'
 import { routeTheme } from './commands/theme.ts'
+import { routeBatch } from './commands/batch.ts'
 
 const VERSION = '0.7.2'
-
-const DISCOVER = {
-  name: 'datapilot',
-  version: VERSION,
-  entities: ['label', 'source', 'automation', 'skill', 'permission', 'theme'],
-  outputFormat: 'json-envelope',
-}
 
 async function main(): Promise<void> {
   const { entity, action, positionals, flags } = parseArgs(process.argv.slice(2))
@@ -37,22 +31,21 @@ async function main(): Promise<void> {
   if (flags['version']) {
     ok(VERSION)
   }
-  if (flags['discover']) {
-    ok(DISCOVER)
-  }
-  if (flags['help'] || !entity) {
+  if (!entity) {
     ok({
       usage: 'datapilot <entity> <action> [args] [--flags]',
-      entities: ['label', 'source', 'automation', 'skill', 'permission', 'theme'],
-      globalFlags: ['--help', '--version', '--discover', '--workspace-root <path>', '--json', '--stdin'],
+      entities: ['label', 'source', 'automation', 'skill', 'permission', 'theme', 'batch'],
+      globalFlags: ['--help', '--version', '--workspace-root <path>', '--json', '--stdin'],
     })
   }
 
-  // Initialize DB
-  await ensureDb()
-
   // Resolve workspace
   const workspaceRoot = resolveWorkspaceRoot(strFlag(flags, 'workspace-root'))
+
+  // Initialize DB (batch is filesystem-only, skip for it)
+  if (entity !== 'batch') {
+    await ensureDb()
+  }
 
   switch (entity) {
     case 'label':
@@ -73,8 +66,11 @@ async function main(): Promise<void> {
     case 'theme':
       routeTheme(workspaceRoot, action, positionals, flags)
       break
+    case 'batch':
+      routeBatch(workspaceRoot, action, positionals, flags)
+      break
     default:
-      fail('USAGE_ERROR', `Unknown entity: ${entity}`, 'Valid entities: label, source, automation, skill, permission, theme')
+      fail('USAGE_ERROR', `Unknown entity: ${entity}`, 'Valid entities: label, source, automation, skill, permission, theme, batch')
   }
 }
 

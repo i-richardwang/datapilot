@@ -26,7 +26,10 @@ export function routeAutomation(
   positionals: string[],
   flags: Record<string, string | boolean | string[]>,
 ): void {
-  if (!action) fail('USAGE_ERROR', 'Missing action', 'datapilot automation <list|get|create|update|delete|enable|disable|duplicate|history|last-executed|test|lint|validate>')
+  if (!action) ok({
+    usage: 'datapilot automation <action> [args] [--flags]',
+    actions: ['list', 'get', 'create', 'update', 'delete', 'enable', 'disable', 'duplicate', 'history', 'last-executed', 'test', 'lint', 'validate'],
+  })
 
   switch (action) {
     case 'list': return cmdList(ws)

@@ -26,7 +26,10 @@ export function routePermission(
   positionals: string[],
   flags: Record<string, string | boolean | string[]>,
 ): void {
-  if (!action) fail('USAGE_ERROR', 'Missing action', 'datapilot permission <list|get|set|add-mcp-pattern|add-api-endpoint|add-bash-pattern|add-write-path|remove|validate|reset>')
+  if (!action) ok({
+    usage: 'datapilot permission <action> [args] [--flags]',
+    actions: ['list', 'get', 'set', 'add-mcp-pattern', 'add-api-endpoint', 'add-bash-pattern', 'add-write-path', 'remove', 'validate', 'reset'],
+  })
 
   const sourceSlug = strFlag(flags, 'source')
 

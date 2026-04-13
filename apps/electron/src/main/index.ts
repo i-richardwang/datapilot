@@ -146,15 +146,9 @@ if (isDebugMode) {
   }
 
   process.env.CRAFT_SCRIPTS = scriptsDir
-  process.env.DATAPILOT_COMMANDS_ENTRY = app.isPackaged
-    ? join(app.getAppPath(), 'packages', 'craft-agents-commands', 'src', 'main.ts')
-    : join(process.cwd(), 'packages', 'craft-agents-commands', 'src', 'main.ts')
   process.env.DATAPILOT_CLI_ENTRY = app.isPackaged
-    ? join(app.getAppPath(), 'packages', 'craft-cli', 'src', 'cli.ts')
-    : join(process.cwd(), 'packages', 'craft-cli', 'src', 'cli.ts')
-  process.env.DATAPILOT_BATCH_CLI_ENTRY = app.isPackaged
-    ? join(app.getAppPath(), 'packages', 'batch-cli', 'src', 'index.ts')
-    : join(process.cwd(), 'packages', 'batch-cli', 'src', 'index.ts')
+    ? join(app.getAppPath(), 'packages', 'craft-cli', 'src', 'index.ts')
+    : join(process.cwd(), 'packages', 'craft-cli', 'src', 'index.ts')
   process.env.DATAPILOT_COMMANDS_DOC_PATH = app.isPackaged
     ? join(resourcesBase, 'resources', 'docs', 'datapilot-cli.md')
     : join(process.cwd(), 'apps', 'electron', 'resources', 'docs', 'datapilot-cli.md')

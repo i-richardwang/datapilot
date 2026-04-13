@@ -25,7 +25,10 @@ export function routeSkill(
   positionals: string[],
   flags: Record<string, string | boolean | string[]>,
 ): void {
-  if (!action) fail('USAGE_ERROR', 'Missing action', 'datapilot skill <list|get|where|create|update|delete|validate>')
+  if (!action) ok({
+    usage: 'datapilot skill <action> [args] [--flags]',
+    actions: ['list', 'get', 'where', 'create', 'update', 'delete', 'validate'],
+  })
 
   const projectRoot = strFlag(flags, 'project-root') ?? process.cwd()
 

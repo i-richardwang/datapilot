@@ -11,7 +11,6 @@ datapilot <entity> <action> [args] [--flags] [--json '<json>'] [--stdin]
 ### Global flags
 - `datapilot --help`
 - `datapilot --version`
-- `datapilot --discover`
 
 ### Input modes
 - Flat flags for simple values
@@ -372,20 +371,17 @@ datapilot theme reset-override
 
 Manage batch processing jobs stored in `batches.json`.
 
-> **Note:** Batch commands use a separate binary `datapilot-batch` (not `datapilot`).
-> This binary ships with the `@craft-agent/batch-cli` package and has plain-text output
-> (not the JSON envelope format of the main `datapilot` CLI).
-
 ### Commands
-- `datapilot-batch list`
-- `datapilot-batch get <id>`
-- `datapilot-batch validate`
-- `datapilot-batch status <id> [--items]`
-- `datapilot-batch create` (see flags below)
-- `datapilot-batch update <id>` (same flags as create, all optional)
-- `datapilot-batch enable <id>`
-- `datapilot-batch disable <id>`
-- `datapilot-batch delete <id>`
+- `datapilot batch list`
+- `datapilot batch get <id>`
+- `datapilot batch validate`
+- `datapilot batch status <id> [--items]`
+- `datapilot batch create` (see flags below)
+- `datapilot batch update <id>` (same flags as create, all optional)
+- `datapilot batch enable <id>`
+- `datapilot batch disable <id>`
+- `datapilot batch delete <id>`
+- `datapilot batch retry <batch-id> <item-id>`
 
 ### Flags for `batch create` / `update`
 
@@ -395,6 +391,7 @@ Manage batch processing jobs stored in `batches.json`.
 | `--source <path>` | **(required for create)** Path to data source file (`.csv`, `.json`, or `.jsonl`) |
 | `--id-field <field>` | **(required for create)** Field name used as the unique item identifier |
 | `--prompt-file <path>` | **(required for create)** Prompt template file with `$BATCH_ITEM_<FIELD>` placeholders |
+| `--prompt <text>` | Inline prompt text (alternative to `--prompt-file`) |
 | `--concurrency <n>` | Max concurrent sessions (default: 3) |
 | `--model "<model-id>"` | Model ID for created sessions |
 | `--connection "<slug>"` | LLM connection slug |
@@ -404,43 +401,44 @@ Manage batch processing jobs stored in `batches.json`.
 | `--output-path <path>` | Output file path (`.jsonl`) for structured results |
 | `--output-schema <json>` | JSON Schema for output validation |
 | `--patch <json>` | Raw JSON patch for advanced fields (flags override `--patch` values) |
-
-### Global flags
-- `--workspace-root <path>` — Override workspace root (default: auto-detected)
-- `--json` — Machine-readable JSON output (for list/get/validate/status)
-- `--help`, `--version`
+| `--json <json>` | Structured JSON input (alternative to flat flags) |
+| `--stdin` | Read structured JSON input from stdin |
 
 ### Examples
 
 ```bash
 # Read operations (allowed in Explore mode)
-datapilot-batch list
-datapilot-batch get abc123
-datapilot-batch validate
-datapilot-batch status abc123
-datapilot-batch status abc123 --items
+datapilot batch list
+datapilot batch get abc123
+datapilot batch validate
+datapilot batch status abc123
+datapilot batch status abc123 --items
 
 # Create (prompt template in a file)
-datapilot-batch create --name "User Analysis" --source data/users.csv --id-field user_id --prompt-file prompt.txt
-datapilot-batch create --name "Reports" --source reports.json --id-field report_id --prompt-file prompt.txt --concurrency 5 --permission-mode safe
+datapilot batch create --name "User Analysis" --source data/users.csv --id-field user_id --prompt-file prompt.txt
+datapilot batch create --name "Reports" --source reports.json --id-field report_id --prompt-file prompt.txt --concurrency 5 --permission-mode safe
 # Create with structured output
-datapilot-batch create --name "Extraction" --source data.csv --id-field id --prompt-file prompt.txt --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
+datapilot batch create --name "Extraction" --source data.csv --id-field id --prompt-file prompt.txt --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
 # Update with flat flags
-datapilot-batch update abc123 --name "Renamed Batch" --concurrency 10
-datapilot-batch update abc123 --enabled false
+datapilot batch update abc123 --name "Renamed Batch" --concurrency 10
+datapilot batch update abc123 --enabled false
 # Update with --patch for complex changes
-datapilot-batch update abc123 --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
-datapilot-batch enable abc123
-datapilot-batch disable abc123
-datapilot-batch delete abc123
+datapilot batch update abc123 --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
+datapilot batch enable abc123
+datapilot batch disable abc123
+datapilot batch delete abc123
+# Retry a failed item
+datapilot batch retry abc123 item-42
 ```
 
 ### Notes
+- All output uses JSON envelope format: `{ "ok": true, "data": ..., "warnings": [] }`.
 - `list` shows batch id, name, enabled state, status, and item progress counts.
-- `status` displays a progress bar; `--items` adds a per-item breakdown table.
+- `status --items` adds a per-item breakdown in the response data.
 - `update` accepts flags and/or `--patch`. Flags override `--patch` values. The result is deep-merged into the existing config.
 - `delete` removes the batch from `batches.json` and cleans up its `batch-state-{id}.json` file.
 - `create` infers source type from the file extension (`.csv` → `csv`, `.json` → `json`, `.jsonl` → `jsonl`).
+- `retry` resets a failed/completed/skipped item to pending. If the batch was done, its status changes to `paused`.
 - Workspace root is auto-detected by walking up from CWD looking for `batches.json` or `.datapilot/`.
 <!-- cli:batch:end -->
 

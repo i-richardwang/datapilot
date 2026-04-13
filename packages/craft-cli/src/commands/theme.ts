@@ -29,7 +29,10 @@ export function routeTheme(
   positionals: string[],
   flags: Record<string, string | boolean | string[]>,
 ): void {
-  if (!action) fail('USAGE_ERROR', 'Missing action', 'datapilot theme <get|validate|list-presets|get-preset|set-color-theme|set-workspace-color-theme|set-override|reset-override>')
+  if (!action) ok({
+    usage: 'datapilot theme <action> [args] [--flags]',
+    actions: ['get', 'validate', 'list-presets', 'get-preset', 'set-color-theme', 'set-workspace-color-theme', 'set-override', 'reset-override'],
+  })
 
   switch (action) {
     case 'get': return cmdGet(ws)

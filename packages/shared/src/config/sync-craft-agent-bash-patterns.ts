@@ -16,7 +16,7 @@ interface PermissionsConfig {
 }
 
 function isCraftAgentPattern(entry: AllowedBashEntry): boolean {
-  return typeof entry.pattern === 'string' && entry.pattern.startsWith('^craft-agent\\s')
+  return typeof entry.pattern === 'string' && entry.pattern.startsWith('^datapilot\\s')
 }
 
 function syncCraftAgentPatterns(config: PermissionsConfig): PermissionsConfig {

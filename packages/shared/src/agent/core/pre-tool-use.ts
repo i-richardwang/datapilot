@@ -469,16 +469,9 @@ function detectCliNamespaceFromConfigDetection(detection: ConfigFileDetection): 
   return null
 }
 
-/** Flags indicating which CLI feature flags are active. */
+/** @deprecated Use FEATURE_FLAGS.craftAgentsCli directly. Kept for call-site compat. */
 export interface CliFeatureFlags {
   craftAgentsCli: boolean;
-  batchCli: boolean;
-}
-
-/** Check whether the guard for a given namespace should be active. */
-function isNamespaceGuardActive(namespace: CliDomainNamespace, flags?: CliFeatureFlags): boolean {
-  if (!flags) return true; // no flags passed → guard all (backward-compat)
-  return namespace === 'batch' ? flags.batchCli : flags.craftAgentsCli;
 }
 
 /**
@@ -526,7 +519,7 @@ export function getConfigCliRedirect(
   if (!namespace) return null
 
   // Skip redirect if the controlling flag for this namespace is off
-  if (!isNamespaceGuardActive(namespace, flags)) return null
+  if (flags && !flags.craftAgentsCli) return null
 
   return {
     message: buildCliDomainBlockMessage(
@@ -549,12 +542,7 @@ export function getConfigDomainBashRedirect(
   const command = typeof input.command === 'string' ? input.command.trim() : '';
   if (!command) return null;
 
-  if (/^datapilot\s+(label|automation|source|skill)\b/.test(command)) {
-    return null;
-  }
-
-  // Exempt separate-binary CLI commands (e.g. datapilot-batch) from token scanning
-  if (/^datapilot-batch\b/.test(command)) {
+  if (/^datapilot\s+(label|automation|source|skill|batch)\b/.test(command)) {
     return null;
   }
 
@@ -579,7 +567,7 @@ export function getConfigDomainBashRedirect(
 
     for (const entry of bashGuardEntries) {
       if (!matchesPathScope(relativePath, entry.scope)) continue
-      if (!isNamespaceGuardActive(entry.namespace, flags)) continue
+      if (flags && !flags.craftAgentsCli) continue
 
       const context = entry.namespace === 'label'
         ? 'Direct Bash operations targeting the workspace labels/ folder are blocked.'
@@ -835,8 +823,8 @@ export function runPreToolUseChecks(ctx: PreToolUseInput): PreToolUseCheckResult
   }
 
   // 5b. Config-domain Bash guard (block direct config path operations unless using CLI tools)
-  const cliFlags: CliFeatureFlags = { craftAgentsCli: FEATURE_FLAGS.craftAgentsCli, batchCli: FEATURE_FLAGS.batchCli };
-  if ((cliFlags.craftAgentsCli || cliFlags.batchCli) && toolName === 'Bash') {
+  const cliFlags: CliFeatureFlags = { craftAgentsCli: FEATURE_FLAGS.craftAgentsCli };
+  if (cliFlags.craftAgentsCli && toolName === 'Bash') {
     const configDomainBashRedirect = getConfigDomainBashRedirect(currentInput, workspaceRootPath, workingDirectory, cliFlags);
     if (configDomainBashRedirect) {
       return { type: 'block', reason: configDomainBashRedirect.message };
@@ -850,7 +838,7 @@ export function runPreToolUseChecks(ctx: PreToolUseInput): PreToolUseCheckResult
   }
 
   // 5d. Config file CLI redirect (labels + automations + batches)
-  if (cliFlags.craftAgentsCli || cliFlags.batchCli) {
+  if (cliFlags.craftAgentsCli) {
     const cliRedirect = getConfigCliRedirect(toolName, currentInput, workspaceRootPath, workingDirectory, cliFlags);
     if (cliRedirect) {
       return { type: 'block', reason: cliRedirect.message };

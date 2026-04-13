@@ -30,7 +30,7 @@ export function resolveWorkspaceRoot(explicitFlag?: string): string {
   // Walk up from CWD
   let dir = process.cwd()
   while (true) {
-    if (existsSync(join(dir, '.datapilot'))) {
+    if (existsSync(join(dir, '.datapilot')) || existsSync(join(dir, 'batches.json'))) {
       return dir
     }
     const parent = dirname(dir)

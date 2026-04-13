@@ -19,7 +19,10 @@ export function routeLabel(
   positionals: string[],
   flags: Record<string, string | boolean | string[]>,
 ): void {
-  if (!action) fail('USAGE_ERROR', 'Missing action', 'datapilot label <list|get|create|update|delete|move|reorder|auto-rule-*>')
+  if (!action) ok({
+    usage: 'datapilot label <action> [args] [--flags]',
+    actions: ['list', 'get', 'create', 'update', 'delete', 'move', 'reorder', 'auto-rule-list', 'auto-rule-add', 'auto-rule-remove', 'auto-rule-clear', 'auto-rule-validate'],
+  })
 
   switch (action) {
     case 'list': return cmdList(ws)

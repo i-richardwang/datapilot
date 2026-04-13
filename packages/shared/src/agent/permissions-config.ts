@@ -376,9 +376,6 @@ function compileBlockedCommandHint(hint: BlockedCommandHintRule): CompiledBlocke
 }
 
 function shouldCompileBashPattern(pattern: string): boolean {
-  if (!FEATURE_FLAGS.batchCli && pattern.startsWith('^datapilot-batch\\s')) {
-    return false;
-  }
   if (!FEATURE_FLAGS.craftAgentsCli && pattern.startsWith('^datapilot\\s')) {
     return false;
   }

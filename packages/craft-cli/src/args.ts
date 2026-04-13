@@ -11,6 +11,9 @@ export interface ParsedArgs {
   flags: Record<string, string | boolean | string[]>
 }
 
+/** Flags that accumulate into arrays when repeated (e.g. --label a --label b). */
+const REPEATABLE_FLAGS = new Set(['label'])
+
 export function parseArgs(argv: string[]): ParsedArgs {
   const positionals: string[] = []
   const flags: Record<string, string | boolean | string[]> = {}
@@ -27,7 +30,16 @@ export function parseArgs(argv: string[]): ParsedArgs {
       const key = arg.slice(2)
       const nextArg = argv[i + 1]
       if (nextArg !== undefined && !nextArg.startsWith('-')) {
-        flags[key] = nextArg
+        if (REPEATABLE_FLAGS.has(key)) {
+          const existing = flags[key]
+          if (Array.isArray(existing)) {
+            existing.push(nextArg)
+          } else {
+            flags[key] = [nextArg]
+          }
+        } else {
+          flags[key] = nextArg
+        }
         i += 2
       } else {
         flags[key] = true

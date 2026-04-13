@@ -90,11 +90,11 @@ function parseOptionalWebSocketUrl(name: string, value: string | undefined): str
 const appRoot = process.env.CRAFT_APP_ROOT ?? join(import.meta.dir, '..', '..', '..', '..')
 const bundledAssetsRoot = process.env.DATAPILOT_BUNDLED_ASSETS_ROOT ?? appRoot
 
-// CLI entry points — live at the monorepo top level, not under apps/electron.
-process.env.DATAPILOT_BATCH_CLI_ENTRY ??= join(appRoot, 'packages', 'batch-cli', 'src', 'index.ts')
+// CLI entry point — lives at the monorepo top level, not under apps/electron.
+// Batch commands are served by the main datapilot CLI (datapilot batch <action>).
 process.env.DATAPILOT_CLI_ENTRY ??= join(appRoot, 'packages', 'craft-cli', 'src', 'index.ts')
 
-// Ensure wrapper scripts (datapilot-batch etc.) are on PATH for agent Bash sessions.
+// Ensure wrapper scripts are on PATH for agent Bash sessions.
 const serverBinDir = join(appRoot, 'apps', 'electron', 'resources', 'bin')
 if (existsSync(serverBinDir)) {
   process.env.PATH = `${serverBinDir}${delimiter}${process.env.PATH}`
