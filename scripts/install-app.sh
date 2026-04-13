@@ -153,7 +153,7 @@ else
         error "Linux currently only supports x64 architecture. Your architecture: $arch"
     fi
     platform="linux-${arch}"
-    APP_NAME="Craft-Agents-x64.AppImage"
+    APP_NAME="DataPilot-x64.AppImage"
     INSTALL_DIR="$HOME/.local/bin"
     ext="AppImage"
     yml_file="latest-linux.yml"
@@ -202,7 +202,7 @@ fi
 
 # Use default filename if not found
 if [ -z "$filename" ]; then
-    filename="Craft-Agents-${arch}.${ext}"
+    filename="DataPilot-${arch}.${ext}"
 fi
 
 info "Expected sha512: ${checksum:0:20}..."
@@ -242,7 +242,7 @@ if [ "$OS_TYPE" = "darwin" ]; then
     zip_path="$installer_path"
 
     # Quit the app if it's running (use bundle ID for reliability)
-    APP_BUNDLE_ID="com.lukilabs.craft-agent"
+    APP_BUNDLE_ID="com.datapilot.app"
     if pgrep -x "DataPilot" >/dev/null 2>&1; then
         info "Quitting DataPilot..."
         osascript -e "tell application id \"$APP_BUNDLE_ID\" to quit" 2>/dev/null || true
@@ -317,13 +317,13 @@ else
 
     # New paths
     APP_DIR="$HOME/.datapilot/app"
-    WRAPPER_PATH="$INSTALL_DIR/craft-agents"
-    APPIMAGE_INSTALL_PATH="$APP_DIR/Craft-Agents-x64.AppImage"
+    WRAPPER_PATH="$INSTALL_DIR/datapilot"
+    APPIMAGE_INSTALL_PATH="$APP_DIR/DataPilot-x64.AppImage"
 
     # Kill the app if it's running
-    if pgrep -f "Craft-Agent.*AppImage" >/dev/null 2>&1; then
+    if pgrep -f "DataPilot.*AppImage" >/dev/null 2>&1; then
         info "Stopping DataPilot..."
-        pkill -f "Craft-Agent.*AppImage" 2>/dev/null || true
+        pkill -f "DataPilot.*AppImage" 2>/dev/null || true
         sleep 2
     fi
 
@@ -345,7 +345,7 @@ else
 #!/bin/bash
 # DataPilot launcher - handles Linux-specific AppImage issues
 
-APPIMAGE_PATH="$HOME/.datapilot/app/Craft-Agents-x64.AppImage"
+APPIMAGE_PATH="$HOME/.datapilot/app/DataPilot-x64.AppImage"
 ELECTRON_CACHE="$HOME/.config/@datapilot"
 ELECTRON_CACHE_ALT="$HOME/.cache/@datapilot"
 
