@@ -108,10 +108,10 @@ mac:
         - "!vendor/ripgrep/arm64-linux/**"
         - "!vendor/ripgrep/x64-linux/**"
         - "!vendor/ripgrep/x64-win32/**"
-    # better-sqlite3 is hoisted to the repo root by bun; copy it into the bundle so
-    # runtime require('better-sqlite3') resolves. The build script places it under
-    # apps/electron/node_modules/ before electron-builder runs, so @electron/rebuild
-    # compiles the .node binary against Electron's ABI.
+    # better-sqlite3 is hoisted to the repo root by bun; stage it into
+    # apps/electron/node_modules/ before electron-builder runs so runtime
+    # require('better-sqlite3') resolves and @electron/rebuild can compile the
+    # .node binary against Electron's ABI.
     - from: node_modules/better-sqlite3
       to: app/node_modules/better-sqlite3
       filter:
@@ -122,7 +122,7 @@ mac:
         - "!build/Release/obj.target/**"
         - "!build/Release/.deps/**"
     # better-sqlite3 runtime deps (require'd by lib/database.js at load time).
-    # Keep in sync with NATIVE_MODULE_DEPS in scripts/build-dmg.sh.
+    # Keep in sync with scripts/electron-stage-runtime-deps.ts.
     - from: node_modules/bindings
       to: app/node_modules/bindings
     - from: node_modules/file-uri-to-path

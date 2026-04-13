@@ -85,42 +85,10 @@ if [ "$UPLOAD" = true ]; then
     echo "Will upload to S3 after build"
 fi
 
-# Packages that need to be physically present under apps/electron/node_modules/
-# at runtime — esbuild can't bundle them away. Two reasons land things here:
-#
-#   1. Native modules whose .node binary must be loaded by Electron.
-#      better-sqlite3 is the real one; bindings + file-uri-to-path are its
-#      JS-level helpers that locate the .node file.
-#
-#   2. Packages that ajv compiles into runtime-eval'd validator strings
-#      ('require("ajv/dist/runtime/equal").default' etc.). These references
-#      only execute when the validator runs, so esbuild can't follow them and
-#      they have to resolve from disk. ajv-formats has the same trick for its
-#      formats helper. Triggered by session-tools-core/handlers/batch-output.ts
-#      whenever the LLM-supplied schema uses enum / format / minLength / $async.
-#
-# Add new entries here if more transitive deps surface.
-NATIVE_MODULE_DEPS=(
-    # better-sqlite3 + helpers
-    "better-sqlite3"
-    "bindings"
-    "file-uri-to-path"
-    # ajv (and its runtime-eval'd deps)
-    "ajv"
-    "ajv-formats"
-    "fast-deep-equal"
-    "fast-uri"
-    "json-schema-traverse"
-    "require-from-string"
-)
-
 # 1. Clean previous build artifacts
 echo "Cleaning previous builds..."
 rm -rf "$ELECTRON_DIR/vendor"
-rm -rf "$ELECTRON_DIR/node_modules/@anthropic-ai"
-for mod in "${NATIVE_MODULE_DEPS[@]}"; do
-    rm -rf "$ELECTRON_DIR/node_modules/$mod"
-done
+rm -rf "$ELECTRON_DIR/node_modules"
 rm -rf "$ELECTRON_DIR/packages"
 rm -rf "$ELECTRON_DIR/release"
 
@@ -153,29 +121,12 @@ unzip -o "$TEMP_DIR/${BUN_DOWNLOAD}.zip" -d "$TEMP_DIR"
 cp "$TEMP_DIR/${BUN_DOWNLOAD}/bun" "$ELECTRON_DIR/vendor/bun/"
 chmod +x "$ELECTRON_DIR/vendor/bun/bun"
 
-# 4. Copy SDK from root node_modules (monorepo hoisting)
-# Note: The SDK is hoisted to root node_modules by the package manager.
-# We copy it here because electron-builder only sees apps/electron/.
-SDK_SOURCE="$ROOT_DIR/node_modules/@anthropic-ai/claude-agent-sdk"
-require_path "$SDK_SOURCE" "SDK" "Run 'bun install' from the repository root first."
-echo "Copying SDK..."
-mkdir -p "$ELECTRON_DIR/node_modules/@anthropic-ai"
-cp -r "$SDK_SOURCE" "$ELECTRON_DIR/node_modules/@anthropic-ai/"
-
-# 4b. Copy NATIVE_MODULE_DEPS from root node_modules.
-# Same reason as the SDK above: bun hoists them to the repo root, but
-# electron-builder only looks inside apps/electron/. Placing better-sqlite3
-# here also lets @electron/rebuild (invoked by electron-builder) compile its
-# .node binary against Electron's ABI — the prebuilt binary from bun install
-# is built for Node.js and will fail to load inside Electron. The ajv group
-# is needed because ajv-generated validators resolve require() from disk.
-mkdir -p "$ELECTRON_DIR/node_modules"
-for mod in "${NATIVE_MODULE_DEPS[@]}"; do
-    SRC="$ROOT_DIR/node_modules/$mod"
-    require_path "$SRC" "$mod" "Run 'bun install' from the repository root first."
-    echo "Copying $mod..."
-    cp -r "$SRC" "$ELECTRON_DIR/node_modules/"
-done
+# 4. Stage runtime dependencies into apps/electron/node_modules.
+# Single source of truth for packaged Electron runtime deps used by root scripts,
+# platform build scripts, and CI release builds.
+echo "Staging Electron runtime dependencies..."
+cd "$ROOT_DIR"
+bun run scripts/electron-stage-runtime-deps.ts
 
 # 5. Copy interceptor
 INTERCEPTOR_SOURCE="$ROOT_DIR/packages/shared/src/unified-network-interceptor.ts"

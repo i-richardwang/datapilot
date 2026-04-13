@@ -73,7 +73,7 @@ fi
 # 1. Clean previous build artifacts
 echo "Cleaning previous builds..."
 rm -rf "$ELECTRON_DIR/vendor"
-rm -rf "$ELECTRON_DIR/node_modules/@anthropic-ai"
+rm -rf "$ELECTRON_DIR/node_modules"
 rm -rf "$ELECTRON_DIR/packages"
 rm -rf "$ELECTRON_DIR/release"
 
@@ -113,14 +113,12 @@ unzip -o "$TEMP_DIR/${BUN_DOWNLOAD}.zip" -d "$TEMP_DIR"
 cp "$TEMP_DIR/${BUN_DOWNLOAD}/bun" "$ELECTRON_DIR/vendor/bun/"
 chmod +x "$ELECTRON_DIR/vendor/bun/bun"
 
-# 4. Copy SDK from root node_modules (monorepo hoisting)
-# Note: The SDK is hoisted to root node_modules by the package manager.
-# We copy it here because electron-builder only sees apps/electron/.
-SDK_SOURCE="$ROOT_DIR/node_modules/@anthropic-ai/claude-agent-sdk"
-require_path "$SDK_SOURCE" "SDK" "Run 'bun install' from the repository root first."
-echo "Copying SDK..."
-mkdir -p "$ELECTRON_DIR/node_modules/@anthropic-ai"
-cp -r "$SDK_SOURCE" "$ELECTRON_DIR/node_modules/@anthropic-ai/"
+# 4. Stage runtime dependencies into apps/electron/node_modules.
+# Single source of truth for packaged Electron runtime deps used by root scripts,
+# platform build scripts, and CI release builds.
+echo "Staging Electron runtime dependencies..."
+cd "$ROOT_DIR"
+bun run scripts/electron-stage-runtime-deps.ts
 
 # 5. Copy interceptor
 INTERCEPTOR_SOURCE="$ROOT_DIR/packages/shared/src/unified-network-interceptor.ts"
