@@ -1,7 +1,7 @@
 /**
  * Batch commands — 10 actions
  *
- * Storage: Filesystem JSON (batches.json) + batch state files
+ * Storage: batches.json for config + workspace.db for runtime state
  */
 
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs'

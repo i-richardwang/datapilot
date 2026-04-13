@@ -42,10 +42,9 @@ async function main(): Promise<void> {
   // Resolve workspace
   const workspaceRoot = resolveWorkspaceRoot(strFlag(flags, 'workspace-root'))
 
-  // Initialize DB (batch is filesystem-only, skip for it)
-  if (entity !== 'batch') {
-    await ensureDb()
-  }
+  // Initialize DB-backed storage used by CLI domains.
+  // Batch config lives in batches.json, but batch state/status live in workspace.db.
+  await ensureDb()
 
   switch (entity) {
     case 'label':
