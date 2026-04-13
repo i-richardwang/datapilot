@@ -1,17 +1,19 @@
 import { debug } from "../utils/debug";
 
-const VERSIONS_URL = 'https://agents.craft.do/electron';
+const GITHUB_REPO = 'i-richardwang/craft-agents-oss';
 
 export async function getLatestVersion(): Promise<string | null> {
     try {
-      const response = await fetch(`${VERSIONS_URL}/latest`);
+      const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+        headers: { 'Accept': 'application/vnd.github.v3+json' },
+      });
       const data = await response.json();
-      const version = (data as { version?: string }).version;
-      if (typeof version !== 'string') {
-        debug('[manifest] Latest version is not a valid string');
+      const tagName = (data as { tag_name?: string }).tag_name;
+      if (typeof tagName !== 'string') {
+        debug('[manifest] Latest version tag_name is not a valid string');
         return null;
       }
-      return version ?? null;
+      return tagName.replace(/^v/, '') ?? null;
     } catch (error) {
       debug(`[manifest] Failed to get latest version: ${error}`);
     }
@@ -20,7 +22,7 @@ export async function getLatestVersion(): Promise<string | null> {
 
 export async function getManifest(version: string): Promise<VersionManifest | null> {
     try {
-        const url = `${VERSIONS_URL}/${version}/manifest.json`;
+        const url = `https://github.com/${GITHUB_REPO}/releases/download/v${version}/manifest.json`;
         debug(`[manifest] Getting manifest for version: ${url}`);
         const response = await fetch(url);
         const data = await response.json();

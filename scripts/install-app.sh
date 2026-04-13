@@ -2,7 +2,8 @@
 
 set -e
 
-VERSIONS_URL="https://agents.craft.do/electron"
+GITHUB_REPO="i-richardwang/craft-agents-oss"
+GITHUB_RELEASES_URL="https://github.com/$GITHUB_REPO/releases"
 DOWNLOAD_DIR="$HOME/.datapilot/downloads"
 
 # Colors for output
@@ -166,7 +167,7 @@ mkdir -p "$INSTALL_DIR"
 
 # Fetch YAML manifest directly from /electron/latest/ (no version endpoint needed)
 info "Fetching release info..."
-manifest_yaml=$(download_file "$VERSIONS_URL/latest/$yml_file")
+manifest_yaml=$(download_file "$GITHUB_RELEASES_URL/latest/download/$yml_file")
 
 if [ -z "$manifest_yaml" ]; then
     error "Failed to fetch release info from $yml_file"
@@ -207,7 +208,7 @@ fi
 info "Expected sha512: ${checksum:0:20}..."
 
 # Download installer
-installer_url="$VERSIONS_URL/latest/$filename"
+installer_url="$GITHUB_RELEASES_URL/latest/download/$filename"
 installer_path="$DOWNLOAD_DIR/$filename"
 
 info "Downloading $filename..."
@@ -351,7 +352,7 @@ ELECTRON_CACHE_ALT="$HOME/.cache/@datapilot"
 # Verify AppImage exists
 if [ ! -f "$APPIMAGE_PATH" ]; then
     echo "Error: DataPilot not found at $APPIMAGE_PATH"
-    echo "Reinstall: curl -fsSL https://agents.craft.do/install-app.sh | bash"
+    echo "Reinstall: curl -fsSL https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/feature/datapilot-sqlite/scripts/install-app.sh | bash"
     exit 1
 fi
 

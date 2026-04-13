@@ -1,10 +1,11 @@
 # DataPilot Windows Installer
-# Usage: irm https://agents.craft.do/install-app.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/feature/datapilot-sqlite/scripts/install-app.ps1 | iex
 
 & {
 $ErrorActionPreference = "Stop"
 
-$VERSIONS_URL = "https://agents.craft.do/electron"
+$GITHUB_REPO = "i-richardwang/craft-agents-oss"
+$GITHUB_RELEASES_URL = "https://github.com/$GITHUB_REPO/releases"
 $DOWNLOAD_DIR = "$env:TEMP\craft-agent-install"
 $APP_NAME = "DataPilot"
 
@@ -33,7 +34,7 @@ New-Item -ItemType Directory -Force -Path $DOWNLOAD_DIR | Out-Null
 Write-Info "Fetching release info..."
 $yamlPath = Join-Path $DOWNLOAD_DIR "latest.yml"
 try {
-    Invoke-WebRequest -Uri "$VERSIONS_URL/latest/latest.yml" -OutFile $yamlPath -UseBasicParsing
+    Invoke-WebRequest -Uri "$GITHUB_RELEASES_URL/latest/download/latest.yml" -OutFile $yamlPath -UseBasicParsing
 } catch {
     Write-Err "Failed to fetch release info: $_"
 }
@@ -111,7 +112,7 @@ if (-not $filename) {
     $filename = "Craft-Agents-$arch.exe"
 }
 
-$installerUrl = "$VERSIONS_URL/latest/$filename"
+$installerUrl = "$GITHUB_RELEASES_URL/latest/download/$filename"
 
 Write-Info "Expected sha512: $($checksum.Substring(0, 20))..."
 
