@@ -75,6 +75,7 @@ publish:
   provider: github
   owner: i-richardwang
   repo: craft-agents-oss
+  releaseType: release
 
 # Disable ASAR to avoid decompression overhead and click delays
 asar: false
