@@ -4,7 +4,7 @@
 
 An open-source, agent-native workflow platform specialized for data analysis. Built on [Craft Agents](https://github.com/lukilabs/craft-agents-oss), DataPilot supports intuitive interaction with AI agents (Claude, GPT, Gemini, etc.), multi-session management, MCP service connections, custom skills, and document-centric workflows.
 
-<img width="1578" height="894" alt="DataPilot Screenshot" src="https://github.com/user-attachments/assets/3f1f2fe8-7cf6-4487-99ff-76f6c8c0a3fb" />
+<img alt="DataPilot Screenshot" src="docs/screenshot.png" />
 
 ## Features
 
