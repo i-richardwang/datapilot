@@ -1,14 +1,14 @@
 import { readFile, writeFile } from 'fs/promises'
-import { join } from 'path'
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { getWorkspaceByNameOrId } from '@craft-agent/shared/config'
 import { appendAutomationHistoryEntry } from '@craft-agent/shared/automations'
 import { AUTOMATION_HISTORY_MAX_RUNS_PER_MATCHER } from '@craft-agent/shared/automations/constants'
+import { getWorkspaceDb } from '@craft-agent/shared/db'
+import { automationHistory } from '@craft-agent/shared/db/schema/automations.sql'
+import { eq, desc } from 'drizzle-orm'
 import type { RpcServer } from '@craft-agent/server-core/transport'
 import type { HandlerDeps } from '../handler-deps'
 
-// History file name — matches AUTOMATIONS_HISTORY_FILE from @craft-agent/shared/automations/constants
-const HISTORY_FILE = 'automations-history.jsonl'
 interface HistoryEntry { id: string; ts: number; ok: boolean; sessionId?: string; prompt?: string; error?: string; webhook?: { method: string; url: string; statusCode: number; durationMs: number; attempts?: number; error?: string; responseBody?: string } }
 
 // Per-workspace config mutex: serializes read-modify-write cycles on automations.json
@@ -237,18 +237,18 @@ export function registerAutomationsHandlers(server: RpcServer, deps: HandlerDeps
     if (!workspace) throw new Error('Workspace not found')
 
     const clampedLimit = Math.max(1, Math.min(limit, AUTOMATION_HISTORY_MAX_RUNS_PER_MATCHER))
-    const historyPath = join(workspace.rootPath, HISTORY_FILE)
     try {
-      const content = await readFile(historyPath, 'utf-8')
-      const lines = content.trim().split('\n').filter(Boolean)
+      const db = getWorkspaceDb(workspace.rootPath)
+      const rows = db.select({ entry: automationHistory.entry })
+        .from(automationHistory)
+        .where(eq(automationHistory.automationId, automationId))
+        .orderBy(desc(automationHistory.createdAt))
+        .limit(clampedLimit)
+        .all()
 
-      return lines
-        .map(line => { try { return JSON.parse(line) } catch { return null } })
-        .filter((e): e is HistoryEntry => e?.id === automationId)
-        .slice(-clampedLimit)
-        .reverse()
+      return rows.map(r => r.entry as HistoryEntry)
     } catch {
-      return [] // File doesn't exist yet
+      return []
     }
   })
 
@@ -302,15 +302,16 @@ export function registerAutomationsHandlers(server: RpcServer, deps: HandlerDeps
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (!workspace) throw new Error('Workspace not found')
 
-    const historyPath = join(workspace.rootPath, HISTORY_FILE)
     try {
-      const content = await readFile(historyPath, 'utf-8')
+      const db = getWorkspaceDb(workspace.rootPath)
+      const rows = db.select({ entry: automationHistory.entry })
+        .from(automationHistory)
+        .all()
+
       const result: Record<string, number> = {}
-      for (const line of content.trim().split('\n')) {
-        try {
-          const entry = JSON.parse(line)
-          if (entry.id && entry.ts) result[entry.id] = entry.ts
-        } catch { /* skip malformed lines */ }
+      for (const row of rows) {
+        const entry = row.entry as HistoryEntry
+        if (entry.id && entry.ts) result[entry.id] = entry.ts
       }
       return result
     } catch {
