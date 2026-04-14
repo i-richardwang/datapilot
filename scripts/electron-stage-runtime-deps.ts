@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 const ROOT_DIR = join(import.meta.dir, '..')
@@ -47,3 +47,31 @@ for (const packageName of RUNTIME_PACKAGES) {
 }
 
 console.log(`${isDryRun ? 'Checked' : 'Prepared'} Electron runtime dependency staging`)
+
+// Rebuild native modules (better-sqlite3) against the Electron ABI.
+// Without this, the .node binary is compiled for the system Node.js which has a
+// different NODE_MODULE_VERSION than Electron's built-in Node.js.
+// We use @electron/rebuild's programmatic API (the official Electron tool for this)
+// with an explicit buildPath to target the staged apps/electron/ directory.
+if (!isDryRun) {
+  const { rebuild } = await import('@electron/rebuild')
+  const electronPkg = JSON.parse(
+    readFileSync(join(ROOT_DIR, 'node_modules', 'electron', 'package.json'), 'utf-8'),
+  )
+  const electronVersion: string = electronPkg.version
+
+  // Use ELECTRON_REBUILD_ARCH env var if set (e.g. by CI or build-dmg.sh for
+  // cross-compilation), otherwise default to the current system architecture.
+  const arch = process.env.ELECTRON_REBUILD_ARCH ?? process.arch
+
+  console.log(`Rebuilding native modules for Electron ${electronVersion} (${arch})...`)
+  await rebuild({
+    buildPath: ELECTRON_DIR,
+    electronVersion,
+    arch,
+    onlyModules: ['better-sqlite3'],
+    force: true,
+  })
+
+  console.log('Native modules rebuilt for Electron')
+}

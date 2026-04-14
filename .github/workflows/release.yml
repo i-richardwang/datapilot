@@ -23,7 +23,10 @@ jobs:
         include:
           - os: macos-latest
             platform: mac
-            arch: "arm64 --x64"
+            arch: arm64
+          - os: macos-latest
+            platform: mac
+            arch: x64
           - os: windows-latest
             platform: win
             arch: x64
@@ -57,6 +60,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          ELECTRON_REBUILD_ARCH: ${{ matrix.arch }}
         run: |
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             bun run electron:dist --${{ matrix.platform }} --${{ matrix.arch }} --publish never

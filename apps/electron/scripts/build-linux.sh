@@ -118,7 +118,7 @@ chmod +x "$ELECTRON_DIR/vendor/bun/bun"
 # platform build scripts, and CI release builds.
 echo "Staging Electron runtime dependencies..."
 cd "$ROOT_DIR"
-bun run scripts/electron-stage-runtime-deps.ts
+ELECTRON_REBUILD_ARCH="$ARCH" bun run scripts/electron-stage-runtime-deps.ts
 
 # 5. Copy interceptor
 INTERCEPTOR_SOURCE="$ROOT_DIR/packages/shared/src/unified-network-interceptor.ts"
