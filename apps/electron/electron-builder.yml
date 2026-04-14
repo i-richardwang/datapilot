@@ -74,7 +74,7 @@ extraMetadata:
 publish:
   provider: github
   owner: i-richardwang
-  repo: craft-agents-oss
+  repo: datapilot
   releaseType: release
 
 # Disable ASAR to avoid decompression overhead and click delays

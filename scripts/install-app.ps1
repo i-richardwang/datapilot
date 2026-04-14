@@ -1,10 +1,10 @@
 # DataPilot Windows Installer
-# Usage: irm https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/scripts/install-app.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/i-richardwang/datapilot/main/scripts/install-app.ps1 | iex
 
 & {
 $ErrorActionPreference = "Stop"
 
-$GITHUB_REPO = "i-richardwang/craft-agents-oss"
+$GITHUB_REPO = "i-richardwang/datapilot"
 $GITHUB_RELEASES_URL = "https://github.com/$GITHUB_REPO/releases"
 $DOWNLOAD_DIR = "$env:TEMP\craft-agent-install"
 $APP_NAME = "DataPilot"

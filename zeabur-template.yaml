@@ -5,7 +5,7 @@ metadata:
     name: DataPilot
 spec:
     description: "DataPilot is an open-source, agent-native workflow platform specialized for data analysis. DataPilot features multi-session management, MCP service connections, custom skills, and document-centric workflows."
-    icon: https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/apps/electron/resources/icon.svg
+    icon: https://raw.githubusercontent.com/i-richardwang/datapilot/main/apps/electron/resources/icon.svg
     tags:
         - AI
         - Agent
@@ -34,7 +34,7 @@ spec:
         4. Start creating agent sessions and workflows
 
         ## Documentation
-        - GitHub: https://github.com/i-richardwang/craft-agents-oss
+        - GitHub: https://github.com/i-richardwang/datapilot
     variables:
         - key: DATAPILOT_WEBUI_WS_URL
           type: STRING
@@ -46,12 +46,12 @@ spec:
           description: "Public URL of the Viewer service (e.g. https://viewer-xxx.zeabur.app). Required for session sharing to work correctly."
     services:
         - name: server
-          icon: https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/apps/electron/resources/icon.svg
+          icon: https://raw.githubusercontent.com/i-richardwang/datapilot/main/apps/electron/resources/icon.svg
           template: GIT
           spec:
             source:
                 source: GITHUB
-                repo: 1172467685
+                repo: 1210193664
                 branch: main
                 dockerfile: Dockerfile.server
             ports:
@@ -80,14 +80,14 @@ spec:
                     default: "1"
 
         - name: viewer
-          icon: https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/apps/electron/resources/icon.svg
+          icon: https://raw.githubusercontent.com/i-richardwang/datapilot/main/apps/electron/resources/icon.svg
           template: GIT
           dependencies:
             - server
           spec:
             source:
                 source: GITHUB
-                repo: 1172467685
+                repo: 1210193664
                 branch: main
                 dockerfile: Dockerfile.viewer
             ports:

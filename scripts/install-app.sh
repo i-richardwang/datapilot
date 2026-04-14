@@ -2,7 +2,7 @@
 
 set -e
 
-GITHUB_REPO="i-richardwang/craft-agents-oss"
+GITHUB_REPO="i-richardwang/datapilot"
 GITHUB_RELEASES_URL="https://github.com/$GITHUB_REPO/releases"
 DOWNLOAD_DIR="$HOME/.datapilot/downloads"
 
@@ -364,7 +364,7 @@ ELECTRON_CACHE_ALT="$HOME/.cache/@datapilot"
 # Verify AppImage exists
 if [ ! -f "$APPIMAGE_PATH" ]; then
     echo "Error: DataPilot not found at $APPIMAGE_PATH"
-    echo "Reinstall: curl -fsSL https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/scripts/install-app.sh | bash"
+    echo "Reinstall: curl -fsSL https://raw.githubusercontent.com/i-richardwang/datapilot/main/scripts/install-app.sh | bash"
     exit 1
 fi
 

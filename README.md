@@ -26,23 +26,23 @@ An open-source, agent-native workflow platform specialized for data analysis. Bu
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/scripts/install-app.sh | bash
+curl -fsSL https://raw.githubusercontent.com/i-richardwang/datapilot/main/scripts/install-app.sh | bash
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/scripts/install-app.ps1 | iex
+irm https://raw.githubusercontent.com/i-richardwang/datapilot/main/scripts/install-app.ps1 | iex
 ```
 
 ### Download from Releases
 
-Pre-built binaries for macOS (arm64/x64), Windows (x64), and Linux (x64) are available on the [Releases](https://github.com/i-richardwang/craft-agents-oss/releases) page.
+Pre-built binaries for macOS (arm64/x64), Windows (x64), and Linux (x64) are available on the [Releases](https://github.com/i-richardwang/datapilot/releases) page.
 
 ### Build from Source
 
 ```bash
-git clone https://github.com/i-richardwang/craft-agents-oss.git
-cd craft-agents-oss
+git clone https://github.com/i-richardwang/datapilot.git
+cd datapilot
 bun install
 bun run electron:start
 ```
@@ -73,7 +73,7 @@ docker run -d \
   -e DATAPILOT_SERVER_TOKEN=<token> \
   -e DATAPILOT_RPC_HOST=0.0.0.0 \
   -v datapilot-data:/home/craftagents/.datapilot \
-  ghcr.io/i-richardwang/craft-agents-oss:latest
+  ghcr.io/i-richardwang/datapilot:latest
 ```
 
 ### One-Click Cloud Deploy

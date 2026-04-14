@@ -1,6 +1,6 @@
 import { debug } from "../utils/debug";
 
-const GITHUB_REPO = 'i-richardwang/craft-agents-oss';
+const GITHUB_REPO = 'i-richardwang/datapilot';
 
 export async function getLatestVersion(): Promise<string | null> {
     try {
