@@ -77,9 +77,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Configuration
-BUN_VERSION="bun-v1.3.9"  # Pinned version for reproducible builds
-
 echo "=== Building DataPilot DMG (${ARCH}) using electron-builder ==="
 if [ "$UPLOAD" = true ]; then
     echo "Will upload to S3 after build"
@@ -97,56 +94,19 @@ echo "Installing dependencies..."
 cd "$ROOT_DIR"
 bun install
 
-# 3. Download Bun binary with checksum verification
-echo "Downloading Bun ${BUN_VERSION} for darwin-${ARCH}..."
-mkdir -p "$ELECTRON_DIR/vendor/bun"
-BUN_DOWNLOAD="bun-darwin-$([ "$ARCH" = "arm64" ] && echo "aarch64" || echo "x64")"
-
-# Create temp directory to avoid race conditions
-TEMP_DIR=$(mktemp -d)
-trap "rm -rf $TEMP_DIR" EXIT
-
-# Download binary and checksums
-curl -fSL "https://github.com/oven-sh/bun/releases/download/${BUN_VERSION}/${BUN_DOWNLOAD}.zip" -o "$TEMP_DIR/${BUN_DOWNLOAD}.zip"
-curl -fSL "https://github.com/oven-sh/bun/releases/download/${BUN_VERSION}/SHASUMS256.txt" -o "$TEMP_DIR/SHASUMS256.txt"
-
-# Verify checksum
-echo "Verifying checksum..."
-cd "$TEMP_DIR"
-grep "${BUN_DOWNLOAD}.zip" SHASUMS256.txt | shasum -a 256 -c -
-cd - > /dev/null
-
-# Extract and install
-unzip -o "$TEMP_DIR/${BUN_DOWNLOAD}.zip" -d "$TEMP_DIR"
-cp "$TEMP_DIR/${BUN_DOWNLOAD}/bun" "$ELECTRON_DIR/vendor/bun/"
-chmod +x "$ELECTRON_DIR/vendor/bun/bun"
-
-# 4. Stage runtime dependencies into apps/electron/node_modules.
-# Single source of truth for packaged Electron runtime deps used by root scripts,
-# platform build scripts, and CI release builds.
+# 3. Stage all runtime dependencies (node_modules, MCP servers, CLI, interceptor, Bun binary).
+# Single source of truth: scripts/electron-stage-runtime-deps.ts handles everything
+# including downloading and verifying the Bun runtime binary.
 echo "Staging Electron runtime dependencies..."
 cd "$ROOT_DIR"
 ELECTRON_REBUILD_ARCH="$ARCH" bun run scripts/electron-stage-runtime-deps.ts
 
-# 5. Copy interceptor
-INTERCEPTOR_SOURCE="$ROOT_DIR/packages/shared/src/unified-network-interceptor.ts"
-require_path "$INTERCEPTOR_SOURCE" "Interceptor" "Ensure packages/shared/src/unified-network-interceptor.ts exists."
-echo "Copying interceptor..."
-mkdir -p "$ELECTRON_DIR/packages/shared/src"
-cp "$INTERCEPTOR_SOURCE" "$ELECTRON_DIR/packages/shared/src/"
-# Also copy dependencies imported by the interceptor at runtime
-for dep in interceptor-common.ts feature-flags.ts interceptor-request-utils.ts; do
-  if [ -f "$ROOT_DIR/packages/shared/src/$dep" ]; then
-    cp "$ROOT_DIR/packages/shared/src/$dep" "$ELECTRON_DIR/packages/shared/src/"
-  fi
-done
-
-# 6. Build Electron app
+# 4. Build Electron app
 echo "Building Electron app..."
 cd "$ROOT_DIR"
 bun run electron:build
 
-# 7. Package with electron-builder
+# 5. Package with electron-builder
 echo "Packaging app with electron-builder..."
 cd "$ELECTRON_DIR"
 
@@ -180,7 +140,7 @@ fi
 # Run electron-builder
 npx electron-builder $BUILDER_ARGS
 
-# 8. Verify the DMG was built
+# 6. Verify the DMG was built
 # electron-builder.yml uses artifactName to output: DataPilot-${arch}.dmg
 DMG_NAME="DataPilot-${ARCH}.dmg"
 DMG_PATH="$ELECTRON_DIR/release/$DMG_NAME"
@@ -197,14 +157,14 @@ echo "=== Build Complete ==="
 echo "DMG: $ELECTRON_DIR/release/${DMG_NAME}"
 echo "Size: $(du -h "$ELECTRON_DIR/release/${DMG_NAME}" | cut -f1)"
 
-# 9. Create manifest.json for upload script
+# 7. Create manifest.json for upload script
 # Read version from package.json
 ELECTRON_VERSION=$(cat "$ELECTRON_DIR/package.json" | grep '"version"' | head -1 | sed 's/.*"version": *"\([^"]*\)".*/\1/')
 echo "Creating manifest.json (version: $ELECTRON_VERSION)..."
 mkdir -p "$ROOT_DIR/.build/upload"
 echo "{\"version\": \"$ELECTRON_VERSION\"}" > "$ROOT_DIR/.build/upload/manifest.json"
 
-# 10. Upload to S3 (if --upload flag is set)
+# 8. Upload to S3 (if --upload flag is set)
 if [ "$UPLOAD" = true ]; then
     echo ""
     echo "=== Uploading to S3 ==="
