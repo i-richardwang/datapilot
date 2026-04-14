@@ -27,7 +27,10 @@ import { getWorkspaceSourcesPath, getWorkspaceSkillsPath } from '../workspaces/s
 import { loadSourceConfig, getSourcePath } from '../sources/storage.db.ts'
 import { isBuiltinSource } from '../sources/builtin-sources.ts'
 import { validateSourceConfig } from '../config/validators.ts'
-import { AUTOMATIONS_CONFIG_FILE, AUTOMATIONS_HISTORY_FILE, AUTOMATIONS_RETRY_QUEUE_FILE } from '../automations/constants.ts'
+import { AUTOMATIONS_CONFIG_FILE, AUTOMATIONS_RETRY_QUEUE_FILE } from '../automations/constants.ts'
+import { getWorkspaceDb } from '../db/connection.ts'
+import { automationHistory } from '../db/schema/automations.sql.ts'
+import { inArray } from 'drizzle-orm'
 import { validateAutomationsConfig } from '../automations/validation.ts'
 import { generateShortId } from '../automations/resolve-config-path.ts'
 import { VALID_EVENTS } from '../automations/schemas.ts'
@@ -994,9 +997,16 @@ function importAutomations(
 
   // Selectively clear history + retry queue for overwritten matcher IDs
   if (overwrittenIds.size > 0) {
-    const historyPath = join(workspaceRootPath, AUTOMATIONS_HISTORY_FILE)
+    // History: delete from SQLite
+    try {
+      const db = getWorkspaceDb(workspaceRootPath)
+      db.delete(automationHistory)
+        .where(inArray(automationHistory.automationId, [...overwrittenIds]))
+        .run()
+    } catch { /* Non-critical: cleanup failure doesn't block import */ }
+
+    // Retry queue: still JSONL file (not yet migrated to SQLite)
     const retryPath = join(workspaceRootPath, AUTOMATIONS_RETRY_QUEUE_FILE)
-    filterJsonlByMatcherIds(historyPath, overwrittenIds)
     filterJsonlByMatcherIds(retryPath, overwrittenIds)
     result.warnings.push(`Cleared history/retry entries for ${overwrittenIds.size} overwritten automation(s)`)
   }
