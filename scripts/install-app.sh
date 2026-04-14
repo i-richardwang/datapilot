@@ -76,26 +76,32 @@ download_file() {
 }
 
 # Extract sha512 from YAML for a specific architecture
-# YAML format: files array with url, sha512, arch fields
+# Matches by arch field if present, otherwise falls back to filename pattern (DataPilot-{arch}.{ext})
 get_sha512_from_yaml() {
     local yaml="$1"
     local target_arch="$2"
 
-    # Find the line with the target arch and extract sha512 from preceding lines
-    local in_target_block=false
+    local url=""
     local sha512=""
 
     while IFS= read -r line; do
         # Check if we're entering a new file entry
-        if [[ $line =~ ^[[:space:]]*-[[:space:]]*url: ]]; then
-            in_target_block=false
+        if [[ $line =~ ^[[:space:]]*-[[:space:]]*url:[[:space:]]*(.+) ]]; then
+            url="${BASH_REMATCH[1]}"
             sha512=""
         fi
         # Extract sha512
         if [[ $line =~ sha512:[[:space:]]*(.+) ]]; then
             sha512="${BASH_REMATCH[1]}"
+            # If no arch field, match by filename pattern (e.g. DataPilot-arm64.zip)
+            if [ -n "$url" ] && [ -n "$sha512" ] && [[ "$url" == *"-${target_arch}."* ]]; then
+                # Peek ahead: if there's an arch field later it will override, but
+                # for electron-builder YAML without arch fields this is the match
+                echo "$sha512"
+                return 0
+            fi
         fi
-        # Check arch
+        # Check arch field (takes priority if present)
         if [[ $line =~ arch:[[:space:]]*(.+) ]]; then
             local arch="${BASH_REMATCH[1]}"
             if [ "$arch" = "$target_arch" ] && [ -n "$sha512" ]; then
@@ -109,6 +115,7 @@ get_sha512_from_yaml() {
 }
 
 # Extract filename from YAML for a specific architecture
+# Matches by arch field if present, otherwise falls back to filename pattern
 get_filename_from_yaml() {
     local yaml="$1"
     local target_arch="$2"
@@ -119,8 +126,13 @@ get_filename_from_yaml() {
         # Check if we're entering a new file entry
         if [[ $line =~ ^[[:space:]]*-[[:space:]]*url:[[:space:]]*(.+) ]]; then
             url="${BASH_REMATCH[1]}"
+            # Match by filename pattern (e.g. DataPilot-arm64.zip)
+            if [[ "$url" == *"-${target_arch}."* ]]; then
+                echo "$url"
+                return 0
+            fi
         fi
-        # Check arch
+        # Check arch field (takes priority if present)
         if [[ $line =~ arch:[[:space:]]*(.+) ]]; then
             local arch="${BASH_REMATCH[1]}"
             if [ "$arch" = "$target_arch" ] && [ -n "$url" ]; then

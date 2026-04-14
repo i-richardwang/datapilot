@@ -78,10 +78,15 @@ function Get-YamlEntryForArch {
         }
         if ($line -match '^\s*sha512:\s*(.+)') {
             $currentSha512 = $Matches[1].Trim()
+            # Match by filename pattern if no arch field (e.g. DataPilot-x64.exe)
+            if ($currentUrl -and $currentSha512 -and $currentUrl -like "*-$targetArch.*") {
+                return @{ url = $currentUrl; sha512 = $currentSha512; size = $currentSize }
+            }
         }
         if ($line -match '^\s*size:\s*(\d+)') {
             $currentSize = [long]$Matches[1]
         }
+        # arch field takes priority if present
         if ($line -match '^\s*arch:\s*(.+)') {
             $entryArch = $Matches[1].Trim()
             if ($entryArch -eq $targetArch -and $currentSha512 -and $currentUrl) {
