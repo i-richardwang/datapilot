@@ -52,7 +52,7 @@ spec:
             source:
                 source: GITHUB
                 repo: 1172467685
-                branch: feature/datapilot-sqlite
+                branch: main
                 dockerfile: Dockerfile.server
             ports:
                 - id: web
@@ -88,7 +88,7 @@ spec:
             source:
                 source: GITHUB
                 repo: 1172467685
-                branch: feature/datapilot-sqlite
+                branch: main
                 dockerfile: Dockerfile.viewer
             ports:
                 - id: web

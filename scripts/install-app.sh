@@ -364,7 +364,7 @@ ELECTRON_CACHE_ALT="$HOME/.cache/@datapilot"
 # Verify AppImage exists
 if [ ! -f "$APPIMAGE_PATH" ]; then
     echo "Error: DataPilot not found at $APPIMAGE_PATH"
-    echo "Reinstall: curl -fsSL https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/feature/datapilot-sqlite/scripts/install-app.sh | bash"
+    echo "Reinstall: curl -fsSL https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/scripts/install-app.sh | bash"
     exit 1
 fi
 

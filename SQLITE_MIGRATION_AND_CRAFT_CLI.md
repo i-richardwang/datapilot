@@ -1,6 +1,6 @@
 # SQLite Migration & DataPilot CLI Guide
 
-> Records the storage migration from JSON files to SQLite and the DataPilot CLI implementation on branch `feature/sqlite-storage`.
+> Records the storage migration from JSON files to SQLite and the DataPilot CLI implementation on branch `feature/sqlite-storage` (archived as `archive/sqlite-storage`, merged into `main`).
 > Purpose: track what changed, why, and what to watch during future merges with upstream/main.
 >
 > **Last updated after:** datapilot CLI implementation + prompt fixes

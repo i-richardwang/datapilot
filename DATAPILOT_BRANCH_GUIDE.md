@@ -1,6 +1,6 @@
 # DataPilot Branch Guide
 
-> Branch: `feature/data-analysis-agent`
+> Branch: `feature/data-analysis-agent` (archived as `archive/data-analysis-agent`, merged into `main`)
 > Base: `main` (commit `1a3a98f`, includes upstream v0.8.1 merge)
 > Purpose: 将 Craft Agent 改造为面向数据分析场景的垂直 Agent — **DataPilot**
 >

@@ -1,5 +1,5 @@
 # DataPilot Windows Installer
-# Usage: irm https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/feature/datapilot-sqlite/scripts/install-app.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/i-richardwang/craft-agents-oss/main/scripts/install-app.ps1 | iex
 
 & {
 $ErrorActionPreference = "Stop"
