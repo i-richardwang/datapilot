@@ -425,10 +425,6 @@ export class BatchProcessor {
     if (!config) {
       throw new Error(`Batch "${batchId}" not found in configuration`)
     }
-    if (config.enabled === false) {
-      throw new Error(`Batch "${batchId}" is disabled`)
-    }
-
     // Load data source
     const items = loadBatchItems(config.source, this.options.workspaceRootPath)
     log.info(`[BatchProcessor] Loaded ${items.length} items from ${config.source.path} for batch "${batchId}"`)
@@ -722,8 +718,6 @@ export class BatchProcessor {
     if (!config) {
       throw new Error(`Batch "${batchId}" not found in configuration`)
     }
-    // Allow testing disabled batches — "enabled" controls auto-start, not testability
-
     // Load data source and sample
     const allItems = loadBatchItems(config.source, this.options.workspaceRootPath)
     const sampled = deterministicSample(allItems, Math.min(sampleSize, allItems.length), batchId)
@@ -856,9 +850,9 @@ function deterministicSample<T>(items: T[], n: number, seed: string): T[] {
 
 /**
  * Compute an MD5 hash of the batch config fields that affect execution.
- * Excludes `id` and `enabled` since those don't change how the batch runs.
+ * Excludes `id` since it doesn't change how the batch runs.
  */
 function computeConfigHash(config: BatchConfig): string {
-  const { id: _id, enabled: _enabled, ...rest } = config
+  const { id: _id, ...rest } = config
   return createHash('md5').update(JSON.stringify(rest)).digest('hex')
 }

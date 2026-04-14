@@ -1,5 +1,5 @@
 /**
- * Batch commands — 10 actions
+ * Batch commands — 8 actions
  *
  * Storage: batches.json for config + workspace.db for runtime state
  */
@@ -31,7 +31,7 @@ export function routeBatch(
 ): void {
   if (!action) ok({
     usage: 'datapilot batch <action> [args] [--flags]',
-    actions: ['list', 'get', 'create', 'update', 'delete', 'enable', 'disable', 'validate', 'status', 'retry'],
+    actions: ['list', 'get', 'create', 'update', 'delete', 'validate', 'status', 'retry'],
   })
 
   switch (action) {
@@ -40,8 +40,6 @@ export function routeBatch(
     case 'create': return cmdCreate(ws, flags)
     case 'update': return cmdUpdate(ws, positionals, flags)
     case 'delete': return cmdDelete(ws, positionals)
-    case 'enable': return cmdToggle(ws, positionals, true)
-    case 'disable': return cmdToggle(ws, positionals, false)
     case 'validate': return cmdValidate(ws)
     case 'status': return cmdStatus(ws, positionals, flags)
     case 'retry': return cmdRetry(ws, positionals)
@@ -139,7 +137,6 @@ function cmdList(ws: string): void {
     return {
       id: b.id ?? '',
       name: b.name,
-      enabled: b.enabled ?? true,
       status: state?.status ?? 'not started',
       total: progress?.totalItems ?? 0,
       completed: progress?.completedItems ?? 0,
@@ -199,7 +196,6 @@ function cmdCreate(
   const newBatch: BatchConfig = {
     id,
     name,
-    enabled: true,
     ...(workingDirectory ? { workingDirectory } : {}),
     source: { type: sourceType, path: source, idField },
     action: {
@@ -268,9 +264,6 @@ function buildPatchFromFlags(flags: Record<string, string | boolean | string[]>)
 
   const name = strFlag(flags, 'name')
   if (name !== undefined) patch.name = name
-
-  const enabled = boolFlag(flags, 'enabled')
-  if (enabled !== undefined) patch.enabled = enabled
 
   const wd = strFlag(flags, 'working-directory')
   if (wd !== undefined) patch.workingDirectory = wd || null
@@ -397,18 +390,7 @@ function cmdDelete(ws: string, positionals: string[]): void {
   ok({ deleted: batch.id ?? batch.name })
 }
 
-// ─── enable / disable ─────────��──────────────────────────────────────────────
-
-function cmdToggle(ws: string, positionals: string[], enabled: boolean): void {
-  const idOrName = requireId(positionals, enabled ? 'enable' : 'disable')
-  const config = loadConfig(ws)
-  const batch = requireBatch(config.batches, idOrName)
-
-  batch.enabled = enabled
-  saveConfig(ws, config)
-
-  ok({ id: batch.id, enabled })
-}
+// ─── validate ─────────────��──────────────────────────────────────────────
 
 // ─── validate ─────────────���──────────────────────────────────────────────────
 

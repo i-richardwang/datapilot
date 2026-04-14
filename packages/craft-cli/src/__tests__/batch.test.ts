@@ -58,7 +58,6 @@ describe('datapilot batch CLI', () => {
       data: Array<{
         id: string
         name: string
-        enabled: boolean
         status: string
         total: number
         completed: number
@@ -73,7 +72,6 @@ describe('datapilot batch CLI', () => {
       {
         id: 'abc123',
         name: 'Test batch',
-        enabled: true,
         status: 'not started',
         total: 0,
         completed: 0,

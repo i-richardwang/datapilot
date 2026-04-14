@@ -32,13 +32,6 @@ function createTestSetup() {
         action: { type: 'prompt', prompt: 'Analyze $BATCH_ITEM_NAME at $BATCH_ITEM_URL', labels: ['batch'] },
       },
       {
-        id: 'disabled-batch',
-        name: 'Disabled Batch',
-        enabled: false,
-        source: { type: 'json', path: 'companies.json', idField: 'id' },
-        action: { type: 'prompt', prompt: 'test' },
-      },
-      {
         id: 'retry-batch',
         name: 'Retry Batch',
         source: { type: 'json', path: 'companies.json', idField: 'id' },
@@ -176,10 +169,6 @@ describe('BatchProcessor', () => {
       setup.processor.start('test-batch')
       await tick()
       expect(setup.createdSessions[0]!.params.labels).toEqual(['batch'])
-    })
-
-    it('should throw for disabled batch', () => {
-      expect(() => setup.processor.start('disabled-batch')).toThrow('disabled')
     })
 
     it('should throw for non-existent batch', () => {

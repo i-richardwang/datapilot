@@ -90,8 +90,6 @@ export interface BatchConfig {
   id?: string
   /** Display name */
   name: string
-  /** Whether this batch is enabled */
-  enabled?: boolean
   /** Working directory for sessions created by this batch (absolute path). Omit to use workspace default. */
   workingDirectory?: string
   /** Data source configuration */

@@ -655,7 +655,6 @@ export interface ElectronAPI {
   getBatchTestResult(workspaceId: string, batchId: string): Promise<import('@craft-agent/shared/batches').TestBatchResult | null>
 
   // Batch CRUD
-  setBatchEnabled(workspaceId: string, batchId: string, enabled: boolean): Promise<void>
   duplicateBatch(workspaceId: string, batchId: string): Promise<void>
   deleteBatch(workspaceId: string, batchId: string): Promise<void>
 

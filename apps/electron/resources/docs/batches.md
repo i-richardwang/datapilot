@@ -15,11 +15,8 @@ datapilot batch status <id> --items
 datapilot batch create --name "My batch" --source data.csv --id-field id --prompt-file prompt.txt
 datapilot batch create --name "Extraction" --source data.csv --id-field id --prompt-file prompt.txt --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
 datapilot batch update <id> --name "Renamed" --concurrency 5
-datapilot batch update <id> --enabled false
 datapilot batch update <id> --patch '{"execution":{"retryOnFailure":true}}'
 datapilot batch retry <id> <item-id>
-datapilot batch enable <id>
-datapilot batch disable <id>
 datapilot batch delete <id>
 ```
 

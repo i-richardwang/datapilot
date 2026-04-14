@@ -378,8 +378,6 @@ Manage batch processing jobs stored in `batches.json`.
 - `datapilot batch status <id> [--items]`
 - `datapilot batch create` (see flags below)
 - `datapilot batch update <id>` (same flags as create, all optional)
-- `datapilot batch enable <id>`
-- `datapilot batch disable <id>`
 - `datapilot batch delete <id>`
 - `datapilot batch retry <batch-id> <item-id>`
 
@@ -397,7 +395,6 @@ Manage batch processing jobs stored in `batches.json`.
 | `--connection "<slug>"` | LLM connection slug |
 | `--permission-mode safe\|ask\|allow-all` | Permission level for created sessions |
 | `--label "<label>"` | Label to apply to created sessions (repeatable) |
-| `--enabled true\|false` | Enable/disable the batch (update only) |
 | `--output-path <path>` | Output file path (`.jsonl`) for structured results |
 | `--output-schema <json>` | JSON Schema for output validation |
 | `--patch <json>` | Raw JSON patch for advanced fields (flags override `--patch` values) |
@@ -421,11 +418,8 @@ datapilot batch create --name "Reports" --source reports.json --id-field report_
 datapilot batch create --name "Extraction" --source data.csv --id-field id --prompt-file prompt.txt --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
 # Update with flat flags
 datapilot batch update abc123 --name "Renamed Batch" --concurrency 10
-datapilot batch update abc123 --enabled false
 # Update with --patch for complex changes
 datapilot batch update abc123 --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
-datapilot batch enable abc123
-datapilot batch disable abc123
 datapilot batch delete abc123
 # Retry a failed item
 datapilot batch retry abc123 item-42
@@ -433,7 +427,7 @@ datapilot batch retry abc123 item-42
 
 ### Notes
 - All output uses JSON envelope format: `{ "ok": true, "data": ..., "warnings": [] }`.
-- `list` shows batch id, name, enabled state, status, and item progress counts.
+- `list` shows batch id, name, status, and item progress counts.
 - `status --items` adds a per-item breakdown in the response data.
 - `update` accepts flags and/or `--patch`. Flags override `--patch` values. The result is deep-merged into the existing config.
 - `delete` removes the batch from `batches.json` and cleans up its `batch-state-{id}.json` file.

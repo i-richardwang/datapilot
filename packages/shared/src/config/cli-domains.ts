@@ -107,7 +107,6 @@ const POLICIES: Record<CliDomainNamespace, CliDomainPolicy> = {
       'datapilot batch status <id>',
       'datapilot batch create --name "My batch" --source data.csv --id-field id --prompt-file prompt.txt',
       'datapilot batch update <id> --name "Renamed" --concurrency 5',
-      'datapilot batch update <id> --enabled false',
     ],
     bashGuardPaths: ['batches.json', 'batch-state-*.json'],
   },
