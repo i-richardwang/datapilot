@@ -412,6 +412,15 @@ export function resolveSetupTestConnectionHint(args: {
     };
   }
 
+  // Claude SDK custom endpoints also route through anthropic_compat when the
+  // caller already resolved provider='anthropic' (e.g. useOnboarding.ts).
+  if (args.customEndpoint?.api === 'anthropic-claude-sdk' && args.baseUrl?.trim()) {
+    return {
+      providerType: 'anthropic_compat',
+      customEndpoint: args.customEndpoint,
+    };
+  }
+
   return {
     providerType: args.baseUrl ? 'pi_compat' : 'anthropic',
   };
@@ -728,7 +737,7 @@ export async function testBackendConnection(args: {
     const providerType = args.connection?.providerType ?? getDefaultProviderType(args.provider);
     const now = Date.now();
     const authType: LlmAuthType = (
-      providerType === 'pi_compat'
+      providerType === 'pi_compat' || providerType === 'anthropic_compat'
     )
       ? 'api_key_with_endpoint'
       : 'api_key';

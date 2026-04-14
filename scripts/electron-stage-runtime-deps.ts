@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
+import { copyFileSync, cpSync, existsSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 const ROOT_DIR = join(import.meta.dir, '..')
@@ -47,6 +47,57 @@ for (const packageName of RUNTIME_PACKAGES) {
 }
 
 console.log(`${isDryRun ? 'Checked' : 'Prepared'} Electron runtime dependency staging`)
+
+// Stage MCP servers into resources/ so they're included in the packaged app.
+// The build step (electron:build:main) compiles these to packages/*/dist/,
+// but electron-builder.yml expects them at resources/*/index.js.
+const MCP_SERVERS = [
+  { name: 'session-mcp-server', required: true },
+  { name: 'pi-agent-server', required: false },
+]
+
+for (const server of MCP_SERVERS) {
+  const source = join(ROOT_DIR, 'packages', server.name, 'dist', 'index.js')
+  const destDir = join(ELECTRON_DIR, 'resources', server.name)
+
+  if (existsSync(source)) {
+    console.log(`${isDryRun ? 'Would stage' : 'Staging'} ${server.name}`)
+    if (!isDryRun) {
+      mkdirSync(destDir, { recursive: true })
+      copyFileSync(source, join(destDir, 'index.js'))
+    }
+  } else if (server.required) {
+    throw new Error(`${server.name} not built at ${source}. Run electron:build first.`)
+  } else {
+    console.warn(`Warning: ${server.name} not built. Related features will not work.`)
+  }
+}
+
+// Stage interceptor source files so they're found by the packaged app runtime.
+// electron-builder.yml includes packages/shared/src/*.ts under files:, which are
+// resolved relative to apps/electron/. build-dmg.sh handles this, but the
+// generic electron:dist path also needs them.
+const INTERCEPTOR_FILES = [
+  'unified-network-interceptor.ts',
+  'interceptor-common.ts',
+  'feature-flags.ts',
+  'interceptor-request-utils.ts',
+]
+const INTERCEPTOR_SRC_DIR = join(ROOT_DIR, 'packages', 'shared', 'src')
+const INTERCEPTOR_DEST_DIR = join(ELECTRON_DIR, 'packages', 'shared', 'src')
+
+if (!isDryRun) {
+  mkdirSync(INTERCEPTOR_DEST_DIR, { recursive: true })
+}
+for (const file of INTERCEPTOR_FILES) {
+  const src = join(INTERCEPTOR_SRC_DIR, file)
+  if (existsSync(src)) {
+    console.log(`${isDryRun ? 'Would stage' : 'Staging'} interceptor: ${file}`)
+    if (!isDryRun) {
+      copyFileSync(src, join(INTERCEPTOR_DEST_DIR, file))
+    }
+  }
+}
 
 // Rebuild native modules (better-sqlite3) against the Electron ABI.
 // Without this, the .node binary is compiled for the system Node.js which has a
