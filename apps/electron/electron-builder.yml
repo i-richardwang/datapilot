@@ -30,6 +30,10 @@ files:
   - packages/shared/src/interceptor-request-utils.ts
   # Include CLI tool Python scripts (platform-independent)
   - resources/scripts/**/*
+  # Include DataPilot CLI (compiled bundle + wrapper scripts for agent Bash sessions)
+  - resources/craft-cli/**/*
+  - resources/bin/datapilot
+  - resources/bin/datapilot.cmd
   # Include CLI tool shell wrappers (platform-independent, both Unix and Windows)
   - resources/bin/markitdown
   - resources/bin/markitdown.cmd

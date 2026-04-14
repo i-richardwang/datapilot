@@ -73,6 +73,22 @@ for (const server of MCP_SERVERS) {
   }
 }
 
+// Stage DataPilot CLI (craft-cli) into resources/ for agent Bash sessions.
+// The wrapper script resources/bin/datapilot runs `bun run $DATAPILOT_CLI_ENTRY`,
+// so the compiled bundle must be available in the packaged app.
+const CLI_SOURCE = join(ROOT_DIR, 'packages', 'craft-cli', 'dist', 'index.js')
+const CLI_DEST_DIR = join(ELECTRON_DIR, 'resources', 'craft-cli')
+
+if (existsSync(CLI_SOURCE)) {
+  console.log(`${isDryRun ? 'Would stage' : 'Staging'} craft-cli`)
+  if (!isDryRun) {
+    mkdirSync(CLI_DEST_DIR, { recursive: true })
+    copyFileSync(CLI_SOURCE, join(CLI_DEST_DIR, 'index.js'))
+  }
+} else {
+  console.warn('Warning: craft-cli not built. datapilot CLI commands will not work in packaged app.')
+}
+
 // Stage interceptor source files so they're found by the packaged app runtime.
 // electron-builder.yml includes packages/shared/src/*.ts under files:, which are
 // resolved relative to apps/electron/. build-dmg.sh handles this, but the

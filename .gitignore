@@ -9,6 +9,7 @@ dist
 apps/electron/release
 apps/electron/resources/session-mcp-server/
 apps/electron/resources/pi-agent-server/
+apps/electron/resources/craft-cli/
 
 # code coverage
 coverage

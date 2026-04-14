@@ -147,7 +147,7 @@ if (isDebugMode) {
 
   process.env.CRAFT_SCRIPTS = scriptsDir
   process.env.DATAPILOT_CLI_ENTRY = app.isPackaged
-    ? join(app.getAppPath(), 'packages', 'craft-cli', 'src', 'index.ts')
+    ? join(resourcesBase, 'resources', 'craft-cli', 'index.js')
     : join(process.cwd(), 'packages', 'craft-cli', 'src', 'index.ts')
   process.env.DATAPILOT_COMMANDS_DOC_PATH = app.isPackaged
     ? join(resourcesBase, 'resources', 'docs', 'datapilot-cli.md')
