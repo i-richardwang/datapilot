@@ -2015,7 +2015,10 @@ export function shouldAllowToolInMode(
         prefix: 'mcp__session__',
         includeDeveloperFeedback: FEATURE_FLAGS.developerFeedback,
         includeBatchOutput: true,
-        liteMode: FEATURE_FLAGS.liteVersion,
+        disableOauth: FEATURE_FLAGS.disableOauth,
+        disableBrowser: FEATURE_FLAGS.disableBrowser,
+        disableValidation: FEATURE_FLAGS.disableValidation,
+        disableTemplates: FEATURE_FLAGS.disableTemplates,
       });
 
       if (safeAllowedSessionTools.has(toolName)) {

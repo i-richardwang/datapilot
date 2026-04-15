@@ -31,7 +31,7 @@ const STATUS_ICONS_DIR = 'statuses/icons';
 // ─── Defaults ───────────────────────────────────────────────────────────────
 
 export function getDefaultStatusConfig(): WorkspaceStatusConfig {
-  const lite = FEATURE_FLAGS.liteVersion;
+  const lite = FEATURE_FLAGS.liteUi;
   const statusList: StatusConfig[] = [
     ...(!lite ? [{
       id: 'backlog',

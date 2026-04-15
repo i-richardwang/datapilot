@@ -345,7 +345,7 @@ grep -rn 'craft-cli\.md' --include="*.ts" --include="*.md" --exclude-dir=node_mo
 v0.8.2 合并完成后，进行全面品牌适配：
 
 **环境变量重命名（37 文件，176 处）：**
-- 13 个用户可见变量：`CRAFT_SERVER_TOKEN` → `DATAPILOT_SERVER_TOKEN`、`CRAFT_RPC_HOST/PORT` → `DATAPILOT_RPC_HOST/PORT`、`CRAFT_WEBUI_*` → `DATAPILOT_WEBUI_*`、`CRAFT_LITE_VERSION` → `DATAPILOT_LITE_VERSION` 等
+- 13 个用户可见变量：`CRAFT_SERVER_TOKEN` → `DATAPILOT_SERVER_TOKEN`、`CRAFT_RPC_HOST/PORT` → `DATAPILOT_RPC_HOST/PORT`、`CRAFT_WEBUI_*` → `DATAPILOT_WEBUI_*` 等（`CRAFT_LITE_VERSION` 已拆分为 5 个细粒度开关：`DATAPILOT_DISABLE_OAUTH`、`DATAPILOT_DISABLE_BROWSER`、`DATAPILOT_DISABLE_VALIDATION`、`DATAPILOT_DISABLE_TEMPLATES`、`DATAPILOT_LITE_UI`）
 - 2 个 CLI 变量：`CRAFT_SERVER_URL` → `DATAPILOT_SERVER_URL`、`CRAFT_TLS_CA` → `DATAPILOT_TLS_CA`
 - 7 个内部 CLI 变量：`CRAFT_CLI_ENTRY` → `DATAPILOT_CLI_ENTRY`、`CRAFT_BUN` → `DATAPILOT_BUN` 等
 
@@ -360,8 +360,8 @@ v0.8.2 合并完成后，进行全面品牌适配：
 
 **其他修复：**
 - ReauthScreen 按钮文本、Dockerfile.viewer 标签、图标组件注释
-- Lite 模式默认开启（Dockerfile.server `ARG CRAFT_LITE_VERSION="1"`，已改为 `DATAPILOT_LITE_VERSION`）
-- Lite 模式恢复 Claude/OpenAI 订阅选项
+- Docker 默认开启 `DATAPILOT_DISABLE_OAUTH=1` 和 `DATAPILOT_LITE_UI=1`（原 `LITE_VERSION` 已拆分为细粒度开关）
+- 恢复 Claude/OpenAI 订阅选项（不再被 OAuth 禁用影响）
 - 服务端 Bootstrap 对齐 Electron 初始化（workspace/permissions/themes/docs/icons）
 - Zeabur 模板添加 `DATAPILOT_VIEWER_URL` 变量
 

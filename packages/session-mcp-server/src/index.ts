@@ -261,7 +261,10 @@ function createCodexContext(config: SessionConfig): SessionToolContext {
 function createSessionTools(includeDeveloperFeedback: boolean): Tool[] {
   return getToolDefsAsJsonSchema({
     includeDeveloperFeedback,
-    liteMode: FEATURE_FLAGS.liteVersion,
+    disableOauth: FEATURE_FLAGS.disableOauth,
+    disableBrowser: FEATURE_FLAGS.disableBrowser,
+    disableValidation: FEATURE_FLAGS.disableValidation,
+    disableTemplates: FEATURE_FLAGS.disableTemplates,
   }).map(def => ({
     name: def.name,
     description: def.description,
@@ -559,7 +562,13 @@ async function main() {
   const ctx = createCodexContext(config);
 
   const includeDeveloperFeedback = isDeveloperFeedbackEnabled();
-  const sessionToolRegistry = getSessionToolRegistry({ includeDeveloperFeedback, liteMode: FEATURE_FLAGS.liteVersion });
+  const sessionToolRegistry = getSessionToolRegistry({
+    includeDeveloperFeedback,
+    disableOauth: FEATURE_FLAGS.disableOauth,
+    disableBrowser: FEATURE_FLAGS.disableBrowser,
+    disableValidation: FEATURE_FLAGS.disableValidation,
+    disableTemplates: FEATURE_FLAGS.disableTemplates,
+  });
 
   // Create MCP server
   const server = new Server(

@@ -4,7 +4,7 @@
  * Tests the centralized source state management used by both
  * ClaudeAgent and CodexAgent.
  */
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { SourceManager } from '../source-manager.ts';
 import type { LoadedSource } from '../../../sources/types.ts';
 
@@ -213,6 +213,36 @@ describe('SourceManager', () => {
 
       expect(formatted).toContain('github (no tools)');
     });
+
+    describe('source_issue with DATAPILOT_DISABLE_OAUTH=1', () => {
+      beforeEach(() => {
+        process.env.DATAPILOT_DISABLE_OAUTH = '1';
+      });
+
+      afterEach(() => {
+        delete process.env.DATAPILOT_DISABLE_OAUTH;
+      });
+
+      it('should show "OAuth not available" instead of "server unreachable" for OAuth sources', () => {
+        const oauthSourceManager = new SourceManager({ onDebug: () => {} });
+        oauthSourceManager.setAllSources([
+          createMockSource('google-cal', {
+            enabled: true,
+            type: 'api',
+            provider: 'google',
+            api: { baseUrl: 'https://www.googleapis.com', authType: 'oauth' },
+            connectionStatus: 'needs_auth',
+          }),
+        ]);
+        oauthSourceManager.updateActiveState(['google-cal'], [], ['google-cal']);
+
+        const formatted = oauthSourceManager.formatSourceState();
+
+        expect(formatted).toContain('OAuth tools are not available in this build');
+        expect(formatted).not.toContain('server is unreachable');
+        expect(formatted).not.toContain('source_google_oauth_trigger');
+      });
+    });
   });
 
   describe('Authentication Utilities', () => {
@@ -266,6 +296,84 @@ describe('SourceManager', () => {
 
       const authTool = sourceManager.getAuthToolName(source);
       expect(authTool).toBeNull();
+    });
+
+    describe('with DATAPILOT_DISABLE_OAUTH=1', () => {
+      beforeEach(() => {
+        process.env.DATAPILOT_DISABLE_OAUTH = '1';
+      });
+
+      afterEach(() => {
+        delete process.env.DATAPILOT_DISABLE_OAUTH;
+      });
+
+      it('should return null for OAuth MCP sources', () => {
+        const source = createMockSource('oauth-mcp', {
+          type: 'mcp',
+          mcp: { url: 'https://example.com/mcp', authType: 'oauth' },
+        });
+
+        expect(sourceManager.getAuthToolName(source)).toBeNull();
+      });
+
+      it('should return null for Google API sources', () => {
+        const source = createMockSource('google', {
+          type: 'api',
+          provider: 'google',
+          api: { baseUrl: 'https://www.googleapis.com', authType: 'oauth' },
+        });
+
+        expect(sourceManager.getAuthToolName(source)).toBeNull();
+      });
+
+      it('should return null for Slack API sources', () => {
+        const source = createMockSource('slack', {
+          type: 'api',
+          provider: 'slack',
+          api: { baseUrl: 'https://slack.com/api', authType: 'oauth' },
+        });
+
+        expect(sourceManager.getAuthToolName(source)).toBeNull();
+      });
+
+      it('should return null for Microsoft API sources', () => {
+        const source = createMockSource('microsoft', {
+          type: 'api',
+          provider: 'microsoft',
+          api: { baseUrl: 'https://graph.microsoft.com', authType: 'oauth' },
+        });
+
+        expect(sourceManager.getAuthToolName(source)).toBeNull();
+      });
+
+      it('should return null for generic OAuth API sources', () => {
+        const source = createMockSource('custom-oauth', {
+          type: 'api',
+          provider: 'custom',
+          api: { baseUrl: 'https://api.example.com', authType: 'oauth' },
+        });
+
+        expect(sourceManager.getAuthToolName(source)).toBeNull();
+      });
+
+      it('should still return source_credential_prompt for bearer sources', () => {
+        const source = createMockSource('bearer-mcp', {
+          type: 'mcp',
+          mcp: { url: 'https://example.com/mcp', authType: 'bearer' },
+        });
+
+        expect(sourceManager.getAuthToolName(source)).toBe('source_credential_prompt');
+      });
+
+      it('should still return source_credential_prompt for API key sources', () => {
+        const source = createMockSource('api-key', {
+          type: 'api',
+          provider: 'custom',
+          api: { baseUrl: 'https://api.example.com', authType: 'bearer' },
+        });
+
+        expect(sourceManager.getAuthToolName(source)).toBe('source_credential_prompt');
+      });
     });
   });
 });

@@ -330,7 +330,10 @@ export function getSessionScopedTools(
       includeBatchOutput: isBatchSession,
       batchMode: isBatchSession,
       minimalBatchMode: isMinimalBatch,
-      liteMode: FEATURE_FLAGS.liteVersion,
+      disableOauth: FEATURE_FLAGS.disableOauth,
+      disableBrowser: FEATURE_FLAGS.disableBrowser,
+      disableValidation: FEATURE_FLAGS.disableValidation,
+      disableTemplates: FEATURE_FLAGS.disableTemplates,
     })
       .filter(def => def.handler !== null) // Skip backend-specific tools (call_llm)
       .map(def => registryTool(def.name, def.inputSchema.shape));

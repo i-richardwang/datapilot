@@ -76,7 +76,9 @@ spec:
                     default: 0.0.0.0
                 DATAPILOT_RPC_PORT:
                     default: "9100"
-                DATAPILOT_LITE_VERSION:
+                DATAPILOT_DISABLE_OAUTH:
+                    default: "1"
+                DATAPILOT_LITE_UI:
                     default: "1"
 
         - name: viewer

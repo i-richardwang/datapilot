@@ -438,7 +438,7 @@ export function TopBar({
         </DropdownMenu>
 
         {/* Help button */}
-        {!FEATURE_FLAGS.liteVersion && (
+        {!FEATURE_FLAGS.liteUi && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <TopBarButton aria-label="Help & Documentation" className="h-[26px] w-[26px] rounded-lg">

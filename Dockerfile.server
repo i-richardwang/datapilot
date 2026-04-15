@@ -74,9 +74,17 @@ RUN bun build packages/session-mcp-server/src/index.ts \
       --outfile packages/pi-agent-server/dist/index.js --target node --format cjs
 
 # Build web UI assets (served by the server on the RPC port)
-# Pass --build-arg DATAPILOT_LITE_VERSION=1 to enable lite mode.
-ARG DATAPILOT_LITE_VERSION="1"
-ENV DATAPILOT_LITE_VERSION=$DATAPILOT_LITE_VERSION
+# Granular feature flags — set to "1" to disable/enable the corresponding feature.
+ARG DATAPILOT_DISABLE_OAUTH="1"
+ARG DATAPILOT_DISABLE_BROWSER=""
+ARG DATAPILOT_DISABLE_VALIDATION=""
+ARG DATAPILOT_DISABLE_TEMPLATES=""
+ARG DATAPILOT_LITE_UI="1"
+ENV DATAPILOT_DISABLE_OAUTH=$DATAPILOT_DISABLE_OAUTH
+ENV DATAPILOT_DISABLE_BROWSER=$DATAPILOT_DISABLE_BROWSER
+ENV DATAPILOT_DISABLE_VALIDATION=$DATAPILOT_DISABLE_VALIDATION
+ENV DATAPILOT_DISABLE_TEMPLATES=$DATAPILOT_DISABLE_TEMPLATES
+ENV DATAPILOT_LITE_UI=$DATAPILOT_LITE_UI
 RUN bunx vite build --config apps/webui/vite.config.ts
 
 # Pre-create .datapilot so Docker named volumes inherit the correct permissions.

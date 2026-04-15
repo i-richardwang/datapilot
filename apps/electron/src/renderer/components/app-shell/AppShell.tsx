@@ -2562,7 +2562,7 @@ function AppShellContent({
                       onClick: () => handleSettingsClick('app'),
                     },
                     // --- What's New ---
-                    ...(!FEATURE_FLAGS.liteVersion ? [{
+                    ...(!FEATURE_FLAGS.liteUi ? [{
                       id: "nav:whats-new",
                       title: t("sidebar.whatsNew"),
                       icon: hasUnseenReleaseNotes ? (

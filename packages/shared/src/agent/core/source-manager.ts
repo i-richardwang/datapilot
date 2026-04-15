@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import type { LoadedSource } from '../../sources/types.ts';
 import { sourceNeedsAuthentication } from '../../sources/credential-manager.ts';
 import type { SourceManagerConfig } from './types.ts';
+import { FEATURE_FLAGS } from '../../feature-flags.ts';
 
 /** Slugs exempt from guide.md prerequisite (internal sources) */
 const GUIDE_EXEMPT_SLUGS = new Set(['session', 'craft-agents-docs']);
@@ -258,6 +259,9 @@ export class SourceManager {
       if (authTool) {
         output += `\n\nThis source requires re-authentication. The user may have revoked access or the token expired.`;
         output += `\nTo fix: Re-authenticate using ${authTool}.`;
+      } else if (FEATURE_FLAGS.disableOauth && this.sourceNeedsOauth(s)) {
+        output += `\n\nThis source requires OAuth authentication, but OAuth tools are not available in this build.`;
+        output += `\nTo fix: Ask the user to re-enable OAuth tools or authenticate this source externally.`;
       } else if (s.config.mcp?.transport === 'stdio') {
         output += `\n\nThis is a local MCP server that is not responding. The server process may need to be restarted.`;
         output += `\nTo fix: Check if the server command/path is correct and the process can start.`;
@@ -332,6 +336,15 @@ export class SourceManager {
   // Authentication Utilities
   // ============================================================
 
+  /** Check if a source requires OAuth authentication (regardless of whether OAuth tools are available). */
+  private sourceNeedsOauth(source: LoadedSource): boolean {
+    const { type, provider, mcp, api } = source.config;
+    if (type === 'mcp' && mcp?.authType === 'oauth') return true;
+    if (type === 'api' && ['google', 'slack', 'microsoft'].includes(provider ?? '')) return true;
+    if (type === 'api' && api?.authType === 'oauth') return true;
+    return false;
+  }
+
   /**
    * Get the correct authentication tool name for a source, or null if no auth is needed.
    *
@@ -340,11 +353,12 @@ export class SourceManager {
    */
   getAuthToolName(source: LoadedSource): string | null {
     const { type, provider, mcp, api } = source.config;
+    const oauthDisabled = FEATURE_FLAGS.disableOauth;
 
     // MCP sources
     if (type === 'mcp') {
       if (mcp?.authType === 'oauth') {
-        return 'source_oauth_trigger';
+        return oauthDisabled ? null : 'source_oauth_trigger';
       }
       if (mcp?.authType === 'bearer') {
         return 'source_credential_prompt';
@@ -359,20 +373,26 @@ export class SourceManager {
       }
 
       // OAuth providers have specific triggers
-      switch (provider) {
-        case 'google':
-          return 'source_google_oauth_trigger';
-        case 'slack':
-          return 'source_slack_oauth_trigger';
-        case 'microsoft':
-          return 'source_microsoft_oauth_trigger';
-        default:
-          // Generic OAuth API sources → OAuth trigger (static config or auto-discovery)
-          if (api?.authType === 'oauth') {
-            return 'source_oauth_trigger';
-          }
-          return 'source_credential_prompt';
+      if (!oauthDisabled) {
+        switch (provider) {
+          case 'google':
+            return 'source_google_oauth_trigger';
+          case 'slack':
+            return 'source_slack_oauth_trigger';
+          case 'microsoft':
+            return 'source_microsoft_oauth_trigger';
+          default:
+            if (api?.authType === 'oauth') {
+              return 'source_oauth_trigger';
+            }
+        }
       }
+
+      // When OAuth is disabled, OAuth sources have no available auth tool
+      if (api?.authType === 'oauth') {
+        return null;
+      }
+      return 'source_credential_prompt';
     }
 
     return null;

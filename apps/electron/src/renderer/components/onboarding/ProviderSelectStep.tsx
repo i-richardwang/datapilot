@@ -22,8 +22,8 @@ interface ProviderOption {
   icon: React.ReactNode
 }
 
-/** Provider IDs hidden in lite version */
-const LITE_HIDDEN_PROVIDERS: Set<ProviderChoice> = new Set(['copilot', 'local'])
+/** Provider IDs hidden when OAuth is disabled (require OAuth flow) */
+const OAUTH_HIDDEN_PROVIDERS: Set<ProviderChoice> = new Set(['copilot'])
 
 const PROVIDER_ICONS: Record<ProviderChoice, React.ReactNode> = {
   claude: <img src={claudeIcon} alt="" className="size-5 rounded-xs" />,
@@ -82,8 +82,8 @@ export function ProviderSelectStep({ onSelect, onSkip }: ProviderSelectStepProps
     },
   ]
 
-  const PROVIDER_OPTIONS: ProviderOption[] = FEATURE_FLAGS.liteVersion
-    ? ALL_PROVIDER_OPTIONS.filter(opt => !LITE_HIDDEN_PROVIDERS.has(opt.id))
+  const PROVIDER_OPTIONS: ProviderOption[] = FEATURE_FLAGS.disableOauth
+    ? ALL_PROVIDER_OPTIONS.filter(opt => !OAUTH_HIDDEN_PROVIDERS.has(opt.id))
     : ALL_PROVIDER_OPTIONS
 
   return (

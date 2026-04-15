@@ -22,6 +22,9 @@ export function getSessionToolProxyDefs(opts?: { includeBatchOutput?: boolean; b
     includeDeveloperFeedback: FEATURE_FLAGS.developerFeedback,
     includeBatchOutput: opts?.includeBatchOutput,
     batchMode: opts?.batchMode,
-    liteMode: FEATURE_FLAGS.liteVersion,
+    disableOauth: FEATURE_FLAGS.disableOauth,
+    disableBrowser: FEATURE_FLAGS.disableBrowser,
+    disableValidation: FEATURE_FLAGS.disableValidation,
+    disableTemplates: FEATURE_FLAGS.disableTemplates,
   });
 }

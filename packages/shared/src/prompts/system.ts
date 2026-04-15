@@ -364,7 +364,7 @@ export function getSystemPrompt(
 
   // Use pinned preferences if provided (for session consistency after compaction)
   const preferences = pinnedPreferencesPrompt ?? formatPreferencesForPrompt();
-  const debugContext = debugMode?.enabled && !FEATURE_FLAGS.liteVersion ? formatDebugModeContext(debugMode.logFilePath) : '';
+  const debugContext = debugMode?.enabled ? formatDebugModeContext(debugMode.logFilePath) : '';
 
   // Get project context files for monorepo support (lives in system prompt for persistence across compaction)
   const projectContextFiles = getProjectContextFilesPrompt(workingDirectory);
@@ -491,8 +491,8 @@ Sources are external data connections. Each source has:
 
 **Creating a new source** (does not exist yet):
 1. Read \`${DOC_REFS.sources}\` for the setup workflow
-2. Verify current endpoints via web search${!FEATURE_FLAGS.liteVersion ? ', and use browser tools when docs are dynamic or login-protected' : ''}
-3. Before full setup${!FEATURE_FLAGS.liteVersion ? ', confirm whether in-app browser is a better fit for one-off or UI-only tasks' : ', consider whether direct API integration or a simpler approach would suffice'}
+2. Verify current endpoints via web search${!FEATURE_FLAGS.disableBrowser ? ', and use browser tools when docs are dynamic or login-protected' : ''}
+3. Before full setup${!FEATURE_FLAGS.disableBrowser ? ', confirm whether in-app browser is a better fit for one-off or UI-only tasks' : ', consider whether direct API integration or a simpler approach would suffice'}
 
 **Workspace structure:**
 - Sources: \`${workspacePath}/sources/{slug}/\`
@@ -532,11 +532,11 @@ ${isBatch ? '' : `## Configuration Documentation
 | Statuses | \`${DOC_REFS.statuses}\` | When user mentions statuses or workflow states |
 | Labels | \`${DOC_REFS.labels}\` | BEFORE creating/modifying labels |
 | Tool Icons | \`${DOC_REFS.toolIcons}\` | BEFORE modifying tool icon mappings |
-${!FEATURE_FLAGS.liteVersion ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When creating diagrams |` : ''}
+${!FEATURE_FLAGS.disableValidation ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When creating diagrams |` : ''}
 | Data Tables | \`${DOC_REFS.dataTables}\` | When working with datasets of 20+ rows |
 | HTML Preview | \`${DOC_REFS.htmlPreview}\` | When rendering HTML content (emails, reports) |
 | PDF Preview | \`${DOC_REFS.pdfPreview}\` | When displaying PDF documents inline |
-| Image Preview | \`${DOC_REFS.imagePreview}\` | When displaying local image files inline |${!FEATURE_FLAGS.liteVersion ? `
+| Image Preview | \`${DOC_REFS.imagePreview}\` | When displaying local image files inline |${!FEATURE_FLAGS.disableBrowser ? `
 | Browser Tools | \`${DOC_REFS.browserTools}\` | When using in-app browser tools (\`browser_tool\`) |` : ''}
 | LLM Tool | \`${DOC_REFS.llmTool}\` | When using \`call_llm\` for subtasks |${FEATURE_FLAGS.craftAgentsCli ? `
 | DataPilot CLI | \`${DOC_REFS.craftCli}\` | When managing labels/sources/skills/automations via \`datapilot\` |` : ''}
@@ -641,19 +641,19 @@ MCP tools from connected sources follow the naming pattern \`mcp__sources__{slug
 - **NEVER** use \`list_mcp_resources\` — it lists resources, not tools. It will not help you discover available tools.
 - **NEVER** use shell/bash to call MCP tools. MCP tools are first-class functions you call directly, just like \`exec_command\` or \`apply_patch\`.
 
-**After OAuth completes:** MCP tools become available on the next turn. If tools were not available before auth, try calling them directly now — they will work after authentication. Do NOT keep running \`source_test\` to check — just call the tools.
-
+${!FEATURE_FLAGS.disableOauth ? `**After OAuth completes:** MCP tools become available on the next turn. If tools were not available before auth, try calling them directly now — they will work after authentication. Do NOT keep running \`source_test\` to check — just call the tools.
+` : ''}
 ## Source Management Tools
 
 The \`session\` MCP server provides tools for managing external sources:
 
 | Tool | Purpose |
 |------|---------|
-| \`source_test\` | Validate config, test connection, check auth status |
+| \`source_test\` | Validate config, test connection, check auth status |${!FEATURE_FLAGS.disableOauth ? `
 | \`source_oauth_trigger\` | Start OAuth for MCP sources (Linear, Notion, etc.) |
 | \`source_google_oauth_trigger\` | Google OAuth (Gmail, Calendar, Drive, Docs, Sheets, YouTube, Search Console) |
 | \`source_slack_oauth_trigger\` | Slack OAuth |
-| \`source_microsoft_oauth_trigger\` | Microsoft OAuth (Outlook, Teams, OneDrive) |
+| \`source_microsoft_oauth_trigger\` | Microsoft OAuth (Outlook, Teams, OneDrive) |` : ''}
 | \`source_credential_prompt\` | Prompt user for API key / bearer token |
 
 **Source creation workflow:**
@@ -662,16 +662,17 @@ The \`session\` MCP server provides tools for managing external sources:
 3. Create \`config.json\` in \`sources/{slug}/\`
 4. Create \`permissions.json\` for Explore mode
 5. Write \`guide.md\` with usage instructions
-6. Run \`source_test\` to validate — **once only, before auth**
-7. Trigger the appropriate auth tool
+6. Run \`source_test\` to validate — **once only, before auth**${!FEATURE_FLAGS.disableOauth ? `
+7. Trigger the appropriate auth tool` : ''}
 
 **STRICT RULES:**
 - Run \`source_test\` at most **ONCE** per source. It validates config structure only. Repeating it gives the same result.
 - When a user asks you to call a specific tool, call **THAT tool and nothing else**. Do not run \`source_test\` or other tools instead.
 - **Do NOT** grep the workspace, search session files, or do web searches to find source config patterns. Read the source's \`config.json\` and \`guide.md\` directly.
 - **If an existing source is already configured**, read its \`config.json\` + \`guide.md\`, then use it. Do not recreate or search for how to set it up.
-
-**If MCP connection fails after OAuth with "Auth required":** The source needs to be re-enabled in the session for the new credentials to take effect. Do NOT keep retrying the same failing call or investigating log files — ask the user to re-enable the source or restart the session.
+${FEATURE_FLAGS.disableOauth ? `
+**OAuth tools are disabled in this build.** \`source_*oauth_trigger\` tools do not exist — ignore references to them in docs. For OAuth sources, tell the user authentication is unavailable.` : `
+**If MCP connection fails after OAuth with "Auth required":** The source needs to be re-enabled in the session for the new credentials to take effect. Do NOT keep retrying the same failing call or investigating log files — ask the user to re-enable the source or restart the session.`}
 ` : ''}
 **Full reference on what commands are enablled:** \`${DOC_REFS.permissions}\` (bash command lists, blocked constructs, planning workflow, customization). Read if unsure, or user has questions about permissions.
 ` : ''}
@@ -802,7 +803,7 @@ Use the \`call_llm\` tool to invoke a secondary LLM for focused subtasks. It run
 
 **Quick reference:** Read \`${DOC_REFS.llmTool}\` for full parameter docs, output formats, and examples.
 ` : ''}
-${!FEATURE_FLAGS.liteVersion && !isBatch ? `## Browser Tools
+${!FEATURE_FLAGS.disableBrowser && !isBatch ? `## Browser Tools
 
 You can control built-in browser windows through \`browser_tool\`, a unified CLI-like interface.
 Multiple commands can be batched with semicolons (e.g., \`fill @e1 x; fill @e2 y; click @e3\`). Batches stop after navigation commands.
@@ -899,14 +900,14 @@ graph LR
     B --> C[Output]
 \`\`\`
 
-${!FEATURE_FLAGS.liteVersion ? `**Tools:**
+${!FEATURE_FLAGS.disableValidation ? `**Tools:**
 - \`mermaid_validate\` - Validate syntax before outputting complex diagrams
 - Full syntax reference: \`${DOC_REFS.mermaid}\`
 
 ` : ''}**Tips:**
 - **The user sees a 4:3 aspect ratio** - Choose HORIZONTAL (LR/RL) or VERTICAL (TD/BT) for easier viewing and navigation in the UI based on diagram size. I.e. If it's a small diagram, use horizontal (LR/RL). If it's a large diagram with many nodes, use vertical (TD/BT).
 - IMPORTANT! : If long diagrams are needed, split them into multiple focused diagrams instead. The user can view several smaller diagrams more easily than one massive one, the UI handles them better, and it reduces the risk of rendering issues.
-- One concept per diagram - keep them focused${!FEATURE_FLAGS.liteVersion ? `
+- One concept per diagram - keep them focused${!FEATURE_FLAGS.disableValidation ? `
 - Validate complex diagrams with \`mermaid_validate\` first` : ''}
 - **Proactive usage:** Use Mermaid diagrams extensively in plans and responses, especially when making structural changes or when the user is trying to understand areas of a codebase or system.
 
@@ -948,7 +949,7 @@ transform_data({
 
 **Reference:** \`${DOC_REFS.htmlPreview}\`
 
-${!FEATURE_FLAGS.liteVersion ? `## Source Templates
+${!FEATURE_FLAGS.disableTemplates ? `## Source Templates
 
 Some sources provide **HTML templates** for consistent, branded rendering of their data. Use the \`render_template\` tool instead of writing custom \`transform_data\` scripts when a template is available.
 

@@ -7,6 +7,10 @@ import {
   getSessionSafeAllowedToolNames,
   getSessionSafeBlockedToolNames,
   getToolDefsAsJsonSchema,
+  OAUTH_TOOLS,
+  BROWSER_TOOLS,
+  VALIDATION_TOOLS,
+  TEMPLATE_TOOLS,
 } from './tool-defs.ts';
 
 describe('session tool filtering helpers', () => {
@@ -90,6 +94,85 @@ describe('session tool filtering helpers', () => {
     expect(blocked.has('source_oauth_trigger')).toBe(true);
     expect(blocked.has('source_credential_prompt')).toBe(true);
     expect(blocked.has('spawn_session')).toBe(true);
+  });
+
+  describe('granular disable flags', () => {
+    it('disableOauth excludes exactly the OAUTH_TOOLS set', () => {
+      const withOauth = getSessionToolDefs();
+      const withoutOauth = getSessionToolDefs({ disableOauth: true });
+
+      const removed = new Set(
+        withOauth.filter(d => !withoutOauth.some(w => w.name === d.name)).map(d => d.name)
+      );
+      expect(removed).toEqual(OAUTH_TOOLS);
+    });
+
+    it('disableBrowser excludes exactly the BROWSER_TOOLS set', () => {
+      const base = getSessionToolDefs();
+      const filtered = getSessionToolDefs({ disableBrowser: true });
+
+      const removed = new Set(
+        base.filter(d => !filtered.some(f => f.name === d.name)).map(d => d.name)
+      );
+      expect(removed).toEqual(BROWSER_TOOLS);
+    });
+
+    it('disableValidation excludes exactly the VALIDATION_TOOLS set', () => {
+      const base = getSessionToolDefs();
+      const filtered = getSessionToolDefs({ disableValidation: true });
+
+      const removed = new Set(
+        base.filter(d => !filtered.some(f => f.name === d.name)).map(d => d.name)
+      );
+      expect(removed).toEqual(VALIDATION_TOOLS);
+    });
+
+    it('disableTemplates excludes exactly the TEMPLATE_TOOLS set', () => {
+      const base = getSessionToolDefs();
+      const filtered = getSessionToolDefs({ disableTemplates: true });
+
+      const removed = new Set(
+        base.filter(d => !filtered.some(f => f.name === d.name)).map(d => d.name)
+      );
+      expect(removed).toEqual(TEMPLATE_TOOLS);
+    });
+
+    it('flags are independent — disabling one category does not affect others', () => {
+      const oauthOnly = getSessionToolDefs({ disableOauth: true });
+      const browserOnly = getSessionToolDefs({ disableBrowser: true });
+
+      // OAuth-disabled still has browser_tool
+      expect(oauthOnly.some(d => d.name === 'browser_tool')).toBe(true);
+      // Browser-disabled still has OAuth tools
+      expect(browserOnly.some(d => d.name === 'source_oauth_trigger')).toBe(true);
+    });
+
+    it('multiple flags can be combined', () => {
+      const filtered = getSessionToolDefs({
+        disableOauth: true,
+        disableBrowser: true,
+        disableValidation: true,
+        disableTemplates: true,
+      });
+      const names = new Set(filtered.map(d => d.name));
+
+      const allDisabled = new Set([...OAUTH_TOOLS, ...BROWSER_TOOLS, ...VALIDATION_TOOLS, ...TEMPLATE_TOOLS]);
+      for (const tool of allDisabled) {
+        expect(names.has(tool)).toBe(false);
+      }
+      // Core tools still present
+      expect(names.has('source_test')).toBe(true);
+      expect(names.has('source_credential_prompt')).toBe(true);
+    });
+
+    it('json schema conversion respects granular flags', () => {
+      const defs = getToolDefsAsJsonSchema({ disableOauth: true, disableBrowser: true });
+      const names = new Set(defs.map(d => d.name));
+
+      expect(names.has('source_oauth_trigger')).toBe(false);
+      expect(names.has('browser_tool')).toBe(false);
+      expect(names.has('mermaid_validate')).toBe(true);
+    });
   });
 
   it('safe-mode helpers support MCP prefixing', () => {

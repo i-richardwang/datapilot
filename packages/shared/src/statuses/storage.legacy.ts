@@ -43,7 +43,7 @@ export function getDefaultStatusConfig(): WorkspaceStatusConfig {
   // - cancelled: foreground/50 (muted, inactive)
   //
   // Note: icon is omitted - auto-discovered from statuses/icons/{id}.svg
-  const lite = FEATURE_FLAGS.liteVersion;
+  const lite = FEATURE_FLAGS.liteUi;
   const statuses: StatusConfig[] = [
     ...(!lite ? [{
       id: 'backlog',

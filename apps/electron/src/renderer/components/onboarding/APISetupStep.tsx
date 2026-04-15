@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils"
 import { Check, CreditCard, Key, Cpu } from "lucide-react"
 import { StepFormLayout, BackButton, ContinueButton } from "./primitives"
 import type { LlmAuthType, LlmProviderType } from "@craft-agent/shared/config/llm-connections"
+import { FEATURE_FLAGS } from "@craft-agent/shared/feature-flags"
 
 /** Provider segment for the segmented control */
 export type ProviderSegment = 'anthropic' | 'pi'
@@ -236,8 +237,10 @@ export function APISetupStep({
     },
   ]
 
-  // Filter options based on active segment
-  const filteredOptions = API_SETUP_OPTIONS.filter(o => o.providerType === activeSegment)
+  // Filter options based on active segment and feature flags
+  const filteredOptions = API_SETUP_OPTIONS
+    .filter(o => o.providerType === activeSegment)
+    .filter(o => !(FEATURE_FLAGS.disableOauth && o.id === 'pi_copilot_oauth'))
 
   // Handle segment change - clear selection if it doesn't belong to new segment
   const handleSegmentChange = (segment: ProviderSegment) => {

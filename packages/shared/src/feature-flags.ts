@@ -60,14 +60,62 @@ export function isEmbeddedServerEnabled(): boolean {
 }
 
 /**
- * Build-time check for lite version.
+ * Build-time check: disable OAuth provider tools and onboarding options.
  *
- * When enabled, hides non-essential UI elements (What's New, Help menu,
- * subscription providers, extra statuses) for a streamlined experience.
- * Set DATAPILOT_LITE_VERSION=1 at build time to enable.
+ * Removes the 4 OAuth trigger tools, hides GitHub Copilot from onboarding,
+ * and suppresses OAuth-related system prompt guidance. Useful for internal
+ * deployments that don't use SaaS OAuth flows.
+ * Set DATAPILOT_DISABLE_OAUTH=1 at build time to enable.
  */
-export function isLiteVersion(): boolean {
-  const override = parseBooleanEnv(process.env.DATAPILOT_LITE_VERSION);
+export function isOauthDisabled(): boolean {
+  const override = parseBooleanEnv(process.env.DATAPILOT_DISABLE_OAUTH);
+  if (override !== undefined) return override;
+  return false;
+}
+
+/**
+ * Build-time check: disable in-app browser tool.
+ *
+ * Removes browser_tool and its system prompt reference.
+ * Set DATAPILOT_DISABLE_BROWSER=1 at build time to enable.
+ */
+export function isBrowserDisabled(): boolean {
+  const override = parseBooleanEnv(process.env.DATAPILOT_DISABLE_BROWSER);
+  if (override !== undefined) return override;
+  return false;
+}
+
+/**
+ * Build-time check: disable validation tools (mermaid_validate, skill_validate).
+ *
+ * Set DATAPILOT_DISABLE_VALIDATION=1 at build time to enable.
+ */
+export function isValidationDisabled(): boolean {
+  const override = parseBooleanEnv(process.env.DATAPILOT_DISABLE_VALIDATION);
+  if (override !== undefined) return override;
+  return false;
+}
+
+/**
+ * Build-time check: disable template and sandbox tools (render_template, script_sandbox).
+ *
+ * Set DATAPILOT_DISABLE_TEMPLATES=1 at build time to enable.
+ */
+export function isTemplatesDisabled(): boolean {
+  const override = parseBooleanEnv(process.env.DATAPILOT_DISABLE_TEMPLATES);
+  if (override !== undefined) return override;
+  return false;
+}
+
+/**
+ * Build-time check: enable streamlined UI.
+ *
+ * Hides non-essential UI elements (What's New, Help menu) and
+ * removes extra default statuses (Backlog, Needs Review).
+ * Set DATAPILOT_LITE_UI=1 at build time to enable.
+ */
+export function isLiteUi(): boolean {
+  const override = parseBooleanEnv(process.env.DATAPILOT_LITE_UI);
   if (override !== undefined) return override;
   return false;
 }
@@ -92,13 +140,25 @@ export const FEATURE_FLAGS = {
   get craftAgentsCli(): boolean {
     return isCraftAgentsCliEnabled();
   },
-  /**
-   * Lite version — hides non-essential UI elements.
-   *
-   * Defaults to disabled. Set DATAPILOT_LITE_VERSION=1 at build time to enable.
-   */
-  get liteVersion(): boolean {
-    return isLiteVersion();
+  /** Disable OAuth provider tools and onboarding options. */
+  get disableOauth(): boolean {
+    return isOauthDisabled();
+  },
+  /** Disable in-app browser tool. */
+  get disableBrowser(): boolean {
+    return isBrowserDisabled();
+  },
+  /** Disable validation tools (mermaid_validate, skill_validate). */
+  get disableValidation(): boolean {
+    return isValidationDisabled();
+  },
+  /** Disable template and sandbox tools (render_template, script_sandbox). */
+  get disableTemplates(): boolean {
+    return isTemplatesDisabled();
+  },
+  /** Streamlined UI — hides non-essential elements and extra statuses. */
+  get liteUi(): boolean {
+    return isLiteUi();
   },
   /**
    * Enable embedded server settings page.

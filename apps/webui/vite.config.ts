@@ -75,7 +75,11 @@ export default defineConfig({
   define: {
     // Flag to detect web UI context in shared code
     'import.meta.env.IS_WEBUI': 'true',
-    'process.env.DATAPILOT_LITE_VERSION': JSON.stringify(process.env.DATAPILOT_LITE_VERSION || ''),
+    'process.env.DATAPILOT_DISABLE_OAUTH': JSON.stringify(process.env.DATAPILOT_DISABLE_OAUTH || ''),
+    'process.env.DATAPILOT_DISABLE_BROWSER': JSON.stringify(process.env.DATAPILOT_DISABLE_BROWSER || ''),
+    'process.env.DATAPILOT_DISABLE_VALIDATION': JSON.stringify(process.env.DATAPILOT_DISABLE_VALIDATION || ''),
+    'process.env.DATAPILOT_DISABLE_TEMPLATES': JSON.stringify(process.env.DATAPILOT_DISABLE_TEMPLATES || ''),
+    'process.env.DATAPILOT_LITE_UI': JSON.stringify(process.env.DATAPILOT_LITE_UI || ''),
   },
   optimizeDeps: {
     include: ['react', 'react-dom', 'jotai'],

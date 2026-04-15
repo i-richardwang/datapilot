@@ -21,6 +21,12 @@ import {
   getSourcePath,
 } from '../source-helpers.ts';
 
+/** Check if OAuth tools are disabled (mirrors FEATURE_FLAGS.disableOauth without importing shared). */
+function isOauthDisabled(): boolean {
+  const val = (typeof process !== 'undefined' && process.env?.DATAPILOT_DISABLE_OAUTH || '').trim().toLowerCase();
+  return ['1', 'true', 'yes', 'on'].includes(val);
+}
+
 export interface SourceTestArgs {
   sourceSlug: string;
 }
@@ -728,7 +734,11 @@ async function testMcpConnection(
         } else if (result.needsAuth) {
           lines.push(`⚠ MCP server requires authentication`);
           if (source.mcp.authType === 'oauth') {
-            lines.push('  Use source_oauth_trigger to authenticate');
+            if (isOauthDisabled()) {
+              lines.push('  OAuth authentication is not available in this build');
+            } else {
+              lines.push('  Use source_oauth_trigger to authenticate');
+            }
           }
           success = true; // Server is reachable, just needs auth
         } else {
@@ -840,7 +850,17 @@ async function checkAuthStatus(
     }
   } else {
     // Determine required auth type
-    if (source.type === 'mcp' && source.mcp?.authType === 'oauth') {
+    const oauthDisabled = isOauthDisabled();
+    const isOauthSource =
+      (source.type === 'mcp' && source.mcp?.authType === 'oauth') ||
+      (source.type === 'api' && ['google', 'slack', 'microsoft'].includes(source.provider ?? '')) ||
+      (source.type === 'api' && source.api?.authType === 'oauth');
+
+    if (oauthDisabled && isOauthSource) {
+      hasWarning = true;
+      lines.push('⚠ Source not authenticated');
+      lines.push('  OAuth authentication is not available in this build');
+    } else if (source.type === 'mcp' && source.mcp?.authType === 'oauth') {
       hasWarning = true;
       lines.push('⚠ Source not authenticated');
       lines.push('  Use source_oauth_trigger to authenticate');

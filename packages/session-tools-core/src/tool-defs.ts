@@ -561,15 +561,27 @@ export const SESSION_TOOL_DEFS: SessionToolDef[] = [
   { name: 'list_sessions', description: TOOL_DESCRIPTIONS.list_sessions, inputSchema: ListSessionsSchema, executionMode: 'registry', safeMode: 'allow', readOnly: true, handler: handleListSessions },
 ];
 
-/** Tools excluded in lite mode (OAuth, browser, validation, template, and sandbox tools not needed) */
-export const LITE_EXCLUDED_TOOLS = new Set([
+/** OAuth provider trigger tools. Disabled via DATAPILOT_DISABLE_OAUTH. */
+export const OAUTH_TOOLS = new Set([
   'source_oauth_trigger',
   'source_google_oauth_trigger',
   'source_slack_oauth_trigger',
   'source_microsoft_oauth_trigger',
+]);
+
+/** In-app browser tool. Disabled via DATAPILOT_DISABLE_BROWSER. */
+export const BROWSER_TOOLS = new Set([
   'browser_tool',
+]);
+
+/** Syntax/schema validation tools. Disabled via DATAPILOT_DISABLE_VALIDATION. */
+export const VALIDATION_TOOLS = new Set([
   'mermaid_validate',
   'skill_validate',
+]);
+
+/** Template rendering and sandbox tools. Disabled via DATAPILOT_DISABLE_TEMPLATES. */
+export const TEMPLATE_TOOLS = new Set([
   'render_template',
   'script_sandbox',
 ]);
@@ -606,8 +618,14 @@ export interface SessionToolFilterOptions {
   includeDeveloperFeedback?: boolean;
   /** Include batch_output tool (only for batch-spawned sessions). Defaults to false. */
   includeBatchOutput?: boolean;
-  /** Exclude provider-specific OAuth tools for lite builds. Defaults to false. */
-  liteMode?: boolean;
+  /** Exclude OAuth provider trigger tools. Defaults to false. */
+  disableOauth?: boolean;
+  /** Exclude in-app browser tool. Defaults to false. */
+  disableBrowser?: boolean;
+  /** Exclude validation tools (mermaid_validate, skill_validate). Defaults to false. */
+  disableValidation?: boolean;
+  /** Exclude template and sandbox tools (render_template, script_sandbox). Defaults to false. */
+  disableTemplates?: boolean;
   /** Exclude UI/interaction tools for batch-spawned sessions. Defaults to false. */
   batchMode?: boolean;
   /** Minimal batch profile: only include tools in MINIMAL_BATCH_SESSION_TOOLS. Defaults to false. */
@@ -623,7 +641,10 @@ export interface SessionToolFilterOptions {
 export function getSessionToolDefs(options?: SessionToolFilterOptions): SessionToolDef[] {
   const includeDeveloperFeedback = options?.includeDeveloperFeedback ?? true;
   const includeBatchOutput = options?.includeBatchOutput ?? false;
-  const liteMode = options?.liteMode ?? false;
+  const disableOauth = options?.disableOauth ?? false;
+  const disableBrowser = options?.disableBrowser ?? false;
+  const disableValidation = options?.disableValidation ?? false;
+  const disableTemplates = options?.disableTemplates ?? false;
   const batchMode = options?.batchMode ?? false;
   const minimalBatchMode = options?.minimalBatchMode ?? false;
 
@@ -634,7 +655,16 @@ export function getSessionToolDefs(options?: SessionToolFilterOptions): SessionT
     if (!includeBatchOutput && def.name === 'batch_output') {
       return false;
     }
-    if (liteMode && LITE_EXCLUDED_TOOLS.has(def.name)) {
+    if (disableOauth && OAUTH_TOOLS.has(def.name)) {
+      return false;
+    }
+    if (disableBrowser && BROWSER_TOOLS.has(def.name)) {
+      return false;
+    }
+    if (disableValidation && VALIDATION_TOOLS.has(def.name)) {
+      return false;
+    }
+    if (disableTemplates && TEMPLATE_TOOLS.has(def.name)) {
       return false;
     }
     if (minimalBatchMode) {
@@ -756,14 +786,20 @@ export function getToolDefsAsJsonSchema(opts?: {
   prefix?: string;
   includeDeveloperFeedback?: boolean;
   includeBatchOutput?: boolean;
-  liteMode?: boolean;
+  disableOauth?: boolean;
+  disableBrowser?: boolean;
+  disableValidation?: boolean;
+  disableTemplates?: boolean;
   batchMode?: boolean;
 }): JsonSchemaToolDef[] {
   const prefix = opts?.prefix || '';
   const defs = getSessionToolDefs({
     includeDeveloperFeedback: opts?.includeDeveloperFeedback,
     includeBatchOutput: opts?.includeBatchOutput,
-    liteMode: opts?.liteMode,
+    disableOauth: opts?.disableOauth,
+    disableBrowser: opts?.disableBrowser,
+    disableValidation: opts?.disableValidation,
+    disableTemplates: opts?.disableTemplates,
     batchMode: opts?.batchMode,
   });
 
