@@ -65,12 +65,12 @@ export function isEmbeddedServerEnabled(): boolean {
  * Removes the 4 OAuth trigger tools, hides GitHub Copilot from onboarding,
  * and suppresses OAuth-related system prompt guidance. Useful for internal
  * deployments that don't use SaaS OAuth flows.
- * Set DATAPILOT_DISABLE_OAUTH=1 at build time to enable.
+ * Defaults to disabled. Set DATAPILOT_DISABLE_OAUTH=0 to re-enable.
  */
 export function isOauthDisabled(): boolean {
   const override = parseBooleanEnv(process.env.DATAPILOT_DISABLE_OAUTH);
   if (override !== undefined) return override;
-  return false;
+  return true;
 }
 
 /**
@@ -112,12 +112,12 @@ export function isTemplatesDisabled(): boolean {
  *
  * Hides non-essential UI elements (What's New, Help menu) and
  * removes extra default statuses (Backlog, Needs Review).
- * Set DATAPILOT_LITE_UI=1 at build time to enable.
+ * Defaults to enabled. Set DATAPILOT_LITE_UI=0 to disable.
  */
 export function isLiteUi(): boolean {
   const override = parseBooleanEnv(process.env.DATAPILOT_LITE_UI);
   if (override !== undefined) return override;
-  return false;
+  return true;
 }
 
 export const FEATURE_FLAGS = {

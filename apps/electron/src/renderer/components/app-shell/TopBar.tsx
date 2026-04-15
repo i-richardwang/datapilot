@@ -416,9 +416,11 @@ export function TopBar({
       {/* === RIGHT: Browser strip + add + help === */}
       {!isCompact && (
       <div ref={rightSlotRef} className="flex min-w-0 shrink-0 items-center justify-end gap-1" style={{ paddingRight: 12 }}>
+        {!FEATURE_FLAGS.disableBrowser && (
         <div className="min-w-0">
           <BrowserTabStrip activeSessionId={activeSessionId} maxVisibleBadges={maxVisibleBrowserBadges} />
         </div>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <TopBarButton aria-label="Add panel menu" className="ml-1 h-[26px] w-[26px] rounded-lg">
@@ -430,10 +432,12 @@ export function TopBar({
               <SquarePenRounded className="h-3.5 w-3.5" />
               {t("session.newSessionInPanel")}
             </StyledDropdownMenuItem>
+            {!FEATURE_FLAGS.disableBrowser && (
             <StyledDropdownMenuItem onClick={onAddBrowserPanel}>
               <Icons.Globe className="h-3.5 w-3.5" />
               New Browser Window
             </StyledDropdownMenuItem>
+            )}
           </StyledDropdownMenuContent>
         </DropdownMenu>
 

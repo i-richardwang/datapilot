@@ -32,6 +32,7 @@ import {
   SettingsInput,
 } from '@/components/settings'
 import { useUpdateChecker } from '@/hooks/useUpdateChecker'
+import { FEATURE_FLAGS } from '@craft-agent/shared/feature-flags'
 
 export const meta: DetailsPageMeta = {
   navigator: 'settings',
@@ -231,6 +232,7 @@ export default function AppSettingsPage() {
               </SettingsSection>
 
               {/* Tools */}
+              {!FEATURE_FLAGS.disableBrowser && (
               <SettingsSection title={t("settings.tools.title")}>
                 <SettingsCard>
                   <SettingsToggle
@@ -241,6 +243,7 @@ export default function AppSettingsPage() {
                   />
                 </SettingsCard>
               </SettingsSection>
+              )}
 
               {/* Network */}
               <SettingsSection title={t("settings.network.title")}>

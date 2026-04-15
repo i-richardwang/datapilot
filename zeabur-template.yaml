@@ -78,6 +78,8 @@ spec:
                     default: "9100"
                 DATAPILOT_DISABLE_OAUTH:
                     default: "1"
+                DATAPILOT_DISABLE_BROWSER:
+                    default: "1"
                 DATAPILOT_LITE_UI:
                     default: "1"
 

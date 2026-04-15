@@ -246,16 +246,6 @@ describe('SourceManager', () => {
   });
 
   describe('Authentication Utilities', () => {
-    it('should return correct auth tool for OAuth MCP sources', () => {
-      const source = createMockSource('oauth-source', {
-        type: 'mcp',
-        mcp: { url: 'https://example.com/mcp', authType: 'oauth' },
-      });
-
-      const authTool = sourceManager.getAuthToolName(source);
-      expect(authTool).toBe('source_oauth_trigger');
-    });
-
     it('should return correct auth tool for bearer MCP sources', () => {
       const source = createMockSource('bearer-source', {
         type: 'mcp',
@@ -266,28 +256,6 @@ describe('SourceManager', () => {
       expect(authTool).toBe('source_credential_prompt');
     });
 
-    it('should return correct auth tool for Google API sources', () => {
-      const source = createMockSource('google-source', {
-        type: 'api',
-        provider: 'google',
-        api: { baseUrl: 'https://www.googleapis.com', authType: 'oauth' },
-      });
-
-      const authTool = sourceManager.getAuthToolName(source);
-      expect(authTool).toBe('source_google_oauth_trigger');
-    });
-
-    it('should return correct auth tool for Slack API sources', () => {
-      const source = createMockSource('slack-source', {
-        type: 'api',
-        provider: 'slack',
-        api: { baseUrl: 'https://slack.com/api', authType: 'oauth' },
-      });
-
-      const authTool = sourceManager.getAuthToolName(source);
-      expect(authTool).toBe('source_slack_oauth_trigger');
-    });
-
     it('should return null for sources without auth', () => {
       const source = createMockSource('no-auth-source', {
         type: 'mcp',
@@ -296,6 +264,48 @@ describe('SourceManager', () => {
 
       const authTool = sourceManager.getAuthToolName(source);
       expect(authTool).toBeNull();
+    });
+
+    describe('with DATAPILOT_DISABLE_OAUTH=0 (OAuth enabled)', () => {
+      beforeEach(() => {
+        process.env.DATAPILOT_DISABLE_OAUTH = '0';
+      });
+
+      afterEach(() => {
+        delete process.env.DATAPILOT_DISABLE_OAUTH;
+      });
+
+      it('should return correct auth tool for OAuth MCP sources', () => {
+        const source = createMockSource('oauth-source', {
+          type: 'mcp',
+          mcp: { url: 'https://example.com/mcp', authType: 'oauth' },
+        });
+
+        const authTool = sourceManager.getAuthToolName(source);
+        expect(authTool).toBe('source_oauth_trigger');
+      });
+
+      it('should return correct auth tool for Google API sources', () => {
+        const source = createMockSource('google-source', {
+          type: 'api',
+          provider: 'google',
+          api: { baseUrl: 'https://www.googleapis.com', authType: 'oauth' },
+        });
+
+        const authTool = sourceManager.getAuthToolName(source);
+        expect(authTool).toBe('source_google_oauth_trigger');
+      });
+
+      it('should return correct auth tool for Slack API sources', () => {
+        const source = createMockSource('slack-source', {
+          type: 'api',
+          provider: 'slack',
+          api: { baseUrl: 'https://slack.com/api', authType: 'oauth' },
+        });
+
+        const authTool = sourceManager.getAuthToolName(source);
+        expect(authTool).toBe('source_slack_oauth_trigger');
+      });
     });
 
     describe('with DATAPILOT_DISABLE_OAUTH=1', () => {
