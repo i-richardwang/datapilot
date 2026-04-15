@@ -410,6 +410,7 @@ bun run tsc --noEmit
 | v0.8.3 | 2026-04-03 | 10 | Session self-management tools. **Restored `anthropic_compat`** as live provider. + 品牌适配：4 conflicts, 无新增品牌需求。+ SQLite 合并：clean。 |
 | v0.8.4 | 2026-04-09 | 35 | Generic OAuth, Send to Workspace. 14 version bump conflicts. Adopted upstream's callback registry. |
 | v0.8.5+v0.8.6 | 2026-04-11 | 9 | i18n (EN/ES/zh-Hans/JA), chunked transfers. Post-merge: `EditPopover` model tier type fix, `listAutomations` type rename. |
+| v0.8.7 | 2026-04-15 | 3 | Hungarian/German/Polish i18n, Bedrock fixes, API token refresh. 3 conflicts: 2 version bumps (package.json) + AppShell.tsx `useMemo` deps merge. Post-merge: duplicate import fix, i18n key sorting + fork keys added to de/hu/pl. |
 
 ### Fork Feature Milestones (non-upstream merges)
 
