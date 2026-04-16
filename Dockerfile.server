@@ -76,7 +76,7 @@ RUN bun build packages/session-mcp-server/src/index.ts \
 # Build web UI assets (served by the server on the RPC port)
 # Granular feature flags — set to "1" to disable/enable the corresponding feature.
 ARG DATAPILOT_DISABLE_OAUTH="1"
-ARG DATAPILOT_DISABLE_BROWSER=""
+ARG DATAPILOT_DISABLE_BROWSER="1"
 ARG DATAPILOT_DISABLE_VALIDATION=""
 ARG DATAPILOT_DISABLE_TEMPLATES=""
 ARG DATAPILOT_LITE_UI="1"
