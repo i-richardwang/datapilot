@@ -11,8 +11,9 @@
  */
 
 import * as React from 'react'
-import { Globe, Share2, Check, Loader2, Copy, RefreshCw, Link2Off } from 'lucide-react'
+import { Globe, CloudUpload, Loader2, Copy, RefreshCw, Link2Off } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import { PreviewOverlay } from './PreviewOverlay'
 import { CopyButton } from './CopyButton'
 import { ItemNavigator } from './ItemNavigator'
@@ -134,7 +135,6 @@ function ShareLinkButton({
   const isShared = anchorEntry !== null
   const isSharing = pending === 'sharing'
   const isBusy = pending !== 'idle'
-  const canUpdate = isShared && currentHash !== null && anchorEntry !== null && currentHash !== anchorEntry.hash
 
   // Guard: without a session or the share action, rendering this button is
   // confusing (no-op clicks, stale state). Hide it in those environments.
@@ -156,11 +156,8 @@ function ShareLinkButton({
 
   const handleCopyLink = async () => {
     if (!anchorEntry) return
-    try {
-      await navigator.clipboard.writeText(anchorEntry.sharedUrl)
-    } catch {
-      // Silently ignore — the link is still visible in the open-in-browser action.
-    }
+    await navigator.clipboard.writeText(anchorEntry.sharedUrl)
+    toast.success(t('toast.linkCopied'))
   }
 
   const handleOpenInBrowser = () => {
@@ -169,7 +166,7 @@ function ShareLinkButton({
   }
 
   const handleUpdateShare = async () => {
-    if (!anchorEntry || !onUpdateHtmlShare || !canUpdate) return
+    if (!anchorEntry || !onUpdateHtmlShare) return
     setPending('updating')
     try {
       await onUpdateHtmlShare(session.sessionId, anchorEntry.sharedId, html)
@@ -210,28 +207,34 @@ function ShareLinkButton({
           className,
         )}
       >
-        {isSharing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Share2 className="w-3.5 h-3.5" />}
+        {isSharing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CloudUpload className="w-3.5 h-3.5" />}
       </button>
     )
   }
 
   const sharedTooltip = t('htmlShare.shared')
   const trigger = (
-    <button
-      type="button"
-      disabled={isBusy}
+    <div
+      role="button"
+      tabIndex={0}
+      aria-disabled={isBusy || undefined}
       title={sharedTooltip}
       aria-label={sharedTooltip}
       className={cn(
         'flex items-center justify-center w-7 h-7 rounded-md transition-colors shrink-0 select-none',
         'text-accent hover:bg-foreground/5',
         'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-        'disabled:opacity-60 disabled:cursor-default',
+        isBusy && 'opacity-60 cursor-default',
         className,
       )}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+        }
+      }}
     >
-      {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-    </button>
+      {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CloudUpload className="w-3.5 h-3.5" />}
+    </div>
   )
 
   return (
@@ -248,19 +251,21 @@ function ShareLinkButton({
         <SimpleDropdownItem
           onClick={handleUpdateShare}
           icon={<RefreshCw className="h-3.5 w-3.5" />}
-          className={cn(!canUpdate && 'opacity-50 pointer-events-none')}
         >
           {t('htmlShare.updateShare')}
         </SimpleDropdownItem>
       )}
       {onRevokeHtmlShare && (
-        <SimpleDropdownItem
-          onClick={handleRevokeShare}
-          icon={<Link2Off className="h-3.5 w-3.5" />}
-          variant="destructive"
-        >
-          {t('htmlShare.stopSharing')}
-        </SimpleDropdownItem>
+        <>
+          <div className="my-1 h-px bg-border/50" role="separator" />
+          <SimpleDropdownItem
+            onClick={handleRevokeShare}
+            icon={<Link2Off className="h-3.5 w-3.5" />}
+            variant="destructive"
+          >
+            {t('htmlShare.stopSharing')}
+          </SimpleDropdownItem>
+        </>
       )}
     </SimpleDropdown>
   )
