@@ -119,4 +119,41 @@ export class S3Storage implements SessionStorage {
       throw err
     }
   }
+
+  async updateHtml(id: string, html: string): Promise<boolean> {
+    const { HeadObjectCommand, PutObjectCommand } = await import('@aws-sdk/client-s3')
+    try {
+      await this.client.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: this.htmlKey(id) })
+      )
+    } catch {
+      return false
+    }
+
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: this.htmlKey(id),
+        Body: html,
+        ContentType: 'text/html; charset=utf-8',
+      })
+    )
+    return true
+  }
+
+  async deleteHtml(id: string): Promise<boolean> {
+    const { DeleteObjectCommand, HeadObjectCommand } = await import('@aws-sdk/client-s3')
+    try {
+      await this.client.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: this.htmlKey(id) })
+      )
+    } catch {
+      return false
+    }
+
+    await this.client.send(
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: this.htmlKey(id) })
+    )
+    return true
+  }
 }

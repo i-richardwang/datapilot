@@ -283,6 +283,12 @@ export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): 
         return sessionManager.updateShare(sessionId)
       case 'revokeShare':
         return sessionManager.revokeShare(sessionId)
+      case 'shareHtml':
+        return sessionManager.shareHtml(sessionId, command.html)
+      case 'updateHtml':
+        return sessionManager.updateHtml(sessionId, command.sharedId, command.html)
+      case 'revokeHtml':
+        return sessionManager.revokeHtml(sessionId, command.sharedId)
       case 'refreshTitle':
         log.info(`IPC: refreshTitle received for session ${sessionId}`)
         return sessionManager.refreshTitle(sessionId)

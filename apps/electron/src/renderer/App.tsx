@@ -1728,20 +1728,52 @@ export default function App() {
     onSetTrafficLightsVisible: (visible: boolean) => {
       window.electronAPI.setTrafficLightsVisible(visible)
     },
-    // Share HTML — uploads to viewer-server, copies URL, shows toast feedback
-    onShareHtml: async (html: string) => {
-      const result = await window.electronAPI.shareHtmlArtifact(html)
-      if (!result.success) {
-        toast.error(t('toast.failedToShare'), { description: result.error })
-        throw new Error(result.error)
+    // Share HTML artifact for a session — uploads to viewer-server, copies URL,
+    // and records the share under the session's htmlShares map.
+    onShareHtml: async (sessionId: string, html: string) => {
+      const result = await window.electronAPI.sessionCommand(sessionId, { type: 'shareHtml', html }) as
+        | { success: true; sharedUrl: string; sharedId: string; contentHash: string }
+        | { success: false; error: string }
+        | undefined
+      if (!result || !result.success) {
+        const error = result && 'error' in result ? result.error : t('toast.unknownError')
+        toast.error(t('toast.failedToShare'), { description: error })
+        throw new Error(error)
       }
       try {
-        await navigator.clipboard.writeText(result.url)
+        await navigator.clipboard.writeText(result.sharedUrl)
       } catch (clipboardError) {
         console.warn('Failed to copy share URL to clipboard:', clipboardError)
       }
       toast.success(t('toast.linkCopied'))
-      return result.url
+      return { sharedUrl: result.sharedUrl, sharedId: result.sharedId, contentHash: result.contentHash }
+    },
+    // Overwrite a previously shared HTML artifact in place.
+    onUpdateHtmlShare: async (sessionId: string, sharedId: string, html: string) => {
+      const result = await window.electronAPI.sessionCommand(sessionId, { type: 'updateHtml', sharedId, html }) as
+        | { success: true; sharedUrl: string; sharedId: string; contentHash: string }
+        | { success: false; error: string }
+        | undefined
+      if (!result || !result.success) {
+        const error = result && 'error' in result ? result.error : t('toast.unknownError')
+        toast.error(t('htmlShare.failedToUpdateShare'), { description: error })
+        throw new Error(error)
+      }
+      toast.success(t('htmlShare.shareUpdated'))
+      return { sharedUrl: result.sharedUrl, sharedId: result.sharedId, contentHash: result.contentHash }
+    },
+    // Revoke a previously shared HTML artifact.
+    onRevokeHtmlShare: async (sessionId: string, sharedId: string) => {
+      const result = await window.electronAPI.sessionCommand(sessionId, { type: 'revokeHtml', sharedId }) as
+        | { success: true }
+        | { success: false; error: string }
+        | undefined
+      if (!result || !result.success) {
+        const error = result && 'error' in result ? result.error : t('toast.unknownError')
+        toast.error(t('htmlShare.failedToStopSharing'), { description: error })
+        throw new Error(error)
+      }
+      toast.success(t('htmlShare.sharingStopped'))
     },
   }), [handleOpenFile, handleOpenUrl, linkInterceptor.openFileExternal, t])
 

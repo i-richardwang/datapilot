@@ -105,9 +105,6 @@ export const CHANNEL_MAP = {
   openFile: invoke(RPC_CHANNELS.shell.OPEN_FILE),
   showInFolder: invoke(RPC_CHANNELS.shell.SHOW_IN_FOLDER),
 
-  // Viewer share — uploads HTML artifact to viewer-server, returns public URL
-  shareHtmlArtifact: invoke(RPC_CHANNELS.viewer.SHARE_HTML),
-
   // Menu event listeners
   onMenuNewChat: listener(RPC_CHANNELS.menu.NEW_CHAT),
   onMenuOpenSettings: listener(RPC_CHANNELS.menu.OPEN_SETTINGS),

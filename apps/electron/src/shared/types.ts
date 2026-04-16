@@ -362,9 +362,6 @@ export interface ElectronAPI {
   openFile(path: string): Promise<void>
   showInFolder(path: string): Promise<void>
 
-  // Viewer share — uploads HTML artifact and returns a public URL
-  shareHtmlArtifact(html: string): Promise<{ success: true; url: string; id: string } | { success: false; error: string }>
-
   // Menu event listeners
   onMenuNewChat(callback: () => void): () => void
   onMenuOpenSettings(callback: () => void): () => void

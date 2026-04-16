@@ -19,6 +19,12 @@ export interface SessionStorage {
 
   /** Load an HTML artifact by ID. Returns null if not found. */
   loadHtml(id: string): Promise<string | null>
+
+  /** Overwrite an existing HTML artifact by ID. Returns true if it existed. */
+  updateHtml(id: string, html: string): Promise<boolean>
+
+  /** Delete an HTML artifact by ID. Returns true if it existed. */
+  deleteHtml(id: string): Promise<boolean>
 }
 
 /** Generate a URL-safe short ID (similar to the format used by the official viewer). */

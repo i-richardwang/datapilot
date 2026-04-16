@@ -2,11 +2,13 @@
  * API route handlers for shared session CRUD.
  *
  * Routes:
- *   POST   /s/api          — Upload session, returns { id, url }
- *   GET    /s/api/:id      — Fetch session JSON
- *   PUT    /s/api/:id      — Update existing session
- *   DELETE /s/api/:id      — Delete session
- *   POST   /s/api/html     — Upload HTML artifact, returns { id, url }
+ *   POST   /s/api              — Upload session, returns { id, url }
+ *   GET    /s/api/:id          — Fetch session JSON
+ *   PUT    /s/api/:id          — Update existing session
+ *   DELETE /s/api/:id          — Delete session
+ *   POST   /s/api/html         — Upload HTML artifact, returns { id, url }
+ *   PUT    /s/api/html/:id     — Overwrite HTML artifact, returns { id, url }
+ *   DELETE /s/api/html/:id     — Delete HTML artifact
  */
 
 import type { SessionStorage } from './storage/interface'
@@ -39,6 +41,40 @@ export function createApiHandler(storage: SessionStorage, baseUrl: string) {
 
       const url = `${baseUrl}/s/h/${id}`
       return Response.json({ id, url }, { status: 201 })
+    }
+
+    // /s/api/html/{id} — update / delete existing HTML artifact
+    const htmlIdMatch = apiPath.match(/^\/html\/([a-zA-Z0-9_-]+)$/)
+    if (htmlIdMatch) {
+      const htmlId = htmlIdMatch[1]!
+
+      if (req.method === 'PUT') {
+        const contentLength = parseInt(req.headers.get('content-length') || '0', 10)
+        if (contentLength > MAX_BODY_SIZE) {
+          return Response.json({ error: 'Request too large' }, { status: 413 })
+        }
+
+        const html = await req.text()
+        if (!html) {
+          return Response.json({ error: 'Empty HTML body' }, { status: 400 })
+        }
+
+        const updated = await storage.updateHtml(htmlId, html)
+        if (!updated) {
+          return Response.json({ error: 'Not found' }, { status: 404 })
+        }
+        return Response.json({ id: htmlId, url: `${baseUrl}/s/h/${htmlId}` })
+      }
+
+      if (req.method === 'DELETE') {
+        const existed = await storage.deleteHtml(htmlId)
+        if (!existed) {
+          return Response.json({ error: 'Not found' }, { status: 404 })
+        }
+        return new Response(null, { status: 204 })
+      }
+
+      return null
     }
 
     // POST /s/api — create

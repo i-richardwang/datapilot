@@ -23,6 +23,11 @@ export {
   ShikiThemeProvider,
   useShikiTheme,
   type ShikiThemeProviderProps,
+  SessionProvider,
+  useSessionContext,
+  type HtmlShareEntry,
+  type SessionContextValue,
+  type SessionProviderProps,
 } from './context'
 
 // Chat components

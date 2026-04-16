@@ -61,4 +61,22 @@ export class FsStorage implements SessionStorage {
     if (!(await file.exists())) return null
     return file.text()
   }
+
+  async updateHtml(id: string, html: string): Promise<boolean> {
+    const file = Bun.file(this.htmlPath(id))
+    if (!(await file.exists())) return false
+    await Bun.write(this.htmlPath(id), html)
+    return true
+  }
+
+  async deleteHtml(id: string): Promise<boolean> {
+    const { unlink } = await import('node:fs/promises')
+    try {
+      await unlink(this.htmlPath(id))
+      return true
+    } catch (err: any) {
+      if (err.code === 'ENOENT') return false
+      throw err
+    }
+  }
 }

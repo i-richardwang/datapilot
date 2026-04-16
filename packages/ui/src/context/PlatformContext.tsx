@@ -115,12 +115,27 @@ export interface PlatformActions {
   onSetTrafficLightsVisible?: (visible: boolean) => void
 
   /**
-   * Upload an HTML snippet to the configured viewer-server and return a public URL.
-   * The returned URL is also copied to the clipboard and a toast is shown to the user.
-   * Implementations should surface their own error feedback (e.g. toast); throwing
-   * lets callers reset transient UI state.
+   * Share an HTML snippet from a chat session. Uploads to the configured
+   * viewer-server and persists the sharedUrl/sharedId under the session's
+   * `htmlShares` map (keyed by sha256(html) content hash).
+   *
+   * Implementations should surface their own error feedback (e.g. toast);
+   * throwing lets callers reset transient UI state.
    */
-  onShareHtml?: (html: string) => Promise<string>
+  onShareHtml?: (sessionId: string, html: string) => Promise<{ sharedUrl: string; sharedId: string; contentHash: string }>
+
+  /**
+   * Overwrite the content of a previously shared HTML artifact. The
+   * artifact's sharedId/URL stay the same; only the content (and indexing
+   * hash inside the session's `htmlShares`) changes.
+   */
+  onUpdateHtmlShare?: (sessionId: string, sharedId: string, html: string) => Promise<{ sharedUrl: string; sharedId: string; contentHash: string }>
+
+  /**
+   * Revoke a previously shared HTML artifact. The artifact is removed from
+   * the viewer-server and the session's `htmlShares` entry is cleared.
+   */
+  onRevokeHtmlShare?: (sessionId: string, sharedId: string) => Promise<void>
 }
 
 const PlatformContext = createContext<PlatformActions>({})

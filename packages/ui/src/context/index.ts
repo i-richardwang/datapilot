@@ -14,3 +14,11 @@ export {
   useShikiTheme,
   type ShikiThemeProviderProps,
 } from './ShikiThemeContext'
+
+export {
+  SessionProvider,
+  useSessionContext,
+  type HtmlShareEntry,
+  type SessionContextValue,
+  type SessionProviderProps,
+} from './SessionContext'
