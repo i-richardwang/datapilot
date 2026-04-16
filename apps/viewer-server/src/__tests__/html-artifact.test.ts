@@ -110,4 +110,85 @@ describe('viewer-server HTML artifact endpoints', () => {
       expect(res!.status).toBe(404)
     })
   })
+
+  describe('PUT /s/api/html/{id}', () => {
+    it('overwrites existing HTML and subsequent GET returns the new content', async () => {
+      const original = '<!doctype html><html><body>Original</body></html>'
+      const upload = await handleApi(
+        new Request(`${BASE_URL}/s/api/html`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          body: original,
+        }),
+        '/s/api/html',
+      )
+      const { id } = (await upload!.json()) as { id: string; url: string }
+
+      const updated = '<!doctype html><html><body>Updated</body></html>'
+      const putRes = await handleApi(
+        new Request(`${BASE_URL}/s/api/html/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          body: updated,
+        }),
+        `/s/api/html/${id}`,
+      )
+      expect(putRes).not.toBeNull()
+      expect(putRes!.status).toBe(200)
+      const putBody = (await putRes!.json()) as { id: string; url: string }
+      expect(putBody.id).toBe(id)
+      expect(putBody.url).toBe(`${BASE_URL}/s/h/${id}`)
+
+      const getRes = await handleHtmlArtifactRoute(storage, `/s/h/${id}`)
+      expect(getRes!.status).toBe(200)
+      expect(await getRes!.text()).toBe(updated)
+    })
+
+    it('returns 404 when the id does not exist', async () => {
+      const res = await handleApi(
+        new Request(`${BASE_URL}/s/api/html/missing-id`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          body: '<html></html>',
+        }),
+        '/s/api/html/missing-id',
+      )
+      expect(res).not.toBeNull()
+      expect(res!.status).toBe(404)
+    })
+  })
+
+  describe('DELETE /s/api/html/{id}', () => {
+    it('deletes the artifact and subsequent GET returns 404', async () => {
+      const html = '<!doctype html><html><body>Goodbye</body></html>'
+      const upload = await handleApi(
+        new Request(`${BASE_URL}/s/api/html`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          body: html,
+        }),
+        '/s/api/html',
+      )
+      const { id } = (await upload!.json()) as { id: string; url: string }
+
+      const delRes = await handleApi(
+        new Request(`${BASE_URL}/s/api/html/${id}`, { method: 'DELETE' }),
+        `/s/api/html/${id}`,
+      )
+      expect(delRes).not.toBeNull()
+      expect(delRes!.status).toBe(204)
+
+      const getRes = await handleHtmlArtifactRoute(storage, `/s/h/${id}`)
+      expect(getRes!.status).toBe(404)
+    })
+
+    it('returns 404 when the id does not exist', async () => {
+      const res = await handleApi(
+        new Request(`${BASE_URL}/s/api/html/missing-id`, { method: 'DELETE' }),
+        '/s/api/html/missing-id',
+      )
+      expect(res).not.toBeNull()
+      expect(res!.status).toBe(404)
+    })
+  })
 })

@@ -199,6 +199,7 @@ function sessionToRow(session: StoredSession, workspaceRootPath: string): typeof
     thinkingLevel: session.thinkingLevel ?? null,
     sharedUrl: session.sharedUrl ?? null,
     sharedId: session.sharedId ?? null,
+    htmlShares: session.htmlShares ?? null,
     pendingPlanExecution: session.pendingPlanExecution ?? null,
     isArchived: session.isArchived ?? false,
     archivedAt: session.archivedAt ?? null,
@@ -249,6 +250,7 @@ function rowToSessionConfig(row: SessionRow, workspaceRootPath: string): Session
     thinkingLevel: row.thinkingLevel as SessionConfig['thinkingLevel'],
     sharedUrl: row.sharedUrl ?? undefined,
     sharedId: row.sharedId ?? undefined,
+    htmlShares: (row.htmlShares as SessionConfig['htmlShares']) ?? undefined,
     pendingPlanExecution: row.pendingPlanExecution as SessionConfig['pendingPlanExecution'],
     isArchived: row.isArchived ?? undefined,
     archivedAt: row.archivedAt ?? undefined,
@@ -288,6 +290,7 @@ function rowToMetadata(row: SessionRow, workspaceRootPath: string): SessionMetad
     planCount: planCount > 0 ? planCount : undefined,
     sharedUrl: row.sharedUrl ?? undefined,
     sharedId: row.sharedId ?? undefined,
+    htmlShares: (row.htmlShares as SessionConfig['htmlShares']) ?? undefined,
     workingDirectory: row.workingDirectory ? expandPath(row.workingDirectory) : undefined,
     sdkCwd: row.sdkCwd ? expandPath(row.sdkCwd) : undefined,
     lastMessageRole: row.lastMessageRole as SessionMetadata['lastMessageRole'],
@@ -658,6 +661,7 @@ export async function updateSessionMetadata(
     | 'permissionMode'
     | 'sharedUrl'
     | 'sharedId'
+    | 'htmlShares'
     | 'model'
     | 'llmConnection'
     | 'isArchived'
@@ -681,6 +685,7 @@ export async function updateSessionMetadata(
   if ('hasUnread' in updates) set.hasUnread = updates.hasUnread ?? false;
   if ('sharedUrl' in updates) set.sharedUrl = updates.sharedUrl ?? null;
   if ('sharedId' in updates) set.sharedId = updates.sharedId ?? null;
+  if ('htmlShares' in updates) set.htmlShares = updates.htmlShares ?? null;
   if (updates.model !== undefined) set.model = updates.model;
   if (updates.llmConnection !== undefined) set.llmConnection = updates.llmConnection;
   if (updates.isArchived !== undefined) set.isArchived = updates.isArchived;

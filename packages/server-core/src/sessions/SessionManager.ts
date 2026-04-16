@@ -5,7 +5,7 @@ import { createScopedLogger, CONSOLE_LOGGER, type PlatformServices, type Logger 
 import { basename, dirname, join } from 'path'
 import { existsSync } from 'fs'
 import { readFile, writeFile, mkdir } from 'fs/promises'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { type AgentEvent, setPermissionMode, hydratePreviousPermissionMode, getPermissionModeDiagnostics, type PermissionMode, unregisterSessionScopedToolCallbacks, cleanupSessionScopedTools, mergeSessionScopedToolCallbacks, registerSessionBatchContext, AbortReason, type AuthRequest, type AuthResult, type CredentialAuthRequest, type BrowserPaneFns, generateConversationSummary } from '@craft-agent/shared/agent'
 import {
   resolveSessionConnection,
@@ -773,6 +773,9 @@ interface ManagedSession {
   sharedUrl?: string
   // Shared session ID in viewer (for revoke)
   sharedId?: string
+  // Shared HTML artifacts for this session, keyed by sha256(html) content hash.
+  // Strictly session-scoped — never reused across sessions.
+  htmlShares?: Record<string, import('@craft-agent/shared/protocol').HtmlShareInfo>
   // Model to use for this session (overrides global config if set)
   model?: string
   // LLM connection slug for this session (locked after first message)
@@ -4146,6 +4149,155 @@ export class SessionManager implements ISessionManager {
       // Signal async operation end
       managed.isAsyncOperationOngoing = false
       this.sendEvent({ type: 'async_operation', sessionId, isOngoing: false }, managed.workspace.id)
+    }
+  }
+
+  // ============================================
+  // HTML Artifact Sharing (session-scoped)
+  // ============================================
+
+  /**
+   * Upload an HTML artifact for a session. Indexed by sha256(html) so repeated
+   * shares of the same content from the same session return the same URL.
+   */
+  async shareHtml(sessionId: string, html: string): Promise<import('@craft-agent/shared/protocol').ShareHtmlResult> {
+    const managed = this.sessions.get(sessionId)
+    if (!managed) {
+      return { success: false, error: 'Session not found' }
+    }
+    if (typeof html !== 'string' || html.length === 0) {
+      return { success: false, error: 'HTML body is empty' }
+    }
+
+    const contentHash = createHash('sha256').update(html).digest('hex')
+    const existing = managed.htmlShares?.[contentHash]
+    if (existing) {
+      return {
+        success: true,
+        sharedUrl: existing.sharedUrl,
+        sharedId: existing.sharedId,
+        contentHash,
+      }
+    }
+
+    try {
+      const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+      const response = await fetch(`${VIEWER_URL}/s/api/html`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        body: html,
+      })
+
+      if (!response.ok) {
+        sessionLog.error(`HTML share failed with status ${response.status}`)
+        if (response.status === 413) {
+          return { success: false, error: 'HTML is too large to share' }
+        }
+        return { success: false, error: `Upload failed (status ${response.status})` }
+      }
+
+      const data = await response.json() as { id: string; url: string }
+      const nextShares = { ...(managed.htmlShares ?? {}), [contentHash]: { sharedUrl: data.url, sharedId: data.id } }
+      managed.htmlShares = nextShares
+      await updateSessionMetadata(managed.workspace.rootPath, sessionId, { htmlShares: nextShares })
+
+      sessionLog.info(`HTML artifact ${data.id} shared for session ${sessionId}`)
+      this.sendEvent({ type: 'session_html_shares_changed', sessionId, htmlShares: nextShares }, managed.workspace.id)
+      return { success: true, sharedUrl: data.url, sharedId: data.id, contentHash }
+    } catch (error) {
+      sessionLog.error('shareHtml error:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
+  /**
+   * Overwrite an existing HTML artifact with new content. Re-indexes the share
+   * under the new content hash while keeping the same sharedId (and therefore URL).
+   */
+  async updateHtml(sessionId: string, sharedId: string, html: string): Promise<import('@craft-agent/shared/protocol').ShareHtmlResult> {
+    const managed = this.sessions.get(sessionId)
+    if (!managed) {
+      return { success: false, error: 'Session not found' }
+    }
+    if (typeof html !== 'string' || html.length === 0) {
+      return { success: false, error: 'HTML body is empty' }
+    }
+
+    const existingEntry = Object.entries(managed.htmlShares ?? {}).find(([, v]) => v.sharedId === sharedId)
+    if (!existingEntry) {
+      return { success: false, error: 'HTML share not found' }
+    }
+    const [previousHash, existing] = existingEntry
+
+    try {
+      const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+      const response = await fetch(`${VIEWER_URL}/s/api/html/${sharedId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        body: html,
+      })
+
+      if (!response.ok) {
+        sessionLog.error(`HTML update share failed with status ${response.status}`)
+        if (response.status === 404) {
+          return { success: false, error: 'Shared HTML not found' }
+        }
+        if (response.status === 413) {
+          return { success: false, error: 'HTML is too large to share' }
+        }
+        return { success: false, error: `Update failed (status ${response.status})` }
+      }
+
+      const contentHash = createHash('sha256').update(html).digest('hex')
+      const nextShares = { ...(managed.htmlShares ?? {}) }
+      if (previousHash !== contentHash) delete nextShares[previousHash]
+      nextShares[contentHash] = { sharedUrl: existing.sharedUrl, sharedId }
+      managed.htmlShares = nextShares
+      await updateSessionMetadata(managed.workspace.rootPath, sessionId, { htmlShares: nextShares })
+
+      sessionLog.info(`HTML artifact ${sharedId} updated for session ${sessionId}`)
+      this.sendEvent({ type: 'session_html_shares_changed', sessionId, htmlShares: nextShares }, managed.workspace.id)
+      return { success: true, sharedUrl: existing.sharedUrl, sharedId, contentHash }
+    } catch (error) {
+      sessionLog.error('updateHtml error:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
+  /** Revoke a previously shared HTML artifact. */
+  async revokeHtml(sessionId: string, sharedId: string): Promise<import('@craft-agent/shared/protocol').RevokeHtmlResult> {
+    const managed = this.sessions.get(sessionId)
+    if (!managed) {
+      return { success: false, error: 'Session not found' }
+    }
+
+    const existingEntry = Object.entries(managed.htmlShares ?? {}).find(([, v]) => v.sharedId === sharedId)
+    if (!existingEntry) {
+      return { success: false, error: 'HTML share not found' }
+    }
+    const [hash] = existingEntry
+
+    try {
+      const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+      const response = await fetch(`${VIEWER_URL}/s/api/html/${sharedId}`, { method: 'DELETE' })
+
+      // Treat 404 as "already gone" — local state should still be cleared.
+      if (!response.ok && response.status !== 404) {
+        sessionLog.error(`HTML revoke failed with status ${response.status}`)
+        return { success: false, error: `Revoke failed (status ${response.status})` }
+      }
+
+      const nextShares = { ...(managed.htmlShares ?? {}) }
+      delete nextShares[hash]
+      managed.htmlShares = nextShares
+      await updateSessionMetadata(managed.workspace.rootPath, sessionId, { htmlShares: nextShares })
+
+      sessionLog.info(`HTML artifact ${sharedId} revoked for session ${sessionId}`)
+      this.sendEvent({ type: 'session_html_shares_changed', sessionId, htmlShares: nextShares }, managed.workspace.id)
+      return { success: true }
+    } catch (error) {
+      sessionLog.error('revokeHtml error:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   }
 

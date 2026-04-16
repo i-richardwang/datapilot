@@ -193,6 +193,14 @@ const WORKSPACE_MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_turn_usage_timestamp ON turn_usage(timestamp);
     `,
   },
+  {
+    name: '0002_html_shares',
+    sql: `
+      -- Per-session HTML artifact shares, keyed by sha256 content hash.
+      -- Stored as JSON with shape { [hash]: { sharedUrl, sharedId } }, default NULL.
+      ALTER TABLE sessions ADD COLUMN html_shares TEXT;
+    `,
+  },
 ];
 
 /**

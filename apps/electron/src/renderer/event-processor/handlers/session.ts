@@ -36,6 +36,7 @@ import type {
   MessageAnnotationsUpdatedEvent,
   SessionSharedEvent,
   SessionUnsharedEvent,
+  SessionHtmlSharesChangedEvent,
   AuthRequestEvent,
   AuthCompletedEvent,
   UsageUpdateEvent,
@@ -808,6 +809,28 @@ export function handleSessionUnshared(
         ...session,
         sharedUrl: undefined,
         sharedId: undefined,
+      },
+      streaming,
+    },
+    effects: [],
+  }
+}
+
+/**
+ * Handle session_html_shares_changed - server pushed a new full htmlShares map
+ * after a shareHtml/updateHtml/revokeHtml operation (possibly from another window).
+ */
+export function handleSessionHtmlSharesChanged(
+  state: SessionState,
+  event: SessionHtmlSharesChangedEvent
+): ProcessResult {
+  const { session, streaming } = state
+
+  return {
+    state: {
+      session: {
+        ...session,
+        htmlShares: event.htmlShares,
       },
       streaming,
     },

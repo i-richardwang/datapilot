@@ -39,6 +39,12 @@ export type SessionStatus = string
 
 export type BuiltInStatusId = 'todo' | 'in-progress' | 'needs-review' | 'done' | 'cancelled'
 
+/** One shared HTML artifact entry in Session.htmlShares. */
+export interface HtmlShareInfo {
+  sharedUrl: string
+  sharedId: string
+}
+
 /**
  * Electron-specific Session type (includes runtime state).
  * Extends core Session with messages array and processing state.
@@ -71,6 +77,11 @@ export interface Session {
   sessionFolderPath?: string
   sharedUrl?: string
   sharedId?: string
+  /**
+   * Shared HTML artifacts for this session, keyed by sha256(html) content hash.
+   * Strictly session-scoped — shares never travel across sessions.
+   */
+  htmlShares?: Record<string, HtmlShareInfo>
   model?: string
   llmConnection?: string
   thinkingLevel?: ThinkingLevel
@@ -199,6 +210,7 @@ export type SessionEvent =
   | { type: 'session_created'; sessionId: string }
   | { type: 'session_shared'; sessionId: string; sharedUrl: string }
   | { type: 'session_unshared'; sessionId: string }
+  | { type: 'session_html_shares_changed'; sessionId: string; htmlShares: Record<string, HtmlShareInfo> }
   | { type: 'auth_request'; sessionId: string; message: Message; request: SharedAuthRequest }
   | { type: 'auth_completed'; sessionId: string; requestId: string; success: boolean; cancelled?: boolean; error?: string }
   | { type: 'source_activated'; sessionId: string; sourceSlug: string; originalMessage: string }
@@ -239,6 +251,9 @@ export type SessionCommand =
   | { type: 'shareToViewer' }
   | { type: 'updateShare' }
   | { type: 'revokeShare' }
+  | { type: 'shareHtml'; html: string }
+  | { type: 'updateHtml'; sharedId: string; html: string }
+  | { type: 'revokeHtml'; sharedId: string }
   | { type: 'refreshTitle' }
   | { type: 'setConnection'; connectionSlug: string }
   | { type: 'setPendingPlanExecution'; planPath: string; draftInputSnapshot?: string }
@@ -445,6 +460,20 @@ export interface ShareResult {
   url?: string
   error?: string
 }
+
+/**
+ * Result of a shareHtml / updateHtml session command.
+ * On success, returns the public URL and stable sharedId; shareHtml also
+ * returns the contentHash under which the share is indexed.
+ */
+export type ShareHtmlResult =
+  | { success: true; sharedUrl: string; sharedId: string; contentHash: string }
+  | { success: false; error: string }
+
+/** Result of a revokeHtml session command. */
+export type RevokeHtmlResult =
+  | { success: true }
+  | { success: false; error: string }
 
 export interface RefreshTitleResult {
   success: boolean

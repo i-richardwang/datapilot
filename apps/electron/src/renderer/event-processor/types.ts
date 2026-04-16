@@ -422,6 +422,16 @@ export interface SessionUnsharedEvent {
 }
 
 /**
+ * Session HTML shares changed - full htmlShares map replaces previous state.
+ * Emitted after shareHtml / updateHtml / revokeHtml succeed.
+ */
+export interface SessionHtmlSharesChangedEvent {
+  type: 'session_html_shares_changed'
+  sessionId: string
+  htmlShares: Record<string, { sharedUrl: string; sharedId: string }>
+}
+
+/**
  * Auth request event - unified auth flow (credential or OAuth)
  * Adds auth-request message to session and displays inline auth UI
  */
@@ -510,6 +520,7 @@ export type AgentEvent =
   | MessageAnnotationsUpdatedEvent
   | SessionSharedEvent
   | SessionUnsharedEvent
+  | SessionHtmlSharesChangedEvent
   | AuthRequestEvent
   | AuthCompletedEvent
   | SourceActivatedEvent

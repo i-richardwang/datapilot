@@ -22,6 +22,8 @@ import type {
   PermissionModeState,
   UnreadSummary,
   ShareResult,
+  ShareHtmlResult,
+  RevokeHtmlResult,
 } from '@craft-agent/shared/protocol'
 import type { SessionBundle, DispatchMode } from '@craft-agent/shared/sessions'
 import type { EventSink } from '../transport'
@@ -129,6 +131,14 @@ export interface ISessionManager {
   shareToViewer(sessionId: string): Promise<ShareResult>
   updateShare(sessionId: string): Promise<ShareResult>
   revokeShare(sessionId: string): Promise<ShareResult>
+
+  /**
+   * HTML artifact sharing — per-session map keyed by sha256(html).
+   * Result shapes align with ShareHtmlResult / RevokeHtmlResult.
+   */
+  shareHtml(sessionId: string, html: string): Promise<ShareHtmlResult>
+  updateHtml(sessionId: string, sharedId: string, html: string): Promise<ShareHtmlResult>
+  revokeHtml(sessionId: string, sharedId: string): Promise<RevokeHtmlResult>
 
   // ---------------------------------------------------------------------------
   // Export / Import

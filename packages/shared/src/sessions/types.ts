@@ -37,7 +37,7 @@ export const SESSION_PERSISTENT_FIELDS = [
   // Model/Connection
   'model', 'llmConnection', 'connectionLocked', 'thinkingLevel',
   // Sharing
-  'sharedUrl', 'sharedId',
+  'sharedUrl', 'sharedId', 'htmlShares',
   // Plan execution
   'pendingPlanExecution',
   // Archive
@@ -94,6 +94,15 @@ export interface SessionTokenUsage {
 export type { StoredMessage } from '@craft-agent/core/types';
 
 /**
+ * One shared HTML artifact for a session.
+ * Keyed in `htmlShares` by the content hash of the HTML body.
+ */
+export interface HtmlShareInfo {
+  sharedUrl: string;
+  sharedId: string;
+}
+
+/**
  * Session configuration (persisted metadata)
  */
 export interface SessionConfig {
@@ -137,6 +146,11 @@ export interface SessionConfig {
   sharedUrl?: string;
   /** Shared session ID in viewer (for revoke) */
   sharedId?: string;
+  /**
+   * Shared HTML artifacts for this session, keyed by sha256(html) content hash.
+   * Strictly session-scoped: shares are not reused across sessions.
+   */
+  htmlShares?: Record<string, HtmlShareInfo>;
   /** Model to use for this session (overrides global config if set) */
   model?: string;
   /** LLM connection slug for this session (locked after first message) */
@@ -255,6 +269,11 @@ export interface SessionHeader {
   sharedUrl?: string;
   /** Shared session ID in viewer (for revoke) */
   sharedId?: string;
+  /**
+   * Shared HTML artifacts for this session, keyed by sha256(html) content hash.
+   * Strictly session-scoped: shares are not reused across sessions.
+   */
+  htmlShares?: Record<string, HtmlShareInfo>;
   /** Model to use for this session (overrides global config if set) */
   model?: string;
   /** LLM connection slug for this session (locked after first message) */
@@ -336,6 +355,11 @@ export interface SessionMetadata {
   sharedUrl?: string;
   /** Shared session ID in viewer (for revoke) */
   sharedId?: string;
+  /**
+   * Shared HTML artifacts for this session, keyed by sha256(html) content hash.
+   * Strictly session-scoped: shares are not reused across sessions.
+   */
+  htmlShares?: Record<string, HtmlShareInfo>;
   /** Working directory for this session */
   workingDirectory?: string;
   /** SDK cwd for session storage - set once at creation, never changes */

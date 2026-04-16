@@ -44,6 +44,7 @@ import {
   handleMessageAnnotationsUpdated,
   handleSessionShared,
   handleSessionUnshared,
+  handleSessionHtmlSharesChanged,
   handleAuthRequest,
   handleAuthCompleted,
   handleUsageUpdate,
@@ -194,6 +195,9 @@ export function processEvent(
 
     case 'session_unshared':
       return handleSessionUnshared(state, event)
+
+    case 'session_html_shares_changed':
+      return handleSessionHtmlSharesChanged(state, event)
 
     case 'auth_request':
       return handleAuthRequest(state, event)

@@ -24,7 +24,6 @@ export const CORE_HANDLED_CHANNELS = [
   RPC_CHANNELS.shell.OPEN_URL,
   RPC_CHANNELS.shell.OPEN_FILE,
   RPC_CHANNELS.shell.SHOW_IN_FOLDER,
-  RPC_CHANNELS.viewer.SHARE_HTML,
   RPC_CHANNELS.releaseNotes.GET,
   RPC_CHANNELS.releaseNotes.GET_LATEST_VERSION,
   RPC_CHANNELS.git.GET_BRANCH,
@@ -358,33 +357,4 @@ export function registerSystemCoreHandlers(server: RpcServer, deps: HandlerDeps)
     }
   })
 
-  // Upload an HTML artifact to the configured viewer-server and return the
-  // public URL. URL itself is the access credential; no auth, no TTL.
-  server.handle(RPC_CHANNELS.viewer.SHARE_HTML, async (_ctx, html: string) => {
-    if (typeof html !== 'string' || html.length === 0) {
-      return { success: false, error: 'HTML body is empty' }
-    }
-    try {
-      const { VIEWER_URL } = await import('@craft-agent/shared/branding')
-      const response = await fetch(`${VIEWER_URL}/s/api/html`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        body: html,
-      })
-
-      if (!response.ok) {
-        if (response.status === 413) {
-          return { success: false, error: 'HTML is too large to share' }
-        }
-        return { success: false, error: `Upload failed (status ${response.status})` }
-      }
-
-      const data = await response.json() as { id: string; url: string }
-      return { success: true, url: data.url, id: data.id }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      deps.platform.logger.error('shareHtml error:', message)
-      return { success: false, error: message }
-    }
-  })
 }

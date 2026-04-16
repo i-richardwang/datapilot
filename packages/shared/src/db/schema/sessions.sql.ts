@@ -55,6 +55,8 @@ export const sessions = sqliteTable('sessions', {
   // Sharing
   sharedUrl: text('shared_url'),
   sharedId: text('shared_id'),
+  /** HTML shares keyed by sha256(html) — JSON object: { [hash]: { sharedUrl, sharedId } } */
+  htmlShares: text('html_shares', { mode: 'json' }),
 
   // Plan execution state as JSON
   pendingPlanExecution: text('pending_plan_execution', { mode: 'json' }),
