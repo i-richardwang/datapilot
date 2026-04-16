@@ -11,10 +11,13 @@
  */
 
 import * as React from 'react'
-import { Globe } from 'lucide-react'
+import { Globe, Share2, Check, Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { PreviewOverlay } from './PreviewOverlay'
 import { CopyButton } from './CopyButton'
 import { ItemNavigator } from './ItemNavigator'
+import { usePlatform } from '../../context/PlatformContext'
+import { cn } from '../../lib/utils'
 
 /**
  * Inject `<base target="_top">` so link clicks navigate the top frame,
@@ -34,6 +37,68 @@ function injectBaseTarget(html: string): string {
 interface PreviewItem {
   src: string
   label?: string
+}
+
+/**
+ * ShareLinkButton — uploads the current HTML to viewer-server and copies the
+ * returned URL to the clipboard. Toast feedback (success/error) is the host
+ * platform's responsibility (see PlatformActions.onShareHtml).
+ */
+function ShareLinkButton({
+  html,
+  className,
+}: {
+  html: string
+  className?: string
+}) {
+  const { t } = useTranslation()
+  const { onShareHtml } = usePlatform()
+  const [state, setState] = React.useState<'idle' | 'sharing' | 'shared'>('idle')
+
+  const handleShare = React.useCallback(async () => {
+    if (!onShareHtml || state === 'sharing' || !html) return
+    setState('sharing')
+    try {
+      await onShareHtml(html)
+      setState('shared')
+      setTimeout(() => setState('idle'), 2000)
+    } catch {
+      // Platform reports the error via toast; just reset the button state.
+      setState('idle')
+    }
+  }, [onShareHtml, state, html])
+
+  if (!onShareHtml) return null
+
+  const tooltip = state === 'sharing'
+    ? t('tooltip.sharing')
+    : state === 'shared'
+      ? t('tooltip.linkCopied')
+      : t('tooltip.shareLink')
+
+  return (
+    <button
+      type="button"
+      onClick={handleShare}
+      disabled={state === 'sharing' || !html}
+      title={tooltip}
+      className={cn(
+        'flex items-center justify-center w-7 h-7 rounded-md transition-colors shrink-0 select-none',
+        state === 'shared'
+          ? 'text-success'
+          : 'text-muted-foreground hover:text-foreground hover:bg-foreground/5',
+        'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+        'disabled:opacity-60 disabled:cursor-default',
+        className,
+      )}
+    >
+      {state === 'sharing'
+        ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+        : state === 'shared'
+          ? <Check className="w-3.5 h-3.5" />
+          : <Share2 className="w-3.5 h-3.5" />}
+    </button>
+  )
 }
 
 export interface HTMLPreviewOverlayProps {
@@ -159,10 +224,11 @@ export function HTMLPreviewOverlay({
 
   const measured = contentSize !== null
 
-  // Header actions: item navigation + copy button
+  // Header actions: item navigation + share + copy button
   const headerActions = (
     <div className="flex items-center gap-2">
       <ItemNavigator items={resolvedItems} activeIndex={activeIdx} onSelect={setActiveIdx} size="md" />
+      <ShareLinkButton html={activeContent || ''} className="bg-background shadow-minimal" />
       <CopyButton content={activeContent || ''} label="Copy HTML" className="bg-background shadow-minimal" />
     </div>
   )

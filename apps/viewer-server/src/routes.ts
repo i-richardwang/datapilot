@@ -2,14 +2,15 @@
  * API route handlers for shared session CRUD.
  *
  * Routes:
- *   POST   /s/api       — Upload session, returns { id, url }
- *   GET    /s/api/:id   — Fetch session JSON
- *   PUT    /s/api/:id   — Update existing session
- *   DELETE /s/api/:id   — Delete session
+ *   POST   /s/api          — Upload session, returns { id, url }
+ *   GET    /s/api/:id      — Fetch session JSON
+ *   PUT    /s/api/:id      — Update existing session
+ *   DELETE /s/api/:id      — Delete session
+ *   POST   /s/api/html     — Upload HTML artifact, returns { id, url }
  */
 
 import type { SessionStorage } from './storage/interface'
-import { generateId } from './storage/interface'
+import { generateId, generateHtmlId } from './storage/interface'
 
 /** Max request body size (50 MB) */
 const MAX_BODY_SIZE = 50 * 1024 * 1024
@@ -19,7 +20,26 @@ export function createApiHandler(storage: SessionStorage, baseUrl: string) {
     // Only handle /s/api routes
     if (!path.startsWith('/s/api')) return null
 
-    const apiPath = path.slice('/s/api'.length) // "" or "/{id}"
+    const apiPath = path.slice('/s/api'.length) // "" or "/{id}" or "/html"
+
+    // POST /s/api/html — upload HTML artifact
+    if (req.method === 'POST' && apiPath === '/html') {
+      const contentLength = parseInt(req.headers.get('content-length') || '0', 10)
+      if (contentLength > MAX_BODY_SIZE) {
+        return Response.json({ error: 'Request too large' }, { status: 413 })
+      }
+
+      const html = await req.text()
+      if (!html) {
+        return Response.json({ error: 'Empty HTML body' }, { status: 400 })
+      }
+
+      const id = generateHtmlId()
+      await storage.saveHtml(id, html)
+
+      const url = `${baseUrl}/s/h/${id}`
+      return Response.json({ id, url }, { status: 201 })
+    }
 
     // POST /s/api — create
     if (req.method === 'POST' && apiPath === '') {
@@ -81,4 +101,26 @@ export function createApiHandler(storage: SessionStorage, baseUrl: string) {
 
     return null
   }
+}
+
+/**
+ * Handle GET /s/h/{id} — serve a previously uploaded HTML artifact directly
+ * with text/html mime so browsers render it.
+ */
+export async function handleHtmlArtifactRoute(
+  storage: SessionStorage,
+  path: string,
+): Promise<Response | null> {
+  const match = path.match(/^\/s\/h\/([a-zA-Z0-9_-]+)$/)
+  const id = match?.[1]
+  if (!id) return null
+
+  const html = await storage.loadHtml(id)
+  if (html == null) {
+    return new Response('Not found', { status: 404 })
+  }
+
+  return new Response(html, {
+    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  })
 }

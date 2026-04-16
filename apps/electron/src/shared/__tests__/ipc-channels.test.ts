@@ -246,6 +246,7 @@ const EXPECTED_CHANNELS: string[] = [
   'update:getDismissed',
   'update:getInfo',
   'update:install',
+  'viewer:shareHtml',
   'views:list',
   'views:save',
   'window:cancelClose',

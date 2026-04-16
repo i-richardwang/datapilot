@@ -37,6 +37,10 @@ export class S3Storage implements SessionStorage {
     return `sessions/${id}.json`
   }
 
+  private htmlKey(id: string): string {
+    return `html/${id}.html`
+  }
+
   async save(id: string, data: unknown): Promise<void> {
     const { PutObjectCommand } = await import('@aws-sdk/client-s3')
     await this.client.send(
@@ -83,5 +87,36 @@ export class S3Storage implements SessionStorage {
       new DeleteObjectCommand({ Bucket: this.bucket, Key: this.key(id) })
     )
     return true
+  }
+
+  async saveHtml(id: string, html: string): Promise<void> {
+    const { PutObjectCommand } = await import('@aws-sdk/client-s3')
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: this.htmlKey(id),
+        Body: html,
+        ContentType: 'text/html; charset=utf-8',
+      })
+    )
+  }
+
+  async loadHtml(id: string): Promise<string | null> {
+    const { GetObjectCommand } = await import('@aws-sdk/client-s3')
+    try {
+      const response = await this.client.send(
+        new GetObjectCommand({
+          Bucket: this.bucket,
+          Key: this.htmlKey(id),
+        })
+      )
+      const body = await response.Body?.transformToString()
+      return body ?? null
+    } catch (err: any) {
+      if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
+        return null
+      }
+      throw err
+    }
   }
 }
