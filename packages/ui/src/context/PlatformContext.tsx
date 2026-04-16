@@ -113,6 +113,14 @@ export interface PlatformActions {
    * No-op on non-macOS platforms or in web viewer.
    */
   onSetTrafficLightsVisible?: (visible: boolean) => void
+
+  /**
+   * Upload an HTML snippet to the configured viewer-server and return a public URL.
+   * The returned URL is also copied to the clipboard and a toast is shown to the user.
+   * Implementations should surface their own error feedback (e.g. toast); throwing
+   * lets callers reset transient UI state.
+   */
+  onShareHtml?: (html: string) => Promise<string>
 }
 
 const PlatformContext = createContext<PlatformActions>({})

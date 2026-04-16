@@ -130,6 +130,9 @@ export const RPC_CHANNELS = {
     OPEN_FILE: 'shell:openFile',
     SHOW_IN_FOLDER: 'shell:showInFolder',
   },
+  viewer: {
+    SHARE_HTML: 'viewer:shareHtml',
+  },
   menu: {
     NEW_CHAT: 'menu:newChat',
     NEW_WINDOW: 'menu:newWindow',

@@ -20,7 +20,7 @@
  */
 
 import { join, extname } from 'node:path'
-import { createApiHandler } from './routes'
+import { createApiHandler, handleHtmlArtifactRoute } from './routes'
 import type { SessionStorage } from './storage/interface'
 
 // ---------------------------------------------------------------------------
@@ -143,6 +143,15 @@ const server = Bun.serve({
     if (apiResponse) {
       apiResponse.headers.set('Access-Control-Allow-Origin', '*')
       return apiResponse
+    }
+
+    // HTML artifact routes: GET /s/h/{id} — must come before SPA fallback
+    if (req.method === 'GET') {
+      const htmlResponse = await handleHtmlArtifactRoute(storage, path)
+      if (htmlResponse) {
+        htmlResponse.headers.set('Access-Control-Allow-Origin', '*')
+        return htmlResponse
+      }
     }
 
     // Redirect root to /s/

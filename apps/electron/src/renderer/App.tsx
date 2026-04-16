@@ -1728,7 +1728,22 @@ export default function App() {
     onSetTrafficLightsVisible: (visible: boolean) => {
       window.electronAPI.setTrafficLightsVisible(visible)
     },
-  }), [handleOpenFile, handleOpenUrl, linkInterceptor.openFileExternal])
+    // Share HTML — uploads to viewer-server, copies URL, shows toast feedback
+    onShareHtml: async (html: string) => {
+      const result = await window.electronAPI.shareHtmlArtifact(html)
+      if (!result.success) {
+        toast.error(t('toast.failedToShare'), { description: result.error })
+        throw new Error(result.error)
+      }
+      try {
+        await navigator.clipboard.writeText(result.url)
+      } catch (clipboardError) {
+        console.warn('Failed to copy share URL to clipboard:', clipboardError)
+      }
+      toast.success(t('toast.linkCopied'))
+      return result.url
+    },
+  }), [handleOpenFile, handleOpenUrl, linkInterceptor.openFileExternal, t])
 
   // Loading state - show splash screen
   if (appState === 'loading') {

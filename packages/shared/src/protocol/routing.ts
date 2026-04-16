@@ -411,6 +411,9 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   // resources — workspace resource export/import
   RPC_CHANNELS.resources.EXPORT,
   RPC_CHANNELS.resources.IMPORT,
+
+  // viewer — uploads HTML artifacts to the configured viewer-server
+  RPC_CHANNELS.viewer.SHARE_HTML,
 ])
 
 // ---------------------------------------------------------------------------
