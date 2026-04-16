@@ -12,6 +12,7 @@
 
 import * as React from 'react'
 import { Globe, Share2, Check, Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { PreviewOverlay } from './PreviewOverlay'
 import { CopyButton } from './CopyButton'
 import { ItemNavigator } from './ItemNavigator'
@@ -50,6 +51,7 @@ function ShareLinkButton({
   html: string
   className?: string
 }) {
+  const { t } = useTranslation()
   const { onShareHtml } = usePlatform()
   const [state, setState] = React.useState<'idle' | 'sharing' | 'shared'>('idle')
 
@@ -69,10 +71,10 @@ function ShareLinkButton({
   if (!onShareHtml) return null
 
   const tooltip = state === 'sharing'
-    ? 'Sharing…'
+    ? t('tooltip.sharing')
     : state === 'shared'
-      ? 'Link copied!'
-      : 'Share Link'
+      ? t('tooltip.linkCopied')
+      : t('tooltip.shareLink')
 
   return (
     <button
