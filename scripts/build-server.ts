@@ -654,7 +654,7 @@ if [ "\${1:-}" = "--systemd" ]; then
     exit 1
   fi
 
-  SERVICE_USER="\${CRAFT_USER:-\$(logname 2>/dev/null || echo craft)}"
+  SERVICE_USER="\${DATAPILOT_USER:-\$(logname 2>/dev/null || echo datapilot)}"
   SERVICE_FILE="/etc/systemd/system/datapilot-server.service"
 
   cat > "$SERVICE_FILE" <<UNIT
