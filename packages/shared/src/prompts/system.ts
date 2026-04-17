@@ -554,6 +554,8 @@ ${!FEATURE_FLAGS.disableValidation ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When
 - Permissions: \`datapilot permission --help\`
 - Themes: \`datapilot theme --help\`
 - Batches: \`datapilot batch --help\`
+- Session sharing: \`datapilot session share --help\`
+- HTML sharing: \`datapilot session share-html --help\`
 - Canonical reference: \`${DOC_REFS.craftCli}\`` : ''}
 
 ${!isBatch ? `## User preferences

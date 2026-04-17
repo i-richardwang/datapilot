@@ -2751,6 +2751,9 @@ export class SessionManager implements ISessionManager {
         // Must be passed per-session (not via process.env) so concurrent sessions
         // don't clobber each other's subprocess env at spawn time.
         CRAFT_SESSION_DIR: sessionDirForMetadata,
+        // Expose the session's own ID so agent-invoked CLI commands
+        // (e.g. `datapilot session share`) can self-identify without args.
+        CRAFT_SESSION_ID: managed.id,
         // Pass mini model to SDK subprocess so built-in tools like WebFetch
         // use the correct model for summarization (instead of hardcoded Haiku)
         ...(miniModel ? { ANTHROPIC_DEFAULT_HAIKU_MODEL: miniModel } : {}),
