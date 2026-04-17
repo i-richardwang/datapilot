@@ -2406,7 +2406,7 @@ export class BrowserPaneManager implements IBrowserPaneManager {
         const extractThemeColor = ${THEME_COLOR_EXTRACTOR_FN};
 
         const w = window;
-        const previousCleanup = w.__CRAFT_THEME_OBSERVER_CLEANUP__;
+        const previousCleanup = w.__DATAPILOT_THEME_OBSERVER_CLEANUP__;
         if (typeof previousCleanup === 'function') {
           try { previousCleanup(); } catch {}
         }
@@ -2492,7 +2492,7 @@ export class BrowserPaneManager implements IBrowserPaneManager {
         if (typeof mql.addEventListener === 'function') mql.addEventListener('change', onSchemeChange);
         else if (typeof mql.addListener === 'function') mql.addListener(onSchemeChange);
 
-        w.__CRAFT_THEME_OBSERVER_CLEANUP__ = () => {
+        w.__DATAPILOT_THEME_OBSERVER_CLEANUP__ = () => {
           headObserver.disconnect();
           rootObserver.disconnect();
           w.removeEventListener('scroll', onScroll);

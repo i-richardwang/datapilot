@@ -335,18 +335,18 @@ function shouldPreferCustomEndpoint(): boolean {
  */
 function setInterceptorApiHints(model: { api?: string; provider?: string; baseUrl?: string } | undefined): void {
   if (!model) {
-    delete process.env.CRAFT_PI_MODEL_API;
-    delete process.env.CRAFT_PI_MODEL_PROVIDER;
-    delete process.env.CRAFT_PI_MODEL_BASE_URL;
+    delete process.env.DATAPILOT_PI_MODEL_API;
+    delete process.env.DATAPILOT_PI_MODEL_PROVIDER;
+    delete process.env.DATAPILOT_PI_MODEL_BASE_URL;
     return;
   }
 
-  process.env.CRAFT_PI_MODEL_API = model.api || '';
-  process.env.CRAFT_PI_MODEL_PROVIDER = model.provider || '';
-  process.env.CRAFT_PI_MODEL_BASE_URL = model.baseUrl || '';
+  process.env.DATAPILOT_PI_MODEL_API = model.api || '';
+  process.env.DATAPILOT_PI_MODEL_PROVIDER = model.provider || '';
+  process.env.DATAPILOT_PI_MODEL_BASE_URL = model.baseUrl || '';
 
   debugLog(
-    `[interceptor-hint] api=${process.env.CRAFT_PI_MODEL_API || '-'} provider=${process.env.CRAFT_PI_MODEL_PROVIDER || '-'} baseUrl=${process.env.CRAFT_PI_MODEL_BASE_URL || '-'}`,
+    `[interceptor-hint] api=${process.env.DATAPILOT_PI_MODEL_API || '-'} provider=${process.env.DATAPILOT_PI_MODEL_PROVIDER || '-'} baseUrl=${process.env.DATAPILOT_PI_MODEL_BASE_URL || '-'}`,
   );
 }
 

@@ -98,7 +98,7 @@ RUN find /app -not -perm -o=r -exec chmod o+r {} + && \
     chmod -R 777 /home/craftagents
 
 # Pre-install Python 3.12 + common data-science packages into a dedicated venv.
-# - CRAFT_PYTHON: used by transform_data runtime resolver for direct Python access
+# - DATAPILOT_PYTHON: used by transform_data runtime resolver for direct Python access
 # - PATH addition: makes python3/pip available in Bash for exploratory analysis
 RUN UV_PYTHON_INSTALL_DIR=/opt/uv-python uv python install 3.12 && \
     UV_PYTHON_INSTALL_DIR=/opt/uv-python uv venv /opt/datapilot-py --python 3.12 && \
@@ -111,12 +111,12 @@ ENV DATAPILOT_RPC_PORT=9100
 ENV DATAPILOT_WEBUI_DIR=/app/apps/webui/dist
 # Resource resolution — aligned with build-server.ts production entry script
 ENV DATAPILOT_BUNDLED_ASSETS_ROOT=/app/apps/electron
-ENV CRAFT_IS_PACKAGED=false
-ENV CRAFT_APP_ROOT=/app
-ENV CRAFT_RESOURCES_PATH=/app/apps/electron/resources
-ENV CRAFT_PYTHON=/opt/datapilot-py/bin/python
-ENV CRAFT_UV=/usr/local/bin/uv
-ENV CRAFT_SCRIPTS=/app/apps/electron/resources/scripts
+ENV DATAPILOT_IS_PACKAGED=false
+ENV DATAPILOT_APP_ROOT=/app
+ENV DATAPILOT_RESOURCES_PATH=/app/apps/electron/resources
+ENV DATAPILOT_PYTHON=/opt/datapilot-py/bin/python
+ENV DATAPILOT_UV=/usr/local/bin/uv
+ENV DATAPILOT_SCRIPTS=/app/apps/electron/resources/scripts
 ENV PATH="/opt/datapilot-py/bin:/app/apps/electron/resources/bin:${PATH}"
 
 EXPOSE 9100

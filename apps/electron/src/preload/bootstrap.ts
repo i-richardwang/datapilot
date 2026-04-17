@@ -417,8 +417,8 @@ client.onConnectionStateChanged((state) => {
 // System warnings — expose env-based flags set during main process startup
 // (preload-only: reads env var directly, no IPC round-trip needed)
 ;(api as ElectronAPI).getSystemWarnings = async () => ({
-  vcredistMissing: process.env.CRAFT_VCREDIST_MISSING === '1',
-  downloadUrl: process.env.CRAFT_VCREDIST_URL,
+  vcredistMissing: process.env.DATAPILOT_VCREDIST_MISSING === '1',
+  downloadUrl: process.env.DATAPILOT_VCREDIST_URL,
 })
 
 // i18n: sync language changes to main process (for native menus/dialogs)

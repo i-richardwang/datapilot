@@ -40,7 +40,7 @@ const activeTransfers = new Map<string, TransferState>()
 const transferableHandlers = new Map<string, HandlerFn>()
 
 function getTransferTtlMs(): number {
-  const raw = Number(process.env.CRAFT_TRANSFER_TTL_MS)
+  const raw = Number(process.env.DATAPILOT_TRANSFER_TTL_MS)
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_TRANSFER_TTL_MS
 }
 

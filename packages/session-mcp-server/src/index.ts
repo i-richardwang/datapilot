@@ -369,7 +369,7 @@ async function handleCallLlm(
   }
 
   // Fallback path: HTTP callback to agent (for Copilot where PreToolUse doesn't fire for MCP tools).
-  // Uses callbackPort from CLI arg (--callback-port) or env var (CRAFT_LLM_CALLBACK_PORT).
+  // Uses callbackPort from CLI arg (--callback-port) or env var (DATAPILOT_LLM_CALLBACK_PORT).
   if (config.callbackPort) {
     try {
       const resp = await fetch(`http://127.0.0.1:${config.callbackPort}/call-llm`, {
@@ -392,7 +392,7 @@ async function handleCallLlm(
 
   return errorResponse(
     'call_llm requires either PreToolUse intercept (_precomputedResult) or ' +
-    'HTTP callback (CRAFT_LLM_CALLBACK_PORT). Neither is available.'
+    'HTTP callback (DATAPILOT_LLM_CALLBACK_PORT). Neither is available.'
   );
 }
 
@@ -445,7 +445,7 @@ async function handleSpawnSession(
 
   return errorResponse(
     'spawn_session requires either PreToolUse intercept (_precomputedResult) or ' +
-    'HTTP callback (CRAFT_LLM_CALLBACK_PORT). Neither is available.'
+    'HTTP callback (DATAPILOT_LLM_CALLBACK_PORT). Neither is available.'
   );
 }
 
@@ -497,7 +497,7 @@ async function handleBatchTest(
 
   return errorResponse(
     'batch_test requires either PreToolUse intercept (_precomputedResult) or ' +
-    'HTTP callback (CRAFT_LLM_CALLBACK_PORT). Neither is available.'
+    'HTTP callback (DATAPILOT_LLM_CALLBACK_PORT). Neither is available.'
   );
 }
 
@@ -555,7 +555,7 @@ async function main() {
     workspaceRootPath,
     plansFolderPath,
     // CLI arg takes priority, env var as fallback (Copilot CLI may not forward env to subprocesses)
-    callbackPort: callbackPort || process.env.CRAFT_LLM_CALLBACK_PORT,
+    callbackPort: callbackPort || process.env.DATAPILOT_LLM_CALLBACK_PORT,
   };
 
   // Create the Codex context

@@ -22,7 +22,7 @@ export interface LocalMcpConfig {
   /**
    * Whether local (stdio) MCP servers are enabled for this workspace.
    * When false, only HTTP-based MCP servers will be used.
-   * Default: true (can be overridden by CRAFT_LOCAL_MCP_ENABLED env var)
+   * Default: true (can be overridden by DATAPILOT_LOCAL_MCP_ENABLED env var)
    */
   enabled: boolean;
 }
@@ -53,7 +53,7 @@ export interface WorkspaceConfig {
   /**
    * Local MCP server configuration.
    * Controls whether stdio-based MCP servers can be spawned in this workspace.
-   * Resolution order: ENV (CRAFT_LOCAL_MCP_ENABLED) > workspace config > default (true)
+   * Resolution order: ENV (DATAPILOT_LOCAL_MCP_ENABLED) > workspace config > default (true)
    */
   localMcpServers?: LocalMcpConfig;
 

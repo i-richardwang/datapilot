@@ -58,8 +58,8 @@ def resolve_wrapper(tool_name: str) -> Path:
 def build_env() -> dict[str, str]:
     uv = resolve_uv_binary()
     env = dict(os.environ)
-    env["CRAFT_UV"] = str(uv)
-    env["CRAFT_SCRIPTS"] = str(SCRIPTS_DIR)
+    env["DATAPILOT_UV"] = str(uv)
+    env["DATAPILOT_SCRIPTS"] = str(SCRIPTS_DIR)
     env["PATH"] = os.pathsep.join([
         str(BIN_DIR),
         str(uv.parent),
