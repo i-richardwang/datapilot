@@ -101,8 +101,9 @@ export class ConnectionError extends Error {
  * (with an actionable message) on failure.
  */
 export async function connect(opts: ConnectOptions): Promise<{ client: CliRpcClient; endpoint: ResolvedEndpoint }> {
-  if (opts.tlsCa) {
-    process.env.NODE_EXTRA_CA_CERTS = opts.tlsCa
+  const tlsCa = opts.tlsCa ?? process.env.DATAPILOT_TLS_CA
+  if (tlsCa) {
+    process.env.NODE_EXTRA_CA_CERTS = tlsCa
   }
 
   const endpoint = resolveEndpoint(opts)

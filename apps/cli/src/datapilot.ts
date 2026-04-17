@@ -18,7 +18,7 @@
  *   Force either with `--json` or `--human`.
  */
 
-import { parseArgs } from './datapilot/args.ts'
+import { parseArgs, UsageError } from './datapilot/args.ts'
 import { ok, fail, setOutputMode } from './datapilot/envelope.ts'
 import { connect, resolveWorkspaceId, ConnectionError } from './datapilot/transport.ts'
 import { isEntity, type RouteCtx, ENTITIES } from './datapilot/router.ts'
@@ -92,6 +92,9 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   } catch (e) {
     if (e instanceof ConnectionError) {
       fail('CONNECTION_ERROR', e.message)
+    }
+    if (e instanceof UsageError) {
+      fail('USAGE_ERROR', e.message)
     }
     const msg = e instanceof Error ? e.message : String(e)
     fail('INTERNAL_ERROR', msg)

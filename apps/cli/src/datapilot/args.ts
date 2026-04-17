@@ -121,10 +121,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
     }
   }
 
-  // Env-var fallbacks for connection details
-  if (global.url === undefined && process.env.DATAPILOT_SERVER_URL) global.url = process.env.DATAPILOT_SERVER_URL
-  if (global.token === undefined && process.env.DATAPILOT_SERVER_TOKEN) global.token = process.env.DATAPILOT_SERVER_TOKEN
-  if (global.tlsCa === undefined && process.env.DATAPILOT_TLS_CA) global.tlsCa = process.env.DATAPILOT_TLS_CA
+  // Connection-detail env vars ($DATAPILOT_SERVER_URL / _TOKEN / _TLS_CA)
+  // are intentionally NOT applied here — they're resolved later in
+  // `transport.resolveEndpoint` / `connect`, so the `source` field on the
+  // resolved endpoint can correctly distinguish flag vs env vs discovery.
 
   const [entity, action, ...rest] = positionals
   return { global, entity, action, positionals: rest, flags }
@@ -187,24 +187,38 @@ export function listFlag(flags: Flags, key: string): string[] | undefined {
 export async function parseInput(flags: Flags): Promise<Record<string, unknown> | undefined> {
   const input = strFlag(flags, 'input')
   if (input) {
-    try {
-      const parsed = JSON.parse(input)
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Record<string, unknown>
-    } catch {
-      throw new Error('--input must be valid JSON object')
-    }
+    return parseObjectJson(input, '--input must be valid JSON object')
   }
   if (boolFlag(flags, 'stdin')) {
     const text = await readStdin()
     if (!text.trim()) return undefined
-    try {
-      const parsed = JSON.parse(text)
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as Record<string, unknown>
-    } catch {
-      throw new Error('stdin must be valid JSON object')
-    }
+    return parseObjectJson(text, 'stdin must be valid JSON object')
   }
   return undefined
+}
+
+function parseObjectJson(raw: string, errorMessage: string): Record<string, unknown> {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw new UsageError(errorMessage)
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new UsageError(errorMessage)
+  }
+  return parsed as Record<string, unknown>
+}
+
+/**
+ * Thrown for input-shape errors that should surface as USAGE_ERROR (exit 2)
+ * instead of INTERNAL_ERROR. Caught by the entry's main loop.
+ */
+export class UsageError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'UsageError'
+  }
 }
 
 async function readStdin(): Promise<string> {

@@ -2,20 +2,26 @@
  * server entity — infrastructure for managing the local datapilot server.
  *
  * Actions:
- *   start        Spawn a local server, write the discovery file, and exit
- *                (server keeps running in the foreground unless --detach).
- *   stop         Read the discovery file, signal SIGTERM to the recorded PID.
+ *   start        Spawn a local server in the foreground; writes the discovery
+ *                file with the child server's PID, blocks until SIGINT/SIGTERM
+ *                or until the server exits on its own.
+ *   stop         Read the discovery file and SIGTERM the recorded child PID.
  *   health       Connect to a running server and report its health check.
  *   status       Report startup info: connected client count, uptime.
  *   versions     Print the server's reported runtime versions.
  *   endpoint     Print the resolved endpoint without connecting.
  *   home-dir     Print the server's home directory.
+ *
+ * Backgrounding is intentionally out of scope for Phase 4 — wrap with `nohup`
+ * / `screen` / a service supervisor instead. (See PR review on DEV-20 for
+ * context: real `--detach` requires `proc.unref()` + log redirection and
+ * cross-OS handling that doesn't belong in this phase.)
  */
 
 import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { ok, fail } from '../envelope.ts'
-import { strFlag, intFlag, boolFlag, type Flags } from '../args.ts'
+import { strFlag, intFlag, type Flags } from '../args.ts'
 import {
   DEFAULT_PORT,
   DISCOVERY_FILE,
@@ -68,9 +74,13 @@ async function cmdStart(flags: Flags): Promise<never> {
   const port = intFlag(flags, 'port') ?? DEFAULT_PORT
   const host = strFlag(flags, 'host') ?? '127.0.0.1'
   const serverEntry = strFlag(flags, 'server-entry')
-  const detach = boolFlag(flags, 'detach') ?? false
 
-  // Spawn — port 0 lets the kernel pick when port is 0; otherwise force the requested one.
+  if (flags['detach']) {
+    fail('USAGE_ERROR', '--detach is not yet supported in Phase 4', {
+      suggestion: "Run 'datapilot server start' in the foreground and wrap with nohup / a service supervisor; backgrounding lands in a follow-up phase.",
+    })
+  }
+
   const env: Record<string, string> = {
     DATAPILOT_RPC_HOST: host,
     DATAPILOT_RPC_PORT: String(port),
@@ -86,38 +96,32 @@ async function cmdStart(flags: Flags): Promise<never> {
   writeDiscoveryFile({
     url: server.url,
     token: server.token,
-    pid: process.pid,
+    pid: server.pid,
     startedAt: Date.now(),
   })
 
-  process.stderr.write(`Server ready: ${server.url}\n`)
+  process.stderr.write(`Server ready: ${server.url} (pid ${server.pid})\n`)
   process.stderr.write(`Discovery file: ${DISCOVERY_FILE}\n`)
 
-  if (detach) {
-    // Best effort: leave the spawned process running, exit the CLI. The server
-    // is the parent's child though, so when this CLI exits the OS will keep
-    // the orphan alive only on Unix; document this caveat in the help.
-    ok({
-      url: server.url,
-      token: server.token,
-      pid: process.pid,
-      detached: true,
-      discoveryFile: DISCOVERY_FILE,
-    })
-  }
-
-  // Foreground mode — wire signals so SIGINT cleanly stops the spawned server
+  // Foreground mode — wire signals so SIGINT cleanly stops the spawned server,
+  // and watch the child for unexpected exit so we don't sit on a dead PID.
   let stopping = false
-  const stop = async () => {
-    if (stopping) return
-    stopping = true
-    try { await server.stop() } catch { /* ignore */ }
+  const cleanup = async (): Promise<never> => {
+    if (!stopping) {
+      stopping = true
+      try { await server.stop() } catch { /* ignore */ }
+    }
     try { unlinkSync(DISCOVERY_FILE) } catch { /* ignore */ }
     process.exit(0)
   }
-  process.on('SIGINT', stop)
-  process.on('SIGTERM', stop)
-  // Block forever — server is now running
+  process.on('SIGINT', () => { void cleanup() })
+  process.on('SIGTERM', () => { void cleanup() })
+
+  // If the server exits on its own (e.g. someone SIGTERM'd the child PID
+  // directly via `datapilot server stop`), tear down the discovery file and
+  // exit too — otherwise this CLI sits forever on a dead server.
+  void server.exited.then(() => { void cleanup() })
+
   await new Promise(() => {})
   // Unreachable, but TypeScript needs this for the `never` return type
   process.exit(0)
@@ -135,6 +139,8 @@ async function cmdStop(): Promise<never> {
   } catch (e) {
     fail('INTERNAL_ERROR', `Could not signal PID ${record.pid}: ${(e as Error).message}`)
   }
+  // The foreground `server start` watcher will remove the discovery file on
+  // child exit; do the same here defensively in case nobody is watching.
   try { unlinkSync(DISCOVERY_FILE) } catch { /* ignore */ }
   ok({ stopped: record.pid, url: record.url })
 }

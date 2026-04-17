@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test'
-import { parseArgs, strFlag, intFlag, boolFlag, listFlag } from './args.ts'
+import { parseArgs, parseInput, strFlag, intFlag, boolFlag, listFlag, UsageError } from './args.ts'
 
 describe('parseArgs', () => {
   it('parses entity + action without flags', () => {
@@ -60,15 +60,15 @@ describe('parseArgs', () => {
     expect(a.positionals).toEqual(['sess-1', '--literal-arg'])
   })
 
-  it('falls back to env vars for url + token', () => {
+  it('does NOT apply env vars (resolveEndpoint owns that priority)', () => {
     const prevUrl = process.env.DATAPILOT_SERVER_URL
     const prevToken = process.env.DATAPILOT_SERVER_TOKEN
     process.env.DATAPILOT_SERVER_URL = 'ws://env:1'
     process.env.DATAPILOT_SERVER_TOKEN = 'env-token'
     try {
       const a = parseArgs(['label', 'list'])
-      expect(a.global.url).toBe('ws://env:1')
-      expect(a.global.token).toBe('env-token')
+      expect(a.global.url).toBeUndefined()
+      expect(a.global.token).toBeUndefined()
     } finally {
       if (prevUrl === undefined) delete process.env.DATAPILOT_SERVER_URL
       else process.env.DATAPILOT_SERVER_URL = prevUrl
@@ -77,22 +77,38 @@ describe('parseArgs', () => {
     }
   })
 
-  it('explicit --url overrides env', () => {
-    const prev = process.env.DATAPILOT_SERVER_URL
-    process.env.DATAPILOT_SERVER_URL = 'ws://env:1'
-    try {
-      const a = parseArgs(['--url', 'ws://flag:2', 'label', 'list'])
-      expect(a.global.url).toBe('ws://flag:2')
-    } finally {
-      if (prev === undefined) delete process.env.DATAPILOT_SERVER_URL
-      else process.env.DATAPILOT_SERVER_URL = prev
-    }
-  })
-
   it('intFlag and boolFlag round-trip', () => {
     const a = parseArgs(['label', 'auto-rule-remove', 'lbl', '--index', '2'])
     expect(intFlag(a.flags, 'index')).toBe(2)
     const b = parseArgs(['automation', 'replay', 'h-1', '--dry-run'])
     expect(boolFlag(b.flags, 'dry-run')).toBe(true)
+  })
+})
+
+describe('parseInput', () => {
+  it('returns undefined when neither --input nor --stdin is set', async () => {
+    const r = await parseInput({})
+    expect(r).toBeUndefined()
+  })
+
+  it('parses a valid JSON object from --input', async () => {
+    const r = await parseInput({ input: '{"name":"x","color":"blue"}' })
+    expect(r).toEqual({ name: 'x', color: 'blue' })
+  })
+
+  it('throws UsageError on invalid JSON', async () => {
+    await expect(parseInput({ input: 'not json' })).rejects.toBeInstanceOf(UsageError)
+  })
+
+  it('throws UsageError on JSON that parses to a non-object (number)', async () => {
+    await expect(parseInput({ input: '123' })).rejects.toBeInstanceOf(UsageError)
+  })
+
+  it('throws UsageError on JSON that parses to a non-object (null)', async () => {
+    await expect(parseInput({ input: 'null' })).rejects.toBeInstanceOf(UsageError)
+  })
+
+  it('throws UsageError on JSON that parses to a non-object (array)', async () => {
+    await expect(parseInput({ input: '[1,2,3]' })).rejects.toBeInstanceOf(UsageError)
   })
 })

@@ -227,6 +227,29 @@ describe('datapilot CLI', () => {
     expect(server.requests.find((req) => req.channel === 'credentials:healthCheck')).toBeDefined()
   })
 
+  it('--detach is rejected with USAGE_ERROR (Phase 4 scope)', async () => {
+    const r = await runCli(['--json', 'server', 'start', '--detach'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('--detach')
+  })
+
+  it('--input with non-object JSON returns USAGE_ERROR, not INTERNAL_ERROR', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'label', 'create', '--input', '123',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('--input')
+  })
+
   it('TTY detection: --json forces envelope output', async () => {
     server = startMockServer({
       handlers: {

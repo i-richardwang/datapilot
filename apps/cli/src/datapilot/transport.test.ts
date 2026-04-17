@@ -47,6 +47,16 @@ describe('resolveEndpoint', () => {
     expect(ep.source).toBe('env')
   })
 
+  it('reports source=env (not flag) when only env is set — regression for DEV-20 review item 3', () => {
+    // parseArgs no longer back-fills env into global.url, so when nothing was
+    // passed on the command line, resolveEndpoint must take the env branch and
+    // report source: 'env'. Previously this branch was dead code because
+    // parseArgs pre-filled opts.url from env, masking the env source as 'flag'.
+    process.env.DATAPILOT_SERVER_URL = 'ws://env-only:9'
+    const ep = resolveEndpoint({})
+    expect(ep.source).toBe('env')
+  })
+
   it('reads discovery file when no flag/env', () => {
     const dir = dirname(DISCOVERY_FILE)
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
