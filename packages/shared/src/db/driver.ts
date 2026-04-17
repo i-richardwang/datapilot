@@ -15,10 +15,9 @@
  *   - `closeDrizzleDatabase(db)` → synchronous
  */
 
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
-export type DrizzleDatabase = BunSQLiteDatabase | BetterSQLite3Database;
+export type DrizzleDatabase = BaseSQLiteDatabase<'sync', unknown>;
 
 export type CreateFn = (dbPath: string) => DrizzleDatabase;
 export type CloseFn = (db: DrizzleDatabase) => void;
