@@ -57,6 +57,8 @@ export const sessions = sqliteTable('sessions', {
   sharedId: text('shared_id'),
   /** HTML shares keyed by sha256(html) — JSON object: { [hash]: { sharedUrl, sharedId } } */
   htmlShares: text('html_shares', { mode: 'json' }),
+  /** Uploaded file assets keyed by original local src path — JSON: { [srcPath]: { mimeType, url } } */
+  assets: text('assets', { mode: 'json' }),
 
   // Plan execution state as JSON
   pendingPlanExecution: text('pending_plan_execution', { mode: 'json' }),

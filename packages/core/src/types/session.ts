@@ -32,11 +32,27 @@ export interface Session {
 }
 
 /**
+ * Uploaded file asset referenced by a file-backed markdown block in a shared
+ * session. Keyed in `StoredSession.assets` by the original src path.
+ */
+export interface SharedAssetInfo {
+  mimeType: string;
+  url: string;
+}
+
+/**
  * Stored session with conversation data (for persistence)
  */
 export interface StoredSession extends Session {
   messages: StoredMessage[];
   tokenUsage: TokenUsage;
+  /**
+   * Uploaded file assets for file-backed preview blocks (html-preview,
+   * pdf-preview, image-preview, datatable, spreadsheet), keyed by the
+   * original src path. Optional — only populated when a session was shared
+   * with file-backed blocks.
+   */
+  assets?: Record<string, SharedAssetInfo>;
 }
 
 /**

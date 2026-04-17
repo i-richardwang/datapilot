@@ -20,6 +20,12 @@ import {
 } from '@craft-agent/shared/agent/backend'
 import { getLlmConnection, getLlmConnections, getDefaultLlmConnection, getDefaultThinkingLevel, resetManagedAnthropicAuthEnvVars } from '@craft-agent/shared/config'
 import { PrivilegedExecutionBroker } from '@craft-agent/server-core/services'
+import {
+  collectReferencedFilePaths,
+  buildAssetsManifest,
+  parseAssetIdFromUrl,
+  deleteAsset as deleteSharedAsset,
+} from './share-assets'
 import { isValidWorkingDirectory } from '../utils/path-validation'
 import { InitGate } from '@craft-agent/server-core/domain'
 import { i18n, LOCALE_REGISTRY, type LanguageCode } from '@craft-agent/shared/i18n'
@@ -4038,6 +4044,21 @@ export class SessionManager implements ISessionManager {
       }
 
       const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+
+      // Upload every file referenced by a file-backed preview block so the
+      // viewer can resolve `onReadFile*` against URLs instead of local disk.
+      // The markdown text is not rewritten — `assets` is a pure indirection
+      // layer keyed by the sharer's original src path.
+      const paths = collectReferencedFilePaths(storedSession.messages)
+      const assets = paths.length > 0
+        ? await buildAssetsManifest(paths, VIEWER_URL, (path, error) => {
+            sessionLog.warn(`Skipping unreadable asset for share: ${path}`, error)
+          })
+        : {}
+      if (Object.keys(assets).length > 0) {
+        storedSession.assets = assets
+      }
+
       const response = await fetch(`${VIEWER_URL}/s/api`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -4061,6 +4082,7 @@ export class SessionManager implements ISessionManager {
       await updateSessionMetadata(workspaceRootPath, sessionId, {
         sharedUrl: data.url,
         sharedId: data.id,
+        assets: Object.keys(assets).length > 0 ? assets : undefined,
       })
 
       sessionLog.info(`Session ${sessionId} shared at ${data.url}`)
@@ -4102,6 +4124,20 @@ export class SessionManager implements ISessionManager {
       }
 
       const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+
+      // Refresh the assets manifest from the current session contents. Asset
+      // ids are content sha256, so repeated uploads of identical bytes are
+      // idempotent; only orphans (entries in the prior manifest whose URL no
+      // longer appears) need to be deleted to prevent viewer-server leaks.
+      const previousAssets = storedSession.assets ?? {}
+      const paths = collectReferencedFilePaths(storedSession.messages)
+      const assets = paths.length > 0
+        ? await buildAssetsManifest(paths, VIEWER_URL, (path, error) => {
+            sessionLog.warn(`Skipping unreadable asset for update: ${path}`, error)
+          })
+        : {}
+      storedSession.assets = Object.keys(assets).length > 0 ? assets : undefined
+
       const response = await fetch(`${VIEWER_URL}/s/api/${managed.sharedId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -4115,6 +4151,27 @@ export class SessionManager implements ISessionManager {
         }
         return { success: false, error: 'Failed to update shared session' }
       }
+
+      // Best-effort cleanup of orphaned assets — do this after the session
+      // PUT succeeds so a failed update can't wipe the live artifacts.
+      const currentUrls = new Set(Object.values(assets).map(a => a.url))
+      const orphanIds = new Set<string>()
+      for (const info of Object.values(previousAssets)) {
+        if (!info?.url || currentUrls.has(info.url)) continue
+        const id = parseAssetIdFromUrl(info.url)
+        if (id) orphanIds.add(id)
+      }
+      await Promise.all(
+        [...orphanIds].map(id =>
+          deleteSharedAsset(VIEWER_URL, id).catch(err => {
+            sessionLog.warn(`Failed to delete orphan asset ${id}`, err)
+          })
+        )
+      )
+
+      await updateSessionMetadata(managed.workspace.rootPath, sessionId, {
+        assets: Object.keys(assets).length > 0 ? assets : undefined,
+      })
 
       sessionLog.info(`Session ${sessionId} share updated at ${managed.sharedUrl}`)
       return { success: true, url: managed.sharedUrl }
@@ -4147,6 +4204,17 @@ export class SessionManager implements ISessionManager {
 
     try {
       const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+
+      // Load the session to see which assets were uploaded — revoke must
+      // leave no orphans on the viewer-server.
+      const storedSession = loadStoredSession(managed.workspace.rootPath, sessionId)
+      const assetIds = new Set<string>()
+      for (const info of Object.values(storedSession?.assets ?? {})) {
+        if (!info?.url) continue
+        const id = parseAssetIdFromUrl(info.url)
+        if (id) assetIds.add(id)
+      }
+
       const response = await fetch(
         `${VIEWER_URL}/s/api/${managed.sharedId}`,
         { method: 'DELETE' }
@@ -4157,6 +4225,17 @@ export class SessionManager implements ISessionManager {
         return { success: false, error: 'Failed to revoke share' }
       }
 
+      // Clean up uploaded asset blobs. Best-effort: a failed delete only
+      // leaves an unreferenced blob on the server, which is harmless for
+      // functionality and follow-up revokes will retry.
+      await Promise.all(
+        [...assetIds].map(id =>
+          deleteSharedAsset(VIEWER_URL, id).catch(err => {
+            sessionLog.warn(`Failed to delete asset ${id} during revoke`, err)
+          })
+        )
+      )
+
       // Clear shared info
       delete managed.sharedUrl
       delete managed.sharedId
@@ -4164,6 +4243,7 @@ export class SessionManager implements ISessionManager {
       await updateSessionMetadata(workspaceRootPath, sessionId, {
         sharedUrl: undefined,
         sharedId: undefined,
+        assets: undefined,
       })
 
       sessionLog.info(`Session ${sessionId} share revoked`)

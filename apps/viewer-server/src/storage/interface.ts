@@ -25,6 +25,15 @@ export interface SessionStorage {
 
   /** Delete an HTML artifact by ID. Returns true if it existed. */
   deleteHtml(id: string): Promise<boolean>
+
+  /** Save a file asset by ID with its mime type. Idempotent — same id overwrites. */
+  saveAsset(id: string, data: Uint8Array, mimeType: string): Promise<void>
+
+  /** Load an asset by ID. Returns null if not found. */
+  loadAsset(id: string): Promise<{ data: Uint8Array; mimeType: string } | null>
+
+  /** Delete an asset by ID. Returns true if it existed. */
+  deleteAsset(id: string): Promise<boolean>
 }
 
 /** Generate a URL-safe short ID (similar to the format used by the official viewer). */
@@ -45,4 +54,17 @@ export function generateHtmlId(): string {
   const bytes = new Uint8Array(16)
   crypto.getRandomValues(bytes)
   return Buffer.from(bytes).toString('base64url')
+}
+
+/**
+ * Generate an ID for a file asset from its content bytes. The id is the
+ * hex-encoded sha256 of the bytes, so identical uploads deduplicate on both
+ * sides without extra bookkeeping.
+ */
+export async function generateAssetId(bytes: Uint8Array): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', bytes)
+  const arr = new Uint8Array(buf)
+  let hex = ''
+  for (const b of arr) hex += b.toString(16).padStart(2, '0')
+  return hex
 }
