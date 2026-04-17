@@ -21,6 +21,7 @@ import { routeSkill } from './commands/skill.ts'
 import { routePermission } from './commands/permission.ts'
 import { routeTheme } from './commands/theme.ts'
 import { routeBatch } from './commands/batch.ts'
+import { routeSession } from './commands/session.ts'
 
 const VERSION = '0.7.2'
 
@@ -34,7 +35,7 @@ async function main(): Promise<void> {
   if (!entity) {
     ok({
       usage: 'datapilot <entity> <action> [args] [--flags]',
-      entities: ['label', 'source', 'automation', 'skill', 'permission', 'theme', 'batch'],
+      entities: ['label', 'source', 'automation', 'skill', 'permission', 'theme', 'batch', 'session'],
       globalFlags: ['--help', '--version', '--workspace-root <path>', '--json', '--stdin'],
     })
   }
@@ -68,8 +69,11 @@ async function main(): Promise<void> {
     case 'batch':
       routeBatch(workspaceRoot, action, positionals, flags)
       break
+    case 'session':
+      await routeSession(workspaceRoot, action, positionals, flags)
+      break
     default:
-      fail('USAGE_ERROR', `Unknown entity: ${entity}`, 'Valid entities: label, source, automation, skill, permission, theme, batch')
+      fail('USAGE_ERROR', `Unknown entity: ${entity}`, 'Valid entities: label, source, automation, skill, permission, theme, batch, session')
   }
 }
 
