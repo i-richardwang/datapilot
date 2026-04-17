@@ -370,6 +370,70 @@ async function cmdSessionDelete(client: CliRpcClient, args: CliArgs): Promise<vo
 }
 
 /**
+ * Split share-command args into positionals and a --session override.
+ * Any other flags are preserved as positionals (none are currently defined).
+ */
+function parseShareArgs(rest: string[]): { positionals: string[]; sessionFlag?: string } {
+  const positionals: string[] = []
+  let sessionFlag: string | undefined
+  for (let i = 0; i < rest.length; i++) {
+    if (rest[i] === '--session') {
+      sessionFlag = rest[++i]
+    } else {
+      positionals.push(rest[i]!)
+    }
+  }
+  return { positionals, sessionFlag }
+}
+
+async function cmdSessionShare(client: CliRpcClient, args: CliArgs): Promise<void> {
+  const { positionals, sessionFlag } = parseShareArgs(args.rest)
+  const sessionId = positionals[0] ?? sessionFlag ?? process.env.CRAFT_SESSION_ID
+  if (!sessionId) {
+    err('Usage: session share [<session-id>]  (or set $CRAFT_SESSION_ID)')
+    process.exit(1)
+  }
+  await client.connect()
+  const result = await client.invoke('sessions:command', sessionId, { type: 'shareToViewer' }) as { success: boolean; url?: string; error?: string }
+  if (!result?.success || !result.url) {
+    err(result?.error ?? 'Failed to share session')
+    process.exit(1)
+  }
+  process.stdout.write(result.url + '\n')
+}
+
+async function cmdSessionShareHtml(client: CliRpcClient, args: CliArgs): Promise<void> {
+  const { positionals, sessionFlag } = parseShareArgs(args.rest)
+  const filePath = positionals[0]
+  if (!filePath) {
+    err('Usage: session share-html <file> [--session <id>]  (or set $CRAFT_SESSION_ID)')
+    process.exit(1)
+  }
+  const sessionId = sessionFlag ?? process.env.CRAFT_SESSION_ID
+  if (!sessionId) {
+    err('Session ID required: pass --session <id> or set $CRAFT_SESSION_ID')
+    process.exit(1)
+  }
+  const { readFile } = await import('fs/promises')
+  let html: string
+  try {
+    html = await readFile(resolve(filePath), 'utf8')
+  } catch (e) {
+    err(`Cannot read ${filePath}: ${e instanceof Error ? e.message : String(e)}`)
+    process.exit(1)
+  }
+  await client.connect()
+  const result = await client.invoke('sessions:command', sessionId, { type: 'shareHtml', html }) as
+    | { success: true; sharedUrl: string; sharedId: string; contentHash: string }
+    | { success: false; error: string }
+  if (!result?.success) {
+    err(result?.error ?? 'Failed to share HTML')
+    process.exit(1)
+  }
+  process.stdout.write(result.sharedUrl + '\n')
+}
+
+/**
  * Read prompt text from positional args + stdin.
  * If there are positional words, they become the base message.
  * Reads stdin when: --stdin flag is present, or no message and stdin is piped (not a TTY).
@@ -1888,6 +1952,11 @@ Commands:
   session create         Create a session (--name, --mode)
   session messages <id>  Print session message history
   session delete <id>    Delete a session
+  session share [<id>]   Share a session to the viewer, print URL
+                         (falls back to $CRAFT_SESSION_ID when <id> omitted)
+  session share-html <file> [--session <id>]
+                         Upload an HTML artifact, print URL
+                         (uses $CRAFT_SESSION_ID when --session omitted)
   send <id> <message>    Send message and stream AI response
   cancel <id>            Cancel in-progress processing
   invoke <channel> [...] Raw RPC call with JSON args
@@ -1995,6 +2064,12 @@ export async function main(argv: string[] = process.argv): Promise<void> {
             break
           case 'delete':
             await cmdSessionDelete(client, args)
+            break
+          case 'share':
+            await cmdSessionShare(client, args)
+            break
+          case 'share-html':
+            await cmdSessionShareHtml(client, args)
             break
           default:
             err(`Unknown session subcommand: ${subCmd}`)
