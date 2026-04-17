@@ -11,7 +11,7 @@
  */
 
 import * as React from 'react'
-import { Globe, Copy, RefreshCw, Link2Off } from 'lucide-react'
+import { Globe, Copy, RefreshCw, Link2Off, Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { PreviewOverlay } from './PreviewOverlay'
@@ -19,7 +19,7 @@ import { CopyButton } from './CopyButton'
 import { ItemNavigator } from './ItemNavigator'
 import { usePlatform } from '../../context/PlatformContext'
 import { useSessionContext } from '../../context/SessionContext'
-import { ShareCloudIconButton } from '../ui/ShareCloudIconButton'
+import { ShareCloudIconButton, ShareCloudMenuIcon } from '../ui/ShareCloudIconButton'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -27,6 +27,8 @@ import {
   StyledDropdownMenuItem,
   StyledDropdownMenuSeparator,
 } from '../ui/StyledDropdown'
+
+const SHARE_LEARN_MORE_URL = 'https://agents.craft.do/docs/go-further/sharing'
 
 /**
  * Inject `<base target="_top">` so link clicks navigate the top frame,
@@ -84,9 +86,10 @@ function useContentHash(content: string): string | null {
  * the `onShareHtml` PlatformAction. Without both, renders nothing so web-viewer
  * / detached overlays don't advertise a feature they can't perform.
  *
- * Shares chrome with ChatPage's session share button via ShareCloudIconButton
- * and the radix DropdownMenu + StyledDropdownMenu* family — the two buttons
- * must be visually and interactively indistinguishable.
+ * Mirrors ChatPage's session share button: a single DropdownMenu in both
+ * states (never a direct-action click) built from ShareCloudIconButton +
+ * radix DropdownMenu + StyledDropdownMenu*, so the two buttons are visually
+ * and interactively indistinguishable.
  *
  * Visual state is derived from whichever `htmlShares` entry is anchored to
  * this button instance:
@@ -189,57 +192,75 @@ function ShareLinkButton({
     }
   }
 
-  // Idle: direct click triggers the initial share — no menu to disambiguate.
-  // This is html-preview-specific; the session button always opens a menu.
-  if (!isShared) {
-    const tooltip = t('htmlShare.share')
-    return (
-      <ShareCloudIconButton
-        isShared={false}
-        onClick={handleShare}
-        disabled={!html}
-        title={tooltip}
-        aria-label={tooltip}
-        className={className}
-      />
-    )
+  const handleLearnMore = () => {
+    onOpenUrl?.(SHARE_LEARN_MORE_URL)
   }
 
-  const sharedTooltip = t('htmlShare.shared')
+  const tooltip = isShared ? t('htmlShare.shared') : t('htmlShare.share')
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <ShareCloudIconButton
-          isShared
-          title={sharedTooltip}
-          aria-label={sharedTooltip}
+          isShared={isShared}
+          title={tooltip}
+          aria-label={tooltip}
           className={className}
         />
       </DropdownMenuTrigger>
       <StyledDropdownMenuContent align="end" sideOffset={8}>
-        {onOpenUrl && (
-          <StyledDropdownMenuItem onClick={handleOpenInBrowser}>
-            <Globe className="h-3.5 w-3.5" />
-            <span className="flex-1">{t('htmlShare.openInBrowser')}</span>
-          </StyledDropdownMenuItem>
-        )}
-        <StyledDropdownMenuItem onClick={handleCopyLink}>
-          <Copy className="h-3.5 w-3.5" />
-          <span className="flex-1">{t('htmlShare.copyLink')}</span>
-        </StyledDropdownMenuItem>
-        {onUpdateHtmlShare && (
-          <StyledDropdownMenuItem onClick={handleUpdateShare}>
-            <RefreshCw className="h-3.5 w-3.5" />
-            <span className="flex-1">{t('htmlShare.updateShare')}</span>
-          </StyledDropdownMenuItem>
-        )}
-        {onRevokeHtmlShare && (
+        {isShared ? (
           <>
-            <StyledDropdownMenuSeparator />
-            <StyledDropdownMenuItem onClick={handleRevokeShare} variant="destructive">
-              <Link2Off className="h-3.5 w-3.5" />
-              <span className="flex-1">{t('htmlShare.stopSharing')}</span>
+            {onOpenUrl && (
+              <StyledDropdownMenuItem onClick={handleOpenInBrowser}>
+                <Globe className="h-3.5 w-3.5" />
+                <span className="flex-1">{t('htmlShare.openInBrowser')}</span>
+              </StyledDropdownMenuItem>
+            )}
+            <StyledDropdownMenuItem onClick={handleCopyLink}>
+              <Copy className="h-3.5 w-3.5" />
+              <span className="flex-1">{t('htmlShare.copyLink')}</span>
             </StyledDropdownMenuItem>
+            {onUpdateHtmlShare && (
+              <StyledDropdownMenuItem onClick={handleUpdateShare}>
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span className="flex-1">{t('htmlShare.updateShare')}</span>
+              </StyledDropdownMenuItem>
+            )}
+            {onRevokeHtmlShare && (
+              <>
+                <StyledDropdownMenuSeparator />
+                <StyledDropdownMenuItem onClick={handleRevokeShare} variant="destructive">
+                  <Link2Off className="h-3.5 w-3.5" />
+                  <span className="flex-1">{t('htmlShare.stopSharing')}</span>
+                </StyledDropdownMenuItem>
+              </>
+            )}
+            {onOpenUrl && (
+              <>
+                <StyledDropdownMenuSeparator />
+                <StyledDropdownMenuItem onClick={handleLearnMore}>
+                  <Info className="h-3.5 w-3.5" />
+                  <span className="flex-1">{t('chat.learnMore')}</span>
+                </StyledDropdownMenuItem>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <StyledDropdownMenuItem onClick={handleShare} disabled={!html}>
+              <ShareCloudMenuIcon />
+              <span className="flex-1">{t('chat.shareOnline')}</span>
+            </StyledDropdownMenuItem>
+            {onOpenUrl && (
+              <>
+                <StyledDropdownMenuSeparator />
+                <StyledDropdownMenuItem onClick={handleLearnMore}>
+                  <Info className="h-3.5 w-3.5" />
+                  <span className="flex-1">{t('chat.learnMore')}</span>
+                </StyledDropdownMenuItem>
+              </>
+            )}
           </>
         )}
       </StyledDropdownMenuContent>
