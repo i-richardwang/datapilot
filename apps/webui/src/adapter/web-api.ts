@@ -90,6 +90,21 @@ export function createWebApi(options: WebApiOptions): {
     },
     openFile: () => Promise.resolve(), // no-op in browser
     showInFolder: () => Promise.resolve(), // no-op in browser
+    // Stream a file out of a session directory via the authenticated HTTP endpoint.
+    // We route through a hidden <a download> so the browser handles the save dialog
+    // and the response is streamed — never materialized in JS memory.
+    downloadSessionFile: (sessionId: string, path: string) => {
+      const url = `/api/session-files/download?sessionId=${encodeURIComponent(sessionId)}&path=${encodeURIComponent(path)}`
+      const a = document.createElement('a')
+      a.href = url
+      a.rel = 'noopener'
+      // Empty `download` attribute keeps the browser's Content-Disposition filename.
+      a.download = ''
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      return Promise.resolve()
+    },
 
     // File dialogs
     openFileDialog: webFilePicker,

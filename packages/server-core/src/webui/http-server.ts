@@ -10,7 +10,8 @@
  *    for separate-port deployments or development.
  */
 
-import { join, extname } from 'node:path'
+import { join, extname, normalize, sep, basename, dirname, isAbsolute } from 'node:path'
+import { realpath } from 'node:fs/promises'
 import {
   RateLimiter,
   initPasswordHash,
@@ -118,6 +119,16 @@ export interface OAuthCallbackDeps {
   pushSourcesChanged: (workspaceId: string) => void
 }
 
+/**
+ * Dependencies for the /api/session-files/download HTTP route.
+ * The resolver must return the absolute, authoritative path of a session's
+ * directory — the download route streams only files that live inside it.
+ */
+export interface SessionFileDownloadDeps {
+  /** Return the absolute session directory path, or null if the session is unknown. */
+  getSessionPath: (sessionId: string) => string | null
+}
+
 export interface WebuiHandlerOptions {
   /** Path to built web UI dist/ directory. */
   webuiDir: string
@@ -139,6 +150,8 @@ export interface WebuiHandlerOptions {
   logger: PlatformServices['logger']
   /** OAuth callback deps — when provided, enables /api/oauth/callback route. */
   oauthCallbackDeps?: OAuthCallbackDeps
+  /** Session file download deps — when provided, enables /api/session-files/download route. */
+  sessionFileDownloadDeps?: SessionFileDownloadDeps
   /**
    * Trusted proxy IPs/CIDRs. When set, proxy headers (x-forwarded-for, x-forwarded-proto)
    * are only trusted from these sources. When empty/unset, proxy headers are ignored
@@ -158,6 +171,8 @@ export interface WebuiHandler {
   dispose: () => void
   /** Inject OAuth callback deps after bootstrap (lazy wiring). */
   setOAuthCallbackDeps: (deps: OAuthCallbackDeps) => void
+  /** Inject session file download deps after bootstrap (lazy wiring). */
+  setSessionFileDownloadDeps: (deps: SessionFileDownloadDeps) => void
 }
 
 /**
@@ -381,6 +396,87 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // ── Session file download (streams a file from inside a session directory) ──
+    if (path === '/api/session-files/download' && req.method === 'GET') {
+      const deps = options.sessionFileDownloadDeps
+      if (!deps) {
+        return Response.json({ error: 'Not Found' }, { status: 404 })
+      }
+
+      const sessionId = url.searchParams.get('sessionId') ?? ''
+      const requestedPath = url.searchParams.get('path') ?? ''
+      if (!sessionId || !requestedPath) {
+        return Response.json({ error: 'Missing sessionId or path' }, { status: 400 })
+      }
+
+      // Require an absolute path — refuse relative paths up front
+      if (!isAbsolute(requestedPath)) {
+        return Response.json({ error: 'Forbidden' }, { status: 403 })
+      }
+
+      const rawSessionDir = deps.getSessionPath(sessionId)
+      if (!rawSessionDir) {
+        return Response.json({ error: 'Session not found' }, { status: 404 })
+      }
+
+      // Resolve real paths to defeat symlink escapes. If either path can't be
+      // realpath'd, fall back to the normalized form — realpath fails when the
+      // target doesn't exist, which we handle as 404 once we try to serve.
+      let realSessionDir: string
+      try {
+        realSessionDir = await realpath(rawSessionDir)
+      } catch {
+        realSessionDir = normalize(rawSessionDir)
+      }
+
+      // For the target: prefer realpath so symlinks can't escape the session.
+      // If the file itself doesn't exist, realpath throws — fall back to
+      // realpath'ing the parent so we still honour symlinks on the containing
+      // directory tree (this keeps the containment check consistent with
+      // realSessionDir, which also goes through realpath).
+      let realTarget: string
+      try {
+        realTarget = await realpath(requestedPath)
+      } catch {
+        const normalized = normalize(requestedPath)
+        try {
+          const realParent = await realpath(dirname(normalized))
+          realTarget = join(realParent, basename(normalized))
+        } catch {
+          realTarget = normalized
+        }
+      }
+
+      // Containment check: the target must equal or sit under the session dir.
+      // Append sep so "/foo/session" doesn't accept "/foo/session-other".
+      const sessionPrefix = realSessionDir.endsWith(sep) ? realSessionDir : realSessionDir + sep
+      if (realTarget !== realSessionDir && !realTarget.startsWith(sessionPrefix)) {
+        return Response.json({ error: 'Forbidden' }, { status: 403 })
+      }
+
+      const file = Bun.file(realTarget)
+      if (!await file.exists()) {
+        return Response.json({ error: 'File not found' }, { status: 404 })
+      }
+
+      const name = basename(realTarget)
+      // RFC 5987: provide an ASCII-safe filename plus the UTF-8 encoded form
+      // so browsers preserve non-ASCII names. Strip CR/LF/quote from the fallback.
+      const asciiFallback = name.replace(/[^\x20-\x7e]/g, '_').replace(/["\r\n]/g, '')
+      const encoded = encodeURIComponent(name)
+      const contentDisposition = `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encoded}`
+
+      return new Response(file, {
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'Content-Disposition': contentDisposition,
+          'Content-Length': String(file.size),
+          // Disable caching — session files change as the agent writes to them
+          'Cache-Control': 'no-store',
+        },
+      })
+    }
+
     // ── Serve SPA static files ──
     if (path !== '/') {
       const file = Bun.file(join(webuiDir, path))
@@ -407,6 +503,9 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
     dispose: () => clearInterval(cleanupTimer),
     setOAuthCallbackDeps: (deps: OAuthCallbackDeps) => {
       options.oauthCallbackDeps = deps
+    },
+    setSessionFileDownloadDeps: (deps: SessionFileDownloadDeps) => {
+      options.sessionFileDownloadDeps = deps
     },
   }
 }

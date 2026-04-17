@@ -361,6 +361,11 @@ export interface ElectronAPI {
   openUrl(url: string): Promise<void>
   openFile(path: string): Promise<void>
   showInFolder(path: string): Promise<void>
+  /**
+   * Trigger a browser download of a file living inside a session directory.
+   * Web-only: Electron has "Show in Finder" instead, and throws if called.
+   */
+  downloadSessionFile(sessionId: string, path: string): Promise<void>
 
   // Menu event listeners
   onMenuNewChat(callback: () => void): () => void
