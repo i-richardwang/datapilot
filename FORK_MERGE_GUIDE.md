@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: 合并 upstream 时的唯一操作手册 — 冲突风险、合并策略、检查清单。
 >
-> **Last updated after:** 9396790 (2026-04-15) — OAuth disabled + Lite UI by default, batch CLI consolidated into datapilot CLI
+> **Last updated after:** upstream v0.8.9 merge (2026-04-17) — Opus 4.7 default, inter-session messaging, local model setup fixes
 >
 > 设计细节见专项文档：
 > - [DATAPILOT_BRANCH_GUIDE.md](DATAPILOT_BRANCH_GUIDE.md) — 品牌改造范围与决策
@@ -411,6 +411,7 @@ bun run tsc --noEmit
 | v0.8.4 | 2026-04-09 | 35 | Generic OAuth, Send to Workspace. 14 version bump conflicts. Adopted upstream's callback registry. |
 | v0.8.5+v0.8.6 | 2026-04-11 | 9 | i18n (EN/ES/zh-Hans/JA), chunked transfers. Post-merge: `EditPopover` model tier type fix, `listAutomations` type rename. |
 | v0.8.7 | 2026-04-15 | 3 | Hungarian/German/Polish i18n, Bedrock fixes, API token refresh. 3 conflicts: 2 version bumps (package.json) + AppShell.tsx `useMemo` deps merge. Post-merge: duplicate import fix, i18n key sorting + fork keys added to de/hu/pl. |
+| v0.8.7+v0.8.8+v0.8.9 | 2026-04-17 | 32 | Triple-version merge (v0.8.7 re-applied since prior content-only restore didn't record merge). **Key upstream changes:** Opus 4.7 default model + migration, `send_agent_message` tool (inter-session messaging), Local model detection via `isLoopbackBaseUrl`, retry button fix, duplicate ConfigWatcher fix, zh-Hans translation pass. **Conflict breakdown:** 14 package.json version bumps (all → 0.8.9), 7 i18n locale files (en/es/ja/zh-Hans had 25 DataPilot rebrands applied per-locale; pl/de/hu preserved fork's untranslated state per memory note), bun.lock regenerated via `bun install`, `README.md` kept fork's simplified version, `llm-connections.ts` merged fork's `anthropic_compat` branch with upstream's `Local Model` loopback branch, `FreeFormInput.tsx` added new `Local` provider group alongside `DataPilot Backend`, `SessionManager.ts` kept fork imports (`createHash`, `cleanupSessionScopedTools`, `registerSessionBatchContext`), `entity-row.tsx` adopted upstream's `open={menuOpen}` prop while keeping fork's `rounded-lg` class, `BrowserEmptyStateCard.tsx` switched hardcoded text to `t('browser.safetyHint')` with DataPilot-branded translations, claude-opus-4-6 → claude-opus-4-7 bumped in tests + models. **Pre-existing tsc errors** in `packages/shared/src/db/__tests__/*` and `packages/server-core/src/handlers/rpc/automations.ts` (verified pre-merge via worktree) are NOT caused by this merge. |
 
 ### Fork Feature Milestones (non-upstream merges)
 
@@ -427,3 +428,4 @@ bun run tsc --noEmit
 | SQLite migration | 2026-04-01 | JSON → SQLite storage, DataPilot CLI (60 commands) |
 | Batch CLI consolidation | 2026-04-14 | `datapilot-batch` 合并进 `datapilot` CLI 的 `batch` entity；移除独立 `batchCli` flag |
 | Granular flags defaults | 2026-04-15 | `isOauthDisabled()` 和 `isLiteUi()` 默认值改为 `true`；browser UI 随 flag 隐藏 |
+| `browser.safetyHint` i18n | 2026-04-17 | Switched from hardcoded "DataPilot only controls browser windows…" to `t('browser.safetyHint')`; locale values in en/es/ja/zh-Hans/pl/de/hu all use DataPilot branding. |

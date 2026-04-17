@@ -301,6 +301,7 @@ export function HTMLPreviewOverlay({
   theme,
 }: HTMLPreviewOverlayProps) {
   // Normalize: single html prop → single item, or use items array
+  const { t } = useTranslation()
   const resolvedItems = React.useMemo<PreviewItem[]>(() => {
     if (items && items.length > 0) return items
     if (html) return [{ src: '__single__' }]
@@ -415,7 +416,7 @@ export function HTMLPreviewOverlay({
     >
       <div className="px-6 pb-6">
         {loadingItem && !activeContent && (
-          <div className="py-12 text-center text-muted-foreground text-sm">Loading...</div>
+          <div className="py-12 text-center text-muted-foreground text-sm">{t('common.loading')}</div>
         )}
         {loadError && !activeContent && (
           <div className="py-12 text-center text-destructive/70 text-sm">{loadError}</div>
