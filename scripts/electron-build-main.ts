@@ -17,8 +17,8 @@ const SESSION_SERVER_DIR = join(ROOT_DIR, "packages/session-mcp-server");
 const SESSION_SERVER_OUTPUT = join(SESSION_SERVER_DIR, "dist/index.js");
 const PI_AGENT_SERVER_DIR = join(ROOT_DIR, "packages/pi-agent-server");
 const PI_AGENT_SERVER_OUTPUT = join(PI_AGENT_SERVER_DIR, "dist/index.js");
-const CRAFT_CLI_DIR = join(ROOT_DIR, "packages/craft-cli");
-const CRAFT_CLI_OUTPUT = join(CRAFT_CLI_DIR, "dist/index.js");
+const DATAPILOT_CLI_DIR = join(ROOT_DIR, "packages/craft-cli");
+const DATAPILOT_CLI_OUTPUT = join(DATAPILOT_CLI_DIR, "dist/index.js");
 
 // Load .env file if it exists
 function loadEnvFile(): void {
@@ -55,7 +55,7 @@ function getBuildDefines(): string[] {
     "MICROSOFT_OAUTH_CLIENT_ID",
     "MICROSOFT_OAUTH_CLIENT_SECRET",
     "SENTRY_ELECTRON_INGEST_URL",
-    "CRAFT_DEV_RUNTIME",
+    "DATAPILOT_DEV_RUNTIME",
   ];
 
   return definedVars.map((varName) => {
@@ -261,7 +261,7 @@ async function buildCraftCli(): Promise<void> {
   console.log("🔧 Building DataPilot CLI...");
 
   // Ensure dist directory exists
-  const distDir = join(CRAFT_CLI_DIR, "dist");
+  const distDir = join(DATAPILOT_CLI_DIR, "dist");
   if (!existsSync(distDir)) {
     mkdirSync(distDir, { recursive: true });
   }
@@ -271,8 +271,8 @@ async function buildCraftCli(): Promise<void> {
   const proc = spawn({
     cmd: [
       "bun", "build",
-      join(CRAFT_CLI_DIR, "src/index.ts"),
-      "--outfile", CRAFT_CLI_OUTPUT,
+      join(DATAPILOT_CLI_DIR, "src/index.ts"),
+      "--outfile", DATAPILOT_CLI_OUTPUT,
       "--target", "bun",
       "--format", "esm",
     ],
@@ -289,8 +289,8 @@ async function buildCraftCli(): Promise<void> {
   }
 
   // Verify output exists
-  if (!existsSync(CRAFT_CLI_OUTPUT)) {
-    console.error("❌ Craft CLI output not found at", CRAFT_CLI_OUTPUT);
+  if (!existsSync(DATAPILOT_CLI_OUTPUT)) {
+    console.error("❌ Craft CLI output not found at", DATAPILOT_CLI_OUTPUT);
     process.exit(1);
   }
 

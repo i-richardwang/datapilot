@@ -3,7 +3,7 @@
 > 品牌改造的设计记录与参考文档。
 > 合并操作请查阅 [FORK_MERGE_GUIDE.md](FORK_MERGE_GUIDE.md)。
 >
-> **Last updated:** 2026-04-01 (v13, 环境变量/CLI二进制/Agent文档全面品牌适配)
+> **Last updated:** 2026-04-17 (v14, 内部 packaging/runtime 环境变量与 CLI 域常量改名)
 
 ## 目标
 
@@ -72,6 +72,23 @@
 | 用户可见变量（13 个） | `CRAFT_SERVER_TOKEN` → `DATAPILOT_SERVER_TOKEN`、`CRAFT_RPC_HOST/PORT` → `DATAPILOT_RPC_HOST/PORT`、`CRAFT_WEBUI_*` → `DATAPILOT_WEBUI_*` |
 | CLI 变量（2 个） | `CRAFT_SERVER_URL` → `DATAPILOT_SERVER_URL`、`CRAFT_TLS_CA` → `DATAPILOT_TLS_CA` |
 | 内部 CLI 变量（7 个） | `CRAFT_CLI_ENTRY` → `DATAPILOT_CLI_ENTRY`、`CRAFT_BUN` → `DATAPILOT_BUN` 等 |
+
+### 内部 packaging/runtime 环境变量与 CLI 域常量改名（v14，DEV-16，~50 文件）
+
+将剩余的内部 `CRAFT_*` 环境变量与 TS 常量统一改名为 `DATAPILOT_*`。仅涵盖 *内部* 接口（writers 与 readers 同 commit 改完）；automation 模板变量、webhook 前缀、feature flag、deeplink scheme、加密 magic bytes 等带外部契约的名称保持不变。
+
+| 类别 | 示例 |
+|------|------|
+| Packaging & runtime（8 个） | `CRAFT_IS_PACKAGED` → `DATAPILOT_IS_PACKAGED`、`CRAFT_APP_ROOT` → `DATAPILOT_APP_ROOT`、`CRAFT_PYTHON/UV/SCRIPTS/NODE` → `DATAPILOT_*` 等 |
+| Dev tooling（3 个） | `CRAFT_DEV_RUNTIME` → `DATAPILOT_DEV_RUNTIME`、`CRAFT_INSTANCE_NUMBER`、`CRAFT_VITE_PORT` |
+| 内部 runtime knobs（6 个） | `CRAFT_HEADLESS`、`CRAFT_LOCAL_MCP_ENABLED`、`CRAFT_INTERCEPTOR_DISABLE_AUTO_INSTALL`、`CRAFT_BROWSER_OPEN_SETTLE_*`、`CRAFT_TRANSFER_TTL_MS` |
+| Pi agent subprocess（3 个） | `CRAFT_PI_MODEL_API/BASE_URL/PROVIDER` → `DATAPILOT_PI_MODEL_*` |
+| Agent identity passthrough（5 个） | `CRAFT_APP_NAME`、`CRAFT_VERSION`、`CRAFT_AGENT_VERSION`、`CRAFT_AGENT_CLI_VERSION`、`CRAFT_AGENT_WORKSPACE_ROOT` |
+| Windows preflight（2 个） | `CRAFT_VCREDIST_MISSING`、`CRAFT_VCREDIST_URL` |
+| Session MCP（1 个） | `CRAFT_LLM_CALLBACK_PORT` → `DATAPILOT_LLM_CALLBACK_PORT` |
+| Misc 内部（3 个） | `CRAFT_LOGO/LOGO_HTML`、`__CRAFT_THEME_OBSERVER_CLEANUP__` |
+| Build-script TS 常量（2 个） | `CRAFT_CLI_DIR/OUTPUT` → `DATAPILOT_CLI_DIR/OUTPUT` |
+| CLI 域 TS 常量（4 个） | `CRAFT_AGENTS_CLI_*` → `DATAPILOT_CLI_*`（去掉 `_AGENTS` 中缀） |
 
 ### CLI 二进制名重命名（11 文件 96 处）
 

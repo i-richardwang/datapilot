@@ -12,10 +12,10 @@
  *   DATAPILOT_RPC_TLS_CERT         — path to PEM certificate file (enables TLS/wss)
  *   DATAPILOT_RPC_TLS_KEY          — path to PEM private key file (required with cert)
  *   DATAPILOT_RPC_TLS_CA           — path to PEM CA chain file (optional)
- *   CRAFT_APP_ROOT             — app root path (default: cwd)
- *   CRAFT_RESOURCES_PATH       — resources path (default: cwd/resources)
- *   CRAFT_IS_PACKAGED          — 'true' for production (default: false)
- *   CRAFT_VERSION              — app version (default: 0.0.0-dev)
+ *   DATAPILOT_APP_ROOT             — app root path (default: cwd)
+ *   DATAPILOT_RESOURCES_PATH       — resources path (default: cwd/resources)
+ *   DATAPILOT_IS_PACKAGED          — 'true' for production (default: false)
+ *   DATAPILOT_VERSION              — app version (default: 0.0.0-dev)
  *   DATAPILOT_DEBUG                — 'true' for debug logging
  *   DATAPILOT_WEBUI_DIR            — path to built web UI assets (enables web UI on RPC port)
  *   DATAPILOT_WEBUI_PASSWORD       — optional shorter password for web login (falls back to DATAPILOT_SERVER_TOKEN)
@@ -43,7 +43,7 @@ import { initModelRefreshService, setFetcherPlatform } from '@craft-agent/server
 import { setSearchPlatform, setImageProcessor } from '@craft-agent/server-core/services'
 import type { HandlerDeps } from '@craft-agent/server-core/handlers'
 
-process.env.CRAFT_IS_PACKAGED ??= 'false'
+process.env.DATAPILOT_IS_PACKAGED ??= 'false'
 
 // Prevent unhandled rejections from crashing the server.
 // SDK subprocess abort can reject promises that propagate up unhandled;
@@ -87,7 +87,7 @@ function parseOptionalWebSocketUrl(name: string, value: string | undefined): str
 // Two distinct roots:
 // - appRoot: monorepo root — for resolving top-level packages and repo-relative paths
 // - bundledAssetsRoot: may point to apps/electron — for setBundledAssetsRoot / getBundledAssetsDir
-const appRoot = process.env.CRAFT_APP_ROOT ?? join(import.meta.dir, '..', '..', '..', '..')
+const appRoot = process.env.DATAPILOT_APP_ROOT ?? join(import.meta.dir, '..', '..', '..', '..')
 const bundledAssetsRoot = process.env.DATAPILOT_BUNDLED_ASSETS_ROOT ?? appRoot
 
 // CLI entry point — lives at the monorepo top level, not under apps/electron.
@@ -160,7 +160,7 @@ const instance = await (async () => {
   try {
     return await bootstrapServer<SessionManager, HandlerDeps>({
       bundledAssetsRoot,
-      serverVersion: process.env.CRAFT_VERSION ?? packageVersion,
+      serverVersion: process.env.DATAPILOT_VERSION ?? packageVersion,
       tls,
       // When web UI is enabled, accept JWT session cookies on WebSocket upgrade
       validateSessionCookie: webuiEnabled && serverToken

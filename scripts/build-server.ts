@@ -583,13 +583,13 @@ ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Set environment for resource resolution
 export DATAPILOT_BUNDLED_ASSETS_ROOT="$ROOT"
-export CRAFT_IS_PACKAGED=true
-export CRAFT_APP_ROOT="$ROOT"
-export CRAFT_RESOURCES_PATH="$ROOT/resources"
+export DATAPILOT_IS_PACKAGED=true
+export DATAPILOT_APP_ROOT="$ROOT"
+export DATAPILOT_RESOURCES_PATH="$ROOT/resources"
 
 # CLI tools (doc tools use uv + Python scripts)
-export CRAFT_UV="$ROOT/resources/bin/uv"
-export CRAFT_SCRIPTS="$ROOT/resources/scripts"
+export DATAPILOT_UV="$ROOT/resources/bin/uv"
+export DATAPILOT_SCRIPTS="$ROOT/resources/scripts"
 
 # Prepend resource bin to PATH (makes doc tool wrappers available)
 export PATH="$ROOT/resources/bin:$ROOT/vendor/bun:$PATH"
@@ -654,7 +654,7 @@ if [ "\${1:-}" = "--systemd" ]; then
     exit 1
   fi
 
-  SERVICE_USER="\${CRAFT_USER:-\$(logname 2>/dev/null || echo craft)}"
+  SERVICE_USER="\${DATAPILOT_USER:-\$(logname 2>/dev/null || echo datapilot)}"
   SERVICE_FILE="/etc/systemd/system/datapilot-server.service"
 
   cat > "$SERVICE_FILE" <<UNIT
@@ -727,12 +727,12 @@ COPY . .
 RUN chmod +x bin/datapilot-server vendor/bun/bun resources/bin/uv && \\
     for f in resources/bin/*; do [ -f "$f" ] && chmod +x "$f"; done
 
-ENV CRAFT_IS_PACKAGED=true
+ENV DATAPILOT_IS_PACKAGED=true
 ENV DATAPILOT_BUNDLED_ASSETS_ROOT=/app
-ENV CRAFT_APP_ROOT=/app
-ENV CRAFT_RESOURCES_PATH=/app/resources
-ENV CRAFT_UV=/app/resources/bin/uv
-ENV CRAFT_SCRIPTS=/app/resources/scripts
+ENV DATAPILOT_APP_ROOT=/app
+ENV DATAPILOT_RESOURCES_PATH=/app/resources
+ENV DATAPILOT_UV=/app/resources/bin/uv
+ENV DATAPILOT_SCRIPTS=/app/resources/scripts
 ENV DATAPILOT_RPC_HOST=0.0.0.0
 ENV DATAPILOT_RPC_PORT=9100
 ENV PATH="/app/resources/bin:/app/vendor/bun:\${PATH}"

@@ -3,7 +3,7 @@
  * Used by OAuth callback pages
  */
 
-export const CRAFT_LOGO = [
+export const DATAPILOT_LOGO = [
   '  ████████ █████████    ██████   ██████████ ██████████',
   '██████████ ██████████ ██████████ █████████  ██████████',
   '██████     ██████████ ██████████ ████████   ██████████',
@@ -12,7 +12,7 @@ export const CRAFT_LOGO = [
 ] as const;
 
 /** Logo as a single string for HTML templates */
-export const CRAFT_LOGO_HTML = CRAFT_LOGO.map((line) => line.trimEnd()).join('\n');
+export const DATAPILOT_LOGO_HTML = DATAPILOT_LOGO.map((line) => line.trimEnd()).join('\n');
 
 /** Session viewer base URL (override with DATAPILOT_VIEWER_URL env var for self-hosted deployments) */
 export const VIEWER_URL = process.env.DATAPILOT_VIEWER_URL ?? 'https://agents.craft.do';

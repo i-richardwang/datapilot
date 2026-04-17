@@ -4,7 +4,7 @@
  * Resolution order:
  * 1. --workspace-root <path> CLI flag (explicit)
  * 2. CRAFT_WORKSPACE_PATH env var (injected by SessionManager for every agent bash session)
- * 3. CRAFT_AGENT_WORKSPACE_ROOT env var (manual override)
+ * 3. DATAPILOT_AGENT_WORKSPACE_ROOT env var (manual override)
  * 4. Walk up from CWD looking for .datapilot/ dir
  * 5. Fall back to CWD
  */
@@ -22,7 +22,7 @@ export function resolveWorkspaceRoot(explicitFlag?: string): string {
     return resolve(craftWorkspacePath)
   }
 
-  const envVar = process.env['CRAFT_AGENT_WORKSPACE_ROOT']
+  const envVar = process.env['DATAPILOT_AGENT_WORKSPACE_ROOT']
   if (envVar) {
     return resolve(envVar)
   }

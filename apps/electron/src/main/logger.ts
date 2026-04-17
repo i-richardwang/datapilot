@@ -5,14 +5,14 @@ import log from 'electron-log/main'
  *
  * Priority:
  * 1) --debug flag always enables debug mode
- * 2) CRAFT_IS_PACKAGED env (when explicitly set)
+ * 2) DATAPILOT_IS_PACKAGED env (when explicitly set)
  * 3) Electron runtime heuristic (defaultApp => dev, otherwise packaged)
  * 4) Non-Electron runtimes default to debug mode (headless Bun / node --check)
  */
 function resolveDebugMode(): boolean {
   if (process.argv.includes('--debug')) return true
 
-  const packagedEnv = process.env.CRAFT_IS_PACKAGED
+  const packagedEnv = process.env.DATAPILOT_IS_PACKAGED
   if (packagedEnv === 'true') return false
   if (packagedEnv === 'false') return true
 

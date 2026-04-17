@@ -115,7 +115,7 @@ if (isDebugMode) {
 }
 
 // Bundle CLI tools: resolve platform-specific uv binary and wrapper scripts.
-// These are available to all agent Bash sessions via CRAFT_UV, CRAFT_SCRIPTS env vars
+// These are available to all agent Bash sessions via DATAPILOT_UV, DATAPILOT_SCRIPTS env vars
 // and PATH prepend. uv auto-downloads Python 3.12 on first use (~5s, then cached).
 {
   // In packaged app: resources are at process.resourcesPath/app/resources/
@@ -133,11 +133,11 @@ if (isDebugMode) {
   const fallbackUv = bundledUvExists ? null : 'uv'
 
   // Runtime resolver hints for shared session tools
-  process.env.CRAFT_IS_PACKAGED = app.isPackaged ? '1' : '0'
-  process.env.CRAFT_RESOURCES_BASE = resourcesBase
-  process.env.CRAFT_APP_ROOT = app.isPackaged ? app.getAppPath() : process.cwd()
+  process.env.DATAPILOT_IS_PACKAGED = app.isPackaged ? '1' : '0'
+  process.env.DATAPILOT_RESOURCES_BASE = resourcesBase
+  process.env.DATAPILOT_APP_ROOT = app.isPackaged ? app.getAppPath() : process.cwd()
 
-  process.env.CRAFT_UV = bundledUvExists ? uvBinary : (fallbackUv ?? uvBinary)
+  process.env.DATAPILOT_UV = bundledUvExists ? uvBinary : (fallbackUv ?? uvBinary)
 
   // Bun runtime (packaged builds should prefer bundled runtime over PATH)
   const bunBinary = join(resourcesBase, 'vendor', 'bun', process.platform === 'win32' ? 'bun.exe' : 'bun')
@@ -145,7 +145,7 @@ if (isDebugMode) {
     process.env.DATAPILOT_BUN = bunBinary
   }
 
-  process.env.CRAFT_SCRIPTS = scriptsDir
+  process.env.DATAPILOT_SCRIPTS = scriptsDir
   process.env.DATAPILOT_CLI_ENTRY = app.isPackaged
     ? join(resourcesBase, 'resources', 'craft-cli', 'index.js')
     : join(process.cwd(), 'packages', 'craft-cli', 'src', 'index.ts')
@@ -153,7 +153,7 @@ if (isDebugMode) {
     ? join(resourcesBase, 'resources', 'docs', 'datapilot-cli.md')
     : join(process.cwd(), 'apps', 'electron', 'resources', 'docs', 'datapilot-cli.md')
   process.env.DATAPILOT_CLI_DOC_PATH = process.env.DATAPILOT_COMMANDS_DOC_PATH
-  process.env.CRAFT_AGENT_VERSION = app.getVersion()
+  process.env.DATAPILOT_AGENT_VERSION = app.getVersion()
   // Prepend both generic wrappers dir and platform uv dir:
   // - binDir exposes wrapper commands (pdf-tool, docx-tool, ...)
   // - uvPlatformDir exposes raw `uv` for direct shell usage / debugging
@@ -162,12 +162,12 @@ if (isDebugMode) {
   if (!bundledUvExists) {
     mainLog.warn('Bundled uv binary missing, CLI document tools may fail unless uv is available on PATH.', {
       expectedUvPath: uvBinary,
-      usingCraftUv: process.env.CRAFT_UV,
+      usingCraftUv: process.env.DATAPILOT_UV,
     })
   }
 
   if (isDebugMode) {
-    mainLog.info('CLI tools configured:', { uvBinary: process.env.CRAFT_UV, binDir, scriptsDir, bundledUvExists })
+    mainLog.info('CLI tools configured:', { uvBinary: process.env.DATAPILOT_UV, binDir, scriptsDir, bundledUvExists })
   }
 }
 
@@ -192,8 +192,8 @@ let moduleClientResolver: ((webContentsId: number) => string | undefined) | null
 let pendingDeepLink: string | null = null
 
 // Set app name early (before app.whenReady) to ensure correct macOS menu bar title
-// Supports multi-instance dev: CRAFT_APP_NAME env var (e.g., "DataPilot [1]")
-app.setName(process.env.CRAFT_APP_NAME || 'DataPilot')
+// Supports multi-instance dev: DATAPILOT_APP_NAME env var (e.g., "DataPilot [1]")
+app.setName(process.env.DATAPILOT_APP_NAME || 'DataPilot')
 
 // Register as default protocol client for craftagents:// URLs
 // This must be done before app.whenReady() on some platforms
@@ -348,7 +348,7 @@ async function createInitialWindows(): Promise<void> {
 
 app.whenReady().then(async () => {
   // Export packaged state as env var so logger.ts (and headless Bun) don't need 'electron'
-  process.env.CRAFT_IS_PACKAGED = app.isPackaged ? 'true' : 'false'
+  process.env.DATAPILOT_IS_PACKAGED = app.isPackaged ? 'true' : 'false'
 
   // Register bundled assets root so all seeding functions can find their files
   // (docs, permissions, themes, tool-icons resolve via getBundledAssetsDir)
@@ -409,8 +409,8 @@ app.whenReady().then(async () => {
     }
 
     // Multi-instance dev: show instance number badge on dock icon
-    // CRAFT_INSTANCE_NUMBER is set by detect-instance.sh for numbered folders
-    const instanceNum = process.env.CRAFT_INSTANCE_NUMBER
+    // DATAPILOT_INSTANCE_NUMBER is set by detect-instance.sh for numbered folders
+    const instanceNum = process.env.DATAPILOT_INSTANCE_NUMBER
     if (instanceNum) {
       const num = parseInt(instanceNum, 10)
       if (!isNaN(num) && num > 0) {
@@ -430,7 +430,7 @@ app.whenReady().then(async () => {
     // it only creates windows whose preload connects to the remote server.
     // Skip server-side initialization (SessionManager, model refresh, platform injection).
     const isClientOnly = !!process.env.DATAPILOT_SERVER_URL
-    const isHeadless = !!process.env.CRAFT_HEADLESS
+    const isHeadless = !!process.env.DATAPILOT_HEADLESS
 
     if (isClientOnly) {
       mainLog.info(`Client-only mode: DATAPILOT_SERVER_URL=${process.env.DATAPILOT_SERVER_URL} (server initialization skipped)`)
@@ -540,9 +540,9 @@ app.whenReady().then(async () => {
         const vcCheck = checkVCRedistInstalled()
         if (!vcCheck.installed) {
           mainLog.warn('[vcredist]', vcCheck.message)
-          process.env.CRAFT_VCREDIST_MISSING = '1'
+          process.env.DATAPILOT_VCREDIST_MISSING = '1'
           if (vcCheck.downloadUrl) {
-            process.env.CRAFT_VCREDIST_URL = vcCheck.downloadUrl
+            process.env.DATAPILOT_VCREDIST_URL = vcCheck.downloadUrl
           }
         } else if (isDebugMode) {
           mainLog.info('[vcredist]', vcCheck.message)
@@ -1015,7 +1015,7 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
-  if (process.env.CRAFT_HEADLESS) return  // headless server stays alive
+  if (process.env.DATAPILOT_HEADLESS) return  // headless server stays alive
   // On macOS, apps typically stay active until explicitly quit
   if (process.platform !== 'darwin') {
     app.quit()

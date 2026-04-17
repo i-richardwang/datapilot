@@ -32,7 +32,7 @@ function loadBundledReleaseNotes(): Record<string, string> {
   const notes: Record<string, string> = {};
 
   // Try bundled assets first, fall back to ~/.craft-agent/release-notes/
-  // (Docker/remote server may not have CRAFT_BUNDLED_ASSETS_ROOT set,
+  // (Docker/remote server may not have DATAPILOT_BUNDLED_ASSETS_ROOT set,
   // but initializeReleaseNotes() copies files to the config dir at startup)
   let dir = assetsDir;
   if (!existsSync(dir)) {
