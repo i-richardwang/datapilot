@@ -161,6 +161,9 @@ mock.module('./server-spawner.ts', () => ({
     return {
       url: mockWsServer.url,
       token: mockWsServer.token,
+      pid: 0,
+      // Mock child never exits during the test — return a never-resolving promise.
+      exited: new Promise<number>(() => {}),
       stop: async () => {},
     }
   },

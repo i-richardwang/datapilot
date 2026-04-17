@@ -15,6 +15,10 @@ import type { Subprocess } from 'bun'
 export interface SpawnedServer {
   url: string
   token: string
+  /** PID of the spawned child process (i.e. the server itself). */
+  pid: number
+  /** Resolves when the child process exits. */
+  exited: Promise<number>
   stop: () => Promise<void>
 }
 
@@ -115,6 +119,8 @@ export async function spawnServer(opts?: SpawnServerOptions): Promise<SpawnedSer
           resolve({
             url,
             token,
+            pid: proc.pid,
+            exited: proc.exited as unknown as Promise<number>,
             stop: async () => {
               proc.kill('SIGTERM')
               await proc.exited
