@@ -18,7 +18,7 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { AnimatePresence, motion, type Variants } from 'motion/react'
-import { File, Folder, FolderOpen, FileText, Image, FileCode, ChevronRight, ExternalLink } from 'lucide-react'
+import { File, Folder, FolderOpen, FileText, Image, FileCode, ChevronRight, ExternalLink, Download } from 'lucide-react'
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -243,6 +243,7 @@ interface FileTreeItemProps {
   onFileClick: (file: SessionFile) => void
   onFileDoubleClick: (file: SessionFile) => void
   onRevealInFileManager: (path: string) => void
+  onDownloadFile: (file: SessionFile) => void
   /** Whether this item is inside an expanded folder (for stagger animation) */
   isNested?: boolean
 }
@@ -262,6 +263,7 @@ function FileTreeItem({
   onFileClick,
   onFileDoubleClick,
   onRevealInFileManager,
+  onDownloadFile,
   isNested,
 }: FileTreeItemProps) {
   const { t } = useTranslation()
@@ -348,20 +350,33 @@ function FileTreeItem({
           {buttonElement}
         </ContextMenuTrigger>
         <StyledContextMenuContent>
-          {/* Open — files only (folders just show "Show in file manager") */}
+          {/* Open — files only (directories have no in-app preview) */}
           {file.type !== 'directory' && (
             <StyledContextMenuItem onSelect={() => onFileClick(file)}>
               <ExternalLink className="h-3.5 w-3.5" />
               {t("chat.openFile")}
             </StyledContextMenuItem>
           )}
-          {/* Show in file manager */}
-          <StyledContextMenuItem
-            onSelect={() => onRevealInFileManager(file.path)}
-          >
-            <FolderOpen className="h-3.5 w-3.5" />
-            {t("chat.showInFileManager", { fileManager: fileManagerName })}
-          </StyledContextMenuItem>
+          {/*
+            Second action depends on runtime: Electron reveals in the native file
+            manager; web has no filesystem access, so it downloads instead. The
+            web download action is hidden on directories (only meaningful per-file).
+          */}
+          {isWebMode ? (
+            file.type !== 'directory' && (
+              <StyledContextMenuItem onSelect={() => onDownloadFile(file)}>
+                <Download className="h-3.5 w-3.5" />
+                {t("chat.downloadFile")}
+              </StyledContextMenuItem>
+            )
+          ) : (
+            <StyledContextMenuItem
+              onSelect={() => onRevealInFileManager(file.path)}
+            >
+              <FolderOpen className="h-3.5 w-3.5" />
+              {t("chat.showInFileManager", { fileManager: fileManagerName })}
+            </StyledContextMenuItem>
+          )}
         </StyledContextMenuContent>
       </ContextMenu>
       {/* Expandable children with framer-motion animation - matches LeftSidebar exactly */}
@@ -399,6 +414,7 @@ function FileTreeItem({
                         onFileClick={onFileClick}
                         onFileDoubleClick={onFileDoubleClick}
                         onRevealInFileManager={onRevealInFileManager}
+                        onDownloadFile={onDownloadFile}
                         isNested={true}
                       />
                     </motion.div>
@@ -533,6 +549,16 @@ export function SessionFilesSection({ sessionId, className, sessionFolderPath, h
     window.electronAPI.showInFolder(path)
   }, [])
 
+  // Trigger a browser download for a file in this session (web mode only).
+  // The HTTP endpoint authenticates via the session cookie and enforces
+  // containment inside the session directory.
+  const handleDownloadFile = useCallback((file: SessionFile) => {
+    if (!sessionId || file.type === 'directory') return
+    void window.electronAPI.downloadSessionFile(sessionId, file.path).catch((err) => {
+      console.error('Failed to download session file:', err)
+    })
+  }, [sessionId])
+
   // Handle file click — preview in-app if possible, open directory in file manager
   const handleFileClick = useCallback((file: SessionFile) => {
     if (file.type === 'directory') {
@@ -611,6 +637,7 @@ export function SessionFilesSection({ sessionId, className, sessionFolderPath, h
                 onFileClick={handleFileClick}
                 onFileDoubleClick={handleFileDoubleClick}
                 onRevealInFileManager={handleRevealInFileManager}
+                onDownloadFile={handleDownloadFile}
               />
             ))}
           </nav>

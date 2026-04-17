@@ -248,6 +248,10 @@ if (webuiHandler) {
       pushTyped(instance.wsServer, RPC_CHANNELS.sources.CHANGED, { to: 'workspace', workspaceId }, workspaceId, sources)
     },
   })
+
+  webuiHandler.setSessionFileDownloadDeps({
+    getSessionPath: (sessionId: string) => instance.sessionManager.getSessionPath(sessionId),
+  })
 }
 
 // Start HTTP health endpoint if DATAPILOT_HEALTH_PORT is set

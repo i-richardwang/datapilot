@@ -424,4 +424,8 @@ client.onConnectionStateChanged((state) => {
 // i18n: sync language changes to main process (for native menus/dialogs)
 ;(api as ElectronAPI).changeLanguage = (lang: string) => ipcRenderer.invoke('i18n:changeLanguage', lang)
 
+// Web-only: guards the session-files download menu item. Electron uses "Show in Finder".
+;(api as ElectronAPI).downloadSessionFile = () =>
+  Promise.reject(new Error('downloadSessionFile is web-only; Electron should use showInFolder'))
+
 contextBridge.exposeInMainWorld('electronAPI', api)
