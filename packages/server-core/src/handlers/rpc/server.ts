@@ -5,7 +5,7 @@ import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { addWorkspace, setActiveWorkspace } from '@craft-agent/shared/config'
 import { getDefaultWorkspacesDir, ensureDefaultWorkspacesDir } from '@craft-agent/shared/workspaces'
 import type { ServerStatus, ServerHealth } from '@craft-agent/core/types'
-import type { RpcServer } from '@craft-agent/server-core/transport'
+import type { RpcDispatcher } from '@craft-agent/rpc-engine'
 import type { HandlerDeps } from '../handler-deps'
 import type { ServerHandlerContext } from '../../bootstrap/headless-start'
 
@@ -19,7 +19,7 @@ export const HANDLED_CHANNELS = [
 ] as const
 
 export function registerServerHandlers(
-  server: RpcServer,
+  server: RpcDispatcher,
   deps: HandlerDeps,
   ctx: ServerHandlerContext,
 ): void {

@@ -4,7 +4,7 @@ import { homedir } from 'os'
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
 import type { RpcServer } from '@craft-agent/server-core/transport'
-import type { HandlerDeps } from '../handler-deps'
+import type { EntityHandlerDeps } from '../handler-deps'
 import { requestClientConfirmDialog } from '@craft-agent/server-core/transport'
 
 export const HANDLED_CHANNELS = [
@@ -14,7 +14,7 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.credentials.HEALTH_CHECK,
 ] as const
 
-export function registerAuthHandlers(server: RpcServer, deps: HandlerDeps): void {
+export function registerAuthHandlers(server: RpcServer, deps: EntityHandlerDeps): void {
   // Show logout confirmation dialog (routed to client)
   server.handle(RPC_CHANNELS.auth.SHOW_LOGOUT_CONFIRMATION, async (ctx) => {
     const result = await requestClientConfirmDialog(server, ctx.clientId, {

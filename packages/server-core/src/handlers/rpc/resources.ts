@@ -7,7 +7,7 @@
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { getWorkspaceByNameOrId } from '@craft-agent/shared/config'
 import { getCredentialManager, SOURCE_CREDENTIAL_TYPES } from '@craft-agent/shared/credentials'
-import type { RpcServer } from '@craft-agent/server-core/transport'
+import type { RpcDispatcher } from '@craft-agent/rpc-engine'
 import type { HandlerDeps } from '../handler-deps'
 import type {
   ResourceBundle,
@@ -20,7 +20,7 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.resources.IMPORT,
 ] as const
 
-export function registerResourcesHandlers(server: RpcServer, deps: HandlerDeps): void {
+export function registerResourcesHandlers(server: RpcDispatcher, deps: HandlerDeps): void {
   // Export workspace resources to a portable bundle
   server.handle(
     RPC_CHANNELS.resources.EXPORT,
