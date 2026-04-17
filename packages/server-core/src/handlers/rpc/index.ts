@@ -8,6 +8,7 @@ import { registerFilesHandlers } from './files'
 import { registerLabelsHandlers } from './labels'
 import { registerLlmConnectionsHandlers } from './llm-connections'
 import { registerOAuthHandlers } from './oauth'
+import { registerPermissionsHandlers } from './permissions'
 import { registerResourcesHandlers } from './resources'
 import { registerOnboardingHandlers } from './onboarding'
 import { registerSessionsHandlers } from './sessions'
@@ -37,6 +38,7 @@ export function registerCoreRpcHandlers(
   registerLlmConnectionsHandlers(server, deps)
   registerOAuthHandlers(server, deps)
   registerOnboardingHandlers(server, deps)
+  registerPermissionsHandlers(server, deps)
   registerResourcesHandlers(server, deps)
   registerSessionsHandlers(server, deps)
   if (serverCtx) registerServerHandlers(server, deps, serverCtx)

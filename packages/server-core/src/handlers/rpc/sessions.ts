@@ -105,6 +105,8 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.sessions.IMPORT,
   RPC_CHANNELS.sessions.EXPORT_REMOTE_TRANSFER,
   RPC_CHANNELS.sessions.IMPORT_REMOTE_TRANSFER,
+  RPC_CHANNELS.sessions.SHARE,
+  RPC_CHANNELS.sessions.SHARE_HTML,
 ] as const
 
 export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): void {
@@ -510,5 +512,62 @@ export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): 
     await sessionManager.waitForInit()
     if (!targetWorkspaceId || typeof targetWorkspaceId !== 'string') throw new Error('targetWorkspaceId is required')
     return sessionManager.importRemoteSessionTransfer(targetWorkspaceId, payload)
+  })
+
+  // Share a session: upload its bundle to the public viewer and persist sharedUrl/sharedId.
+  server.handle(RPC_CHANNELS.sessions.SHARE, async (_ctx, workspaceId: string, sessionId: string) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error(`Workspace not found: ${workspaceId}`)
+
+    const { loadSession, updateSessionMetadata } = await import('@craft-agent/shared/sessions')
+    const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+
+    const stored = loadSession(workspace.rootPath, sessionId)
+    if (!stored) throw new Error(`Session '${sessionId}' not found in workspace`)
+
+    const response = await fetch(`${VIEWER_URL}/s/api`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(stored),
+    })
+    if (!response.ok) {
+      if (response.status === 413) throw new Error('Session is too large to share')
+      throw new Error(`Upload failed (status ${response.status})`)
+    }
+    const data = await response.json() as { id: string; url: string }
+    await updateSessionMetadata(workspace.rootPath, sessionId, { sharedUrl: data.url, sharedId: data.id })
+    return { url: data.url, id: data.id }
+  })
+
+  // Share an HTML artifact for a session: dedupes by sha256(html) against session's htmlShares.
+  server.handle(RPC_CHANNELS.sessions.SHARE_HTML, async (_ctx, workspaceId: string, sessionId: string, html: string) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error(`Workspace not found: ${workspaceId}`)
+    if (!html || html.length === 0) throw new Error('HTML payload is empty')
+
+    const { loadSession, updateSessionMetadata } = await import('@craft-agent/shared/sessions')
+    const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+    const { createHash } = await import('crypto')
+
+    const stored = loadSession(workspace.rootPath, sessionId)
+    if (!stored) throw new Error(`Session '${sessionId}' not found in workspace`)
+
+    const contentHash = createHash('sha256').update(html).digest('hex')
+    const existing = stored.htmlShares?.[contentHash]
+    if (existing) return { url: existing.sharedUrl, id: existing.sharedId, deduped: true }
+
+    const response = await fetch(`${VIEWER_URL}/s/api/html`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      body: html,
+    })
+    if (!response.ok) {
+      if (response.status === 413) throw new Error('HTML is too large to share')
+      throw new Error(`Upload failed (status ${response.status})`)
+    }
+    const data = await response.json() as { id: string; url: string }
+    const nextShares = { ...(stored.htmlShares ?? {}), [contentHash]: { sharedUrl: data.url, sharedId: data.id } }
+    await updateSessionMetadata(workspace.rootPath, sessionId, { htmlShares: nextShares })
+    return { url: data.url, id: data.id, deduped: false }
   })
 }

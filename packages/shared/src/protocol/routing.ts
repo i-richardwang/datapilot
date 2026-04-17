@@ -79,6 +79,9 @@ export const LOCAL_ONLY_CHANNELS = new Set<string>([
   RPC_CHANNELS.theme.GET_ALL_WORKSPACE_THEMES,
   RPC_CHANNELS.theme.BROADCAST_WORKSPACE_THEME,
   RPC_CHANNELS.theme.WORKSPACE_THEME_CHANGED,
+  RPC_CHANNELS.theme.VALIDATE,
+  RPC_CHANNELS.theme.SET_OVERRIDE,
+  RPC_CHANNELS.theme.RESET_OVERRIDE,
 
   // update — local auto-update
   RPC_CHANNELS.update.CHECK,
@@ -244,6 +247,8 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   RPC_CHANNELS.sessions.IMPORT,
   RPC_CHANNELS.sessions.EXPORT_REMOTE_TRANSFER,
   RPC_CHANNELS.sessions.IMPORT_REMOTE_TRANSFER,
+  RPC_CHANNELS.sessions.SHARE,
+  RPC_CHANNELS.sessions.SHARE_HTML,
 
   // transfer — chunked large-payload import (sessions, resources)
   RPC_CHANNELS.transfer.START,
@@ -358,11 +363,25 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   // permissions — workspace permissions
   RPC_CHANNELS.permissions.GET_DEFAULTS,
   RPC_CHANNELS.permissions.DEFAULTS_CHANGED,
+  RPC_CHANNELS.permissions.LIST,
+  RPC_CHANNELS.permissions.GET,
+  RPC_CHANNELS.permissions.SET,
+  RPC_CHANNELS.permissions.ADD_MCP_PATTERN,
+  RPC_CHANNELS.permissions.ADD_API_ENDPOINT,
+  RPC_CHANNELS.permissions.ADD_BASH_PATTERN,
+  RPC_CHANNELS.permissions.ADD_WRITE_PATH,
+  RPC_CHANNELS.permissions.REMOVE,
+  RPC_CHANNELS.permissions.VALIDATE,
+  RPC_CHANNELS.permissions.RESET,
 
   // skills — skill content per-workspace (not openEditor/openFinder which are local OS)
   RPC_CHANNELS.skills.GET,
   RPC_CHANNELS.skills.GET_FILES,
+  RPC_CHANNELS.skills.CREATE,
+  RPC_CHANNELS.skills.UPDATE,
   RPC_CHANNELS.skills.DELETE,
+  RPC_CHANNELS.skills.WHERE,
+  RPC_CHANNELS.skills.VALIDATE,
   RPC_CHANNELS.skills.CHANGED,
 
   // statuses — workspace metadata
