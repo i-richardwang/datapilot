@@ -2,7 +2,7 @@
   "name": "@craft-agent/rpc-engine",
   "version": "0.8.9",
   "license": "Apache-2.0",
-  "description": "Transport-agnostic RPC dispatcher and handler-registration facade for DataPilot. Lets WS and embedded transports share one handler implementation.",
+  "description": "Transport-agnostic RPC dispatcher and handler-registration facade for DataPilot. Keeps `register*Handlers` functions decoupled from the concrete WS transport.",
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",

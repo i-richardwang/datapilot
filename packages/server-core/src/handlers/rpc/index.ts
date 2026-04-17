@@ -28,10 +28,9 @@ import { registerWorkspaceCoreHandlers } from './workspace'
 
 /**
  * Register all handlers whose implementations only need the
- * transport-agnostic `RpcDispatcher` facade. This is the entry Phase 3's
- * embedded CLI uses directly — no `RpcServer` dependency, no WS-only
- * capabilities. Handlers that call back into clients via `invokeClient`
- * live in `registerClientCapabilityHandlers`.
+ * transport-agnostic `RpcDispatcher` facade — no `RpcServer` dependency
+ * and no WS-only capabilities. Handlers that call back into clients via
+ * `invokeClient` live in `registerClientCapabilityHandlers`.
  */
 export function registerCoreRpcHandlers(
   dispatcher: RpcDispatcher,
@@ -55,10 +54,10 @@ export function registerCoreRpcHandlers(
 }
 
 /**
- * Register handlers that depend on WS-transport client capabilities
- * (native confirm/open dialogs, open-external URL, client-scoped
- * `invokeClient`). Called only from WS-hosting transports; the embedded
- * dispatcher has no clients to invoke and must skip this surface.
+ * Register handlers that depend on the WS transport's client-capability
+ * surface (native confirm / open / save dialogs, open-external URL,
+ * client-scoped `invokeClient`). Kept separate so the shared
+ * registration entry stays typed against `RpcDispatcher`.
  */
 export function registerClientCapabilityHandlers(
   server: RpcServer,
