@@ -37,7 +37,7 @@ export const SESSION_PERSISTENT_FIELDS = [
   // Model/Connection
   'model', 'llmConnection', 'connectionLocked', 'thinkingLevel',
   // Sharing
-  'sharedUrl', 'sharedId', 'htmlShares',
+  'sharedUrl', 'sharedId', 'htmlShares', 'assets',
   // Plan execution
   'pendingPlanExecution',
   // Archive
@@ -103,6 +103,19 @@ export interface HtmlShareInfo {
 }
 
 /**
+ * One uploaded file asset referenced by a file-backed markdown block
+ * (`html-preview`, `pdf-preview`, `image-preview`, `datatable`, `spreadsheet`).
+ * Keyed in `assets` by the original src path from the sharer's machine — the
+ * markdown text is never rewritten, the map is the indirection layer.
+ */
+export interface SharedAssetInfo {
+  /** Mime type stored alongside the bytes on the viewer-server. */
+  mimeType: string;
+  /** Public URL to fetch the bytes back (e.g. `{VIEWER_URL}/s/a/{id}`). */
+  url: string;
+}
+
+/**
  * Session configuration (persisted metadata)
  */
 export interface SessionConfig {
@@ -151,6 +164,14 @@ export interface SessionConfig {
    * Strictly session-scoped: shares are not reused across sessions.
    */
   htmlShares?: Record<string, HtmlShareInfo>;
+  /**
+   * Uploaded file assets referenced by file-backed markdown blocks in this
+   * session, keyed by the original local src path. Populated by
+   * `shareToViewer` / `updateShare` and sent along with the session JSON so
+   * the web viewer can resolve `onReadFile*` without any disk access.
+   * Absent on sessions that have never been shared with file references.
+   */
+  assets?: Record<string, SharedAssetInfo>;
   /** Model to use for this session (overrides global config if set) */
   model?: string;
   /** LLM connection slug for this session (locked after first message) */
@@ -274,6 +295,14 @@ export interface SessionHeader {
    * Strictly session-scoped: shares are not reused across sessions.
    */
   htmlShares?: Record<string, HtmlShareInfo>;
+  /**
+   * Uploaded file assets referenced by file-backed markdown blocks in this
+   * session, keyed by the original local src path. Populated by
+   * `shareToViewer` / `updateShare` and sent along with the session JSON so
+   * the web viewer can resolve `onReadFile*` without any disk access.
+   * Absent on sessions that have never been shared with file references.
+   */
+  assets?: Record<string, SharedAssetInfo>;
   /** Model to use for this session (overrides global config if set) */
   model?: string;
   /** LLM connection slug for this session (locked after first message) */
@@ -360,6 +389,12 @@ export interface SessionMetadata {
    * Strictly session-scoped: shares are not reused across sessions.
    */
   htmlShares?: Record<string, HtmlShareInfo>;
+  /**
+   * Uploaded file assets for file-backed preview blocks, keyed by the original
+   * local src path. Absent on sessions without file-backed previews or that
+   * have never been shared.
+   */
+  assets?: Record<string, SharedAssetInfo>;
   /** Working directory for this session */
   workingDirectory?: string;
   /** SDK cwd for session storage - set once at creation, never changes */

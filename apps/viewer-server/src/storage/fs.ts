@@ -3,6 +3,7 @@
  *
  * Sessions: {dataDir}/{id}.json
  * HTML artifacts: {dataDir}/html/{id}.html
+ * File assets: {dataDir}/assets/{id} (raw bytes) + {dataDir}/assets/{id}.meta (mime type)
  * Suitable for single-machine deployments. Requires a mounted volume in Docker.
  */
 
@@ -12,14 +13,17 @@ import type { SessionStorage } from './interface'
 
 export class FsStorage implements SessionStorage {
   private readonly htmlDir: string
+  private readonly assetsDir: string
 
   constructor(private readonly dataDir: string) {
     this.htmlDir = join(dataDir, 'html')
+    this.assetsDir = join(dataDir, 'assets')
   }
 
   async initialize(): Promise<void> {
     await mkdir(this.dataDir, { recursive: true })
     await mkdir(this.htmlDir, { recursive: true })
+    await mkdir(this.assetsDir, { recursive: true })
   }
 
   private filePath(id: string): string {
@@ -78,5 +82,44 @@ export class FsStorage implements SessionStorage {
       if (err.code === 'ENOENT') return false
       throw err
     }
+  }
+
+  private assetPath(id: string): string {
+    return join(this.assetsDir, id)
+  }
+
+  private assetMetaPath(id: string): string {
+    return join(this.assetsDir, `${id}.meta`)
+  }
+
+  async saveAsset(id: string, data: Uint8Array, mimeType: string): Promise<void> {
+    await Bun.write(this.assetPath(id), data)
+    await Bun.write(this.assetMetaPath(id), mimeType)
+  }
+
+  async loadAsset(id: string): Promise<{ data: Uint8Array; mimeType: string } | null> {
+    const file = Bun.file(this.assetPath(id))
+    if (!(await file.exists())) return null
+    const meta = Bun.file(this.assetMetaPath(id))
+    const mimeType = (await meta.exists()) ? (await meta.text()) : 'application/octet-stream'
+    const data = new Uint8Array(await file.arrayBuffer())
+    return { data, mimeType }
+  }
+
+  async deleteAsset(id: string): Promise<boolean> {
+    const { unlink } = await import('node:fs/promises')
+    let existed = false
+    try {
+      await unlink(this.assetPath(id))
+      existed = true
+    } catch (err: any) {
+      if (err.code !== 'ENOENT') throw err
+    }
+    try {
+      await unlink(this.assetMetaPath(id))
+    } catch (err: any) {
+      if (err.code !== 'ENOENT') throw err
+    }
+    return existed
   }
 }

@@ -41,6 +41,10 @@ export class S3Storage implements SessionStorage {
     return `html/${id}.html`
   }
 
+  private assetKey(id: string): string {
+    return `assets/${id}`
+  }
+
   async save(id: string, data: unknown): Promise<void> {
     const { PutObjectCommand } = await import('@aws-sdk/client-s3')
     await this.client.send(
@@ -153,6 +157,55 @@ export class S3Storage implements SessionStorage {
 
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: this.htmlKey(id) })
+    )
+    return true
+  }
+
+  async saveAsset(id: string, data: Uint8Array, mimeType: string): Promise<void> {
+    const { PutObjectCommand } = await import('@aws-sdk/client-s3')
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: this.assetKey(id),
+        Body: data,
+        ContentType: mimeType,
+      })
+    )
+  }
+
+  async loadAsset(id: string): Promise<{ data: Uint8Array; mimeType: string } | null> {
+    const { GetObjectCommand } = await import('@aws-sdk/client-s3')
+    try {
+      const response = await this.client.send(
+        new GetObjectCommand({
+          Bucket: this.bucket,
+          Key: this.assetKey(id),
+        })
+      )
+      const buffer = await response.Body?.transformToByteArray()
+      if (!buffer) return null
+      const mimeType = response.ContentType ?? 'application/octet-stream'
+      return { data: buffer as Uint8Array, mimeType }
+    } catch (err: any) {
+      if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
+        return null
+      }
+      throw err
+    }
+  }
+
+  async deleteAsset(id: string): Promise<boolean> {
+    const { DeleteObjectCommand, HeadObjectCommand } = await import('@aws-sdk/client-s3')
+    try {
+      await this.client.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: this.assetKey(id) })
+      )
+    } catch {
+      return false
+    }
+
+    await this.client.send(
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: this.assetKey(id) })
     )
     return true
   }

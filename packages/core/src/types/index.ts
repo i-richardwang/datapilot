@@ -19,6 +19,7 @@ export type {
   StoredSession,
   SessionMetadata,
   SessionStatus,
+  SharedAssetInfo,
 } from './session.ts';
 
 // Message types

@@ -20,7 +20,7 @@
  */
 
 import { join, extname } from 'node:path'
-import { createApiHandler, handleHtmlArtifactRoute } from './routes'
+import { createApiHandler, createAssetHandler, handleHtmlArtifactRoute } from './routes'
 import type { SessionStorage } from './storage/interface'
 
 // ---------------------------------------------------------------------------
@@ -80,6 +80,7 @@ async function initStorage(): Promise<SessionStorage> {
 
 const storage = await initStorage()
 const handleApi = createApiHandler(storage, baseUrl)
+const handleAsset = createAssetHandler(storage, baseUrl)
 
 // ---------------------------------------------------------------------------
 // Static file serving + SPA fallback
@@ -143,6 +144,13 @@ const server = Bun.serve({
     if (apiResponse) {
       apiResponse.headers.set('Access-Control-Allow-Origin', '*')
       return apiResponse
+    }
+
+    // File-asset routes: /s/a (POST) + /s/a/{id} (GET/DELETE) — must come before SPA fallback
+    const assetResponse = await handleAsset(req, path)
+    if (assetResponse) {
+      assetResponse.headers.set('Access-Control-Allow-Origin', '*')
+      return assetResponse
     }
 
     // HTML artifact routes: GET /s/h/{id} — must come before SPA fallback

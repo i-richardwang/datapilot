@@ -17,6 +17,8 @@ export type {
   SessionMetadata,
   SessionHeader,
   SessionPersistentField,
+  HtmlShareInfo,
+  SharedAssetInfo,
 } from './types.ts';
 
 // Field constants

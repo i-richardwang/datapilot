@@ -201,6 +201,16 @@ const WORKSPACE_MIGRATIONS: Migration[] = [
       ALTER TABLE sessions ADD COLUMN html_shares TEXT;
     `,
   },
+  {
+    name: '0003_session_assets',
+    sql: `
+      -- Per-session uploaded file assets, keyed by original local src path.
+      -- Stored as JSON with shape { [srcPath]: { mimeType, url } }, default NULL.
+      -- Drives file-backed preview blocks (html-preview, pdf-preview, image-preview,
+      -- datatable, spreadsheet) in the web viewer without local disk access.
+      ALTER TABLE sessions ADD COLUMN assets TEXT;
+    `,
+  },
 ];
 
 /**

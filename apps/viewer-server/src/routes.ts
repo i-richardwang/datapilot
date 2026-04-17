@@ -9,10 +9,13 @@
  *   POST   /s/api/html         — Upload HTML artifact, returns { id, url }
  *   PUT    /s/api/html/:id     — Overwrite HTML artifact, returns { id, url }
  *   DELETE /s/api/html/:id     — Delete HTML artifact
+ *   POST   /s/a                — Upload file asset (raw bytes), returns { id, url }
+ *   GET    /s/a/:id            — Fetch asset bytes with stored mime type
+ *   DELETE /s/a/:id            — Delete file asset
  */
 
 import type { SessionStorage } from './storage/interface'
-import { generateId, generateHtmlId } from './storage/interface'
+import { generateId, generateHtmlId, generateAssetId } from './storage/interface'
 
 /** Max request body size (50 MB) */
 const MAX_BODY_SIZE = 50 * 1024 * 1024
@@ -159,4 +162,57 @@ export async function handleHtmlArtifactRoute(
   return new Response(html, {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
   })
+}
+
+/**
+ * Handler for the `/s/a` file-asset routes used by file-backed preview blocks
+ * in shared sessions. One shape — raw bytes in, raw bytes out — so HTML, PDFs,
+ * images, CSV/JSON, and spreadsheets all round-trip through the same pipeline.
+ */
+export function createAssetHandler(storage: SessionStorage, baseUrl: string) {
+  return async (req: Request, path: string): Promise<Response | null> => {
+    // POST /s/a — upload raw bytes, id = sha256(bytes), mime = request Content-Type
+    if (req.method === 'POST' && path === '/s/a') {
+      const contentLength = parseInt(req.headers.get('content-length') || '0', 10)
+      if (contentLength > MAX_BODY_SIZE) {
+        return Response.json({ error: 'Request too large' }, { status: 413 })
+      }
+
+      const bytes = new Uint8Array(await req.arrayBuffer())
+      if (bytes.byteLength === 0) {
+        return Response.json({ error: 'Empty asset body' }, { status: 400 })
+      }
+
+      const mimeType = req.headers.get('content-type') ?? 'application/octet-stream'
+      const id = await generateAssetId(bytes)
+      await storage.saveAsset(id, bytes, mimeType)
+
+      const url = `${baseUrl}/s/a/${id}`
+      return Response.json({ id, url }, { status: 201 })
+    }
+
+    const idMatch = path.match(/^\/s\/a\/([a-zA-Z0-9_-]+)$/)
+    if (!idMatch) return null
+    const id = idMatch[1]!
+
+    if (req.method === 'GET') {
+      const asset = await storage.loadAsset(id)
+      if (!asset) {
+        return new Response('Not found', { status: 404 })
+      }
+      return new Response(asset.data, {
+        headers: { 'Content-Type': asset.mimeType },
+      })
+    }
+
+    if (req.method === 'DELETE') {
+      const existed = await storage.deleteAsset(id)
+      if (!existed) {
+        return Response.json({ error: 'Not found' }, { status: 404 })
+      }
+      return new Response(null, { status: 204 })
+    }
+
+    return null
+  }
 }

@@ -200,6 +200,7 @@ function sessionToRow(session: StoredSession, workspaceRootPath: string): typeof
     sharedUrl: session.sharedUrl ?? null,
     sharedId: session.sharedId ?? null,
     htmlShares: session.htmlShares ?? null,
+    assets: session.assets ?? null,
     pendingPlanExecution: session.pendingPlanExecution ?? null,
     isArchived: session.isArchived ?? false,
     archivedAt: session.archivedAt ?? null,
@@ -251,6 +252,7 @@ function rowToSessionConfig(row: SessionRow, workspaceRootPath: string): Session
     sharedUrl: row.sharedUrl ?? undefined,
     sharedId: row.sharedId ?? undefined,
     htmlShares: (row.htmlShares as SessionConfig['htmlShares']) ?? undefined,
+    assets: (row.assets as SessionConfig['assets']) ?? undefined,
     pendingPlanExecution: row.pendingPlanExecution as SessionConfig['pendingPlanExecution'],
     isArchived: row.isArchived ?? undefined,
     archivedAt: row.archivedAt ?? undefined,
@@ -291,6 +293,7 @@ function rowToMetadata(row: SessionRow, workspaceRootPath: string): SessionMetad
     sharedUrl: row.sharedUrl ?? undefined,
     sharedId: row.sharedId ?? undefined,
     htmlShares: (row.htmlShares as SessionConfig['htmlShares']) ?? undefined,
+    assets: (row.assets as SessionConfig['assets']) ?? undefined,
     workingDirectory: row.workingDirectory ? expandPath(row.workingDirectory) : undefined,
     sdkCwd: row.sdkCwd ? expandPath(row.sdkCwd) : undefined,
     lastMessageRole: row.lastMessageRole as SessionMetadata['lastMessageRole'],
@@ -662,6 +665,7 @@ export async function updateSessionMetadata(
     | 'sharedUrl'
     | 'sharedId'
     | 'htmlShares'
+    | 'assets'
     | 'model'
     | 'llmConnection'
     | 'isArchived'
@@ -686,6 +690,7 @@ export async function updateSessionMetadata(
   if ('sharedUrl' in updates) set.sharedUrl = updates.sharedUrl ?? null;
   if ('sharedId' in updates) set.sharedId = updates.sharedId ?? null;
   if ('htmlShares' in updates) set.htmlShares = updates.htmlShares ?? null;
+  if ('assets' in updates) set.assets = updates.assets ?? null;
   if (updates.model !== undefined) set.model = updates.model;
   if (updates.llmConnection !== undefined) set.llmConnection = updates.llmConnection;
   if (updates.isArchived !== undefined) set.isArchived = updates.isArchived;

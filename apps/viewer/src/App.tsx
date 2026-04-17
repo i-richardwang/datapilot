@@ -9,7 +9,7 @@
  * - /s/{id} - View shared session
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileText } from 'lucide-react'
 import type { StoredSession } from '@craft-agent/core'
@@ -177,6 +177,57 @@ export function App() {
     return extractOverlayData(overlayActivity)
   }, [overlayActivity])
 
+  // File-backed preview blocks (html-preview, pdf-preview, image-preview,
+  // datatable, spreadsheet) read source files via `onReadFile*`. In Electron
+  // those go through IPC; in the web viewer we resolve the src path against
+  // the `session.assets` manifest and fetch the uploaded artifact instead.
+  // Missing paths (old sessions without a manifest, or unreadable files at
+  // share time) throw "Cannot load content" — the same fallback that was
+  // shown before this route existed.
+  const sessionRef = useRef<StoredSession | null>(session)
+  useEffect(() => { sessionRef.current = session }, [session])
+
+  const lookupAssetUrl = useCallback((path: string): string => {
+    const assets = sessionRef.current?.assets
+    const entry = assets?.[path]
+    if (!entry?.url) throw new Error('Cannot load content')
+    return entry.url
+  }, [])
+
+  const readFileAsText = useCallback(async (path: string): Promise<string> => {
+    const url = lookupAssetUrl(path)
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`Failed to fetch asset: ${res.status}`)
+    return res.text()
+  }, [lookupAssetUrl])
+
+  const readFileAsDataUrl = useCallback(async (path: string): Promise<string> => {
+    const url = lookupAssetUrl(path)
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`Failed to fetch asset: ${res.status}`)
+    const blob = await res.blob()
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror = () => reject(reader.error ?? new Error('Failed to read asset'))
+      reader.readAsDataURL(blob)
+    })
+  }, [lookupAssetUrl])
+
+  const readFileAsBinary = useCallback(async (path: string): Promise<Uint8Array> => {
+    const url = lookupAssetUrl(path)
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`Failed to fetch asset: ${res.status}`)
+    return new Uint8Array(await res.arrayBuffer())
+  }, [lookupAssetUrl])
+
+  // Old sessions (shared before asset upload existed) have no `assets` map;
+  // we deliberately leave `onReadFile*` undefined in that case so the block
+  // components fall back to their original "no onReadFile" behavior instead
+  // of surfacing misleading fetch errors for paths that were never uploaded.
+  const hasAssetsManifest =
+    session?.assets != null && Object.keys(session.assets).length > 0
+
   // Platform actions for the viewer (limited functionality)
   const platformActions: PlatformActions = {
     onOpenUrl: (url) => {
@@ -185,6 +236,11 @@ export function App() {
     onCopyToClipboard: async (text) => {
       await navigator.clipboard.writeText(text)
     },
+    ...(hasAssetsManifest ? {
+      onReadFile: readFileAsText,
+      onReadFileDataUrl: readFileAsDataUrl,
+      onReadFileBinary: readFileAsBinary,
+    } : {}),
   }
 
   const theme = isDark ? 'dark' : 'light'
