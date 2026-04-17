@@ -203,6 +203,7 @@
   "chat.context": "コンテキスト",
   "chat.contextBadge": "コンテキストバッジ",
   "chat.downloadFile": "ダウンロード",
+  "chat.downloadSessionZip": "ZIP としてダウンロード",
   "chat.enterSessionName": "セッション名を入力...",
   "chat.failedToStopSharing": "共有の停止に失敗しました",
   "chat.failedToUpdateShare": "共有の更新に失敗しました",

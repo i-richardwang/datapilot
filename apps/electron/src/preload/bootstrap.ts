@@ -428,4 +428,8 @@ client.onConnectionStateChanged((state) => {
 ;(api as ElectronAPI).downloadSessionFile = () =>
   Promise.reject(new Error('downloadSessionFile is web-only; Electron should use showInFolder'))
 
+// Web-only: guards the Download as zip header button. Electron uses "View in Finder".
+;(api as ElectronAPI).downloadSessionZip = () =>
+  Promise.reject(new Error('downloadSessionZip is web-only; Electron should use showInFolder'))
+
 contextBridge.exposeInMainWorld('electronAPI', api)

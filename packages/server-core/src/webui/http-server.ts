@@ -12,6 +12,7 @@
 
 import { join, extname, normalize, sep, basename, dirname, isAbsolute } from 'node:path'
 import { realpath } from 'node:fs/promises'
+import { createSessionZipResponse } from './session-zip'
 import {
   RateLimiter,
   initPasswordHash,
@@ -475,6 +476,36 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
           'Cache-Control': 'no-store',
         },
       })
+    }
+
+    // ── Session zip download (streams the entire session directory as a zip) ──
+    if (path === '/api/session-files/download-zip' && req.method === 'GET') {
+      const deps = options.sessionFileDownloadDeps
+      if (!deps) {
+        return Response.json({ error: 'Not Found' }, { status: 404 })
+      }
+
+      const sessionId = url.searchParams.get('sessionId') ?? ''
+      if (!sessionId) {
+        return Response.json({ error: 'Missing sessionId' }, { status: 400 })
+      }
+
+      const rawSessionDir = deps.getSessionPath(sessionId)
+      if (!rawSessionDir) {
+        return Response.json({ error: 'Session not found' }, { status: 404 })
+      }
+
+      // Realpath the session root up front so symlinks on the path itself are
+      // resolved once, and a non-existent session dir surfaces as 404 instead
+      // of a mid-stream error.
+      let realSessionDir: string
+      try {
+        realSessionDir = await realpath(rawSessionDir)
+      } catch {
+        return Response.json({ error: 'Session not found' }, { status: 404 })
+      }
+
+      return createSessionZipResponse({ sessionDir: realSessionDir })
     }
 
     // ── Serve SPA static files ──

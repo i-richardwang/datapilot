@@ -203,6 +203,7 @@
   "chat.context": "上下文",
   "chat.contextBadge": "上下文标记",
   "chat.downloadFile": "下载",
+  "chat.downloadSessionZip": "下载为 zip",
   "chat.enterSessionName": "输入会话名称...",
   "chat.failedToStopSharing": "无法停止共享",
   "chat.failedToUpdateShare": "无法更新共享",

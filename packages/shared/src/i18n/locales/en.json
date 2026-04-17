@@ -203,6 +203,7 @@
   "chat.context": "Context",
   "chat.contextBadge": "Context badge",
   "chat.downloadFile": "Download",
+  "chat.downloadSessionZip": "Download as zip",
   "chat.enterSessionName": "Enter session name...",
   "chat.failedToStopSharing": "Failed to stop sharing",
   "chat.failedToUpdateShare": "Failed to update share",

@@ -203,6 +203,7 @@
   "chat.context": "Contexto",
   "chat.contextBadge": "Insignia de contexto",
   "chat.downloadFile": "Descargar",
+  "chat.downloadSessionZip": "Descargar como zip",
   "chat.enterSessionName": "Introduce el nombre de la sesión...",
   "chat.failedToStopSharing": "Error al detener la compartición",
   "chat.failedToUpdateShare": "Error al actualizar el compartido",

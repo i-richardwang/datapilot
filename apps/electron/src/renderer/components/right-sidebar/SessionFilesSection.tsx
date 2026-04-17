@@ -342,43 +342,53 @@ function FileTreeItem({
 
   const fileManagerName = getFileManagerName()
 
+  // In web mode, a directory right-click has no useful actions (Open is not
+  // meaningful for directories in the browser, and there's no per-folder
+  // download). Skip the ContextMenu entirely so right-clicking a folder
+  // surfaces the native browser menu instead of an empty popover.
+  const suppressContextMenu = isWebMode && file.type === 'directory'
+
   // Inner content: button and expandable children (wrapped in group/section like LeftSidebar)
   const innerContent = (
     <div className="group/section min-w-0">
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          {buttonElement}
-        </ContextMenuTrigger>
-        <StyledContextMenuContent>
-          {/* Open — files only (directories have no in-app preview) */}
-          {file.type !== 'directory' && (
-            <StyledContextMenuItem onSelect={() => onFileClick(file)}>
-              <ExternalLink className="h-3.5 w-3.5" />
-              {t("chat.openFile")}
-            </StyledContextMenuItem>
-          )}
-          {/*
-            Second action depends on runtime: Electron reveals in the native file
-            manager; web has no filesystem access, so it downloads instead. The
-            web download action is hidden on directories (only meaningful per-file).
-          */}
-          {isWebMode ? (
-            file.type !== 'directory' && (
-              <StyledContextMenuItem onSelect={() => onDownloadFile(file)}>
-                <Download className="h-3.5 w-3.5" />
-                {t("chat.downloadFile")}
+      {suppressContextMenu ? (
+        buttonElement
+      ) : (
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            {buttonElement}
+          </ContextMenuTrigger>
+          <StyledContextMenuContent>
+            {/* Open — files only (directories have no in-app preview) */}
+            {file.type !== 'directory' && (
+              <StyledContextMenuItem onSelect={() => onFileClick(file)}>
+                <ExternalLink className="h-3.5 w-3.5" />
+                {t("chat.openFile")}
               </StyledContextMenuItem>
-            )
-          ) : (
-            <StyledContextMenuItem
-              onSelect={() => onRevealInFileManager(file.path)}
-            >
-              <FolderOpen className="h-3.5 w-3.5" />
-              {t("chat.showInFileManager", { fileManager: fileManagerName })}
-            </StyledContextMenuItem>
-          )}
-        </StyledContextMenuContent>
-      </ContextMenu>
+            )}
+            {/*
+              Second action depends on runtime: Electron reveals in the native file
+              manager; web has no filesystem access, so it downloads instead. The
+              web download action is hidden on directories (only meaningful per-file).
+            */}
+            {isWebMode ? (
+              file.type !== 'directory' && (
+                <StyledContextMenuItem onSelect={() => onDownloadFile(file)}>
+                  <Download className="h-3.5 w-3.5" />
+                  {t("chat.downloadFile")}
+                </StyledContextMenuItem>
+              )
+            ) : (
+              <StyledContextMenuItem
+                onSelect={() => onRevealInFileManager(file.path)}
+              >
+                <FolderOpen className="h-3.5 w-3.5" />
+                {t("chat.showInFileManager", { fileManager: fileManagerName })}
+              </StyledContextMenuItem>
+            )}
+          </StyledContextMenuContent>
+        </ContextMenu>
+      )}
       {/* Expandable children with framer-motion animation - matches LeftSidebar exactly */}
       {hasChildren && (
         <AnimatePresence initial={false}>
@@ -559,6 +569,14 @@ export function SessionFilesSection({ sessionId, className, sessionFolderPath, h
     })
   }, [sessionId])
 
+  // Trigger a streaming zip download of the entire session directory (web mode only).
+  const handleDownloadZip = useCallback(() => {
+    if (!sessionId) return
+    void window.electronAPI.downloadSessionZip(sessionId).catch((err) => {
+      console.error('Failed to download session zip:', err)
+    })
+  }, [sessionId])
+
   // Handle file click — preview in-app if possible, open directory in file manager
   const handleFileClick = useCallback((file: SessionFile) => {
     if (file.type === 'directory') {
@@ -603,14 +621,32 @@ export function SessionFilesSection({ sessionId, className, sessionFolderPath, h
       {!hideHeader && (
         <div className="flex items-center justify-between px-4 pt-4 pb-2 shrink-0 select-none">
           <span className="text-xs font-medium text-muted-foreground">{t("chat.sessionFiles")}</span>
-          {sessionFolderPath && (
-            <button
-              type="button"
-              onClick={() => window.electronAPI.showInFolder(sessionFolderPath)}
-              className="text-xs text-foreground/50 hover:text-foreground/80 hover:underline underline-offset-2 transition-colors"
-            >
-              {t("chat.viewInFileManager", { fileManager: fileManagerName })}
-            </button>
+          {/*
+            Header action depends on runtime. Electron reveals the session folder
+            in the native file manager. Web has no filesystem access, so instead
+            the button streams the whole session directory as a zip. Web needs a
+            sessionId (not a path); Electron needs the absolute path.
+          */}
+          {isWebMode ? (
+            sessionId && (
+              <button
+                type="button"
+                onClick={() => handleDownloadZip()}
+                className="text-xs text-foreground/50 hover:text-foreground/80 hover:underline underline-offset-2 transition-colors"
+              >
+                {t("chat.downloadSessionZip")}
+              </button>
+            )
+          ) : (
+            sessionFolderPath && (
+              <button
+                type="button"
+                onClick={() => window.electronAPI.showInFolder(sessionFolderPath)}
+                className="text-xs text-foreground/50 hover:text-foreground/80 hover:underline underline-offset-2 transition-colors"
+              >
+                {t("chat.viewInFileManager", { fileManager: fileManagerName })}
+              </button>
+            )
           )}
         </div>
       )}
