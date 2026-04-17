@@ -1,3 +1,4 @@
+import type { RpcDispatcher } from '@craft-agent/rpc-engine'
 import type { RpcServer } from '@craft-agent/server-core/transport'
 import type { HandlerDeps } from '../handler-deps'
 
@@ -25,28 +26,47 @@ import { registerSystemCoreHandlers } from './system'
 import { registerTransferHandlers } from './transfer'
 import { registerWorkspaceCoreHandlers } from './workspace'
 
+/**
+ * Register all handlers whose implementations only need the
+ * transport-agnostic `RpcDispatcher` facade. This is the entry Phase 3's
+ * embedded CLI uses directly — no `RpcServer` dependency, no WS-only
+ * capabilities. Handlers that call back into clients via `invokeClient`
+ * live in `registerClientCapabilityHandlers`.
+ */
 export function registerCoreRpcHandlers(
-  server: RpcServer,
+  dispatcher: RpcDispatcher,
   deps: HandlerDeps,
   serverCtx?: ServerHandlerContext,
 ): void {
+  registerAutomationsHandlers(dispatcher, deps)
+  registerBatchesHandlers(dispatcher, deps)
+  registerLabelsHandlers(dispatcher, deps)
+  registerOAuthHandlers(dispatcher, deps)
+  registerOnboardingHandlers(dispatcher, deps)
+  registerPermissionsHandlers(dispatcher, deps)
+  registerResourcesHandlers(dispatcher, deps)
+  registerSessionsHandlers(dispatcher, deps)
+  if (serverCtx) registerServerHandlers(dispatcher, deps, serverCtx)
+  registerSkillsHandlers(dispatcher, deps)
+  registerSourcesHandlers(dispatcher, deps)
+  registerStatusesHandlers(dispatcher, deps)
+  registerTransferHandlers(dispatcher)
+  registerWorkspaceCoreHandlers(dispatcher, deps)
+}
+
+/**
+ * Register handlers that depend on WS-transport client capabilities
+ * (native confirm/open dialogs, open-external URL, client-scoped
+ * `invokeClient`). Called only from WS-hosting transports; the embedded
+ * dispatcher has no clients to invoke and must skip this surface.
+ */
+export function registerClientCapabilityHandlers(
+  server: RpcServer,
+  deps: HandlerDeps,
+): void {
   registerAuthHandlers(server, deps)
-  registerAutomationsHandlers(server, deps)
-  registerBatchesHandlers(server, deps)
   registerFilesHandlers(server, deps)
-  registerLabelsHandlers(server, deps)
   registerLlmConnectionsHandlers(server, deps)
-  registerOAuthHandlers(server, deps)
-  registerOnboardingHandlers(server, deps)
-  registerPermissionsHandlers(server, deps)
-  registerResourcesHandlers(server, deps)
-  registerSessionsHandlers(server, deps)
-  if (serverCtx) registerServerHandlers(server, deps, serverCtx)
   registerSettingsHandlers(server, deps)
-  registerSkillsHandlers(server, deps)
-  registerSourcesHandlers(server, deps)
-  registerStatusesHandlers(server, deps)
   registerSystemCoreHandlers(server, deps)
-  registerTransferHandlers(server)
-  registerWorkspaceCoreHandlers(server, deps)
 }

@@ -72,7 +72,7 @@ import { existsSync, readFileSync } from 'fs'
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { SessionManager, setSessionPlatform, setSessionRuntimeHooks } from '@craft-agent/server-core/sessions'
 import { registerAllRpcHandlers } from './handlers/index'
-import { registerCoreRpcHandlers, cleanupSessionFileWatchForClient } from '@craft-agent/server-core/handlers/rpc'
+import { registerCoreRpcHandlers, registerClientCapabilityHandlers, cleanupSessionFileWatchForClient } from '@craft-agent/server-core/handlers/rpc'
 import type { PlatformServices } from '../runtime/platform'
 import { createElectronPlatform } from './platform'
 import type { HandlerDeps } from './handlers/handler-deps'
@@ -630,10 +630,13 @@ app.whenReady().then(async () => {
           browserPaneManager: browserPaneManager ?? undefined,
           oauthFlowStore: ofs,
         }),
-        // Headless: register only core handlers (no GUI handlers for browser, settings, etc.)
-        // GUI: register all handlers (core + GUI)
+        // Headless: register core dispatcher handlers + WS client-capability handlers (no GUI).
+        // GUI: register all handlers (core + client-capability + GUI).
         registerAllRpcHandlers: isHeadless
-          ? (server, deps, serverCtx) => registerCoreRpcHandlers(server, deps, serverCtx)
+          ? (server, deps, serverCtx) => {
+              registerCoreRpcHandlers(server, deps, serverCtx)
+              registerClientCapabilityHandlers(server, deps)
+            }
           : registerAllRpcHandlers,
         setSessionEventSink: (sm, sink) => sm.setEventSink(sink),
         initializeSessionManager: (sm) => sm.initialize(),

@@ -7,14 +7,21 @@ import type { IWindowManager } from './window-manager-interface'
 /**
  * Narrow dep bag for handlers that only touch platform services.
  *
- * Entity handlers (labels, sources, automations, batches, skills,
- * permissions, statuses, transfer, llm-connections, onboarding, auth)
- * accept this. Embedded transports can build it without pulling in
- * SessionManager / WindowManager / BrowserPaneManager — those carry
- * Electron / browser-pane / agent-runtime weight that doesn't belong in
- * a one-shot CLI process.
+ * Handlers that accept this type today: labels, sources, skills,
+ * permissions, statuses, transfer, onboarding. None of these reach into
+ * SessionManager / WindowManager / BrowserPaneManager / OAuthFlowStore,
+ * so Phase 3's embedded CLI can register them without pulling in the
+ * heavyweight managers (which carry Electron / browser-pane /
+ * agent-runtime weight that doesn't belong in a one-shot CLI process).
  *
- * Hosts that need only the entity surface should populate just `platform`.
+ * Everything else — automations, batches, oauth, resources, server,
+ * sessions, workspace (core) — takes the full `HandlerDeps` because the
+ * handlers genuinely need SessionManager (executePromptAutomation,
+ * ensureBatchProcessor, workspace registry, reinitializeAuth, …) or
+ * OAuthFlowStore. The five `RpcServer`-requiring handlers (auth, files,
+ * llm-connections, settings, system) also take `HandlerDeps` because
+ * they need sessionManager or windowManager in addition to the WS
+ * client-capability surface.
  */
 export interface EntityHandlerDeps {
   platform: PlatformServices
@@ -26,11 +33,6 @@ export interface EntityHandlerDeps {
  * Concrete hosts specialize the generics to their runtime implementations;
  * Electron narrows them to its concrete classes, while headless server-core
  * keeps the interface defaults.
- *
- * Handlers that genuinely need the session manager (sessions, settings,
- * automations executor, batches), the window manager (files, sessions,
- * system, workspace), the browser pane manager, or the OAuth flow store
- * (oauth) accept this richer shape.
  */
 export interface HandlerDeps<
   TSessionManager extends ISessionManager = ISessionManager,
