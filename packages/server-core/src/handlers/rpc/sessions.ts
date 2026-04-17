@@ -5,7 +5,7 @@ import type { StoredAttachment } from '@craft-agent/core/types'
 import { getWorkspaceByNameOrId } from '@craft-agent/shared/config'
 import { perf } from '@craft-agent/shared/utils'
 import { isValidThinkingLevel } from '@craft-agent/shared/agent/thinking-levels'
-import { pushTyped, type RpcServer } from '@craft-agent/server-core/transport'
+import { pushTyped, type RpcDispatcher } from '@craft-agent/rpc-engine'
 import type { HandlerDeps } from '../handler-deps'
 import { setTransferableHandler } from './transfer'
 
@@ -109,7 +109,7 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.sessions.SHARE_HTML,
 ] as const
 
-export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): void {
+export function registerSessionsHandlers(server: RpcDispatcher, deps: HandlerDeps): void {
   const { sessionManager, platform } = deps
   const log = platform.logger
 

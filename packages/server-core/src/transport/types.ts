@@ -1,20 +1,17 @@
 /**
  * Transport-layer interfaces for the WS-based RPC.
+ *
+ * `RpcServer` extends the transport-agnostic `RpcDispatcher` from
+ * `@craft-agent/rpc-engine` with the WS-specific guarantee that
+ * `invokeClient` is always available.
  */
 
 import type { PushTarget } from '@craft-agent/shared/protocol'
+import type { RpcDispatcher } from '@craft-agent/rpc-engine'
 
-export interface RequestContext {
-  clientId: string
-  workspaceId: string | null
-  webContentsId: number | null
-}
+export type { RequestContext, HandlerFn } from '@craft-agent/rpc-engine'
 
-export type HandlerFn = (ctx: RequestContext, ...args: any[]) => Promise<any> | any
-
-export interface RpcServer {
-  handle(channel: string, handler: HandlerFn): void
-  push(channel: string, target: PushTarget, ...args: any[]): void
+export interface RpcServer extends RpcDispatcher {
   invokeClient(clientId: string, channel: string, ...args: any[]): Promise<any>
   updateClientWorkspace?(clientId: string, workspaceId: string): void
 }

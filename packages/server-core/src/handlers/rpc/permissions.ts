@@ -12,8 +12,8 @@ import {
   validatePermissionsConfig,
   type PermissionsConfigFile,
 } from '@craft-agent/shared/agent'
-import type { RpcServer } from '@craft-agent/server-core/transport'
-import type { HandlerDeps } from '../handler-deps'
+import type { RpcDispatcher } from '@craft-agent/rpc-engine'
+import type { EntityHandlerDeps } from '../handler-deps'
 
 export const HANDLED_CHANNELS = [
   RPC_CHANNELS.permissions.LIST,
@@ -59,7 +59,7 @@ function pathFor(workspaceRoot: string, sourceSlug?: string): string {
     : getWorkspacePermissionsPath(workspaceRoot)
 }
 
-export function registerPermissionsHandlers(server: RpcServer, _deps: HandlerDeps): void {
+export function registerPermissionsHandlers(server: RpcDispatcher, _deps: EntityHandlerDeps): void {
   // List workspace + per-source permission files (with existence flags)
   server.handle(RPC_CHANNELS.permissions.LIST, async (_ctx, workspaceId: string) => {
     const workspace = getWorkspaceByNameOrId(workspaceId)

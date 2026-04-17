@@ -1,7 +1,7 @@
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { getWorkspaceByNameOrId } from '@craft-agent/shared/config'
-import { pushTyped, type RpcServer } from '@craft-agent/server-core/transport'
-import type { HandlerDeps } from '../handler-deps'
+import { pushTyped, type RpcDispatcher } from '@craft-agent/rpc-engine'
+import type { EntityHandlerDeps } from '../handler-deps'
 import type { AutoLabelRule, LabelConfig, UpdateLabelInput } from '@craft-agent/shared/labels'
 
 export const HANDLED_CHANNELS = [
@@ -29,11 +29,11 @@ function findInTree(label: LabelConfig, id: string): LabelConfig | null {
   return null
 }
 
-function notifyChanged(server: RpcServer, workspaceId: string): void {
+function notifyChanged(server: RpcDispatcher, workspaceId: string): void {
   pushTyped(server, RPC_CHANNELS.labels.CHANGED, { to: 'workspace', workspaceId }, workspaceId)
 }
 
-export function registerLabelsHandlers(server: RpcServer, _deps: HandlerDeps): void {
+export function registerLabelsHandlers(server: RpcDispatcher, _deps: EntityHandlerDeps): void {
   // List all labels for a workspace
   server.handle(RPC_CHANNELS.labels.LIST, async (_ctx, workspaceId: string) => {
     const workspace = getWorkspaceByNameOrId(workspaceId)
