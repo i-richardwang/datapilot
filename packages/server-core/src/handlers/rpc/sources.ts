@@ -9,7 +9,13 @@ import type { HandlerDeps } from '../handler-deps'
 export const HANDLED_CHANNELS = [
   RPC_CHANNELS.sources.GET,
   RPC_CHANNELS.sources.CREATE,
+  RPC_CHANNELS.sources.UPDATE,
   RPC_CHANNELS.sources.DELETE,
+  RPC_CHANNELS.sources.VALIDATE,
+  RPC_CHANNELS.sources.TEST,
+  RPC_CHANNELS.sources.INIT_GUIDE,
+  RPC_CHANNELS.sources.INIT_PERMISSIONS,
+  RPC_CHANNELS.sources.AUTH_HELP,
   RPC_CHANNELS.sources.START_OAUTH,
   RPC_CHANNELS.sources.SAVE_CREDENTIALS,
   RPC_CHANNELS.sources.GET_PERMISSIONS,
@@ -45,6 +51,191 @@ export function registerSourcesHandlers(server: RpcServer, deps: HandlerDeps): v
       api: config.api,
       local: config.local,
     })
+  })
+
+  // Update an existing source's config (merge-overwrites top-level fields, preserves identity)
+  server.handle(RPC_CHANNELS.sources.UPDATE, async (_ctx, workspaceId: string, sourceSlug: string, patch: Partial<import('@craft-agent/shared/sources').FolderSourceConfig>) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error(`Workspace not found: ${workspaceId}`)
+    const { loadSourceConfig, saveSourceConfig } = await import('@craft-agent/shared/sources')
+
+    const config = loadSourceConfig(workspace.rootPath, sourceSlug)
+    if (!config) throw new Error(`Source not found: ${sourceSlug}`)
+
+    // Shallow merge — preserve identity (id/slug) regardless of patch contents
+    const updated = {
+      ...config,
+      ...patch,
+      id: config.id,
+      slug: config.slug,
+      updatedAt: Date.now(),
+    } as import('@craft-agent/shared/sources').FolderSourceConfig
+
+    saveSourceConfig(workspace.rootPath, updated)
+    return updated
+  })
+
+  // Validate a source config (config-only validation, not runtime auth check)
+  server.handle(RPC_CHANNELS.sources.VALIDATE, async (_ctx, workspaceId: string, sourceSlug: string) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error(`Workspace not found: ${workspaceId}`)
+    const { loadSourceConfig } = await import('@craft-agent/shared/sources')
+
+    const config = loadSourceConfig(workspace.rootPath, sourceSlug)
+    if (!config) throw new Error(`Source not found: ${sourceSlug}`)
+
+    const errors: string[] = []
+    if (!config.name) errors.push('Missing name')
+    if (!config.type) errors.push('Missing type')
+    if (!config.provider) errors.push('Missing provider')
+
+    if (config.type === 'mcp') {
+      if (!config.mcp?.url && !config.mcp?.command) errors.push('MCP source requires either url or command')
+    } else if (config.type === 'api') {
+      if (!config.api?.baseUrl) errors.push('API source requires base-url')
+      if (!config.api?.authType) errors.push('API source requires auth-type')
+    } else if (config.type === 'local') {
+      if (!config.local?.path) errors.push('Local source requires path')
+    }
+
+    return { valid: errors.length === 0, errors }
+  })
+
+  // Test a source — lightweight checks (config-only, no live network calls)
+  server.handle(RPC_CHANNELS.sources.TEST, async (_ctx, workspaceId: string, sourceSlug: string) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error(`Workspace not found: ${workspaceId}`)
+    const { loadSourceConfig } = await import('@craft-agent/shared/sources')
+
+    const config = loadSourceConfig(workspace.rootPath, sourceSlug)
+    if (!config) throw new Error(`Source not found: ${sourceSlug}`)
+
+    const checks: Array<{ check: string; passed: boolean; detail?: string }> = []
+    checks.push({ check: 'config_exists', passed: true })
+    checks.push({ check: 'type_valid', passed: ['mcp', 'api', 'local'].includes(config.type) })
+
+    if (config.type === 'mcp') {
+      const hasEndpoint = !!(config.mcp?.url || config.mcp?.command)
+      checks.push({ check: 'mcp_endpoint', passed: hasEndpoint, detail: hasEndpoint ? (config.mcp?.url ?? config.mcp?.command) : 'No url or command configured' })
+    } else if (config.type === 'api') {
+      const hasBaseUrl = !!config.api?.baseUrl
+      checks.push({ check: 'api_base_url', passed: hasBaseUrl, detail: config.api?.baseUrl })
+      if (config.api?.baseUrl && !config.api.baseUrl.endsWith('/')) {
+        checks.push({ check: 'api_trailing_slash', passed: false, detail: 'base-url should end with /' })
+      }
+    } else if (config.type === 'local') {
+      const hasPath = !!config.local?.path
+      checks.push({ check: 'local_path', passed: hasPath, detail: config.local?.path })
+      if (config.local?.path) {
+        const { existsSync } = await import('fs')
+        checks.push({ check: 'local_path_exists', passed: existsSync(config.local.path) })
+      }
+    }
+
+    return { slug: sourceSlug, passed: checks.every(c => c.passed), checks }
+  })
+
+  // Initialize a guide.md for a source from a built-in template
+  server.handle(RPC_CHANNELS.sources.INIT_GUIDE, async (_ctx, workspaceId: string, sourceSlug: string, template?: string) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error(`Workspace not found: ${workspaceId}`)
+    const { loadSourceConfig, parseGuideMarkdown, saveSourceGuide } = await import('@craft-agent/shared/sources')
+
+    const config = loadSourceConfig(workspace.rootPath, sourceSlug)
+    if (!config) throw new Error(`Source not found: ${sourceSlug}`)
+
+    const chosenTemplate = template ?? config.type ?? 'generic'
+    const guideContent = generateGuideTemplate(config.name, config.provider, chosenTemplate)
+    const guide = parseGuideMarkdown(guideContent)
+    saveSourceGuide(workspace.rootPath, sourceSlug, guide)
+    return { slug: sourceSlug, template: chosenTemplate, guide }
+  })
+
+  // Initialize permissions.json for a source (read-only or empty starter)
+  server.handle(RPC_CHANNELS.sources.INIT_PERMISSIONS, async (_ctx, workspaceId: string, sourceSlug: string, mode?: string) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error(`Workspace not found: ${workspaceId}`)
+    const { sourceExists } = await import('@craft-agent/shared/sources')
+    if (!sourceExists(workspace.rootPath, sourceSlug)) throw new Error(`Source not found: ${sourceSlug}`)
+
+    const { saveSourcePermissions, getSourcePermissionsPath } = await import('@craft-agent/shared/agent/permissions-config')
+
+    const resolvedMode = mode ?? 'read-only'
+    const permissions = resolvedMode === 'read-only'
+      ? {
+          allowedMcpPatterns: [
+            { pattern: 'list', comment: 'List operations' },
+            { pattern: 'get', comment: 'Get operations' },
+            { pattern: 'search', comment: 'Search operations' },
+            { pattern: 'read', comment: 'Read operations' },
+          ],
+        }
+      : {}
+
+    saveSourcePermissions(workspace.rootPath, sourceSlug, permissions)
+    return { slug: sourceSlug, mode: resolvedMode, path: getSourcePermissionsPath(workspace.rootPath, sourceSlug) }
+  })
+
+  // Recommend an auth flow for a source based on its config
+  server.handle(RPC_CHANNELS.sources.AUTH_HELP, async (_ctx, workspaceId: string, sourceSlug: string) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error(`Workspace not found: ${workspaceId}`)
+    const { loadSourceConfig } = await import('@craft-agent/shared/sources')
+
+    const config = loadSourceConfig(workspace.rootPath, sourceSlug)
+    if (!config) throw new Error(`Source not found: ${sourceSlug}`)
+
+    let recommendation: Record<string, unknown>
+    if (config.type === 'mcp') {
+      if (config.mcp?.authType === 'oauth') {
+        recommendation = {
+          method: 'oauth',
+          tool: 'source_oauth_trigger',
+          steps: [
+            `Use the source_oauth_trigger tool with slug "${sourceSlug}"`,
+            'Complete the OAuth flow in the browser',
+            'The source will be marked as authenticated automatically',
+          ],
+        }
+      } else if (config.mcp?.authType === 'bearer') {
+        recommendation = {
+          method: 'bearer',
+          tool: 'source_credential_prompt',
+          steps: [
+            `Use the source_credential_prompt tool with slug "${sourceSlug}"`,
+            'Provide the bearer token when prompted',
+          ],
+        }
+      } else {
+        recommendation = { method: 'none', note: 'This MCP source does not require authentication' }
+      }
+    } else if (config.type === 'api') {
+      if (config.api?.authType === 'bearer' || config.api?.authType === 'header') {
+        recommendation = {
+          method: config.api.authType,
+          tool: 'source_credential_prompt',
+          steps: [
+            `Use the source_credential_prompt tool with slug "${sourceSlug}"`,
+            `Provide the ${config.api.authType === 'bearer' ? 'bearer token' : 'API key'} when prompted`,
+          ],
+        }
+      } else if (config.api?.authType === 'oauth') {
+        recommendation = {
+          method: 'oauth',
+          tool: 'source_oauth_trigger',
+          steps: [
+            `Use the source_oauth_trigger or source_google_oauth_trigger tool with slug "${sourceSlug}"`,
+            'Complete the OAuth flow in the browser',
+          ],
+        }
+      } else {
+        recommendation = { method: config.api?.authType ?? 'none', note: 'No additional auth setup needed' }
+      }
+    } else {
+      recommendation = { method: 'none', note: 'Local sources do not require authentication' }
+    }
+
+    return { slug: sourceSlug, type: config.type, ...recommendation }
   })
 
   // Delete a source
@@ -240,4 +431,30 @@ export function registerSourcesHandlers(server: RpcServer, deps: HandlerDeps): v
       return { success: false, error: errorMessage }
     }
   })
+}
+
+function generateGuideTemplate(name: string, provider: string, template: string): string {
+  const sections: string[] = [`# ${name} Source Guide\n`]
+
+  switch (template) {
+    case 'mcp':
+      sections.push('## Scope\nThis source provides access via MCP (Model Context Protocol).\n')
+      sections.push('## Guidelines\n- Use list/get operations for read access\n- Confirm with the user before write operations\n')
+      sections.push(`## Context\nProvider: ${provider}\n`)
+      break
+    case 'api':
+      sections.push('## Scope\nThis source provides access via REST API.\n')
+      sections.push('## Guidelines\n- Prefer GET endpoints for data retrieval\n- Rate-limit awareness: space out requests\n')
+      sections.push('## API Notes\n- Check authentication status before making requests\n')
+      break
+    case 'local':
+      sections.push('## Scope\nThis source provides access to local filesystem data.\n')
+      sections.push('## Guidelines\n- Treat data as read-only unless explicitly asked\n- Respect file permissions\n')
+      break
+    default:
+      sections.push(`## Scope\nThis source connects to ${provider}.\n`)
+      sections.push('## Guidelines\n- Follow the principle of least privilege\n- Confirm destructive operations with the user\n')
+  }
+
+  return sections.join('\n')
 }

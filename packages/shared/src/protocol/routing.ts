@@ -329,7 +329,13 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   // sources — source config per-workspace
   RPC_CHANNELS.sources.GET,
   RPC_CHANNELS.sources.CREATE,
+  RPC_CHANNELS.sources.UPDATE,
   RPC_CHANNELS.sources.DELETE,
+  RPC_CHANNELS.sources.VALIDATE,
+  RPC_CHANNELS.sources.TEST,
+  RPC_CHANNELS.sources.INIT_GUIDE,
+  RPC_CHANNELS.sources.INIT_PERMISSIONS,
+  RPC_CHANNELS.sources.AUTH_HELP,
   RPC_CHANNELS.sources.START_OAUTH,
   RPC_CHANNELS.sources.SAVE_CREDENTIALS,
   RPC_CHANNELS.sources.CHANGED,
@@ -367,7 +373,15 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   // labels — workspace metadata
   RPC_CHANNELS.labels.LIST,
   RPC_CHANNELS.labels.CREATE,
+  RPC_CHANNELS.labels.UPDATE,
   RPC_CHANNELS.labels.DELETE,
+  RPC_CHANNELS.labels.MOVE,
+  RPC_CHANNELS.labels.REORDER,
+  RPC_CHANNELS.labels.AUTO_RULE_LIST,
+  RPC_CHANNELS.labels.AUTO_RULE_ADD,
+  RPC_CHANNELS.labels.AUTO_RULE_REMOVE,
+  RPC_CHANNELS.labels.AUTO_RULE_CLEAR,
+  RPC_CHANNELS.labels.AUTO_RULE_VALIDATE,
   RPC_CHANNELS.labels.CHANGED,
 
   // views — workspace UI views
@@ -382,6 +396,8 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
 
   // automations — workspace automations
   RPC_CHANNELS.automations.LIST,
+  RPC_CHANNELS.automations.CREATE,
+  RPC_CHANNELS.automations.UPDATE,
   RPC_CHANNELS.automations.TEST,
   RPC_CHANNELS.automations.SET_ENABLED,
   RPC_CHANNELS.automations.DUPLICATE,
@@ -389,10 +405,14 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   RPC_CHANNELS.automations.GET_HISTORY,
   RPC_CHANNELS.automations.GET_LAST_EXECUTED,
   RPC_CHANNELS.automations.REPLAY,
+  RPC_CHANNELS.automations.VALIDATE,
+  RPC_CHANNELS.automations.LINT,
   RPC_CHANNELS.automations.CHANGED,
 
   // batches — workspace batch processing
   RPC_CHANNELS.batches.LIST,
+  RPC_CHANNELS.batches.CREATE,
+  RPC_CHANNELS.batches.UPDATE,
   RPC_CHANNELS.batches.START,
   RPC_CHANNELS.batches.PAUSE,
   RPC_CHANNELS.batches.RESUME,
@@ -401,8 +421,10 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   RPC_CHANNELS.batches.GET_ITEMS,
   RPC_CHANNELS.batches.DUPLICATE,
   RPC_CHANNELS.batches.DELETE,
+  RPC_CHANNELS.batches.VALIDATE,
   RPC_CHANNELS.batches.TEST,
   RPC_CHANNELS.batches.GET_TEST_RESULT,
+  RPC_CHANNELS.batches.RETRY_ITEM,
   RPC_CHANNELS.batches.CHANGED,
 
   // git — workspace filesystem

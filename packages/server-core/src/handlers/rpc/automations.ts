@@ -56,6 +56,8 @@ async function withAutomationMatcher(workspaceId: string, eventName: string, mat
 
 export const HANDLED_CHANNELS = [
   RPC_CHANNELS.automations.LIST,
+  RPC_CHANNELS.automations.CREATE,
+  RPC_CHANNELS.automations.UPDATE,
   RPC_CHANNELS.automations.TEST,
   RPC_CHANNELS.automations.SET_ENABLED,
   RPC_CHANNELS.automations.DUPLICATE,
@@ -63,6 +65,8 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.automations.GET_HISTORY,
   RPC_CHANNELS.automations.GET_LAST_EXECUTED,
   RPC_CHANNELS.automations.REPLAY,
+  RPC_CHANNELS.automations.VALIDATE,
+  RPC_CHANNELS.automations.LINT,
 ] as const
 
 export function registerAutomationsHandlers(server: RpcServer, deps: HandlerDeps): void {
@@ -295,6 +299,150 @@ export function registerAutomationsHandlers(server: RpcServer, deps: HandlerDeps
     }
 
     return { results: results.map(r => ({ ...r, duration: r.durationMs ?? 0 })) }
+  })
+
+  // Create a new automation matcher under a given event
+  server.handle(RPC_CHANNELS.automations.CREATE, async (_ctx, workspaceId: string, eventName: string, matcher: Record<string, unknown>) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error('Workspace not found')
+
+    const { VALID_EVENTS, validateAutomationsConfig } = await import('@craft-agent/shared/automations')
+    if (!VALID_EVENTS.includes(eventName)) {
+      throw new Error(`Invalid event: ${eventName}. Valid events: ${VALID_EVENTS.join(', ')}`)
+    }
+
+    let created!: Record<string, unknown>
+    await withConfigMutex(workspace.rootPath, async () => {
+      const { resolveAutomationsConfigPath, generateShortId } = await import('@craft-agent/shared/automations/resolve-config-path')
+      const configPath = resolveAutomationsConfigPath(workspace.rootPath)
+
+      let config: AutomationsConfigJson
+      try {
+        const raw = await readFile(configPath, 'utf-8')
+        config = JSON.parse(raw)
+      } catch (error) {
+        if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+          config = { automations: {} }
+        } else {
+          throw error
+        }
+      }
+
+      const newMatcher = { ...matcher }
+      if (!newMatcher.id) newMatcher.id = generateShortId()
+      if (!Array.isArray(newMatcher.actions) || newMatcher.actions.length === 0) {
+        throw new Error('Automation must have at least one action')
+      }
+
+      if (!config.automations) config.automations = {}
+      const eventMap = config.automations
+      if (!Array.isArray(eventMap[eventName])) eventMap[eventName] = []
+      eventMap[eventName]!.push(newMatcher)
+
+      const validation = validateAutomationsConfig(config as Parameters<typeof validateAutomationsConfig>[0])
+      if (!validation.valid) {
+        throw new Error(`Invalid automation config: ${validation.errors.join(', ')}`)
+      }
+
+      await writeFile(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8')
+      created = { event: eventName, ...newMatcher }
+    })
+    deps.sessionManager.notifyAutomationsChanged(workspaceId)
+    return created
+  })
+
+  // Update fields on an existing matcher (matched by event + index, merge-overwrite)
+  server.handle(RPC_CHANNELS.automations.UPDATE, async (_ctx, workspaceId: string, eventName: string, matcherIndex: number, patch: Record<string, unknown>) => {
+    const { validateAutomationsConfig } = await import('@craft-agent/shared/automations')
+    let updated!: Record<string, unknown>
+    await withAutomationMatcher(workspaceId, eventName, matcherIndex, (matchers, idx, config) => {
+      const current = matchers[idx]!
+      const merged = { ...current, ...patch }
+      // Preserve identity
+      merged.id = current.id ?? merged.id
+      matchers[idx] = merged
+
+      const validation = validateAutomationsConfig(config as Parameters<typeof validateAutomationsConfig>[0])
+      if (!validation.valid) {
+        throw new Error(`Invalid automation config: ${validation.errors.join(', ')}`)
+      }
+      updated = { event: eventName, ...merged }
+    })
+    deps.sessionManager.notifyAutomationsChanged(workspaceId)
+    return updated
+  })
+
+  // Validate automations.json (schema check, no mutation)
+  server.handle(RPC_CHANNELS.automations.VALIDATE, async (_ctx, workspaceId: string) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error('Workspace not found')
+
+    const { resolveAutomationsConfigPath } = await import('@craft-agent/shared/automations/resolve-config-path')
+    const { validateAutomationsConfig } = await import('@craft-agent/shared/automations')
+    const configPath = resolveAutomationsConfigPath(workspace.rootPath)
+
+    try {
+      const content = await readFile(configPath, 'utf-8')
+      const parsed = JSON.parse(content)
+      return validateAutomationsConfig(parsed)
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return { valid: true, errors: [] as string[], note: 'No automations.json found (empty config is valid)' }
+      }
+      throw error
+    }
+  })
+
+  // Lint automations.json (best-practice checks beyond schema validation)
+  server.handle(RPC_CHANNELS.automations.LINT, async (_ctx, workspaceId: string) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error('Workspace not found')
+
+    const { resolveAutomationsConfigPath } = await import('@craft-agent/shared/automations/resolve-config-path')
+    const configPath = resolveAutomationsConfigPath(workspace.rootPath)
+
+    let config: AutomationsConfigJson
+    try {
+      const raw = await readFile(configPath, 'utf-8')
+      config = JSON.parse(raw)
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return { clean: true, issues: [] as Array<Record<string, unknown>> }
+      }
+      throw error
+    }
+
+    const issues: Array<{ id?: string; event: string; issue: string }> = []
+    const eventMap = config.automations ?? {}
+    for (const [event, matchers] of Object.entries(eventMap)) {
+      if (!Array.isArray(matchers)) continue
+      for (const m of matchers as Array<Record<string, unknown>>) {
+        const id = typeof m.id === 'string' ? m.id : undefined
+        const matcherStr = typeof m.matcher === 'string' ? m.matcher : undefined
+        if (matcherStr) {
+          try { new RegExp(matcherStr) } catch { issues.push({ id, event, issue: `Invalid regex: ${matcherStr}` }) }
+        }
+
+        const actions = Array.isArray(m.actions) ? m.actions : []
+        if (actions.length === 0) issues.push({ id, event, issue: 'No actions defined' })
+
+        if (typeof m.cron === 'string') {
+          const parts = m.cron.trim().split(/\s+/)
+          if (parts.length !== 5) issues.push({ id, event, issue: `Invalid cron expression (expected 5 fields): ${m.cron}` })
+        }
+
+        for (const action of actions as Array<Record<string, unknown>>) {
+          if (action.type === 'prompt' && typeof action.prompt === 'string') {
+            const mentions = action.prompt.match(/@\w+/g) || []
+            if (mentions.length > 5) {
+              issues.push({ id, event, issue: `Prompt has ${mentions.length} @mentions (>5 may cause performance issues)` })
+            }
+          }
+        }
+      }
+    }
+
+    return { clean: issues.length === 0, issues }
   })
 
   // Return last execution timestamp for all automations

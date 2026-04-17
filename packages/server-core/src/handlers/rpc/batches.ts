@@ -47,6 +47,8 @@ async function withBatchMutation(
 
 export const HANDLED_CHANNELS = [
   RPC_CHANNELS.batches.LIST,
+  RPC_CHANNELS.batches.CREATE,
+  RPC_CHANNELS.batches.UPDATE,
   RPC_CHANNELS.batches.START,
   RPC_CHANNELS.batches.PAUSE,
   RPC_CHANNELS.batches.RESUME,
@@ -55,6 +57,7 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.batches.GET_ITEMS,
   RPC_CHANNELS.batches.DUPLICATE,
   RPC_CHANNELS.batches.DELETE,
+  RPC_CHANNELS.batches.VALIDATE,
   RPC_CHANNELS.batches.TEST,
   RPC_CHANNELS.batches.GET_TEST_RESULT,
   RPC_CHANNELS.batches.RETRY_ITEM,
@@ -117,6 +120,87 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
 
     const processor = deps.sessionManager.ensureBatchProcessor(workspace.rootPath, workspaceId)
     return processor.getItems(batchId, offset, limit)
+  })
+
+  // Create a new batch entry in batches.json
+  server.handle(RPC_CHANNELS.batches.CREATE, async (_ctx, workspaceId: string, batch: Record<string, unknown>) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error('Workspace not found')
+
+    const { BatchesFileConfigSchema } = await import('@craft-agent/shared/batches')
+
+    let created!: Record<string, unknown>
+    await withConfigMutex(workspace.rootPath, async () => {
+      const { randomBytes } = await import('crypto')
+      const configPath = join(workspace.rootPath, BATCHES_CONFIG_FILE)
+
+      let config: { batches: Array<Record<string, unknown>> }
+      try {
+        const raw = await readFile(configPath, 'utf-8')
+        config = JSON.parse(raw)
+        if (!Array.isArray(config.batches)) config.batches = []
+      } catch (error) {
+        if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+          config = { batches: [] }
+        } else {
+          throw error
+        }
+      }
+
+      const newBatch = { ...batch }
+      if (!newBatch.id) newBatch.id = randomBytes(3).toString('hex')
+      config.batches.push(newBatch)
+
+      const validation = BatchesFileConfigSchema.safeParse(config)
+      if (!validation.success) {
+        throw new Error(`Invalid batch config: ${validation.error.message}`)
+      }
+
+      await writeFile(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8')
+      created = newBatch
+    })
+    deps.sessionManager.notifyBatchesChanged(workspaceId)
+    return created
+  })
+
+  // Update an existing batch (shallow merge of top-level fields, preserves identity)
+  server.handle(RPC_CHANNELS.batches.UPDATE, async (_ctx, workspaceId: string, batchId: string, patch: Record<string, unknown>) => {
+    const { BatchesFileConfigSchema } = await import('@craft-agent/shared/batches')
+
+    let updated!: Record<string, unknown>
+    await withBatchMutation(workspaceId, batchId, (batches, idx, config) => {
+      const current = batches[idx]!
+      const merged = { ...current, ...patch }
+      merged.id = current.id ?? merged.id
+      batches[idx] = merged
+
+      const validation = BatchesFileConfigSchema.safeParse(config)
+      if (!validation.success) {
+        throw new Error(`Invalid batch config: ${validation.error.message}`)
+      }
+      updated = merged
+    })
+    deps.sessionManager.notifyBatchesChanged(workspaceId)
+    return updated
+  })
+
+  // Validate batches.json (returns details, does not throw)
+  server.handle(RPC_CHANNELS.batches.VALIDATE, async (_ctx, workspaceId: string) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error('Workspace not found')
+
+    const { validateBatches } = await import('@craft-agent/shared/batches')
+    const configPath = join(workspace.rootPath, BATCHES_CONFIG_FILE)
+
+    try {
+      await readFile(configPath, 'utf-8')
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return { valid: true, errors: [] as Array<{ path: string; message: string }>, note: 'No batches.json found (empty config is valid)' }
+      }
+      throw error
+    }
+    return validateBatches(workspace.rootPath)
   })
 
   server.handle(RPC_CHANNELS.batches.DUPLICATE, async (_ctx, workspaceId: string, batchId: string) => {
