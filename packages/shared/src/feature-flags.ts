@@ -60,6 +60,24 @@ export function isEmbeddedServerEnabled(): boolean {
 }
 
 /**
+ * Runtime-evaluated check for routing agent `datapilot` invocations to the
+ * unified CLI binary (apps/cli/src/datapilot.ts) instead of the legacy
+ * craft-cli binary (packages/craft-cli/src/index.ts).
+ *
+ * Defaults to disabled — legacy behavior is preserved byte-for-byte until
+ * Phase 5 flips the default. Override with DATAPILOT_UNIFIED_CLI=1|0.
+ *
+ * Consumers: the `datapilot` wrapper script (apps/electron/resources/bin/)
+ * branches between `DATAPILOT_CLI_ENTRY` (legacy) and
+ * `DATAPILOT_UNIFIED_CLI_ENTRY` (unified) based on this flag.
+ */
+export function isUnifiedCliEnabled(): boolean {
+  const override = parseBooleanEnv(getEnv('DATAPILOT_UNIFIED_CLI'));
+  if (override !== undefined) return override;
+  return false;
+}
+
+/**
  * Build-time check: disable OAuth provider tools and onboarding options.
  *
  * Removes the 4 OAuth trigger tools, hides GitHub Copilot from onboarding,
@@ -167,5 +185,14 @@ export const FEATURE_FLAGS = {
    */
   get embeddedServer(): boolean {
     return isEmbeddedServerEnabled();
+  },
+  /**
+   * Route agent `datapilot` invocations to the unified CLI binary instead of
+   * the legacy craft-cli binary.
+   *
+   * Defaults to disabled. Override with DATAPILOT_UNIFIED_CLI=1|0.
+   */
+  get unifiedCli(): boolean {
+    return isUnifiedCliEnabled();
   },
 } as const;

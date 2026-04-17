@@ -94,6 +94,11 @@ const bundledAssetsRoot = process.env.DATAPILOT_BUNDLED_ASSETS_ROOT ?? appRoot
 // Batch commands are served by the main datapilot CLI (datapilot batch <action>).
 process.env.DATAPILOT_CLI_ENTRY ??= join(appRoot, 'packages', 'craft-cli', 'src', 'index.ts')
 
+// Unified CLI entry (shadow-runtime routing target for DEV-21). The
+// `datapilot` wrapper script dispatches here when DATAPILOT_UNIFIED_CLI=1.
+// The legacy entry above remains the default — this is strictly additive.
+process.env.DATAPILOT_UNIFIED_CLI_ENTRY ??= join(appRoot, 'apps', 'cli', 'src', 'datapilot.ts')
+
 // Ensure wrapper scripts are on PATH for agent Bash sessions.
 const serverBinDir = join(appRoot, 'apps', 'electron', 'resources', 'bin')
 if (existsSync(serverBinDir)) {

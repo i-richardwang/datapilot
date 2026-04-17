@@ -1,3 +1,22 @@
 #!/bin/sh
+# datapilot — agent-facing CLI wrapper.
+#
+# By default, this runs the legacy craft-cli at $DATAPILOT_CLI_ENTRY.
+# When DATAPILOT_UNIFIED_CLI is truthy (1, true, yes, on), it dispatches to the
+# unified CLI at $DATAPILOT_UNIFIED_CLI_ENTRY instead. The flag is off by
+# default — legacy behavior is byte-for-byte preserved.
+#
+# If DATAPILOT_UNIFIED_CLI is truthy but DATAPILOT_UNIFIED_CLI_ENTRY is unset,
+# the wrapper exits non-zero rather than silently falling back to legacy.
 export DATAPILOT_CLI_JSON_ONLY="${DATAPILOT_CLI_JSON_ONLY:-1}"
-exec "${DATAPILOT_BUN:-bun}" run "${DATAPILOT_CLI_ENTRY}" "$@"
+_cli_entry="${DATAPILOT_CLI_ENTRY}"
+case "${DATAPILOT_UNIFIED_CLI:-}" in
+  1|true|yes|on|TRUE|YES|ON|True|Yes|On)
+    if [ -z "${DATAPILOT_UNIFIED_CLI_ENTRY:-}" ]; then
+      printf 'datapilot: DATAPILOT_UNIFIED_CLI=%s but DATAPILOT_UNIFIED_CLI_ENTRY is not set\n' "${DATAPILOT_UNIFIED_CLI}" >&2
+      exit 1
+    fi
+    _cli_entry="${DATAPILOT_UNIFIED_CLI_ENTRY}"
+    ;;
+esac
+exec "${DATAPILOT_BUN:-bun}" run "${_cli_entry}" "$@"
