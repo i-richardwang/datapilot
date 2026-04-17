@@ -1,7 +1,7 @@
 {
   "name": "@craft-agent/viewer-server",
   "version": "0.8.1",
-  "description": "Backend server for hosting shared Craft Agent session transcripts",
+  "description": "Backend server for hosting shared DataPilot session transcripts",
   "private": true,
   "type": "module",
   "main": "src/index.ts",

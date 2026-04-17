@@ -106,7 +106,7 @@ interface PlannerProject {
 const projects: PlannerProject[] = [
   { id: 'p1', name: 'Personal', status: 'open', sortOrder: 1, installationHint: 'MacBook · my-workspace', memberCount: 1 },
   { id: 'p2', name: 'Planner V2', status: 'open', sortOrder: 2, installationHint: 'MacBook · my-workspace', memberCount: 3 },
-  { id: 'p3', name: 'Craft App', status: 'open', sortOrder: 3, installationHint: 'Import mounted locally', memberCount: 4 },
+  { id: 'p3', name: 'DataPilot App', status: 'open', sortOrder: 3, installationHint: 'Import mounted locally', memberCount: 4 },
   { id: 'p4', name: 'Markdown Samples', status: 'open', sortOrder: 4, installationHint: 'Editor test fixtures', memberCount: 1 },
 ]
 
@@ -341,7 +341,7 @@ const initialTasks: PlannerTask[] = [
     id: 'ms12',
     headingId: 'h6',
     title: 'Prose: Rich formatting showcase',
-    notes: 'This task demonstrates all **basic** formatting.\n\n## Headings work\n\n### And sub-headings too\n\nHere is some *italic text*, some **bold text**, and some ***bold italic***. We also have `inline code` and ~~strikethrough~~.\n\n## Lists\n\nUnordered:\n- First item\n- Second item with **bold** inside\n  - Nested item\n  - Another nested one\n- Third item\n\nOrdered:\n1. Step one\n2. Step two\n3. Step three\n\n## Blockquotes\n\n> This is a quote.\n> It can span multiple lines.\n>\n> And even have **formatting** inside.\n\n## Links, images, and code\n\nVisit [Craft](https://craft.do) for more info.\n\n![Rich formatting sample image](https://picsum.photos/seed/planner-rich-formatting/1100/520 "Rich formatting sample")\n\n```bash\n# A simple shell script\nfor i in $(seq 1 5); do\n  echo \"Task $i completed\"\ndone\n```\n\n---\n\nThat horizontal rule above separates sections nicely.',
+    notes: 'This task demonstrates all **basic** formatting.\n\n## Headings work\n\n### And sub-headings too\n\nHere is some *italic text*, some **bold text**, and some ***bold italic***. We also have `inline code` and ~~strikethrough~~.\n\n## Lists\n\nUnordered:\n- First item\n- Second item with **bold** inside\n  - Nested item\n  - Another nested one\n- Third item\n\nOrdered:\n1. Step one\n2. Step two\n3. Step three\n\n## Blockquotes\n\n> This is a quote.\n> It can span multiple lines.\n>\n> And even have **formatting** inside.\n\n## Links, images, and code\n\nVisit [DataPilot](https://github.com/i-richardwang/datapilot) for more info.\n\n![Rich formatting sample image](https://picsum.photos/seed/planner-rich-formatting/1100/520 "Rich formatting sample")\n\n```bash\n# A simple shell script\nfor i in $(seq 1 5); do\n  echo \"Task $i completed\"\ndone\n```\n\n---\n\nThat horizontal rule above separates sections nicely.',
     state: 'done',
     due: '',
   },
@@ -372,7 +372,7 @@ const events: PlannerTaskEvent[] = [
   { id: 'e1', taskId: 't1', type: 'task.created', at: 'Today · 18:12', actor: 'Balint', payloadSummary: 'Task created in Today heading' },
   { id: 'e2', taskId: 't1', type: 'task.session_linked', at: 'Today · 18:20', actor: 'Balint', payloadSummary: 'Linked session snapshot s1' },
   { id: 'e3', taskId: 't1', type: 'task.updated', at: 'Today · 18:27', actor: 'Balint', payloadSummary: 'Updated notes and due date' },
-  { id: 'e4', taskId: 't1', type: 'task.session_snapshot_updated', at: 'Today · 18:42', actor: 'Craft Agent', payloadSummary: 'Refreshed snapshot summary' },
+  { id: 'e4', taskId: 't1', type: 'task.session_snapshot_updated', at: 'Today · 18:42', actor: 'DataPilot', payloadSummary: 'Refreshed snapshot summary' },
 ]
 
 const stateStyles: Record<TaskState, string> = {

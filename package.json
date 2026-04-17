@@ -1,8 +1,8 @@
 {
-  "name": "craft-agent",
+  "name": "datapilot",
   "version": "0.8.9",
   "license": "Apache-2.0",
-  "description": "Claude Code-like agent for Craft documents",
+  "description": "Claude Code-like agent for data analysis",
   "type": "module",
   "private": true,
   "trustedDependencies": [

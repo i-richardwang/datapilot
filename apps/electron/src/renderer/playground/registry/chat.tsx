@@ -557,7 +557,7 @@ function InputContainerPlayground({
   placeholder = 'Message DataPilot...',
   currentModel = 'claude-sonnet-4-6',
   permissionMode = 'ask',
-  workingDirectory = '/Users/demo/projects/craft-agent',
+  workingDirectory = '/Users/demo/projects/datapilot',
   inputMode = 'freeform',
   compactMode = false,
   showOptionBadges = true,
@@ -834,7 +834,7 @@ function ActiveTasksBarContext({ tasks = sampleBackgroundTasks }: ActiveTasksBar
           onPermissionModeChange={setPermissionMode}
           sources={mockSources}
           enabledSourceSlugs={['github-api', 'local-files']}
-          workingDirectory="/Users/demo/projects/craft-agent"
+          workingDirectory="/Users/demo/projects/datapilot"
           sessionId="playground-session"
           onSubmit={mockInputCallbacks.onSubmit}
           onModelChange={mockInputCallbacks.onModelChange}
@@ -937,7 +937,7 @@ function PermissionInputToggle({ autoToggle = false, autoToggleInterval = 3000, 
         onPermissionModeChange={setPermissionMode}
         sources={mockSources}
         enabledSourceSlugs={['github-api', 'local-files']}
-        workingDirectory="/Users/demo/projects/craft-agent"
+        workingDirectory="/Users/demo/projects/datapilot"
         sessionId="playground-session"
         structuredInput={structuredInput}
         onStructuredResponse={handlePermissionResponse}
@@ -1361,7 +1361,7 @@ export const chatComponents: ComponentEntry[] = [
         name: 'workingDirectory',
         description: 'Current working directory',
         control: { type: 'string', placeholder: '/path/to/project' },
-        defaultValue: '/Users/demo/projects/craft-agent',
+        defaultValue: '/Users/demo/projects/datapilot',
       },
       {
         name: 'seedRecentDirs',

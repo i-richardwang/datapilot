@@ -15,7 +15,7 @@ We expect all participants to:
 
 ## Enforcement
 
-Instances of unacceptable behavior may be reported to: conduct@craft.do
+Instances of unacceptable behavior may be reported by opening a private report via [GitHub Security Advisories](https://github.com/i-richardwang/datapilot/security/advisories/new) or by contacting the project maintainers directly.
 
 All complaints will be reviewed and investigated promptly and fairly.
 

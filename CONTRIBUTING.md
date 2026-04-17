@@ -1,6 +1,6 @@
-# Contributing to Craft Agents
+# Contributing to DataPilot
 
-Thank you for your interest in contributing to Craft Agents! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to DataPilot! This document provides guidelines and instructions for contributing.
 
 ## Getting Started
 
@@ -93,7 +93,7 @@ How you tested these changes
 ## Project Structure
 
 ```
-craft-agents/
+datapilot/
 ├── apps/
 │   ├── electron/    # Desktop GUI (primary interface)
 │   └── tui/         # Terminal CLI (deprecated)
