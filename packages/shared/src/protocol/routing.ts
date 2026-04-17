@@ -79,6 +79,9 @@ export const LOCAL_ONLY_CHANNELS = new Set<string>([
   RPC_CHANNELS.theme.GET_ALL_WORKSPACE_THEMES,
   RPC_CHANNELS.theme.BROADCAST_WORKSPACE_THEME,
   RPC_CHANNELS.theme.WORKSPACE_THEME_CHANGED,
+  RPC_CHANNELS.theme.VALIDATE,
+  RPC_CHANNELS.theme.SET_OVERRIDE,
+  RPC_CHANNELS.theme.RESET_OVERRIDE,
 
   // update — local auto-update
   RPC_CHANNELS.update.CHECK,
@@ -244,6 +247,8 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   RPC_CHANNELS.sessions.IMPORT,
   RPC_CHANNELS.sessions.EXPORT_REMOTE_TRANSFER,
   RPC_CHANNELS.sessions.IMPORT_REMOTE_TRANSFER,
+  RPC_CHANNELS.sessions.SHARE,
+  RPC_CHANNELS.sessions.SHARE_HTML,
 
   // transfer — chunked large-payload import (sessions, resources)
   RPC_CHANNELS.transfer.START,
@@ -329,7 +334,13 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   // sources — source config per-workspace
   RPC_CHANNELS.sources.GET,
   RPC_CHANNELS.sources.CREATE,
+  RPC_CHANNELS.sources.UPDATE,
   RPC_CHANNELS.sources.DELETE,
+  RPC_CHANNELS.sources.VALIDATE,
+  RPC_CHANNELS.sources.TEST,
+  RPC_CHANNELS.sources.INIT_GUIDE,
+  RPC_CHANNELS.sources.INIT_PERMISSIONS,
+  RPC_CHANNELS.sources.AUTH_HELP,
   RPC_CHANNELS.sources.START_OAUTH,
   RPC_CHANNELS.sources.SAVE_CREDENTIALS,
   RPC_CHANNELS.sources.CHANGED,
@@ -352,11 +363,25 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   // permissions — workspace permissions
   RPC_CHANNELS.permissions.GET_DEFAULTS,
   RPC_CHANNELS.permissions.DEFAULTS_CHANGED,
+  RPC_CHANNELS.permissions.LIST,
+  RPC_CHANNELS.permissions.GET,
+  RPC_CHANNELS.permissions.SET,
+  RPC_CHANNELS.permissions.ADD_MCP_PATTERN,
+  RPC_CHANNELS.permissions.ADD_API_ENDPOINT,
+  RPC_CHANNELS.permissions.ADD_BASH_PATTERN,
+  RPC_CHANNELS.permissions.ADD_WRITE_PATH,
+  RPC_CHANNELS.permissions.REMOVE,
+  RPC_CHANNELS.permissions.VALIDATE,
+  RPC_CHANNELS.permissions.RESET,
 
   // skills — skill content per-workspace (not openEditor/openFinder which are local OS)
   RPC_CHANNELS.skills.GET,
   RPC_CHANNELS.skills.GET_FILES,
+  RPC_CHANNELS.skills.CREATE,
+  RPC_CHANNELS.skills.UPDATE,
   RPC_CHANNELS.skills.DELETE,
+  RPC_CHANNELS.skills.WHERE,
+  RPC_CHANNELS.skills.VALIDATE,
   RPC_CHANNELS.skills.CHANGED,
 
   // statuses — workspace metadata
@@ -367,7 +392,15 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   // labels — workspace metadata
   RPC_CHANNELS.labels.LIST,
   RPC_CHANNELS.labels.CREATE,
+  RPC_CHANNELS.labels.UPDATE,
   RPC_CHANNELS.labels.DELETE,
+  RPC_CHANNELS.labels.MOVE,
+  RPC_CHANNELS.labels.REORDER,
+  RPC_CHANNELS.labels.AUTO_RULE_LIST,
+  RPC_CHANNELS.labels.AUTO_RULE_ADD,
+  RPC_CHANNELS.labels.AUTO_RULE_REMOVE,
+  RPC_CHANNELS.labels.AUTO_RULE_CLEAR,
+  RPC_CHANNELS.labels.AUTO_RULE_VALIDATE,
   RPC_CHANNELS.labels.CHANGED,
 
   // views — workspace UI views
@@ -382,6 +415,8 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
 
   // automations — workspace automations
   RPC_CHANNELS.automations.LIST,
+  RPC_CHANNELS.automations.CREATE,
+  RPC_CHANNELS.automations.UPDATE,
   RPC_CHANNELS.automations.TEST,
   RPC_CHANNELS.automations.SET_ENABLED,
   RPC_CHANNELS.automations.DUPLICATE,
@@ -389,10 +424,14 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   RPC_CHANNELS.automations.GET_HISTORY,
   RPC_CHANNELS.automations.GET_LAST_EXECUTED,
   RPC_CHANNELS.automations.REPLAY,
+  RPC_CHANNELS.automations.VALIDATE,
+  RPC_CHANNELS.automations.LINT,
   RPC_CHANNELS.automations.CHANGED,
 
   // batches — workspace batch processing
   RPC_CHANNELS.batches.LIST,
+  RPC_CHANNELS.batches.CREATE,
+  RPC_CHANNELS.batches.UPDATE,
   RPC_CHANNELS.batches.START,
   RPC_CHANNELS.batches.PAUSE,
   RPC_CHANNELS.batches.RESUME,
@@ -401,8 +440,10 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   RPC_CHANNELS.batches.GET_ITEMS,
   RPC_CHANNELS.batches.DUPLICATE,
   RPC_CHANNELS.batches.DELETE,
+  RPC_CHANNELS.batches.VALIDATE,
   RPC_CHANNELS.batches.TEST,
   RPC_CHANNELS.batches.GET_TEST_RESULT,
+  RPC_CHANNELS.batches.RETRY_ITEM,
   RPC_CHANNELS.batches.CHANGED,
 
   // git — workspace filesystem

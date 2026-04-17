@@ -28,6 +28,9 @@ export const CORE_HANDLED_CHANNELS = [
   RPC_CHANNELS.theme.SET_WORKSPACE_COLOR_THEME,
   RPC_CHANNELS.theme.GET_ALL_WORKSPACE_THEMES,
   RPC_CHANNELS.theme.BROADCAST_WORKSPACE_THEME,
+  RPC_CHANNELS.theme.VALIDATE,
+  RPC_CHANNELS.theme.SET_OVERRIDE,
+  RPC_CHANNELS.theme.RESET_OVERRIDE,
   RPC_CHANNELS.views.LIST,
   RPC_CHANNELS.views.SAVE,
   RPC_CHANNELS.toolIcons.GET_MAPPINGS,
@@ -343,6 +346,46 @@ export function registerWorkspaceCoreHandlers(server: RpcServer, deps: HandlerDe
     pushTyped(server, RPC_CHANNELS.theme.WORKSPACE_THEME_CHANGED, { to: 'all' }, { workspaceId, themeId })
   })
 
+  // Validate the app-level theme override file (or a named preset)
+  server.handle(RPC_CHANNELS.theme.VALIDATE, async (_ctx, presetId?: string) => {
+    const { loadAppTheme, loadPresetTheme, getAppThemePath } = await import('@craft-agent/shared/config/storage')
+
+    if (presetId) {
+      const preset = loadPresetTheme(presetId)
+      if (!preset) throw new Error(`Preset '${presetId}' not found`)
+      const errors = validateThemeOverrides(preset.theme as import('@craft-agent/shared/config/theme').ThemeOverrides)
+      return { valid: errors.length === 0, preset: presetId, errors }
+    }
+
+    const appTheme = loadAppTheme()
+    if (!appTheme) {
+      return { valid: true, errors: [] as string[], note: 'No app override file' }
+    }
+    const errors = validateThemeOverrides(appTheme)
+    return { valid: errors.length === 0, path: getAppThemePath(), errors }
+  })
+
+  // Write the app-level theme override (~/.datapilot/theme.json)
+  server.handle(RPC_CHANNELS.theme.SET_OVERRIDE, async (_ctx, theme: import('@craft-agent/shared/config/theme').ThemeOverrides) => {
+    const errors = validateThemeOverrides(theme)
+    if (errors.length > 0) {
+      throw new Error(`Invalid theme: ${errors.join(', ')}`)
+    }
+    const { saveAppTheme, getAppThemePath } = await import('@craft-agent/shared/config/storage')
+    saveAppTheme(theme)
+    return { path: getAppThemePath(), theme }
+  })
+
+  // Delete the app-level theme override file (revert to defaults)
+  server.handle(RPC_CHANNELS.theme.RESET_OVERRIDE, async () => {
+    const { existsSync, unlinkSync } = await import('fs')
+    const { getAppThemePath } = await import('@craft-agent/shared/config/storage')
+    const path = getAppThemePath()
+    if (!existsSync(path)) return { reset: false, path, note: 'No override file to reset' }
+    unlinkSync(path)
+    return { reset: true, path }
+  })
+
   // ============================================================
   // Views
   // ============================================================
@@ -404,4 +447,26 @@ export function registerWorkspaceCoreHandlers(server: RpcServer, deps: HandlerDe
     const result = getLogoUrl(serviceUrl, provider)
     return result
   })
+}
+
+const CSS_COLOR_PATTERN = /^(#[0-9a-fA-F]{3,8}|rgb\(|rgba\(|hsl\(|hsla\(|oklch\(|[a-z]+$)/
+const THEME_COLOR_KEYS = ['background', 'foreground', 'accent', 'info', 'success', 'destructive', 'paper', 'navigator', 'input', 'popover', 'popoverSolid'] as const
+
+function validateThemeOverrides(theme: import('@craft-agent/shared/config/theme').ThemeOverrides): string[] {
+  const errors: string[] = []
+  for (const key of THEME_COLOR_KEYS) {
+    const value = (theme as Record<string, unknown>)[key]
+    if (value !== undefined && typeof value === 'string' && !CSS_COLOR_PATTERN.test(value)) {
+      errors.push(`Invalid CSS color for ${key}: ${value}`)
+    }
+  }
+  if (theme.dark) {
+    for (const key of THEME_COLOR_KEYS) {
+      const value = (theme.dark as Record<string, unknown>)[key]
+      if (value !== undefined && typeof value === 'string' && !CSS_COLOR_PATTERN.test(value)) {
+        errors.push(`Invalid CSS color for dark.${key}: ${value}`)
+      }
+    }
+  }
+  return errors
 }
