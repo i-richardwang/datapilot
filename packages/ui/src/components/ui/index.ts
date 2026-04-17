@@ -28,6 +28,11 @@ export {
   StyledDropdownMenuSubTrigger,
   StyledDropdownMenuSubContent,
 } from './StyledDropdown'
+export {
+  ShareCloudIconButton,
+  ShareCloudMenuIcon,
+  type ShareCloudIconButtonProps,
+} from './ShareCloudIconButton'
 export { BrowserShader, type BrowserShaderProps } from './BrowserShader'
 export { BrowserControls, type BrowserControlsProps } from './BrowserControls'
 export {

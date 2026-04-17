@@ -11,7 +11,7 @@
  */
 
 import * as React from 'react'
-import { Globe, CloudUpload, Loader2, Copy, RefreshCw, Link2Off } from 'lucide-react'
+import { Globe, Copy, RefreshCw, Link2Off } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { PreviewOverlay } from './PreviewOverlay'
@@ -19,8 +19,14 @@ import { CopyButton } from './CopyButton'
 import { ItemNavigator } from './ItemNavigator'
 import { usePlatform } from '../../context/PlatformContext'
 import { useSessionContext } from '../../context/SessionContext'
-import { SimpleDropdown, SimpleDropdownItem } from '../ui/SimpleDropdown'
-import { cn } from '../../lib/utils'
+import { ShareCloudIconButton } from '../ui/ShareCloudIconButton'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  StyledDropdownMenuContent,
+  StyledDropdownMenuItem,
+  StyledDropdownMenuSeparator,
+} from '../ui/StyledDropdown'
 
 /**
  * Inject `<base target="_top">` so link clicks navigate the top frame,
@@ -78,6 +84,10 @@ function useContentHash(content: string): string | null {
  * the `onShareHtml` PlatformAction. Without both, renders nothing so web-viewer
  * / detached overlays don't advertise a feature they can't perform.
  *
+ * Shares chrome with ChatPage's session share button via ShareCloudIconButton
+ * and the radix DropdownMenu + StyledDropdownMenu* family — the two buttons
+ * must be visually and interactively indistinguishable.
+ *
  * Visual state is derived from whichever `htmlShares` entry is anchored to
  * this button instance:
  *   - No anchor yet and `htmlShares[hash(html)]` does not exist → idle.
@@ -97,7 +107,6 @@ function ShareLinkButton({
   const { t } = useTranslation()
   const session = useSessionContext()
   const { onShareHtml, onUpdateHtmlShare, onRevokeHtmlShare, onOpenUrl } = usePlatform()
-  const [pending, setPending] = React.useState<'idle' | 'sharing' | 'updating' | 'revoking'>('idle')
   const [anchorSharedId, setAnchorSharedId] = React.useState<string | null>(null)
 
   const currentHash = useContentHash(html)
@@ -118,6 +127,8 @@ function ShareLinkButton({
   }, [htmlShares, anchorSharedId])
 
   // Auto-adopt a matching existing share when the current bytes line up.
+  // This is the html-preview-specific behavior (cross-window sync on content
+  // hash match) — the session share button does not have an equivalent.
   React.useEffect(() => {
     if (!htmlShares || anchorSharedId || !currentHash) return
     const match = htmlShares[currentHash]
@@ -133,24 +144,18 @@ function ShareLinkButton({
   }, [anchorSharedId, htmlShares])
 
   const isShared = anchorEntry !== null
-  const isSharing = pending === 'sharing'
-  const isBusy = pending !== 'idle'
 
   // Guard: without a session or the share action, rendering this button is
   // confusing (no-op clicks, stale state). Hide it in those environments.
   if (!session || !onShareHtml) return null
 
   const handleShare = async () => {
-    if (isBusy || !html) return
-    setPending('sharing')
+    if (!html) return
     try {
       const result = await onShareHtml(session.sessionId, html)
       setAnchorSharedId(result.sharedId)
     } catch {
-      // PlatformAction implementations surface their own errors (toast);
-      // just reset transient UI state.
-    } finally {
-      setPending('idle')
+      // PlatformAction implementations surface their own errors (toast).
     }
   }
 
@@ -167,107 +172,78 @@ function ShareLinkButton({
 
   const handleUpdateShare = async () => {
     if (!anchorEntry || !onUpdateHtmlShare) return
-    setPending('updating')
     try {
       await onUpdateHtmlShare(session.sessionId, anchorEntry.sharedId, html)
     } catch {
       // Platform surfaces the error; leave anchor in place.
-    } finally {
-      setPending('idle')
     }
   }
 
   const handleRevokeShare = async () => {
     if (!anchorEntry || !onRevokeHtmlShare) return
-    setPending('revoking')
     try {
       await onRevokeHtmlShare(session.sessionId, anchorEntry.sharedId)
       setAnchorSharedId(null)
     } catch {
       // Leave anchor in place on failure so user can retry.
-    } finally {
-      setPending('idle')
     }
   }
 
+  // Idle: direct click triggers the initial share — no menu to disambiguate.
+  // This is html-preview-specific; the session button always opens a menu.
   if (!isShared) {
-    const tooltip = isSharing ? t('htmlShare.sharing') : t('htmlShare.share')
+    const tooltip = t('htmlShare.share')
     return (
-      <button
-        type="button"
+      <ShareCloudIconButton
+        isShared={false}
         onClick={handleShare}
-        disabled={isBusy || !html}
+        disabled={!html}
         title={tooltip}
         aria-label={tooltip}
-        className={cn(
-          'flex items-center justify-center w-7 h-7 rounded-md transition-colors shrink-0 select-none',
-          'text-muted-foreground hover:text-foreground hover:bg-foreground/5',
-          'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-          'disabled:opacity-60 disabled:cursor-default',
-          className,
-        )}
-      >
-        {isSharing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CloudUpload className="w-3.5 h-3.5" />}
-      </button>
+        className={className}
+      />
     )
   }
 
   const sharedTooltip = t('htmlShare.shared')
-  const trigger = (
-    <div
-      role="button"
-      tabIndex={0}
-      aria-disabled={isBusy || undefined}
-      title={sharedTooltip}
-      aria-label={sharedTooltip}
-      className={cn(
-        'flex items-center justify-center w-7 h-7 rounded-md transition-colors shrink-0 select-none',
-        'text-accent hover:bg-foreground/5',
-        'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-        isBusy && 'opacity-60 cursor-default',
-        className,
-      )}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-        }
-      }}
-    >
-      {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CloudUpload className="w-3.5 h-3.5" />}
-    </div>
-  )
-
   return (
-    <SimpleDropdown trigger={trigger} align="end">
-      {onOpenUrl && (
-        <SimpleDropdownItem onClick={handleOpenInBrowser} icon={<Globe className="h-3.5 w-3.5" />}>
-          {t('htmlShare.openInBrowser')}
-        </SimpleDropdownItem>
-      )}
-      <SimpleDropdownItem onClick={handleCopyLink} icon={<Copy className="h-3.5 w-3.5" />}>
-        {t('htmlShare.copyLink')}
-      </SimpleDropdownItem>
-      {onUpdateHtmlShare && (
-        <SimpleDropdownItem
-          onClick={handleUpdateShare}
-          icon={<RefreshCw className="h-3.5 w-3.5" />}
-        >
-          {t('htmlShare.updateShare')}
-        </SimpleDropdownItem>
-      )}
-      {onRevokeHtmlShare && (
-        <>
-          <div className="my-1 h-px bg-border/50" role="separator" />
-          <SimpleDropdownItem
-            onClick={handleRevokeShare}
-            icon={<Link2Off className="h-3.5 w-3.5" />}
-            variant="destructive"
-          >
-            {t('htmlShare.stopSharing')}
-          </SimpleDropdownItem>
-        </>
-      )}
-    </SimpleDropdown>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <ShareCloudIconButton
+          isShared
+          title={sharedTooltip}
+          aria-label={sharedTooltip}
+          className={className}
+        />
+      </DropdownMenuTrigger>
+      <StyledDropdownMenuContent align="end" sideOffset={8}>
+        {onOpenUrl && (
+          <StyledDropdownMenuItem onClick={handleOpenInBrowser}>
+            <Globe className="h-3.5 w-3.5" />
+            <span className="flex-1">{t('htmlShare.openInBrowser')}</span>
+          </StyledDropdownMenuItem>
+        )}
+        <StyledDropdownMenuItem onClick={handleCopyLink}>
+          <Copy className="h-3.5 w-3.5" />
+          <span className="flex-1">{t('htmlShare.copyLink')}</span>
+        </StyledDropdownMenuItem>
+        {onUpdateHtmlShare && (
+          <StyledDropdownMenuItem onClick={handleUpdateShare}>
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span className="flex-1">{t('htmlShare.updateShare')}</span>
+          </StyledDropdownMenuItem>
+        )}
+        {onRevokeHtmlShare && (
+          <>
+            <StyledDropdownMenuSeparator />
+            <StyledDropdownMenuItem onClick={handleRevokeShare} variant="destructive">
+              <Link2Off className="h-3.5 w-3.5" />
+              <span className="flex-1">{t('htmlShare.stopSharing')}</span>
+            </StyledDropdownMenuItem>
+          </>
+        )}
+      </StyledDropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -398,7 +374,7 @@ export function HTMLPreviewOverlay({
   const headerActions = (
     <div className="flex items-center gap-2">
       <ItemNavigator items={resolvedItems} activeIndex={activeIdx} onSelect={setActiveIdx} size="md" />
-      <ShareLinkButton html={activeContent || ''} className="bg-background shadow-minimal" />
+      <ShareLinkButton html={activeContent || ''} />
       <CopyButton content={activeContent || ''} label="Copy HTML" className="bg-background shadow-minimal" />
     </div>
   )
