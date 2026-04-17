@@ -10,6 +10,7 @@
   },
   "scripts": {
     "start": "bun run src/index.ts",
+    "datapilot": "bun run src/datapilot.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test src/"
   },

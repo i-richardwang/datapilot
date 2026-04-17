@@ -1,0 +1,155 @@
+/**
+ * session entity — wraps the sessions:* RPC channels for non-interactive use.
+ *
+ * Streaming send/follow uses `events tail --session <id>` rather than being
+ * baked in here, so that this module stays request/response.
+ */
+
+import { ok, fail } from '../envelope.ts'
+import { strFlag, listFlag, parseInput, type Flags } from '../args.ts'
+import type { RouteCtx } from '../router.ts'
+
+const ACTIONS = [
+  'list', 'get', 'create', 'delete',
+  'messages', 'send', 'cancel',
+  'get-model', 'set-model',
+  'unread-summary', 'mark-all-read',
+  'get-files', 'get-notes', 'set-notes',
+  'export', 'share',
+] as const
+
+export async function routeSession(
+  ctx: RouteCtx,
+  action: string | undefined,
+  positionals: string[],
+  flags: Flags,
+): Promise<never> {
+  if (!action) ok({ entity: 'session', actions: ACTIONS })
+  if (!ACTIONS.includes(action as typeof ACTIONS[number])) {
+    fail('USAGE_ERROR', `Unknown session action: ${action}`)
+  }
+
+  const client = await ctx.getClient()
+
+  switch (action) {
+    case 'list': {
+      const ws = await requireWorkspace(ctx)
+      ok(await client.invoke('sessions:get', ws))
+    }
+
+    case 'get': {
+      const id = positionals[0]
+      if (!id) fail('USAGE_ERROR', 'Missing session id')
+      const ws = await requireWorkspace(ctx)
+      const list = (await client.invoke('sessions:get', ws)) as Array<{ id: string }>
+      const found = list.find((s) => s.id === id)
+      if (!found) fail('NOT_FOUND', `Session '${id}' not found`)
+      ok(found)
+    }
+
+    case 'create': {
+      const ws = await requireWorkspace(ctx)
+      const input = (await parseInput(flags)) ?? {}
+      const name = (input.name as string) ?? strFlag(flags, 'name')
+      const mode = (input.permissionMode as string) ?? strFlag(flags, 'mode')
+      const sources = (input.enabledSourceSlugs as string[] | undefined) ?? listFlag(flags, 'source')
+      const opts: Record<string, unknown> = { ...input }
+      if (name) opts.name = name
+      if (mode) opts.permissionMode = mode
+      if (sources?.length) opts.enabledSourceSlugs = sources
+      ok(await client.invoke('sessions:create', ws, opts))
+    }
+
+    case 'delete': {
+      const id = positionals[0]
+      if (!id) fail('USAGE_ERROR', 'Missing session id')
+      await client.invoke('sessions:delete', id)
+      ok({ deleted: id })
+    }
+
+    case 'messages': {
+      const id = positionals[0]
+      if (!id) fail('USAGE_ERROR', 'Missing session id')
+      ok(await client.invoke('sessions:getMessages', id))
+    }
+
+    case 'send': {
+      const id = positionals[0]
+      if (!id) fail('USAGE_ERROR', 'Missing session id')
+      const message = positionals.slice(1).join(' ')
+      if (!message) fail('USAGE_ERROR', 'Missing message text')
+      ok(await client.invoke('sessions:sendMessage', id, message))
+    }
+
+    case 'cancel': {
+      const id = positionals[0]
+      if (!id) fail('USAGE_ERROR', 'Missing session id')
+      await client.invoke('sessions:cancel', id)
+      ok({ cancelled: id })
+    }
+
+    case 'get-model': {
+      const id = positionals[0]
+      if (!id) fail('USAGE_ERROR', 'Missing session id')
+      ok(await client.invoke('session:getModel', id))
+    }
+
+    case 'set-model': {
+      const id = positionals[0]
+      const model = positionals[1]
+      if (!id || !model) fail('USAGE_ERROR', 'Usage: session set-model <id> <model>')
+      const ws = await requireWorkspace(ctx)
+      const connectionSlug = strFlag(flags, 'connection')
+      ok(await client.invoke('session:setModel', id, ws, model, connectionSlug))
+    }
+
+    case 'unread-summary': {
+      const ws = await requireWorkspace(ctx)
+      ok(await client.invoke('sessions:getUnreadSummary', ws))
+    }
+
+    case 'mark-all-read': {
+      const ws = await requireWorkspace(ctx)
+      ok(await client.invoke('sessions:markAllRead', ws))
+    }
+
+    case 'get-files': {
+      const id = positionals[0]
+      if (!id) fail('USAGE_ERROR', 'Missing session id')
+      ok(await client.invoke('sessions:getFiles', id))
+    }
+
+    case 'get-notes': {
+      const id = positionals[0]
+      if (!id) fail('USAGE_ERROR', 'Missing session id')
+      ok(await client.invoke('sessions:getNotes', id))
+    }
+
+    case 'set-notes': {
+      const id = positionals[0]
+      if (!id) fail('USAGE_ERROR', 'Missing session id')
+      const notes = strFlag(flags, 'notes') ?? positionals.slice(1).join(' ')
+      ok(await client.invoke('sessions:setNotes', id, notes))
+    }
+
+    case 'export': {
+      const id = positionals[0]
+      if (!id) fail('USAGE_ERROR', 'Missing session id')
+      ok(await client.invoke('sessions:export', id))
+    }
+
+    case 'share': {
+      const id = positionals[0]
+      if (!id) fail('USAGE_ERROR', 'Missing session id')
+      ok(await client.invoke('sessions:share', id))
+    }
+  }
+
+  fail('USAGE_ERROR', `Unhandled session action: ${action}`)
+}
+
+async function requireWorkspace(ctx: RouteCtx): Promise<string> {
+  const ws = await ctx.getWorkspace()
+  if (!ws) fail('VALIDATION_ERROR', 'No workspace available — pass --workspace <id>')
+  return ws
+}

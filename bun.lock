@@ -310,6 +310,7 @@
       "version": "0.8.9",
       "dependencies": {
         "@craft-agent/core": "workspace:*",
+        "@craft-agent/rpc-engine": "workspace:*",
         "@craft-agent/shared": "workspace:*",
         "@mariozechner/pi-ai": "0.66.1",
         "fflate": "^0.8.2",
