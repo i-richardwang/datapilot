@@ -208,7 +208,7 @@ function ShareLinkButton({
           className={className}
         />
       </DropdownMenuTrigger>
-      <StyledDropdownMenuContent align="end" sideOffset={8}>
+      <StyledDropdownMenuContent align="end" sideOffset={8} style={{ zIndex: 'var(--z-floating-menu, 400)' }}>
         {isShared ? (
           <>
             {onOpenUrl && (
