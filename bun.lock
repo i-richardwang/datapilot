@@ -301,6 +301,7 @@
         "@craft-agent/core": "workspace:*",
         "@craft-agent/shared": "workspace:*",
         "@mariozechner/pi-ai": "0.66.1",
+        "fflate": "^0.8.2",
         "jose": "^6.0.0",
         "sharp": "0.34.5",
         "ws": "^8.19.0",

@@ -105,6 +105,19 @@ export function createWebApi(options: WebApiOptions): {
       a.remove()
       return Promise.resolve()
     },
+    // Stream the entire session directory as a zip via the authenticated HTTP endpoint.
+    // Same <a download> pattern as downloadSessionFile — the browser drives the save.
+    downloadSessionZip: (sessionId: string) => {
+      const url = `/api/session-files/download-zip?sessionId=${encodeURIComponent(sessionId)}`
+      const a = document.createElement('a')
+      a.href = url
+      a.rel = 'noopener'
+      a.download = ''
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      return Promise.resolve()
+    },
 
     // File dialogs
     openFileDialog: webFilePicker,

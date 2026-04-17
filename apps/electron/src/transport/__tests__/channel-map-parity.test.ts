@@ -28,6 +28,7 @@ type ApiToChannelMapKeys = Exclude<
   | 'onTransferProgress' // direct IPC listener — chunk upload progress
   | 'changeLanguage' // direct IPC to main process — syncs i18n language
   | 'downloadSessionFile' // web-only; preload stub rejects, web adapter triggers <a download>
+  | 'downloadSessionZip' // web-only; preload stub rejects, web adapter triggers <a download>
 > | BrowserPaneKeys
 type ChannelMapKeys = keyof typeof CHANNEL_MAP & string
 

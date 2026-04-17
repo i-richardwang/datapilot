@@ -203,6 +203,7 @@
   "chat.context": "Kontextus",
   "chat.contextBadge": "Kontextus jelvény",
   "chat.downloadFile": "Letöltés",
+  "chat.downloadSessionZip": "Letöltés zip-ként",
   "chat.enterSessionName": "Add meg a munkamenet nevét...",
   "chat.failedToStopSharing": "A megosztás leállítása sikertelen",
   "chat.failedToUpdateShare": "A megosztás frissítése sikertelen",

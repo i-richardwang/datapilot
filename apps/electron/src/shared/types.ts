@@ -366,6 +366,12 @@ export interface ElectronAPI {
    * Web-only: Electron has "Show in Finder" instead, and throws if called.
    */
   downloadSessionFile(sessionId: string, path: string): Promise<void>
+  /**
+   * Trigger a browser download of the entire session directory as a zip.
+   * Web-only: Electron reveals the folder in the native file manager instead,
+   * and this rejects if called.
+   */
+  downloadSessionZip(sessionId: string): Promise<void>
 
   // Menu event listeners
   onMenuNewChat(callback: () => void): () => void

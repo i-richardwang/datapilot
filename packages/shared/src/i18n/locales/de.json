@@ -203,6 +203,7 @@
   "chat.context": "Kontext",
   "chat.contextBadge": "Kontext-Badge",
   "chat.downloadFile": "Herunterladen",
+  "chat.downloadSessionZip": "Als ZIP herunterladen",
   "chat.enterSessionName": "Sitzungsname eingeben...",
   "chat.failedToStopSharing": "Freigabe konnte nicht beendet werden",
   "chat.failedToUpdateShare": "Freigabe konnte nicht aktualisiert werden",
