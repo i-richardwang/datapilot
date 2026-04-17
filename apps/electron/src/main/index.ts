@@ -149,13 +149,11 @@ if (isDebugMode) {
   process.env.DATAPILOT_CLI_ENTRY = app.isPackaged
     ? join(resourcesBase, 'resources', 'craft-cli', 'index.js')
     : join(process.cwd(), 'packages', 'craft-cli', 'src', 'index.ts')
-  // Unified CLI entry (DEV-21 shadow-runtime routing target). Dev-only for
-  // now; packaged bundle staging lands with Phase 5 when the default flips.
-  // Leaving this unset in packaged builds means DATAPILOT_UNIFIED_CLI=1 will
-  // fail loudly in the wrapper rather than silently falling back to legacy.
-  if (!app.isPackaged) {
-    process.env.DATAPILOT_UNIFIED_CLI_ENTRY = join(process.cwd(), 'apps', 'cli', 'src', 'datapilot.ts')
-  }
+  // Unified CLI entry (default after DEV-22 Phase 5). The `datapilot` wrapper
+  // dispatches here unless DATAPILOT_UNIFIED_CLI=0 forces the legacy path.
+  process.env.DATAPILOT_UNIFIED_CLI_ENTRY = app.isPackaged
+    ? join(resourcesBase, 'resources', 'datapilot-cli', 'index.js')
+    : join(process.cwd(), 'apps', 'cli', 'src', 'datapilot.ts')
   process.env.DATAPILOT_COMMANDS_DOC_PATH = app.isPackaged
     ? join(resourcesBase, 'resources', 'docs', 'datapilot-cli.md')
     : join(process.cwd(), 'apps', 'electron', 'resources', 'docs', 'datapilot-cli.md')

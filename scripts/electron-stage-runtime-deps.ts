@@ -168,8 +168,9 @@ for (const server of MCP_SERVERS) {
 }
 
 // ── 3. Stage DataPilot CLI ──────────────────────────────────────────────────
-// The wrapper script resources/bin/datapilot runs `bun run $DATAPILOT_CLI_ENTRY`,
-// so the compiled bundle must be available in the packaged app.
+// The wrapper script resources/bin/datapilot runs `bun run $DATAPILOT_CLI_ENTRY`
+// (legacy) or `bun run $DATAPILOT_UNIFIED_CLI_ENTRY` (default after DEV-22),
+// so both compiled bundles must be available in the packaged app.
 
 const CLI_SOURCE = join(ROOT_DIR, 'packages', 'craft-cli', 'dist', 'index.js')
 const CLI_DEST_DIR = join(ELECTRON_DIR, 'resources', 'craft-cli')
@@ -181,7 +182,20 @@ if (existsSync(CLI_SOURCE)) {
     copyFileSync(CLI_SOURCE, join(CLI_DEST_DIR, 'index.js'))
   }
 } else {
-  console.warn('Warning: craft-cli not built. datapilot CLI commands will not work in packaged app.')
+  console.warn('Warning: craft-cli not built. The DATAPILOT_UNIFIED_CLI=0 escape hatch will not work in this packaged app.')
+}
+
+const UNIFIED_CLI_SOURCE = join(ROOT_DIR, 'apps', 'cli', 'dist', 'datapilot.js')
+const UNIFIED_CLI_DEST_DIR = join(ELECTRON_DIR, 'resources', 'datapilot-cli')
+
+if (existsSync(UNIFIED_CLI_SOURCE)) {
+  console.log(`${isDryRun ? 'Would stage' : 'Staging'} datapilot-cli (unified)`)
+  if (!isDryRun) {
+    mkdirSync(UNIFIED_CLI_DEST_DIR, { recursive: true })
+    copyFileSync(UNIFIED_CLI_SOURCE, join(UNIFIED_CLI_DEST_DIR, 'index.js'))
+  }
+} else {
+  console.warn('Warning: unified datapilot CLI not built. Default datapilot CLI commands will not work in packaged app — set DATAPILOT_UNIFIED_CLI=0 to fall back to legacy.')
 }
 
 // ── 4. Stage interceptor source files ───────────────────────────────────────
