@@ -181,7 +181,7 @@ export function ShikiDiffViewer({
       }
       header.addEventListener('click', handleClick)
       // Store cleanup ref so we can remove listener
-      ;(header as any).__craftClickCleanup = () => header.removeEventListener('click', handleClick)
+      ;(header as any).__datapilotClickCleanup = () => header.removeEventListener('click', handleClick)
     }, 150)
 
     return () => {
@@ -189,7 +189,7 @@ export function ShikiDiffViewer({
       const diffsContainer = containerRef.current?.querySelector(DIFFS_TAG_NAME)
       const header = diffsContainer?.shadowRoot?.querySelector('[data-diffs-header]')
       if (header) {
-        ;(header as any).__craftClickCleanup?.()
+        ;(header as any).__datapilotClickCleanup?.()
       }
     }
   }, [filePath, disableFileHeader, onFileHeaderClick])
