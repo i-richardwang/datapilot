@@ -48,6 +48,7 @@ WORKDIR /app
 COPY package.json bun.lock ./
 COPY packages/server/package.json packages/server/
 COPY packages/server-core/package.json packages/server-core/
+COPY packages/rpc-engine/package.json packages/rpc-engine/
 COPY packages/shared/package.json packages/shared/
 COPY packages/core/package.json packages/core/
 COPY packages/session-tools-core/package.json packages/session-tools-core/
