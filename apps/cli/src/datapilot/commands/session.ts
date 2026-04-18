@@ -5,6 +5,8 @@
  * baked in here, so that this module stays request/response.
  */
 
+import { readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
 import { ok, fail } from '../envelope.ts'
 import { strFlag, listFlag, parseInput, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
@@ -15,7 +17,7 @@ const ACTIONS = [
   'get-model', 'set-model',
   'unread-summary', 'mark-all-read',
   'get-files', 'get-notes', 'set-notes',
-  'export', 'share',
+  'export', 'share', 'share-html',
 ] as const
 
 export async function routeSession(
@@ -142,6 +144,30 @@ export async function routeSession(
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing session id')
       ok(await client.invoke('sessions:share', id))
+    }
+
+    case 'share-html': {
+      const filePath = positionals[0]
+      if (!filePath) {
+        fail('USAGE_ERROR', 'Missing HTML file path', {
+          suggestion: 'datapilot session share-html <file> [--session <id>]',
+        })
+      }
+      const id = strFlag(flags, 'session') ?? process.env.CRAFT_SESSION_ID
+      if (!id) {
+        fail('USAGE_ERROR', 'Session ID required', {
+          suggestion: 'pass --session <id> or run inside a session where $CRAFT_SESSION_ID is set',
+        })
+      }
+      let html: string
+      try {
+        html = await readFile(resolve(filePath), 'utf8')
+      } catch (e) {
+        fail('NOT_FOUND', `Cannot read ${filePath}: ${(e as Error).message}`)
+      }
+      if (html.length === 0) fail('VALIDATION_ERROR', 'HTML file is empty')
+      const ws = await requireWorkspace(ctx)
+      ok(await client.invoke('sessions:shareHtml', ws, id, html))
     }
   }
 
