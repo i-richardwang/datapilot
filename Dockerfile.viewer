@@ -29,8 +29,10 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 WORKDIR /app
 
-# Copy dependency manifests first for layer caching
-COPY package.json bun.lock ./
+# Copy dependency manifests first for layer caching.
+# bunfig.toml must be present *before* `bun install` runs so the hoisted
+# linker setting is honored (see Dockerfile.server for details).
+COPY package.json bun.lock bunfig.toml ./
 COPY packages/shared/package.json packages/shared/
 COPY packages/core/package.json packages/core/
 COPY packages/ui/package.json packages/ui/

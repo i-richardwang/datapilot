@@ -44,8 +44,11 @@ RUN groupadd -r craftagents && \
 
 WORKDIR /app
 
-# Copy dependency manifests first for layer caching
-COPY package.json bun.lock ./
+# Copy dependency manifests first for layer caching.
+# bunfig.toml must be present *before* `bun install` runs so the hoisted
+# linker setting is honored; otherwise bun falls back to configVersion=1's
+# isolated default and Vite can't resolve transitive deps during webui build.
+COPY package.json bun.lock bunfig.toml ./
 COPY packages/server/package.json packages/server/
 COPY packages/server-core/package.json packages/server-core/
 COPY packages/shared/package.json packages/shared/

@@ -1,1 +1,9 @@
 preload = ["./packages/shared/src/unified-network-interceptor.ts"]
+
+# Use hoisted linker (npm-style single node_modules at root) instead of bun 1.3's
+# default isolated mode. Required because transitive deps like `i18next` are
+# imported directly from apps/electron/src/renderer/* files (which are consumed
+# by the webui build via alias). Under isolated linker, those imports can't be
+# resolved from the webui build root.
+[install]
+linker = "hoisted"
