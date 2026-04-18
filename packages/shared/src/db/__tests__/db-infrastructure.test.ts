@@ -51,19 +51,19 @@ describe('DB Infrastructure', () => {
     // Verify migration tracking table exists
     const migrations = db.all<{ name: string }>(sql`SELECT name FROM _migrations`);
     expect(migrations.length).toBeGreaterThan(0);
-    expect(migrations[0].name).toBe('0000_initial');
+    expect(migrations[0]!.name).toBe('0000_initial');
   });
 
   test('applies WAL pragma', async () => {
     const db = getWorkspaceDb(testDir);
     const result = db.all<{ journal_mode: string }>(sql`PRAGMA journal_mode`);
-    expect(result[0].journal_mode).toBe('wal');
+    expect(result[0]!.journal_mode).toBe('wal');
   });
 
   test('applies foreign_keys pragma', async () => {
     const db = getWorkspaceDb(testDir);
     const result = db.all<{ foreign_keys: number }>(sql`PRAGMA foreign_keys`);
-    expect(result[0].foreign_keys).toBe(1);
+    expect(result[0]!.foreign_keys).toBe(1);
   });
 
   test('returns cached connection on second call', async () => {
@@ -103,10 +103,10 @@ describe('Statuses table', () => {
     // Read
     const rows = db.select().from(statuses).all();
     expect(rows).toHaveLength(1);
-    expect(rows[0].id).toBe('todo');
-    expect(rows[0].label).toBe('Todo');
-    expect(rows[0].category).toBe('open');
-    expect(rows[0].isFixed).toBe(true);
+    expect(rows[0]!.id).toBe('todo');
+    expect(rows[0]!.label).toBe('Todo');
+    expect(rows[0]!.category).toBe('open');
+    expect(rows[0]!.isFixed).toBe(true);
 
     // Update
     db.update(statuses).set({ label: 'To Do' }).where(eq(statuses.id, 'todo')).run();
@@ -203,8 +203,8 @@ describe('Sessions and Messages tables', () => {
       .orderBy(messages.position)
       .all();
     expect(msgs).toHaveLength(2);
-    expect((msgs[0].content as { text: string }).text).toBe('Hello');
-    expect((msgs[1].content as { text: string }).text).toBe('Hi!');
+    expect((msgs[0]!.content as { text: string }).text).toBe('Hello');
+    expect((msgs[1]!.content as { text: string }).text).toBe('Hi!');
   });
 
   test('cascade deletes messages when session is deleted', async () => {
