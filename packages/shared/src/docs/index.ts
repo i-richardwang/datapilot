@@ -120,7 +120,7 @@ export const DOC_REFS = {
   imagePreview: `${APP_ROOT}/docs/image-preview.md`,
   llmTool: `${APP_ROOT}/docs/llm-tool.md`,
   browserTools: `${APP_ROOT}/docs/browser-tools.md`,
-  craftCli: `${APP_ROOT}/docs/datapilot-cli.md`,
+  datapilotCli: `${APP_ROOT}/docs/datapilot-cli.md`,
   docsDir: `${APP_ROOT}/docs/`,
 } as const;
 

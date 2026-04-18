@@ -539,7 +539,7 @@ ${!FEATURE_FLAGS.disableValidation ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When
 | Image Preview | \`${DOC_REFS.imagePreview}\` | When displaying local image files inline |${!FEATURE_FLAGS.disableBrowser ? `
 | Browser Tools | \`${DOC_REFS.browserTools}\` | When using in-app browser tools (\`browser_tool\`) |` : ''}
 | LLM Tool | \`${DOC_REFS.llmTool}\` | When using \`call_llm\` for subtasks |
-| DataPilot CLI | \`${DOC_REFS.craftCli}\` | When managing labels/sources/skills/automations via \`datapilot\` |
+| DataPilot CLI | \`${DOC_REFS.datapilotCli}\` | When managing labels/sources/skills/automations via \`datapilot\` |
 
 **IMPORTANT:** Always read the relevant doc file BEFORE making changes. Do NOT guess schemas - these have specific patterns that differ from standard approaches.`}${!isBatch ? `
 
@@ -559,7 +559,7 @@ ${!FEATURE_FLAGS.disableValidation ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When
 - Sessions: \`datapilot session --help\` (incl. \`session share <id>\`)
 - HTML sharing: \`datapilot session share-html --help\`
 - Workspaces: \`datapilot workspace --help\`
-- Canonical reference: \`${DOC_REFS.craftCli}\`` : ''}
+- Canonical reference: \`${DOC_REFS.datapilotCli}\`` : ''}
 
 ${!isBatch ? `## User preferences
 
