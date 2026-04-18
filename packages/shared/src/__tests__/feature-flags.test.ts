@@ -1,13 +1,11 @@
 import { describe, it, expect, afterEach } from 'bun:test';
-import { FEATURE_FLAGS, isDevRuntime, isDeveloperFeedbackEnabled, isCraftAgentsCliEnabled, isEmbeddedServerEnabled, isUnifiedCliEnabled } from '../feature-flags.ts';
+import { isDevRuntime, isDeveloperFeedbackEnabled, isEmbeddedServerEnabled } from '../feature-flags.ts';
 
 const ORIGINAL_ENV = {
   NODE_ENV: process.env.NODE_ENV,
   DATAPILOT_DEBUG: process.env.DATAPILOT_DEBUG,
   CRAFT_FEATURE_DEVELOPER_FEEDBACK: process.env.CRAFT_FEATURE_DEVELOPER_FEEDBACK,
-  CRAFT_FEATURE_CRAFT_AGENTS_CLI: process.env.CRAFT_FEATURE_CRAFT_AGENTS_CLI,
   CRAFT_FEATURE_EMBEDDED_SERVER: process.env.CRAFT_FEATURE_EMBEDDED_SERVER,
-  DATAPILOT_UNIFIED_CLI: process.env.DATAPILOT_UNIFIED_CLI,
 };
 
 afterEach(() => {
@@ -20,14 +18,8 @@ afterEach(() => {
   if (ORIGINAL_ENV.CRAFT_FEATURE_DEVELOPER_FEEDBACK === undefined) delete process.env.CRAFT_FEATURE_DEVELOPER_FEEDBACK;
   else process.env.CRAFT_FEATURE_DEVELOPER_FEEDBACK = ORIGINAL_ENV.CRAFT_FEATURE_DEVELOPER_FEEDBACK;
 
-  if (ORIGINAL_ENV.CRAFT_FEATURE_CRAFT_AGENTS_CLI === undefined) delete process.env.CRAFT_FEATURE_CRAFT_AGENTS_CLI;
-  else process.env.CRAFT_FEATURE_CRAFT_AGENTS_CLI = ORIGINAL_ENV.CRAFT_FEATURE_CRAFT_AGENTS_CLI;
-
   if (ORIGINAL_ENV.CRAFT_FEATURE_EMBEDDED_SERVER === undefined) delete process.env.CRAFT_FEATURE_EMBEDDED_SERVER;
   else process.env.CRAFT_FEATURE_EMBEDDED_SERVER = ORIGINAL_ENV.CRAFT_FEATURE_EMBEDDED_SERVER;
-
-  if (ORIGINAL_ENV.DATAPILOT_UNIFIED_CLI === undefined) delete process.env.DATAPILOT_UNIFIED_CLI;
-  else process.env.DATAPILOT_UNIFIED_CLI = ORIGINAL_ENV.DATAPILOT_UNIFIED_CLI;
 });
 
 describe('feature-flags runtime helpers', () => {
@@ -68,24 +60,6 @@ describe('feature-flags runtime helpers', () => {
     expect(isDeveloperFeedbackEnabled()).toBe(true);
   });
 
-  it('isCraftAgentsCliEnabled defaults to true when no override is set', () => {
-    delete process.env.CRAFT_FEATURE_CRAFT_AGENTS_CLI;
-
-    expect(isCraftAgentsCliEnabled()).toBe(true);
-  });
-
-  it('isCraftAgentsCliEnabled honors explicit override true', () => {
-    process.env.CRAFT_FEATURE_CRAFT_AGENTS_CLI = '1';
-
-    expect(isCraftAgentsCliEnabled()).toBe(true);
-  });
-
-  it('isCraftAgentsCliEnabled honors explicit override false', () => {
-    process.env.CRAFT_FEATURE_CRAFT_AGENTS_CLI = '0';
-
-    expect(isCraftAgentsCliEnabled()).toBe(false);
-  });
-
   it('isEmbeddedServerEnabled defaults to false when no override is set', () => {
     delete process.env.CRAFT_FEATURE_EMBEDDED_SERVER;
 
@@ -102,33 +76,5 @@ describe('feature-flags runtime helpers', () => {
     process.env.CRAFT_FEATURE_EMBEDDED_SERVER = '0';
 
     expect(isEmbeddedServerEnabled()).toBe(false);
-  });
-
-  it('isUnifiedCliEnabled defaults to true when no override is set', () => {
-    delete process.env.DATAPILOT_UNIFIED_CLI;
-
-    expect(isUnifiedCliEnabled()).toBe(true);
-  });
-
-  it('isUnifiedCliEnabled honors explicit override true (1, true, yes, on)', () => {
-    for (const truthy of ['1', 'true', 'yes', 'on']) {
-      process.env.DATAPILOT_UNIFIED_CLI = truthy;
-      expect(isUnifiedCliEnabled()).toBe(true);
-    }
-  });
-
-  it('isUnifiedCliEnabled honors explicit override false (0, false, no, off) as legacy fallback', () => {
-    for (const falsy of ['0', 'false', 'no', 'off']) {
-      process.env.DATAPILOT_UNIFIED_CLI = falsy;
-      expect(isUnifiedCliEnabled()).toBe(false);
-    }
-  });
-
-  it('FEATURE_FLAGS.unifiedCli mirrors isUnifiedCliEnabled()', () => {
-    delete process.env.DATAPILOT_UNIFIED_CLI;
-    expect(FEATURE_FLAGS.unifiedCli).toBe(true);
-
-    process.env.DATAPILOT_UNIFIED_CLI = '0';
-    expect(FEATURE_FLAGS.unifiedCli).toBe(false);
   });
 });

@@ -30,11 +30,8 @@ files:
   - packages/shared/src/interceptor-request-utils.ts
   # Include CLI tool Python scripts (platform-independent)
   - resources/scripts/**/*
-  # Include DataPilot CLI (compiled bundles + wrapper scripts for agent Bash sessions)
-  # The wrapper defaults to resources/datapilot-cli/index.js (unified, DEV-22);
-  # resources/craft-cli/index.js stays as the DATAPILOT_UNIFIED_CLI=0 escape hatch.
-  - resources/craft-cli/**/*
-  - resources/datapilot-cli/**/*
+  # Include DataPilot CLI (compiled bundle + wrapper scripts for agent Bash sessions)
+  - resources/cli/**/*
   - resources/bin/datapilot
   - resources/bin/datapilot.cmd
   # Include CLI tool shell wrappers (platform-independent, both Unix and Windows)

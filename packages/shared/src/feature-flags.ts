@@ -38,17 +38,6 @@ export function isDeveloperFeedbackEnabled(): boolean {
 }
 
 /**
- * Runtime-evaluated check for craft-agents-cli integration.
- *
- * Defaults to enabled. Override with CRAFT_FEATURE_CRAFT_AGENTS_CLI=1|0.
- */
-export function isCraftAgentsCliEnabled(): boolean {
-  const override = parseBooleanEnv(getEnv('CRAFT_FEATURE_CRAFT_AGENTS_CLI'));
-  if (override !== undefined) return override;
-  return true;
-}
-
-/**
  * Runtime-evaluated check for embedded server settings page.
  *
  * Defaults to disabled. Override with CRAFT_FEATURE_EMBEDDED_SERVER=1|0.
@@ -57,25 +46,6 @@ export function isEmbeddedServerEnabled(): boolean {
   const override = parseBooleanEnv(getEnv('CRAFT_FEATURE_EMBEDDED_SERVER'));
   if (override !== undefined) return override;
   return false;
-}
-
-/**
- * Runtime-evaluated check for routing agent `datapilot` invocations to the
- * unified CLI binary (apps/cli/src/datapilot.ts) instead of the legacy
- * craft-cli binary (packages/craft-cli/src/index.ts).
- *
- * Defaults to enabled — the unified binary is the default agent CLI surface.
- * Set DATAPILOT_UNIFIED_CLI=0 to fall back to the legacy craft-cli for one
- * release cycle (the escape hatch is removed in a follow-up phase).
- *
- * Consumers: the `datapilot` wrapper script (apps/electron/resources/bin/)
- * branches between `DATAPILOT_UNIFIED_CLI_ENTRY` (unified, default) and
- * `DATAPILOT_CLI_ENTRY` (legacy fallback) based on this flag.
- */
-export function isUnifiedCliEnabled(): boolean {
-  const override = parseBooleanEnv(getEnv('DATAPILOT_UNIFIED_CLI'));
-  if (override !== undefined) return override;
-  return true;
 }
 
 /**
@@ -151,14 +121,6 @@ export const FEATURE_FLAGS = {
   get developerFeedback(): boolean {
     return isDeveloperFeedbackEnabled();
   },
-  /**
-   * Enable datapilot CLI guidance and guardrails (all entities including batch).
-   *
-   * Defaults to enabled. Override with CRAFT_FEATURE_CRAFT_AGENTS_CLI=1|0.
-   */
-  get craftAgentsCli(): boolean {
-    return isCraftAgentsCliEnabled();
-  },
   /** Disable OAuth provider tools and onboarding options. */
   get disableOauth(): boolean {
     return isOauthDisabled();
@@ -186,14 +148,5 @@ export const FEATURE_FLAGS = {
    */
   get embeddedServer(): boolean {
     return isEmbeddedServerEnabled();
-  },
-  /**
-   * Route agent `datapilot` invocations to the unified CLI binary instead of
-   * the legacy craft-cli binary.
-   *
-   * Defaults to enabled. Set DATAPILOT_UNIFIED_CLI=0 to fall back to legacy.
-   */
-  get unifiedCli(): boolean {
-    return isUnifiedCliEnabled();
   },
 } as const;

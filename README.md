@@ -96,40 +96,30 @@ docker run -d \
 DATAPILOT_SERVER_URL=wss://your-server:9100 DATAPILOT_SERVER_TOKEN=<token> bun run electron:start
 ```
 
-## CLI Client
+## DataPilot CLI
 
-A terminal client for scripting, CI/CD pipelines, and command-line workflows.
-
-```bash
-# Self-contained run (spawns its own server)
-datapilot-cli run "Summarize the README"
-datapilot-cli run --workspace-dir ./my-project --source github "List open PRs"
-
-# Multi-provider support
-datapilot-cli run --provider openai --model gpt-4o "Summarize this repo"
-datapilot-cli run --provider google --model gemini-2.0-flash "Hello"
-
-# Connect to a running server
-export DATAPILOT_SERVER_URL=ws://127.0.0.1:9100
-export DATAPILOT_SERVER_TOKEN=<token>
-datapilot-cli sessions
-datapilot-cli send <session-id> "What files changed today?"
-```
-
-See `datapilot-cli --help` for the full command reference.
-
-## DataPilot CLI (Workspace Tool)
-
-A local CLI tool (`datapilot`) for managing workspace entities directly from the terminal or from within agent sessions:
+The `datapilot` binary is the unified CLI for the DataPilot server. It covers
+workspace entities (labels, sources, skills, automations, permissions, themes,
+batches) as well as session lifecycle, workspace management, server control,
+and event tailing.
 
 ```bash
+# Workspace entities
 datapilot source list                    # List configured sources
 datapilot skill get my-skill             # View a skill definition
 datapilot label create --name "urgent"   # Create a label
 datapilot batch list                     # List batch jobs
 datapilot automation list                # List automations
 datapilot batch status <id> --items      # Batch progress with item details
+
+# Session lifecycle (connect to a running server)
+export DATAPILOT_SERVER_URL=ws://127.0.0.1:9100
+export DATAPILOT_SERVER_TOKEN=<token>
+datapilot session list
+datapilot session send <session-id> "What files changed today?"
 ```
+
+See `datapilot --help` for the full command reference.
 
 ## Supported LLM Providers
 
@@ -164,7 +154,7 @@ bun run electron:dist:mac
 ```
 datapilot/
 ├── apps/
-│   ├── cli/                   # Terminal client (CLI)
+│   ├── cli/                   # Unified `datapilot` CLI
 │   ├── webui/                 # Web UI (thin client)
 │   └── electron/              # Desktop GUI
 │       └── src/
@@ -176,7 +166,6 @@ datapilot/
     ├── shared/                # Business logic
     ├── server/                # Headless server
     ├── server-core/           # Server RPC handlers
-    ├── craft-cli/             # Workspace CLI tool
     └── session-tools-core/    # Session tool framework
 ```
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * datapilot-cli — Terminal client for Craft Agent server.
+ * Internal terminal helper for the DataPilot server (run via `bun run`).
  *
  * Connects over WebSocket (ws:// or wss://) to a running Craft Agent server
  * and provides commands for listing resources, managing sessions, sending
@@ -1336,7 +1336,7 @@ export function getValidateSteps(): ValidateStep[] {
 mkdir -p "${skillDir}" && cat > "${skillDir}/SKILL.md" << 'SKILLEOF'
 ---
 name: "CLI Validate Skill"
-description: "Validation skill created by datapilot-cli"
+description: "Validation skill created by the CLI validate-server flow"
 requiredSources:
   - "${sourceSlug}"
 ---
@@ -1851,9 +1851,9 @@ export async function runValidation(
 // ---------------------------------------------------------------------------
 
 function printHelp(): void {
-  process.stdout.write(`datapilot-cli — Terminal client for DataPilot server
+  process.stdout.write(`datapilot run — internal terminal helper for the DataPilot server
 
-Usage: datapilot-cli [options] <command> [args...]
+Usage: bun run apps/cli/src/index.ts [options] <command> [args...]
 
 Connection:
   --url <ws[s]://...>    Server URL (default: $DATAPILOT_SERVER_URL)
@@ -1896,20 +1896,20 @@ Commands:
                          --verbose, -v       Show server stderr output
 
 Examples:
-  datapilot-cli run "What files are in the current directory?"
-  datapilot-cli run --source craft-kb "Summarize today's daily note"
-  datapilot-cli run --workspace-dir .github/agents --source craft-public "Read the doc"
-  datapilot-cli run --provider openai --model gpt-4o "Summarize this repo"
-  OPENAI_API_KEY=sk-... datapilot-cli run --provider openai "Hello"
-  GOOGLE_API_KEY=... datapilot-cli run --provider google --model gemini-2.0-flash "Hello"
-  echo "Analyze this code" | datapilot-cli run
-  datapilot-cli ping
-  datapilot-cli sessions
-  datapilot-cli send abc-123 "What files are in the current directory?"
-  echo "Summarize this" | datapilot-cli send abc-123
-  datapilot-cli --validate-server
-  datapilot-cli invoke system:homeDir
-  datapilot-cli --json workspaces | jq '.[].name'
+  bun run apps/cli/src/index.ts run "What files are in the current directory?"
+  bun run apps/cli/src/index.ts run --source craft-kb "Summarize today's daily note"
+  bun run apps/cli/src/index.ts run --workspace-dir .github/agents --source craft-public "Read the doc"
+  bun run apps/cli/src/index.ts run --provider openai --model gpt-4o "Summarize this repo"
+  OPENAI_API_KEY=sk-... bun run apps/cli/src/index.ts run --provider openai "Hello"
+  GOOGLE_API_KEY=... bun run apps/cli/src/index.ts run --provider google --model gemini-2.0-flash "Hello"
+  echo "Analyze this code" | bun run apps/cli/src/index.ts run
+  bun run apps/cli/src/index.ts ping
+  bun run apps/cli/src/index.ts sessions
+  bun run apps/cli/src/index.ts send abc-123 "What files are in the current directory?"
+  echo "Summarize this" | bun run apps/cli/src/index.ts send abc-123
+  bun run apps/cli/src/index.ts --validate-server
+  bun run apps/cli/src/index.ts invoke system:homeDir
+  bun run apps/cli/src/index.ts --json workspaces | jq '.[].name'
 `)
 }
 

@@ -32,7 +32,6 @@ import {
   DATAPILOT_CLI_WORKSPACE_SCOPE_ENTRIES,
   type CliDomainNamespace,
 } from '../../config/cli-domains.ts';
-import { FEATURE_FLAGS } from '../../feature-flags.ts';
 import { AGENTS_PLUGIN_NAME } from '../../skills/types.ts';
 import { GLOBAL_AGENT_SKILLS_DIR, PROJECT_AGENT_SKILLS_DIR } from '../../skills/storage.ts';
 import {
@@ -469,11 +468,6 @@ function detectCliNamespaceFromConfigDetection(detection: ConfigFileDetection): 
   return null
 }
 
-/** @deprecated Use FEATURE_FLAGS.craftAgentsCli directly. Kept for call-site compat. */
-export interface CliFeatureFlags {
-  craftAgentsCli: boolean;
-}
-
 /**
  * For selected config domains, enforce CLI usage instead of direct file operations.
  * - labels/**: strict block on Read/Write/Edit
@@ -487,11 +481,10 @@ export function getConfigCliRedirect(
   input: Record<string, unknown>,
   workspaceRootPath: string,
   workingDirectory?: string,
-  flags?: CliFeatureFlags,
 ): { message: string } | null {
   const filePath = input.file_path as string | undefined;
 
-  if ((!flags || flags.craftAgentsCli) && filePath && LABELS_BLOCKED_FILE_TOOLS.has(toolName)) {
+  if (filePath && LABELS_BLOCKED_FILE_TOOLS.has(toolName)) {
     const relativePath = getWorkspaceRelativePath(filePath, workspaceRootPath, workingDirectory)
     if (relativePath) {
       const labelsScopeMatch = DATAPILOT_CLI_WORKSPACE_SCOPE_ENTRIES.find(
@@ -518,9 +511,6 @@ export function getConfigCliRedirect(
   const namespace = detectCliNamespaceFromConfigDetection(detection)
   if (!namespace) return null
 
-  // Skip redirect if the controlling flag for this namespace is off
-  if (flags && !flags.craftAgentsCli) return null
-
   return {
     message: buildCliDomainBlockMessage(
       namespace,
@@ -530,14 +520,13 @@ export function getConfigCliRedirect(
 }
 
 /**
- * Block bash commands that operate on guarded config paths unless they use craft-agent commands.
+ * Block bash commands that operate on guarded config paths unless they use the datapilot CLI.
  * Current guarded domains in Bash are declared in shared CLI domain policy.
  */
 export function getConfigDomainBashRedirect(
   input: Record<string, unknown>,
   workspaceRootPath: string,
   workingDirectory?: string,
-  flags?: CliFeatureFlags,
 ): { message: string } | null {
   const command = typeof input.command === 'string' ? input.command.trim() : '';
   if (!command) return null;
@@ -567,7 +556,6 @@ export function getConfigDomainBashRedirect(
 
     for (const entry of bashGuardEntries) {
       if (!matchesPathScope(relativePath, entry.scope)) continue
-      if (flags && !flags.craftAgentsCli) continue
 
       const context = entry.namespace === 'label'
         ? 'Direct Bash operations targeting the workspace labels/ folder are blocked.'
@@ -823,9 +811,8 @@ export function runPreToolUseChecks(ctx: PreToolUseInput): PreToolUseCheckResult
   }
 
   // 5b. Config-domain Bash guard (block direct config path operations unless using CLI tools)
-  const cliFlags: CliFeatureFlags = { craftAgentsCli: FEATURE_FLAGS.craftAgentsCli };
-  if (cliFlags.craftAgentsCli && toolName === 'Bash') {
-    const configDomainBashRedirect = getConfigDomainBashRedirect(currentInput, workspaceRootPath, workingDirectory, cliFlags);
+  if (toolName === 'Bash') {
+    const configDomainBashRedirect = getConfigDomainBashRedirect(currentInput, workspaceRootPath, workingDirectory);
     if (configDomainBashRedirect) {
       return { type: 'block', reason: configDomainBashRedirect.message };
     }
@@ -838,11 +825,9 @@ export function runPreToolUseChecks(ctx: PreToolUseInput): PreToolUseCheckResult
   }
 
   // 5d. Config file CLI redirect (labels + automations + batches)
-  if (cliFlags.craftAgentsCli) {
-    const cliRedirect = getConfigCliRedirect(toolName, currentInput, workspaceRootPath, workingDirectory, cliFlags);
-    if (cliRedirect) {
-      return { type: 'block', reason: cliRedirect.message };
-    }
+  const cliRedirect = getConfigCliRedirect(toolName, currentInput, workspaceRootPath, workingDirectory);
+  if (cliRedirect) {
+    return { type: 'block', reason: cliRedirect.message };
   }
 
   // 5e. Skill qualification

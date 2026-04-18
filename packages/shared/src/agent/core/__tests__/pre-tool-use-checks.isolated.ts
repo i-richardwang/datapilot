@@ -82,12 +82,8 @@ mock.module('../../../skills/storage.ts', () => ({
   PROJECT_AGENT_SKILLS_DIR: '.agents/skills',
 }));
 
-let mockCraftAgentsCliFlag = false;
 mock.module('../../../feature-flags.ts', () => ({
   FEATURE_FLAGS: {
-    get craftAgentsCli() {
-      return mockCraftAgentsCliFlag;
-    },
     get developerFeedback() {
       return false;
     },
@@ -166,7 +162,6 @@ describe('runPreToolUseChecks', () => {
     mockValidateConfigFileContent.mockReset();
     mockValidateConfigFileContent.mockImplementation(() => null);
     mockReadOnlyBashPatterns = [];
-    mockCraftAgentsCliFlag = false;
   });
 
   // ============================================================
@@ -413,10 +408,6 @@ describe('runPreToolUseChecks', () => {
   // ============================================================
 
   describe('step 5: input transforms', () => {
-    beforeEach(() => {
-      mockCraftAgentsCliFlag = true;
-    });
-
     it('expands tilde paths and returns modify', () => {
       const result = runPreToolUseChecks(createInput({
         toolName: 'Read',
@@ -467,9 +458,7 @@ describe('runPreToolUseChecks', () => {
       }
     });
 
-    it('blocks direct label folder reads and suggests craft-agent label help when feature is enabled', () => {
-      mockCraftAgentsCliFlag = true;
-
+    it('blocks direct label folder reads and suggests datapilot label help', () => {
       const result = runPreToolUseChecks(createInput({
         toolName: 'Read',
         input: { file_path: '/test/workspace/labels/config.json' },
@@ -477,14 +466,13 @@ describe('runPreToolUseChecks', () => {
 
       expect(result.type).toBe('block');
       if (result.type === 'block') {
-        expect(result.reason).toContain('craft-agent label');
-        expect(result.reason).toContain('craft-agent label --help');
+        expect(result.reason).toContain('datapilot label');
+        expect(result.reason).toContain('datapilot label --help');
         expect(result.reason).toContain('labels/');
       }
     });
 
-    it('blocks direct label config writes and suggests craft-agent label help when feature is enabled', () => {
-      mockCraftAgentsCliFlag = true;
+    it('blocks direct label config writes and suggests datapilot label help', () => {
       mockDetectConfigFileType.mockImplementation(() => ({ type: 'labels', displayFile: 'labels/config.json' }));
 
       const result = runPreToolUseChecks(createInput({
@@ -494,49 +482,12 @@ describe('runPreToolUseChecks', () => {
 
       expect(result.type).toBe('block');
       if (result.type === 'block') {
-        expect(result.reason).toContain('craft-agent label');
-        expect(result.reason).toContain('craft-agent label --help');
+        expect(result.reason).toContain('datapilot label');
+        expect(result.reason).toContain('datapilot label --help');
       }
     });
 
-    it('does not apply config-file CLI redirect when feature is disabled', () => {
-      mockCraftAgentsCliFlag = false;
-      mockDetectConfigFileType.mockImplementation(() => ({ type: 'labels', displayFile: 'labels/config.json' }));
-
-      const result = runPreToolUseChecks(createInput({
-        toolName: 'Write',
-        input: { file_path: '/test/workspace/labels/config.json', content: '{}' },
-      }));
-
-      expect(result.type).toBe('allow');
-    });
-
-    it('does not block label config writes when feature is disabled', () => {
-      mockCraftAgentsCliFlag = false;
-      mockDetectConfigFileType.mockImplementation(() => ({ type: 'labels', displayFile: 'labels/config.json' }));
-
-      const result = runPreToolUseChecks(createInput({
-        toolName: 'Write',
-        input: { file_path: '/test/workspace/labels/config.json', content: '{}' },
-      }));
-
-      expect(result.type).toBe('allow');
-    });
-
-    it('does not block bash commands touching automations files when feature is disabled', () => {
-      mockCraftAgentsCliFlag = false;
-
-      const result = runPreToolUseChecks(createInput({
-        toolName: 'Bash',
-        input: { command: 'python3 scripts/update.py automations.json' },
-        permissionMode: 'allow-all',
-      }));
-
-      expect(result.type).toBe('allow');
-    });
-
-    it('blocks direct automations config edits and suggests craft-agent automation commands when feature is enabled', () => {
-      mockCraftAgentsCliFlag = true;
+    it('blocks direct automations config edits and suggests datapilot automation commands', () => {
       mockDetectConfigFileType.mockImplementation(() => ({ type: 'automations', displayFile: 'automations.json' }));
 
       const result = runPreToolUseChecks(createInput({
@@ -550,13 +501,12 @@ describe('runPreToolUseChecks', () => {
 
       expect(result.type).toBe('block');
       if (result.type === 'block') {
-        expect(result.reason).toContain('craft-agent automation');
+        expect(result.reason).toContain('datapilot automation');
         expect(result.reason).toContain('automations.json');
       }
     });
 
-    it('blocks direct source config edits and suggests craft-agent source commands when feature is enabled', () => {
-      mockCraftAgentsCliFlag = true;
+    it('blocks direct source config edits and suggests datapilot source commands', () => {
       mockDetectConfigFileType.mockImplementation(() => ({
         type: 'source',
         slug: 'linear',
@@ -574,13 +524,12 @@ describe('runPreToolUseChecks', () => {
 
       expect(result.type).toBe('block');
       if (result.type === 'block') {
-        expect(result.reason).toContain('craft-agent source');
+        expect(result.reason).toContain('datapilot source');
         expect(result.reason).toContain('sources/linear/config.json');
       }
     });
 
-    it('blocks direct skill file edits and suggests craft-agent skill commands when feature is enabled', () => {
-      mockCraftAgentsCliFlag = true;
+    it('blocks direct skill file edits and suggests datapilot skill commands', () => {
       mockDetectConfigFileType.mockImplementation(() => ({
         type: 'skill',
         slug: 'commit-helper',
@@ -598,14 +547,12 @@ describe('runPreToolUseChecks', () => {
 
       expect(result.type).toBe('block');
       if (result.type === 'block') {
-        expect(result.reason).toContain('craft-agent skill');
+        expect(result.reason).toContain('datapilot skill');
         expect(result.reason).toContain('skills/commit-helper/SKILL.md');
       }
     });
 
-    it('blocks bash commands touching labels paths and points to craft-agent label --help when feature is enabled', () => {
-      mockCraftAgentsCliFlag = true;
-
+    it('blocks bash commands touching labels paths and points to datapilot label --help', () => {
       const result = runPreToolUseChecks(createInput({
         toolName: 'Bash',
         input: { command: 'python3 scripts/update.py labels/config.json' },
@@ -614,24 +561,22 @@ describe('runPreToolUseChecks', () => {
 
       expect(result.type).toBe('block');
       if (result.type === 'block') {
-        expect(result.reason).toContain('craft-agent label --help');
-        expect(result.reason).toContain('craft-agent label');
+        expect(result.reason).toContain('datapilot label --help');
+        expect(result.reason).toContain('datapilot label');
       }
     });
 
-    it('allows bash craft-agent label commands through labels guard', () => {
+    it('allows bash datapilot label commands through labels guard', () => {
       const result = runPreToolUseChecks(createInput({
         toolName: 'Bash',
-        input: { command: 'craft-agent label list' },
+        input: { command: 'datapilot label list' },
         permissionMode: 'allow-all',
       }));
 
       expect(result.type).toBe('allow');
     });
 
-    it('blocks bash commands touching automations files and points to craft-agent automation --help when feature is enabled', () => {
-      mockCraftAgentsCliFlag = true;
-
+    it('blocks bash commands touching automations files and points to datapilot automation --help', () => {
       const result = runPreToolUseChecks(createInput({
         toolName: 'Bash',
         input: { command: 'python3 scripts/update.py automations.json' },
@@ -640,27 +585,15 @@ describe('runPreToolUseChecks', () => {
 
       expect(result.type).toBe('block');
       if (result.type === 'block') {
-        expect(result.reason).toContain('craft-agent automation --help');
-        expect(result.reason).toContain('craft-agent automation');
+        expect(result.reason).toContain('datapilot automation --help');
+        expect(result.reason).toContain('datapilot automation');
       }
     });
 
-    it('allows bash craft-agent automation commands through config-domain bash guard', () => {
+    it('allows bash datapilot automation commands through config-domain bash guard', () => {
       const result = runPreToolUseChecks(createInput({
         toolName: 'Bash',
-        input: { command: 'craft-agent automation list' },
-        permissionMode: 'allow-all',
-      }));
-
-      expect(result.type).toBe('allow');
-    });
-
-    it('does not apply config-domain bash guard when feature is disabled', () => {
-      mockCraftAgentsCliFlag = false;
-
-      const result = runPreToolUseChecks(createInput({
-        toolName: 'Bash',
-        input: { command: 'python3 scripts/update.py automations.json' },
+        input: { command: 'datapilot automation list' },
         permissionMode: 'allow-all',
       }));
 
@@ -930,7 +863,6 @@ describe('shouldPromptInAskMode', () => {
     mockValidateConfigFileContent.mockReset();
     mockValidateConfigFileContent.mockImplementation(() => null);
     mockReadOnlyBashPatterns = [];
-    mockCraftAgentsCliFlag = false;
   });
 
   // --- File writes ---

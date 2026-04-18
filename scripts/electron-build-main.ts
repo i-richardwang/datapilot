@@ -17,10 +17,9 @@ const SESSION_SERVER_DIR = join(ROOT_DIR, "packages/session-mcp-server");
 const SESSION_SERVER_OUTPUT = join(SESSION_SERVER_DIR, "dist/index.js");
 const PI_AGENT_SERVER_DIR = join(ROOT_DIR, "packages/pi-agent-server");
 const PI_AGENT_SERVER_OUTPUT = join(PI_AGENT_SERVER_DIR, "dist/index.js");
-const DATAPILOT_CLI_DIR = join(ROOT_DIR, "packages/craft-cli");
-const DATAPILOT_CLI_OUTPUT = join(DATAPILOT_CLI_DIR, "dist/index.js");
-const UNIFIED_CLI_DIR = join(ROOT_DIR, "apps/cli");
-const UNIFIED_CLI_OUTPUT = join(UNIFIED_CLI_DIR, "dist/datapilot.js");
+const DATAPILOT_CLI_DIR = join(ROOT_DIR, "apps/cli");
+const DATAPILOT_CLI_SRC = join(DATAPILOT_CLI_DIR, "src/datapilot.ts");
+const DATAPILOT_CLI_OUTPUT = join(DATAPILOT_CLI_DIR, "dist/datapilot.js");
 
 // Load .env file if it exists
 function loadEnvFile(): void {
@@ -269,11 +268,11 @@ async function buildCraftCli(): Promise<void> {
   }
 
   // Use --target=bun so bun:sqlite resolves at runtime (builtin module).
-  // Use --format=esm since craft-cli uses top-level await.
+  // Use --format=esm since the CLI uses top-level await.
   const proc = spawn({
     cmd: [
       "bun", "build",
-      join(DATAPILOT_CLI_DIR, "src/index.ts"),
+      DATAPILOT_CLI_SRC,
       "--outfile", DATAPILOT_CLI_OUTPUT,
       "--target", "bun",
       "--format", "esm",
@@ -286,58 +285,17 @@ async function buildCraftCli(): Promise<void> {
   const exitCode = await proc.exited;
 
   if (exitCode !== 0) {
-    console.error("❌ Craft CLI build failed with exit code", exitCode);
+    console.error("❌ DataPilot CLI build failed with exit code", exitCode);
     process.exit(exitCode);
   }
 
   // Verify output exists
   if (!existsSync(DATAPILOT_CLI_OUTPUT)) {
-    console.error("❌ Craft CLI output not found at", DATAPILOT_CLI_OUTPUT);
+    console.error("❌ DataPilot CLI output not found at", DATAPILOT_CLI_OUTPUT);
     process.exit(1);
   }
 
-  console.log("✅ Craft CLI built successfully");
-}
-
-// Build the unified DataPilot CLI (WebSocket thin client at apps/cli/src/datapilot.ts).
-// This is the default entry the `datapilot` wrapper dispatches to after Phase 5;
-// the legacy craft-cli bundle above stays as a one-release escape hatch.
-async function buildUnifiedCli(): Promise<void> {
-  console.log("🛰  Building unified DataPilot CLI...");
-
-  const distDir = join(UNIFIED_CLI_DIR, "dist");
-  if (!existsSync(distDir)) {
-    mkdirSync(distDir, { recursive: true });
-  }
-
-  // Match the craft-cli bundle profile (bun target / ESM) so the wrapper can
-  // run either entry through the same `bun run` invocation.
-  const proc = spawn({
-    cmd: [
-      "bun", "build",
-      join(UNIFIED_CLI_DIR, "src/datapilot.ts"),
-      "--outfile", UNIFIED_CLI_OUTPUT,
-      "--target", "bun",
-      "--format", "esm",
-    ],
-    cwd: ROOT_DIR,
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-
-  const exitCode = await proc.exited;
-
-  if (exitCode !== 0) {
-    console.error("❌ Unified CLI build failed with exit code", exitCode);
-    process.exit(exitCode);
-  }
-
-  if (!existsSync(UNIFIED_CLI_OUTPUT)) {
-    console.error("❌ Unified CLI output not found at", UNIFIED_CLI_OUTPUT);
-    process.exit(1);
-  }
-
-  console.log("✅ Unified CLI built successfully");
+  console.log("✅ DataPilot CLI built successfully");
 }
 
 async function main(): Promise<void> {
@@ -360,9 +318,6 @@ async function main(): Promise<void> {
 
   // Build DataPilot CLI (datapilot command for agent Bash sessions)
   await buildCraftCli();
-
-  // Build unified CLI (default datapilot binary after DEV-22 Phase 5)
-  await buildUnifiedCli();
 
   // Build unified network interceptor (CJS bundle for Node.js --require)
   await buildInterceptor();
