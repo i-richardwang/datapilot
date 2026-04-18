@@ -2,14 +2,14 @@
 # Craft Agents Server — multi-platform Docker image
 #
 # Build:
-#   docker buildx build -f Dockerfile.server -t craft-agent-server .
+#   docker buildx build -f Dockerfile.server -t datapilot-server .
 #
 # Run (use --user to match host UID/GID for volume permissions):
 #   docker run --rm -p 9100:9100 \
 #     --user $(id -u):$(id -g) \
 #     -e HOME=/home/craftagents \
 #     -e DATAPILOT_SERVER_TOKEN=<secret> \
-#     craft-agent-server
+#     datapilot-server
 #
 # Run with TLS + mounted config:
 #   docker run --rm -p 9100:9100 \
@@ -20,7 +20,7 @@
 #     -e DATAPILOT_RPC_TLS_KEY=/certs/key.pem \
 #     -v /path/to/certs:/certs:ro \
 #     -v ~/.datapilot:/home/craftagents/.datapilot \
-#     craft-agent-server
+#     datapilot-server
 # =============================================================================
 
 FROM oven/bun:1.3-slim
