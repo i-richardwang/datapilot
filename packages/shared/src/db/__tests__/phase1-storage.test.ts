@@ -130,7 +130,7 @@ describe('Statuses DB Storage', () => {
     const list = listStatuses(testDir);
     expect(list.length).toBeGreaterThanOrEqual(3);
     for (let i = 1; i < list.length; i++) {
-      expect(list[i].order).toBeGreaterThanOrEqual(list[i - 1].order);
+      expect(list[i]!.order).toBeGreaterThanOrEqual(list[i - 1]!.order);
     }
   });
 
@@ -171,9 +171,9 @@ describe('Labels DB Storage', () => {
     const custom = {
       version: 1,
       labels: [
-        { id: 'test', name: 'Test', color: { hue: 100, saturation: 50, lightness: 50 } },
-        { id: 'parent', name: 'Parent', color: { hue: 200, saturation: 60, lightness: 50 }, children: [
-          { id: 'child', name: 'Child', color: { hue: 210, saturation: 55, lightness: 50 } },
+        { id: 'test', name: 'Test', color: 'accent' as const },
+        { id: 'parent', name: 'Parent', color: 'info' as const, children: [
+          { id: 'child', name: 'Child', color: 'success' as const },
         ]},
       ],
     };
@@ -181,8 +181,8 @@ describe('Labels DB Storage', () => {
     saveLabelConfig(testDir, custom);
     const loaded = loadLabelConfig(testDir);
     expect(loaded.labels).toHaveLength(2);
-    expect(loaded.labels[1].children).toHaveLength(1);
-    expect(loaded.labels[1].children![0].id).toBe('child');
+    expect(loaded.labels[1]!.children).toHaveLength(1);
+    expect(loaded.labels[1]!.children![0]!.id).toBe('child');
   });
 
   test('listLabels returns root-level labels', () => {
@@ -249,8 +249,8 @@ describe('Views DB Storage', () => {
     saveViewsConfig(testDir, custom);
     const loaded = loadViewsConfig(testDir);
     expect(loaded.views).toHaveLength(2);
-    expect(loaded.views[0].id).toBe('flagged');
-    expect(loaded.views[1].expression).toBe('tokenUsage.costUsd > 1');
+    expect(loaded.views[0]!.id).toBe('flagged');
+    expect(loaded.views[1]!.expression).toBe('tokenUsage.costUsd > 1');
   });
 
   test('listViews returns views array', () => {
@@ -269,7 +269,7 @@ describe('Views DB Storage', () => {
     saveViews(testDir, newViews);
     const loaded = listViews(testDir);
     expect(loaded).toHaveLength(1);
-    expect(loaded[0].id).toBe('new-view');
+    expect(loaded[0]!.id).toBe('new-view');
   });
 });
 
