@@ -68,7 +68,7 @@ Won't conflict unless upstream adds similarly-named features.
 
 | Location | Purpose |
 |----------|---------|
-| `packages/craft-cli/` | 8 source files, 7 entities (label/source/automation/batch/skill/permission/theme) |
+| `apps/cli/` | 8 source files, 7 entities (label/source/automation/batch/skill/permission/theme) |
 | `apps/electron/resources/docs/datapilot-cli.md` | 475-line CLI specification document (agent reads via doc reference table) |
 
 ### Viewer Server & Docker
@@ -316,7 +316,7 @@ For each conflicting file, look it up in the "Modified Upstream Files" section a
 | System prompt CLI section | Must remain mandatory ("MUST use"), not soft ("Prefer") |
 | PreToolUse pipeline | Config domain bash guard and CLI redirect preserved |
 | New config domains | Add to `cli-domains.ts`, implement CLI commands, add PreToolUse guards |
-| Automations config format | Update `packages/craft-cli/src/commands/automation.ts` parsing |
+| Automations config format | Update `apps/cli/src/datapilot/commands/automation.ts` parsing |
 
 ### Step 5 — Post-Merge Verification
 
@@ -339,13 +339,13 @@ grep -rn 'CRAFT_SERVER_\|CRAFT_RPC_\|CRAFT_WEBUI_\|CRAFT_LITE_\|CRAFT_HEALTH_\|C
   --exclude="FORK_MERGE_GUIDE.md" --exclude-dir=node_modules --exclude-dir=.git . 2>/dev/null
 
 # CLI 二进制名
-grep -rn 'craft-cli\|craft-server\|craft-agent-batch' \
+grep -rn 'datapilot-cli\|craft-server\|craft-agent-batch' \
   --include="*.ts" --include="*.json" --include="*.md" \
   --exclude="FORK_MERGE_GUIDE.md" --exclude="SQLITE_MIGRATION_AND_CRAFT_CLI.md" \
   --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=release-notes . 2>/dev/null
 
 # 文档文件名引用
-grep -rn 'craft-cli\.md' --include="*.ts" --include="*.md" \
+grep -rn 'datapilot-cli\.md' --include="*.ts" --include="*.md" \
   --exclude-dir=node_modules --exclude-dir=.git . 2>/dev/null
 ```
 
@@ -364,9 +364,9 @@ grep -rn 'craft-cli\.md' --include="*.ts" --include="*.md" \
 #### 5b. SQLite/CLI Verification
 
 ```bash
-cd packages/craft-cli && bun run tsc --noEmit
-bun packages/craft-cli/src/index.ts --discover
-bun packages/craft-cli/src/index.ts label list
+cd apps/cli && bun run tsc --noEmit
+bun apps/cli/src/index.ts --discover
+bun apps/cli/src/index.ts label list
 cd packages/shared && bun test src/__tests__/feature-flags.test.ts
 ```
 
