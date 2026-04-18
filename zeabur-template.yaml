@@ -60,7 +60,7 @@ spec:
                   type: HTTP
             volumes:
                 - id: server-data
-                  dir: /home/craftagents/.datapilot
+                  dir: /home/datapilot/.datapilot
             instructions:
                 - type: PASSWORD
                   title: Server Token

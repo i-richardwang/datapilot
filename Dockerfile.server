@@ -7,19 +7,19 @@
 # Run (use --user to match host UID/GID for volume permissions):
 #   docker run --rm -p 9100:9100 \
 #     --user $(id -u):$(id -g) \
-#     -e HOME=/home/craftagents \
+#     -e HOME=/home/datapilot \
 #     -e DATAPILOT_SERVER_TOKEN=<secret> \
 #     datapilot-server
 #
 # Run with TLS + mounted config:
 #   docker run --rm -p 9100:9100 \
 #     --user $(id -u):$(id -g) \
-#     -e HOME=/home/craftagents \
+#     -e HOME=/home/datapilot \
 #     -e DATAPILOT_SERVER_TOKEN=<secret> \
 #     -e DATAPILOT_RPC_TLS_CERT=/certs/cert.pem \
 #     -e DATAPILOT_RPC_TLS_KEY=/certs/key.pem \
 #     -v /path/to/certs:/certs:ro \
-#     -v ~/.datapilot:/home/craftagents/.datapilot \
+#     -v ~/.datapilot:/home/datapilot/.datapilot \
 #     datapilot-server
 # =============================================================================
 
@@ -39,8 +39,8 @@ RUN apt-get update && \
 
 # Create non-root user (Claude Code SDK refuses to run as root).
 # At runtime, override with --user $(id -u):$(id -g) to match host permissions.
-RUN groupadd -r craftagents && \
-    useradd -r -g craftagents -m -d /home/craftagents -s /bin/bash craftagents
+RUN groupadd -r datapilot && \
+    useradd -r -g datapilot -m -d /home/datapilot -s /bin/bash datapilot
 
 WORKDIR /app
 
@@ -90,14 +90,14 @@ ENV DATAPILOT_LITE_UI=$DATAPILOT_LITE_UI
 RUN bunx vite build --config apps/webui/vite.config.ts
 
 # Pre-create .datapilot so Docker named volumes inherit the correct permissions.
-RUN mkdir -p /home/craftagents/.datapilot
+RUN mkdir -p /home/datapilot/.datapilot
 
 # Make app world-readable so any --user can run it. Home dir is writable for .datapilot.
 # Use find to only touch files/dirs missing the read bit — much faster than chmod -R on the
 # entire tree (node_modules alone has hundreds of thousands of entries).
 RUN find /app -not -perm -o=r -exec chmod o+r {} + && \
     find /app -type d -not -perm -o=x -exec chmod o+x {} + && \
-    chmod -R 777 /home/craftagents
+    chmod -R 777 /home/datapilot
 
 # Pre-install Python 3.12 + common data-science packages into a dedicated venv.
 # - DATAPILOT_PYTHON: used by transform_data runtime resolver for direct Python access
@@ -123,14 +123,14 @@ ENV PATH="/opt/datapilot-py/bin:/app/apps/electron/resources/bin:${PATH}"
 
 EXPOSE 9100
 
-# Smart entrypoint: drop from root to craftagents when the container platform
+# Smart entrypoint: drop from root to datapilot when the container platform
 # (e.g. Zeabur) ignores the Dockerfile USER directive and runs as root.
 # Claude Agent SDK refuses --dangerously-skip-permissions under root.
-RUN printf '#!/bin/sh\nset -e\nif [ "$(id -u)" = "0" ]; then\n  chown -R craftagents:craftagents /home/craftagents 2>/dev/null || true\n  export HOME=/home/craftagents\n  exec gosu craftagents "$@"\nfi\nexec "$@"\n' > /usr/local/bin/entrypoint.sh && \
+RUN printf '#!/bin/sh\nset -e\nif [ "$(id -u)" = "0" ]; then\n  chown -R datapilot:datapilot /home/datapilot 2>/dev/null || true\n  export HOME=/home/datapilot\n  exec gosu datapilot "$@"\nfi\nexec "$@"\n' > /usr/local/bin/entrypoint.sh && \
     chmod +x /usr/local/bin/entrypoint.sh
 
-# Default to non-root, but entrypoint handles root->craftagents fallback
-USER craftagents
+# Default to non-root, but entrypoint handles root->datapilot fallback
+USER datapilot
 
 # --allow-insecure-bind: safe inside Docker — the container network is isolated;
 # external TLS should be handled by a reverse proxy (nginx, Caddy, etc.)

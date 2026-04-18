@@ -25,7 +25,7 @@ services:
       - DATAPILOT_WEBUI_PASSWORD=${DATAPILOT_WEBUI_PASSWORD:-}
       - DATAPILOT_HEALTH_PORT=9101
     volumes:
-      - ${DATAPILOT_DATA_DIR:-~/.datapilot}:/home/craftagents/.datapilot
+      - ${DATAPILOT_DATA_DIR:-~/.datapilot}:/home/datapilot/.datapilot
     healthcheck:
       test: ["CMD-SHELL", "bun -e 'await fetch(\"http://localhost:9101/\")' || exit 1"]
       interval: 30s

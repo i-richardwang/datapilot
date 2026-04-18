@@ -72,7 +72,7 @@ docker run -d \
   -p 9100:9100 \
   -e DATAPILOT_SERVER_TOKEN=<token> \
   -e DATAPILOT_RPC_HOST=0.0.0.0 \
-  -v datapilot-data:/home/craftagents/.datapilot \
+  -v datapilot-data:/home/datapilot/.datapilot \
   ghcr.io/i-richardwang/datapilot:latest
 ```
 
