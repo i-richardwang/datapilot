@@ -439,6 +439,7 @@ is exposed via `events tail`; this entity is request/response.
 - `datapilot session set-notes <id> [--notes "..."]`
 - `datapilot session export <id>`
 - `datapilot session share <id>`
+- `datapilot session share-html <file> --session <id>`
 
 ### Examples
 
@@ -449,6 +450,7 @@ datapilot session send sess-abc "Summarize today's open PRs"
 datapilot session cancel sess-abc
 datapilot session export sess-abc
 datapilot session share sess-abc
+datapilot session share-html ./report.html --session sess-abc
 ```
 <!-- cli:session:end -->
 
