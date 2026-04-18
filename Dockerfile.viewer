@@ -2,13 +2,13 @@
 # DataPilot Viewer Server — lightweight session sharing service
 #
 # Build:
-#   docker buildx build -f Dockerfile.viewer -t craft-viewer-server .
+#   docker buildx build -f Dockerfile.viewer -t datapilot-viewer .
 #
 # Run (filesystem storage with volume):
 #   docker run -d -p 9101:9101 \
 #     -e VIEWER_BASE_URL=https://your-domain.com \
 #     -v viewer-data:/data \
-#     craft-viewer-server
+#     datapilot-viewer
 #
 # Run (S3/R2 storage):
 #   docker run -d -p 9101:9101 \
@@ -18,7 +18,7 @@
 #     -e VIEWER_S3_BUCKET=shared-sessions \
 #     -e VIEWER_S3_ACCESS_KEY_ID=xxx \
 #     -e VIEWER_S3_SECRET_ACCESS_KEY=xxx \
-#     craft-viewer-server
+#     datapilot-viewer
 # =============================================================================
 
 FROM oven/bun:1.3-slim
