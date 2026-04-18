@@ -3,7 +3,7 @@ import { getWorkspaceByNameOrId } from '@craft-agent/shared/config'
 import { loadWorkspaceSources } from '@craft-agent/shared/sources'
 import { safeJsonParse } from '@craft-agent/shared/utils/files'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
-import type { RpcDispatcher } from '@craft-agent/rpc-engine'
+import type { RpcServer } from '@craft-agent/server-core/transport'
 import type { EntityHandlerDeps } from '../handler-deps'
 
 export const HANDLED_CHANNELS = [
@@ -24,7 +24,7 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.sources.GET_MCP_TOOLS,
 ] as const
 
-export function registerSourcesHandlers(server: RpcDispatcher, deps: EntityHandlerDeps): void {
+export function registerSourcesHandlers(server: RpcServer, deps: EntityHandlerDeps): void {
   const log = deps.platform.logger
 
   // Get all sources for a workspace

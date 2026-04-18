@@ -18,7 +18,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
-import type { HandlerFn, RequestContext, RpcDispatcher } from '@craft-agent/rpc-engine'
+import type { HandlerFn, RequestContext, RpcServer } from '@craft-agent/server-core/transport'
 
 interface TransferState {
   id: string
@@ -89,7 +89,14 @@ export function __resetTransferStateForTests(): void {
   transferableHandlers.clear()
 }
 
-export function registerTransferHandlers(server: RpcDispatcher): void {
+export const HANDLED_CHANNELS = [
+  RPC_CHANNELS.transfer.START,
+  RPC_CHANNELS.transfer.CHUNK,
+  RPC_CHANNELS.transfer.COMMIT,
+  RPC_CHANNELS.transfer.ABORT,
+] as const
+
+export function registerTransferHandlers(server: RpcServer): void {
   server.handle(RPC_CHANNELS.transfer.START, async (ctx, opts: {
     totalBytes: number
     chunkCount: number

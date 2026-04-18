@@ -2,7 +2,7 @@ import { join } from 'path'
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'fs'
 import { RPC_CHANNELS, type SkillFile } from '@craft-agent/shared/protocol'
 import { getWorkspaceByNameOrId } from '@craft-agent/shared/config'
-import { pushTyped, type RpcDispatcher } from '@craft-agent/rpc-engine'
+import { pushTyped, type RpcServer } from '@craft-agent/server-core/transport'
 import type { EntityHandlerDeps } from '../handler-deps'
 
 interface SkillCreateInput {
@@ -65,7 +65,7 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.skills.OPEN_FINDER,
 ] as const
 
-export function registerSkillsHandlers(server: RpcDispatcher, deps: EntityHandlerDeps): void {
+export function registerSkillsHandlers(server: RpcServer, deps: EntityHandlerDeps): void {
   // Get all skills for a workspace (and optionally project-level skills from workingDirectory)
   server.handle(RPC_CHANNELS.skills.GET, async (_ctx, workspaceId: string, workingDirectory?: string) => {
     deps.platform.logger?.info(`SKILLS_GET: Loading skills for workspace: ${workspaceId}${workingDirectory ? `, workingDirectory: ${workingDirectory}` : ''}`)

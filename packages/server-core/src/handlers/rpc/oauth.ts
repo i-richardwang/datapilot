@@ -3,7 +3,7 @@ import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { getWorkspaceByNameOrId } from '@craft-agent/shared/config'
 import { loadSource, loadWorkspaceSources, getSourceCredentialManager } from '@craft-agent/shared/sources'
 import { createPendingFlow } from '@craft-agent/shared/auth'
-import { pushTyped, type RpcDispatcher } from '@craft-agent/rpc-engine'
+import { pushTyped, type RpcServer } from '@craft-agent/server-core/transport'
 import type { HandlerDeps } from '../handler-deps'
 
 export const HANDLED_CHANNELS = [
@@ -75,7 +75,7 @@ export async function completeOAuthFlow(opts: {
   return result
 }
 
-export function registerOAuthHandlers(server: RpcDispatcher, deps: HandlerDeps): void {
+export function registerOAuthHandlers(server: RpcServer, deps: HandlerDeps): void {
   const log = deps.platform.logger
   const flowStore = deps.oauthFlowStore
   const credManager = getSourceCredentialManager()

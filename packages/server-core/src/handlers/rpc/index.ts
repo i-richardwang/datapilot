@@ -1,4 +1,3 @@
-import type { RpcDispatcher } from '@craft-agent/rpc-engine'
 import type { RpcServer } from '@craft-agent/server-core/transport'
 import type { HandlerDeps } from '../handler-deps'
 
@@ -27,45 +26,34 @@ import { registerTransferHandlers } from './transfer'
 import { registerWorkspaceCoreHandlers } from './workspace'
 
 /**
- * Register all handlers whose implementations only need the
- * transport-agnostic `RpcDispatcher` facade — no `RpcServer` dependency
- * and no WS-only capabilities. Handlers that call back into clients via
- * `invokeClient` live in `registerClientCapabilityHandlers`.
+ * Register every RPC handler provided by server-core.
+ *
+ * GUI-only handlers (Electron windows, browser panes, native menus) live in
+ * `apps/electron` and are registered alongside these via the unified
+ * `registerAllRpcHandlers` there.
  */
-export function registerCoreRpcHandlers(
-  dispatcher: RpcDispatcher,
+export function registerServerCoreRpcHandlers(
+  server: RpcServer,
   deps: HandlerDeps,
   serverCtx?: ServerHandlerContext,
 ): void {
-  registerAutomationsHandlers(dispatcher, deps)
-  registerBatchesHandlers(dispatcher, deps)
-  registerLabelsHandlers(dispatcher, deps)
-  registerOAuthHandlers(dispatcher, deps)
-  registerOnboardingHandlers(dispatcher, deps)
-  registerPermissionsHandlers(dispatcher, deps)
-  registerResourcesHandlers(dispatcher, deps)
-  registerSessionsHandlers(dispatcher, deps)
-  if (serverCtx) registerServerHandlers(dispatcher, deps, serverCtx)
-  registerSkillsHandlers(dispatcher, deps)
-  registerSourcesHandlers(dispatcher, deps)
-  registerStatusesHandlers(dispatcher, deps)
-  registerTransferHandlers(dispatcher)
-  registerWorkspaceCoreHandlers(dispatcher, deps)
-}
-
-/**
- * Register handlers that depend on the WS transport's client-capability
- * surface (native confirm / open / save dialogs, open-external URL,
- * client-scoped `invokeClient`). Kept separate so the shared
- * registration entry stays typed against `RpcDispatcher`.
- */
-export function registerClientCapabilityHandlers(
-  server: RpcServer,
-  deps: HandlerDeps,
-): void {
   registerAuthHandlers(server, deps)
+  registerAutomationsHandlers(server, deps)
+  registerBatchesHandlers(server, deps)
   registerFilesHandlers(server, deps)
+  registerLabelsHandlers(server, deps)
   registerLlmConnectionsHandlers(server, deps)
+  registerOAuthHandlers(server, deps)
+  registerOnboardingHandlers(server, deps)
+  registerPermissionsHandlers(server, deps)
+  registerResourcesHandlers(server, deps)
+  registerSessionsHandlers(server, deps)
+  if (serverCtx) registerServerHandlers(server, deps, serverCtx)
   registerSettingsHandlers(server, deps)
+  registerSkillsHandlers(server, deps)
+  registerSourcesHandlers(server, deps)
+  registerStatusesHandlers(server, deps)
   registerSystemCoreHandlers(server, deps)
+  registerTransferHandlers(server)
+  registerWorkspaceCoreHandlers(server, deps)
 }

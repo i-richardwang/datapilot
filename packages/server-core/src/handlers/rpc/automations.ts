@@ -6,7 +6,7 @@ import { AUTOMATION_HISTORY_MAX_RUNS_PER_MATCHER } from '@craft-agent/shared/aut
 import { getWorkspaceDb } from '@craft-agent/shared/db'
 import { automationHistory } from '@craft-agent/shared/db/schema/automations.sql'
 import { eq, desc } from 'drizzle-orm'
-import type { RpcDispatcher } from '@craft-agent/rpc-engine'
+import type { RpcServer } from '@craft-agent/server-core/transport'
 import type { HandlerDeps } from '../handler-deps'
 
 interface HistoryEntry { id: string; ts: number; ok: boolean; sessionId?: string; prompt?: string; error?: string; webhook?: { method: string; url: string; statusCode: number; durationMs: number; attempts?: number; error?: string; responseBody?: string } }
@@ -69,7 +69,7 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.automations.LINT,
 ] as const
 
-export function registerAutomationsHandlers(server: RpcDispatcher, deps: HandlerDeps): void {
+export function registerAutomationsHandlers(server: RpcServer, deps: HandlerDeps): void {
   const log = deps.platform.logger
 
   // List automations — reads automations.json and returns raw config.

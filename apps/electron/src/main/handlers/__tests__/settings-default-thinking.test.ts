@@ -35,6 +35,7 @@ describe('settings default thinking RPC handlers', () => {
       async invokeClient() {
         return null
       },
+      updateClientWorkspace() {},
     }
 
     const deps: HandlerDeps = {

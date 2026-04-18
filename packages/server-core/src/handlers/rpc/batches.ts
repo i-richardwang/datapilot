@@ -3,7 +3,7 @@ import { join } from 'path'
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { getWorkspaceByNameOrId } from '@craft-agent/shared/config'
 import { BATCHES_CONFIG_FILE, BATCH_STATE_FILE_PREFIX, BATCH_TEST_RESULT_FILE_PREFIX, TEST_BATCH_SUFFIX } from '@craft-agent/shared/batches'
-import type { RpcDispatcher } from '@craft-agent/rpc-engine'
+import type { RpcServer } from '@craft-agent/server-core/transport'
 import type { HandlerDeps } from '../handler-deps'
 
 // Per-workspace config mutex: serializes read-modify-write cycles on batches.json
@@ -63,7 +63,7 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.batches.RETRY_ITEM,
 ] as const
 
-export function registerBatchesHandlers(server: RpcDispatcher, deps: HandlerDeps): void {
+export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): void {
   const log = deps.platform.logger
 
   server.handle(RPC_CHANNELS.batches.LIST, async (_ctx, workspaceId: string) => {

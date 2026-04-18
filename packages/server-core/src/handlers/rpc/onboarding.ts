@@ -9,7 +9,7 @@ import { setSetupDeferred } from '@craft-agent/shared/config'
 import { prepareClaudeOAuth, exchangeClaudeCode, hasValidOAuthState, clearOAuthState, prepareMcpOAuth } from '@craft-agent/shared/auth'
 import { validateMcpConnection } from '@craft-agent/shared/mcp'
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
-import type { RpcDispatcher } from '@craft-agent/rpc-engine'
+import type { RpcServer } from '@craft-agent/server-core/transport'
 import type { EntityHandlerDeps } from '../handler-deps'
 
 // ============================================
@@ -27,7 +27,7 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.onboarding.DEFER_SETUP,
 ] as const
 
-export function registerOnboardingHandlers(server: RpcDispatcher, deps: EntityHandlerDeps): void {
+export function registerOnboardingHandlers(server: RpcServer, deps: EntityHandlerDeps): void {
   const log = deps.platform.logger
 
   // Get current auth state

@@ -39,7 +39,6 @@ COPY apps/viewer-server/package.json apps/viewer-server/
 # Workspace stubs for packages referenced in root lockfile
 COPY packages/server/package.json packages/server/
 COPY packages/server-core/package.json packages/server-core/
-COPY packages/rpc-engine/package.json packages/rpc-engine/
 COPY packages/session-tools-core/package.json packages/session-tools-core/
 COPY packages/session-mcp-server/package.json packages/session-mcp-server/
 COPY packages/pi-agent-server/package.json packages/pi-agent-server/

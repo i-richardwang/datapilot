@@ -1,6 +1,6 @@
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { getWorkspaceByNameOrId } from '@craft-agent/shared/config'
-import type { RpcDispatcher } from '@craft-agent/rpc-engine'
+import type { RpcServer } from '@craft-agent/server-core/transport'
 import type { EntityHandlerDeps } from '../handler-deps'
 
 export const HANDLED_CHANNELS = [
@@ -8,7 +8,7 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.statuses.REORDER,
 ] as const
 
-export function registerStatusesHandlers(server: RpcDispatcher, _deps: EntityHandlerDeps): void {
+export function registerStatusesHandlers(server: RpcServer, _deps: EntityHandlerDeps): void {
   // List all statuses for a workspace
   server.handle(RPC_CHANNELS.statuses.LIST, async (_ctx, workspaceId: string) => {
     const workspace = getWorkspaceByNameOrId(workspaceId)
