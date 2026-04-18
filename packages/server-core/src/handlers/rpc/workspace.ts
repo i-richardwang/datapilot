@@ -4,7 +4,7 @@ import { homedir } from 'os'
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { getWorkspaceByNameOrId, addWorkspace, setActiveWorkspace, updateWorkspaceRemoteServer } from '@craft-agent/shared/config'
 import { perf } from '@craft-agent/shared/utils'
-import { pushTyped, type RpcDispatcher } from '@craft-agent/rpc-engine'
+import { pushTyped, type RpcServer } from '@craft-agent/server-core/transport'
 import type { HandlerDeps } from '../handler-deps'
 import { isValidWorkspaceRootPath } from '../../utils/path-validation'
 
@@ -37,7 +37,7 @@ export const CORE_HANDLED_CHANNELS = [
   RPC_CHANNELS.logo.GET_URL,
 ] as const
 
-export function registerWorkspaceCoreHandlers(server: RpcDispatcher, deps: HandlerDeps): void {
+export function registerWorkspaceCoreHandlers(server: RpcServer, deps: HandlerDeps): void {
   const { sessionManager } = deps
   const windowManager = deps.windowManager
 
@@ -99,7 +99,7 @@ export function registerWorkspaceCoreHandlers(server: RpcDispatcher, deps: Handl
     const end = perf.start('ipc.switchWorkspace', { workspaceId })
 
     // Keep WS push routing in sync (works for both GUI and headless)
-    server.updateClientWorkspace?.(ctx.clientId, workspaceId)
+    server.updateClientWorkspace(ctx.clientId, workspaceId)
 
     if (windowManager) {
       const wcId = ctx.webContentsId!

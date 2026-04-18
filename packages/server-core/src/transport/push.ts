@@ -1,9 +1,16 @@
 /**
- * Re-export the dispatcher-bound `pushTyped` from rpc-engine.
- *
- * Kept here so existing call sites
- * (`import { pushTyped } from '@craft-agent/server-core/transport'`)
- * continue to work without churn.
+ * Type-safe push helper — constrains args against BroadcastEventMap at
+ * compile time.
  */
 
-export { pushTyped } from '@craft-agent/rpc-engine'
+import type { BroadcastEventMap, PushTarget } from '@craft-agent/shared/protocol'
+import type { RpcServer } from './types'
+
+export function pushTyped<K extends keyof BroadcastEventMap & string>(
+  server: RpcServer,
+  channel: K,
+  target: PushTarget,
+  ...args: BroadcastEventMap[K]
+): void {
+  server.push(channel, target, ...args)
+}

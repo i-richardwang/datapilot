@@ -41,6 +41,7 @@ describe('sessions file watchers', () => {
       async invokeClient() {
         return null
       },
+      updateClientWorkspace() {},
     }
 
     const deps: HandlerDeps = {

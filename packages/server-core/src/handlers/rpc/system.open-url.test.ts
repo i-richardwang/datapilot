@@ -21,6 +21,7 @@ function createTestHarness(overrides?: { workspaceId?: string | null }) {
       invokeClientCalls.push({ clientId, channel, args })
       return undefined
     },
+    updateClientWorkspace() {},
   }
 
   const deps: HandlerDeps = {

@@ -49,6 +49,7 @@ function createMockServer(): RpcServer {
     },
     push() {},
     async invokeClient() {},
+    updateClientWorkspace() {},
   }
 }
 
@@ -85,39 +86,45 @@ function createMockDeps(): HandlerDeps {
 }
 
 async function getExpectedChannels(): Promise<Set<string>> {
-  // Core handler channels (now in server-core)
+  // Core handler channels (server-core)
   const [
     auth,
     automations,
+    batches,
     files,
     labels,
     llm,
     oauth,
+    onboarding,
+    permissions,
+    resources,
     sessions,
     coreSettings,
     skills,
     sources,
     statuses,
     coreSystem,
+    transfer,
     coreWorkspace,
-    onboarding,
-    resources,
   ] = await Promise.all([
     import('@craft-agent/server-core/handlers/rpc/auth'),
     import('@craft-agent/server-core/handlers/rpc/automations'),
+    import('@craft-agent/server-core/handlers/rpc/batches'),
     import('@craft-agent/server-core/handlers/rpc/files'),
     import('@craft-agent/server-core/handlers/rpc/labels'),
     import('@craft-agent/server-core/handlers/rpc/llm-connections'),
     import('@craft-agent/server-core/handlers/rpc/oauth'),
+    import('@craft-agent/server-core/handlers/rpc/onboarding'),
+    import('@craft-agent/server-core/handlers/rpc/permissions'),
+    import('@craft-agent/server-core/handlers/rpc/resources'),
     import('@craft-agent/server-core/handlers/rpc/sessions'),
     import('@craft-agent/server-core/handlers/rpc/settings'),
     import('@craft-agent/server-core/handlers/rpc/skills'),
     import('@craft-agent/server-core/handlers/rpc/sources'),
     import('@craft-agent/server-core/handlers/rpc/statuses'),
     import('@craft-agent/server-core/handlers/rpc/system'),
+    import('@craft-agent/server-core/handlers/rpc/transfer'),
     import('@craft-agent/server-core/handlers/rpc/workspace'),
-    import('@craft-agent/server-core/handlers/rpc/onboarding'),
-    import('@craft-agent/server-core/handlers/rpc/resources'),
   ])
 
   // GUI handler channels (remain in electron)
@@ -131,19 +138,22 @@ async function getExpectedChannels(): Promise<Set<string>> {
   return new Set([
     ...auth.HANDLED_CHANNELS,
     ...automations.HANDLED_CHANNELS,
+    ...batches.HANDLED_CHANNELS,
     ...files.HANDLED_CHANNELS,
     ...labels.HANDLED_CHANNELS,
     ...llm.HANDLED_CHANNELS,
     ...oauth.HANDLED_CHANNELS,
+    ...onboarding.HANDLED_CHANNELS,
+    ...permissions.HANDLED_CHANNELS,
+    ...resources.HANDLED_CHANNELS,
     ...sessions.HANDLED_CHANNELS,
     ...coreSettings.HANDLED_CHANNELS,
     ...skills.HANDLED_CHANNELS,
     ...sources.HANDLED_CHANNELS,
     ...statuses.HANDLED_CHANNELS,
     ...coreSystem.CORE_HANDLED_CHANNELS,
+    ...transfer.HANDLED_CHANNELS,
     ...coreWorkspace.CORE_HANDLED_CHANNELS,
-    ...onboarding.HANDLED_CHANNELS,
-    ...resources.HANDLED_CHANNELS,
     ...browser.HANDLED_CHANNELS,
     ...guiSystem.GUI_HANDLED_CHANNELS,
     ...guiWorkspace.GUI_HANDLED_CHANNELS,

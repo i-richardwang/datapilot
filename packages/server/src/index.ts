@@ -37,7 +37,7 @@ if (process.argv.includes('--generate-token')) {
   process.exit(0)
 }
 import type { WsRpcTlsOptions } from '@craft-agent/server-core/transport'
-import { registerCoreRpcHandlers, registerClientCapabilityHandlers, cleanupSessionFileWatchForClient } from '@craft-agent/server-core/handlers/rpc'
+import { registerServerCoreRpcHandlers, cleanupSessionFileWatchForClient } from '@craft-agent/server-core/handlers/rpc'
 import { SessionManager, setSessionPlatform, setSessionRuntimeHooks } from '@craft-agent/server-core/sessions'
 import { initModelRefreshService, setFetcherPlatform } from '@craft-agent/server-core/model-fetchers'
 import { setSearchPlatform, setImageProcessor } from '@craft-agent/server-core/services'
@@ -205,8 +205,7 @@ const instance = await (async () => {
         oauthFlowStore,
       }),
       registerAllRpcHandlers: (server, deps, serverCtx) => {
-        registerCoreRpcHandlers(server, deps, serverCtx)
-        registerClientCapabilityHandlers(server, deps)
+        registerServerCoreRpcHandlers(server, deps, serverCtx)
       },
       setSessionEventSink: (sessionManager, sink) => {
         sessionManager.setEventSink(sink)

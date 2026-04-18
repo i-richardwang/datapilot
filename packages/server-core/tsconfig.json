@@ -20,9 +20,7 @@
     "baseUrl": ".",
     "paths": {
       "@craft-agent/shared": ["../shared/src/index.ts"],
-      "@craft-agent/shared/*": ["../shared/src/*"],
-      "@craft-agent/rpc-engine": ["../rpc-engine/src/index.ts"],
-      "@craft-agent/rpc-engine/*": ["../rpc-engine/src/*"]
+      "@craft-agent/shared/*": ["../shared/src/*"]
     }
   },
   "include": ["src/**/*", "../shared/src/agent/bash-parser.d.ts"],
