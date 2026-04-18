@@ -1,27 +1,6 @@
 #!/bin/sh
 # datapilot — agent-facing CLI wrapper.
 #
-# By default, this runs the unified CLI at $DATAPILOT_UNIFIED_CLI_ENTRY.
-# Set DATAPILOT_UNIFIED_CLI=0 (or false/no/off) to fall back to the legacy
-# craft-cli at $DATAPILOT_CLI_ENTRY for one release cycle.
-#
-# If the unified entry is unset (e.g. a packaged build that didn't stage the
-# unified bundle), the wrapper exits non-zero rather than silently falling
-# back to legacy. Set DATAPILOT_UNIFIED_CLI=0 explicitly to opt into legacy.
+# Dispatches to the unified CLI entry at $DATAPILOT_CLI_ENTRY.
 export DATAPILOT_CLI_JSON_ONLY="${DATAPILOT_CLI_JSON_ONLY:-1}"
-_use_unified=1
-case "${DATAPILOT_UNIFIED_CLI:-}" in
-  0|false|no|off|FALSE|NO|OFF|False|No|Off)
-    _use_unified=0
-    ;;
-esac
-if [ "$_use_unified" = "1" ]; then
-  if [ -z "${DATAPILOT_UNIFIED_CLI_ENTRY:-}" ]; then
-    printf 'datapilot: DATAPILOT_UNIFIED_CLI_ENTRY is not set; cannot run the unified CLI. Set DATAPILOT_UNIFIED_CLI=0 to fall back to legacy.\n' >&2
-    exit 1
-  fi
-  _cli_entry="${DATAPILOT_UNIFIED_CLI_ENTRY}"
-else
-  _cli_entry="${DATAPILOT_CLI_ENTRY}"
-fi
-exec "${DATAPILOT_BUN:-bun}" run "${_cli_entry}" "$@"
+exec "${DATAPILOT_BUN:-bun}" run "${DATAPILOT_CLI_ENTRY}" "$@"

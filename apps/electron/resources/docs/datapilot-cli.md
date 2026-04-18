@@ -68,12 +68,6 @@ Exit codes:
 
 `events tail` streams one JSON object per line instead of a single envelope.
 
-## Legacy escape hatch
-
-The unified binary is the default. Set `DATAPILOT_UNIFIED_CLI=0` (or `false` /
-`no` / `off`) to fall back to the legacy `craft-cli` binary for one release
-cycle. This escape hatch is removed in a follow-up phase.
-
 ---
 
 <!-- cli:label:start -->

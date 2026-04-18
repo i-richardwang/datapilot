@@ -1,15 +1,7 @@
 /**
- * DEV-21/DEV-22 parity test — exercises the agent-facing `datapilot` wrapper
- * and verifies a multi-entity flow round-trips through the unified CLI binary.
- *
- * After Phase 5 (DEV-22), the wrapper defaults to the unified CLI; this test
- * intentionally leaves DATAPILOT_UNIFIED_CLI unset so it exercises the new
- * default path. A separate test asserts the legacy escape hatch
- * (DATAPILOT_UNIFIED_CLI=0) still routes to craft-cli.
- *
- * If the unified CLI regresses (envelope shape, routing, transport), the
- * multi-entity flow fails because the mock server only implements the WS
- * channels the unified binary hits.
+ * End-to-end test — exercises the agent-facing `datapilot` wrapper and verifies
+ * a multi-entity flow round-trips through the unified CLI binary, hitting the
+ * expected RPC channels on a running mock server.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
@@ -24,8 +16,7 @@ import type { MessageEnvelope } from '@craft-agent/shared/protocol'
 // Repo root relative to this test file (apps/cli/src/datapilot/parity.test.ts).
 const REPO_ROOT = join(import.meta.dir, '..', '..', '..', '..')
 const WRAPPER = join(REPO_ROOT, 'apps/electron/resources/bin/datapilot')
-const LEGACY_ENTRY = join(REPO_ROOT, 'packages/craft-cli/src/index.ts')
-const UNIFIED_ENTRY = join(REPO_ROOT, 'apps/cli/src/datapilot.ts')
+const CLI_ENTRY = join(REPO_ROOT, 'apps/cli/src/datapilot.ts')
 
 interface RecordedRequest { channel: string; args: unknown[] }
 
@@ -124,9 +115,7 @@ let server: MockServer | null = null
 beforeEach(() => {
   delete process.env.DATAPILOT_SERVER_URL
   delete process.env.DATAPILOT_SERVER_TOKEN
-  delete process.env.DATAPILOT_UNIFIED_CLI
   delete process.env.DATAPILOT_CLI_ENTRY
-  delete process.env.DATAPILOT_UNIFIED_CLI_ENTRY
 })
 
 afterEach(() => {
@@ -135,24 +124,11 @@ afterEach(() => {
 })
 
 // The sh wrapper isn't invoked on Windows — Windows CI would use datapilot.cmd
-// with separate test coverage. Current CI matrix is ubuntu-latest for the
-// parity job, so skip on win32.
+// with separate test coverage. Current CI matrix is ubuntu-latest for this job.
 const describeUnix = process.platform === 'win32' ? describe.skip : describe
 
-describeUnix('datapilot wrapper routes through the unified CLI by default', () => {
-  it('errors loudly when the unified entry is unset and the legacy escape hatch is not used', async () => {
-    const r = await runWrapper(['label', 'list'], {
-      DATAPILOT_CLI_ENTRY: LEGACY_ENTRY,
-      DATAPILOT_UNIFIED_CLI_ENTRY: '',
-    })
-    expect(r.exitCode).not.toBe(0)
-    expect(r.stderr).toContain('DATAPILOT_UNIFIED_CLI_ENTRY')
-  })
-
-  it('default (no env var) routes a multi-entity flow through the unified CLI', async () => {
-    // Mock server that only implements channels the UNIFIED CLI uses. If the
-    // wrapper accidentally dispatches to the legacy CLI (which writes direct
-    // to SQLite and never hits these channels), the assertions below fail.
+describeUnix('datapilot wrapper routes to the unified CLI', () => {
+  it('routes a multi-entity flow through the unified CLI', async () => {
     let createdLabel: { id: string; name: string; color: string } | null = null
     let createdSource: { slug: string; name: string; provider: string; type: string } | null = null
 
@@ -176,8 +152,7 @@ describeUnix('datapilot wrapper routes through the unified CLI by default', () =
     })
 
     const env = {
-      DATAPILOT_CLI_ENTRY: LEGACY_ENTRY,
-      DATAPILOT_UNIFIED_CLI_ENTRY: UNIFIED_ENTRY,
+      DATAPILOT_CLI_ENTRY: CLI_ENTRY,
       DATAPILOT_SERVER_URL: server.url,
       DATAPILOT_SERVER_TOKEN: 'test-token',
     }
@@ -219,39 +194,10 @@ describeUnix('datapilot wrapper routes through the unified CLI by default', () =
       { slug: 'src-new', name: 'MyAPI', provider: 'generic', type: 'api' },
     ])
 
-    // The unified CLI proves itself by the channels it hits — the legacy
-    // craft-cli writes straight to SQLite and never contacts the WS server.
     const channels = server.requests.map((r) => r.channel)
     expect(channels).toContain('labels:create')
     expect(channels).toContain('labels:list')
     expect(channels).toContain('sources:create')
     expect(channels).toContain('sources:get')
-  })
-
-  it('DATAPILOT_UNIFIED_CLI=0 falls back to the legacy craft-cli (escape hatch)', async () => {
-    // The mock server only implements the unified CLI's WS channels, so any
-    // request landing here would prove the wrapper still routed unified.
-    // The legacy CLI talks straight to SQLite, so it never touches the mock.
-    server = startMockServer({
-      handlers: {
-        'labels:list': () => {
-          throw new Error('legacy escape hatch should not reach the WS mock')
-        },
-      },
-    })
-
-    const env = {
-      DATAPILOT_UNIFIED_CLI: '0',
-      DATAPILOT_CLI_ENTRY: LEGACY_ENTRY,
-      DATAPILOT_UNIFIED_CLI_ENTRY: UNIFIED_ENTRY,
-      DATAPILOT_SERVER_URL: server.url,
-      DATAPILOT_SERVER_TOKEN: 'test-token',
-    }
-
-    // Bare `--version` keeps the legacy CLI off SQLite (no workspace required)
-    // while still confirming the legacy entry was the one bun ran.
-    const r = await runWrapper(['--version'], env)
-    expect(r.exitCode).toBe(0)
-    expect(server.requests).toHaveLength(0)
   })
 })

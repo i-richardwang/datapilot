@@ -90,14 +90,9 @@ function parseOptionalWebSocketUrl(name: string, value: string | undefined): str
 const appRoot = process.env.DATAPILOT_APP_ROOT ?? join(import.meta.dir, '..', '..', '..', '..')
 const bundledAssetsRoot = process.env.DATAPILOT_BUNDLED_ASSETS_ROOT ?? appRoot
 
-// Legacy craft-cli entry — used as the DATAPILOT_UNIFIED_CLI=0 escape hatch.
-// Batch commands are served by the main datapilot CLI (datapilot batch <action>).
-process.env.DATAPILOT_CLI_ENTRY ??= join(appRoot, 'packages', 'craft-cli', 'src', 'index.ts')
-
-// Unified CLI entry — default target for the `datapilot` wrapper after
-// DEV-22 Phase 5. Set DATAPILOT_UNIFIED_CLI=0 to fall back to the legacy
-// entry above for one release cycle.
-process.env.DATAPILOT_UNIFIED_CLI_ENTRY ??= join(appRoot, 'apps', 'cli', 'src', 'datapilot.ts')
+// CLI entry point — unified `datapilot` CLI served from apps/cli.
+// Batch, label, source, etc. commands all route through this single binary.
+process.env.DATAPILOT_CLI_ENTRY ??= join(appRoot, 'apps', 'cli', 'src', 'datapilot.ts')
 
 // Ensure wrapper scripts are on PATH for agent Bash sessions.
 const serverBinDir = join(appRoot, 'apps', 'electron', 'resources', 'bin')
