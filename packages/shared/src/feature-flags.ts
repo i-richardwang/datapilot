@@ -64,17 +64,18 @@ export function isEmbeddedServerEnabled(): boolean {
  * unified CLI binary (apps/cli/src/datapilot.ts) instead of the legacy
  * craft-cli binary (packages/craft-cli/src/index.ts).
  *
- * Defaults to disabled — legacy behavior is preserved byte-for-byte until
- * Phase 5 flips the default. Override with DATAPILOT_UNIFIED_CLI=1|0.
+ * Defaults to enabled — the unified binary is the default agent CLI surface.
+ * Set DATAPILOT_UNIFIED_CLI=0 to fall back to the legacy craft-cli for one
+ * release cycle (the escape hatch is removed in a follow-up phase).
  *
  * Consumers: the `datapilot` wrapper script (apps/electron/resources/bin/)
- * branches between `DATAPILOT_CLI_ENTRY` (legacy) and
- * `DATAPILOT_UNIFIED_CLI_ENTRY` (unified) based on this flag.
+ * branches between `DATAPILOT_UNIFIED_CLI_ENTRY` (unified, default) and
+ * `DATAPILOT_CLI_ENTRY` (legacy fallback) based on this flag.
  */
 export function isUnifiedCliEnabled(): boolean {
   const override = parseBooleanEnv(getEnv('DATAPILOT_UNIFIED_CLI'));
   if (override !== undefined) return override;
-  return false;
+  return true;
 }
 
 /**
@@ -190,7 +191,7 @@ export const FEATURE_FLAGS = {
    * Route agent `datapilot` invocations to the unified CLI binary instead of
    * the legacy craft-cli binary.
    *
-   * Defaults to disabled. Override with DATAPILOT_UNIFIED_CLI=1|0.
+   * Defaults to enabled. Set DATAPILOT_UNIFIED_CLI=0 to fall back to legacy.
    */
   get unifiedCli(): boolean {
     return isUnifiedCliEnabled();

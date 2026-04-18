@@ -547,6 +547,8 @@ ${!FEATURE_FLAGS.disableValidation ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When
 
 **You MUST use the \`datapilot\` CLI to manage workspace configuration.** Direct file edits are blocked — labels, sources, statuses, and views are stored in SQLite (not JSON files), and all other config domains (automations, skills, permissions, themes) are guarded by the CLI.
 
+\`datapilot\` is a thin client over the local DataPilot server. Every command is \`datapilot <entity> <action>\`. Output is a JSON envelope (\`{ok, data|error, warnings}\`) on non-TTY stdout — agents can parse stdout directly. Pass structured input with \`--input '<json>'\` (legacy used \`--json\` for this; \`--json\` is now the global "force JSON output" flag).
+
 - Labels: \`datapilot label --help\`
 - Sources: \`datapilot source --help\`
 - Skills: \`datapilot skill --help\`
@@ -554,8 +556,8 @@ ${!FEATURE_FLAGS.disableValidation ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When
 - Permissions: \`datapilot permission --help\`
 - Themes: \`datapilot theme --help\`
 - Batches: \`datapilot batch --help\`
-- Session sharing: \`datapilot session share --help\`
-- HTML sharing: \`datapilot session share-html --help\`
+- Sessions: \`datapilot session --help\` (incl. \`session share <id>\`)
+- Workspaces: \`datapilot workspace --help\`
 - Canonical reference: \`${DOC_REFS.craftCli}\`` : ''}
 
 ${!isBatch ? `## User preferences

@@ -104,10 +104,10 @@ describe('feature-flags runtime helpers', () => {
     expect(isEmbeddedServerEnabled()).toBe(false);
   });
 
-  it('isUnifiedCliEnabled defaults to false when no override is set', () => {
+  it('isUnifiedCliEnabled defaults to true when no override is set', () => {
     delete process.env.DATAPILOT_UNIFIED_CLI;
 
-    expect(isUnifiedCliEnabled()).toBe(false);
+    expect(isUnifiedCliEnabled()).toBe(true);
   });
 
   it('isUnifiedCliEnabled honors explicit override true (1, true, yes, on)', () => {
@@ -117,7 +117,7 @@ describe('feature-flags runtime helpers', () => {
     }
   });
 
-  it('isUnifiedCliEnabled honors explicit override false (0, false, no, off)', () => {
+  it('isUnifiedCliEnabled honors explicit override false (0, false, no, off) as legacy fallback', () => {
     for (const falsy of ['0', 'false', 'no', 'off']) {
       process.env.DATAPILOT_UNIFIED_CLI = falsy;
       expect(isUnifiedCliEnabled()).toBe(false);
@@ -126,9 +126,9 @@ describe('feature-flags runtime helpers', () => {
 
   it('FEATURE_FLAGS.unifiedCli mirrors isUnifiedCliEnabled()', () => {
     delete process.env.DATAPILOT_UNIFIED_CLI;
-    expect(FEATURE_FLAGS.unifiedCli).toBe(false);
-
-    process.env.DATAPILOT_UNIFIED_CLI = '1';
     expect(FEATURE_FLAGS.unifiedCli).toBe(true);
+
+    process.env.DATAPILOT_UNIFIED_CLI = '0';
+    expect(FEATURE_FLAGS.unifiedCli).toBe(false);
   });
 });

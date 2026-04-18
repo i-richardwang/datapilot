@@ -1,13 +1,15 @@
 /**
- * DEV-21 parity test — exercises the agent-facing `datapilot` wrapper with
- * DATAPILOT_UNIFIED_CLI=1 and verifies a multi-entity flow round-trips
- * through the unified CLI binary.
+ * DEV-21/DEV-22 parity test — exercises the agent-facing `datapilot` wrapper
+ * and verifies a multi-entity flow round-trips through the unified CLI binary.
  *
- * If the unified CLI regresses (envelope shape, routing, transport), this
- * test fails with the wrapper in DATAPILOT_UNIFIED_CLI=1 mode but the legacy
- * CLI path (DATAPILOT_UNIFIED_CLI=0) remains a no-op for backwards-compat
- * — that's the shadow-runtime guarantee Phase 4 exists to enforce before
- * Phase 5 flips the default.
+ * After Phase 5 (DEV-22), the wrapper defaults to the unified CLI; this test
+ * intentionally leaves DATAPILOT_UNIFIED_CLI unset so it exercises the new
+ * default path. A separate test asserts the legacy escape hatch
+ * (DATAPILOT_UNIFIED_CLI=0) still routes to craft-cli.
+ *
+ * If the unified CLI regresses (envelope shape, routing, transport), the
+ * multi-entity flow fails because the mock server only implements the WS
+ * channels the unified binary hits.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
@@ -137,10 +139,9 @@ afterEach(() => {
 // parity job, so skip on win32.
 const describeUnix = process.platform === 'win32' ? describe.skip : describe
 
-describeUnix('DATAPILOT_UNIFIED_CLI flag routes the datapilot wrapper', () => {
-  it('errors loudly when DATAPILOT_UNIFIED_CLI=1 but DATAPILOT_UNIFIED_CLI_ENTRY is unset', async () => {
+describeUnix('datapilot wrapper routes through the unified CLI by default', () => {
+  it('errors loudly when the unified entry is unset and the legacy escape hatch is not used', async () => {
     const r = await runWrapper(['label', 'list'], {
-      DATAPILOT_UNIFIED_CLI: '1',
       DATAPILOT_CLI_ENTRY: LEGACY_ENTRY,
       DATAPILOT_UNIFIED_CLI_ENTRY: '',
     })
@@ -148,7 +149,7 @@ describeUnix('DATAPILOT_UNIFIED_CLI flag routes the datapilot wrapper', () => {
     expect(r.stderr).toContain('DATAPILOT_UNIFIED_CLI_ENTRY')
   })
 
-  it('DATAPILOT_UNIFIED_CLI=1 routes a multi-entity flow through the unified CLI', async () => {
+  it('default (no env var) routes a multi-entity flow through the unified CLI', async () => {
     // Mock server that only implements channels the UNIFIED CLI uses. If the
     // wrapper accidentally dispatches to the legacy CLI (which writes direct
     // to SQLite and never hits these channels), the assertions below fail.
@@ -175,7 +176,6 @@ describeUnix('DATAPILOT_UNIFIED_CLI flag routes the datapilot wrapper', () => {
     })
 
     const env = {
-      DATAPILOT_UNIFIED_CLI: '1',
       DATAPILOT_CLI_ENTRY: LEGACY_ENTRY,
       DATAPILOT_UNIFIED_CLI_ENTRY: UNIFIED_ENTRY,
       DATAPILOT_SERVER_URL: server.url,
@@ -226,5 +226,32 @@ describeUnix('DATAPILOT_UNIFIED_CLI flag routes the datapilot wrapper', () => {
     expect(channels).toContain('labels:list')
     expect(channels).toContain('sources:create')
     expect(channels).toContain('sources:get')
+  })
+
+  it('DATAPILOT_UNIFIED_CLI=0 falls back to the legacy craft-cli (escape hatch)', async () => {
+    // The mock server only implements the unified CLI's WS channels, so any
+    // request landing here would prove the wrapper still routed unified.
+    // The legacy CLI talks straight to SQLite, so it never touches the mock.
+    server = startMockServer({
+      handlers: {
+        'labels:list': () => {
+          throw new Error('legacy escape hatch should not reach the WS mock')
+        },
+      },
+    })
+
+    const env = {
+      DATAPILOT_UNIFIED_CLI: '0',
+      DATAPILOT_CLI_ENTRY: LEGACY_ENTRY,
+      DATAPILOT_UNIFIED_CLI_ENTRY: UNIFIED_ENTRY,
+      DATAPILOT_SERVER_URL: server.url,
+      DATAPILOT_SERVER_TOKEN: 'test-token',
+    }
+
+    // Bare `--version` keeps the legacy CLI off SQLite (no workspace required)
+    // while still confirming the legacy entry was the one bun ran.
+    const r = await runWrapper(['--version'], env)
+    expect(r.exitCode).toBe(0)
+    expect(server.requests).toHaveLength(0)
   })
 })

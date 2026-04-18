@@ -19,6 +19,8 @@ const PI_AGENT_SERVER_DIR = join(ROOT_DIR, "packages/pi-agent-server");
 const PI_AGENT_SERVER_OUTPUT = join(PI_AGENT_SERVER_DIR, "dist/index.js");
 const DATAPILOT_CLI_DIR = join(ROOT_DIR, "packages/craft-cli");
 const DATAPILOT_CLI_OUTPUT = join(DATAPILOT_CLI_DIR, "dist/index.js");
+const UNIFIED_CLI_DIR = join(ROOT_DIR, "apps/cli");
+const UNIFIED_CLI_OUTPUT = join(UNIFIED_CLI_DIR, "dist/datapilot.js");
 
 // Load .env file if it exists
 function loadEnvFile(): void {
@@ -297,6 +299,47 @@ async function buildCraftCli(): Promise<void> {
   console.log("✅ Craft CLI built successfully");
 }
 
+// Build the unified DataPilot CLI (WebSocket thin client at apps/cli/src/datapilot.ts).
+// This is the default entry the `datapilot` wrapper dispatches to after Phase 5;
+// the legacy craft-cli bundle above stays as a one-release escape hatch.
+async function buildUnifiedCli(): Promise<void> {
+  console.log("🛰  Building unified DataPilot CLI...");
+
+  const distDir = join(UNIFIED_CLI_DIR, "dist");
+  if (!existsSync(distDir)) {
+    mkdirSync(distDir, { recursive: true });
+  }
+
+  // Match the craft-cli bundle profile (bun target / ESM) so the wrapper can
+  // run either entry through the same `bun run` invocation.
+  const proc = spawn({
+    cmd: [
+      "bun", "build",
+      join(UNIFIED_CLI_DIR, "src/datapilot.ts"),
+      "--outfile", UNIFIED_CLI_OUTPUT,
+      "--target", "bun",
+      "--format", "esm",
+    ],
+    cwd: ROOT_DIR,
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+
+  const exitCode = await proc.exited;
+
+  if (exitCode !== 0) {
+    console.error("❌ Unified CLI build failed with exit code", exitCode);
+    process.exit(exitCode);
+  }
+
+  if (!existsSync(UNIFIED_CLI_OUTPUT)) {
+    console.error("❌ Unified CLI output not found at", UNIFIED_CLI_OUTPUT);
+    process.exit(1);
+  }
+
+  console.log("✅ Unified CLI built successfully");
+}
+
 async function main(): Promise<void> {
   loadEnvFile();
 
@@ -317,6 +360,9 @@ async function main(): Promise<void> {
 
   // Build DataPilot CLI (datapilot command for agent Bash sessions)
   await buildCraftCli();
+
+  // Build unified CLI (default datapilot binary after DEV-22 Phase 5)
+  await buildUnifiedCli();
 
   // Build unified network interceptor (CJS bundle for Node.js --require)
   await buildInterceptor();
