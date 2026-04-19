@@ -3,7 +3,7 @@
  */
 
 import { ok, fail } from '../envelope.ts'
-import { strFlag, intFlag, boolFlag, parseInput, type Flags } from '../args.ts'
+import { strFlag, intFlag, parseInput, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 interface AutomationMatcher { id?: string; [key: string]: unknown }
@@ -114,8 +114,10 @@ export async function routeAutomation(
     }
 
     case 'history': {
+      const id = positionals[0]
+      if (!id) fail('USAGE_ERROR', 'Missing automation id')
       const limit = intFlag(flags, 'limit') ?? 50
-      ok(await client.invoke('automations:getHistory', ws, { limit }))
+      ok(await client.invoke('automations:getHistory', ws, id, limit))
     }
 
     case 'last-executed':
@@ -129,9 +131,10 @@ export async function routeAutomation(
 
     case 'replay': {
       const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing history entry id')
-      const dryRun = boolFlag(flags, 'dry-run') ?? false
-      ok(await client.invoke('automations:replay', ws, id, { dryRun }))
+      if (!id) fail('USAGE_ERROR', 'Missing automation id')
+      const resolved = await resolveAutomationId(client, ws, id)
+      if (!resolved) fail('NOT_FOUND', `Automation '${id}' not found`)
+      ok(await client.invoke('automations:replay', ws, id, resolved.eventName))
     }
 
     case 'validate': {

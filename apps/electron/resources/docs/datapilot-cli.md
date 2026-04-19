@@ -228,10 +228,10 @@ Manage workspace automations stored in `automations.json`.
 - `datapilot automation enable <id>`
 - `datapilot automation disable <id>`
 - `datapilot automation duplicate <id>`
-- `datapilot automation history [<id>] [--limit <n>]`
+- `datapilot automation history <id> [--limit <n>]`
 - `datapilot automation last-executed <id>`
 - `datapilot automation test <id> [--match "..."]`
-- `datapilot automation replay <id> --execution-id <eid>`
+- `datapilot automation replay <id>`
 - `datapilot automation lint`
 - `datapilot automation validate`
 
