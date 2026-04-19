@@ -7,7 +7,7 @@ import { type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
-  'list', 'get', 'permissions', 'settings',
+  'list', 'get',
 ] as const
 
 export async function routeWorkspace(
@@ -33,19 +33,11 @@ export async function routeWorkspace(
       const target = id ?? (await ctx.getWorkspace())
       const found = list.find((w) => w.id === target)
       if (!found) fail('NOT_FOUND', `Workspace '${target}' not found`)
-      ok(found)
-    }
-
-    case 'permissions': {
-      const ws = positionals[0] ?? (await ctx.getWorkspace())
-      if (!ws) fail('VALIDATION_ERROR', 'No workspace selected')
-      ok(await client.invoke('workspace:getPermissions', ws))
-    }
-
-    case 'settings': {
-      const ws = positionals[0] ?? (await ctx.getWorkspace())
-      if (!ws) fail('VALIDATION_ERROR', 'No workspace selected')
-      ok(await client.invoke('workspaceSettings:get', ws))
+      const [permissions, settings] = await Promise.all([
+        client.invoke('workspace:getPermissions', target),
+        client.invoke('workspaceSettings:get', target),
+      ])
+      ok({ ...found, permissions, settings })
     }
   }
 
