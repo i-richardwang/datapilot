@@ -53,7 +53,7 @@ export async function routeSkill(
       const input = (await parseInput(flags)) ?? {}
       const slug = (input.slug as string) ?? strFlag(flags, 'slug')
       if (!slug) fail('USAGE_ERROR', 'Missing --slug')
-      ok(await client.invoke('skills:create', ws, slug, input))
+      ok(await client.invoke('skills:create', ws, { ...input, slug }))
     }
 
     case 'update': {
