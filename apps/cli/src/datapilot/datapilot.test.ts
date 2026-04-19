@@ -382,4 +382,59 @@ describe('datapilot CLI', () => {
     expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
     expect(r.envelope?.error?.message).toContain('Unknown entity')
   })
+
+  it('source get returns merged response with permissions and mcpTools', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'sources:get': () => [{ slug: 'linear', name: 'Linear', provider: 'linear', type: 'mcp' }],
+        'sources:getPermissions': () => ({ allowedTools: ['linear_search'], defaultPolicy: 'allow' }),
+        'sources:getMcpTools': () => [{ name: 'linear_search', permissionStatus: 'allowed' }],
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'source', 'get', 'linear',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    const data = r.envelope?.data as Record<string, unknown>
+    expect(data.slug).toBe('linear')
+    expect(data.name).toBe('Linear')
+    expect(data.permissions).toEqual({ allowedTools: ['linear_search'], defaultPolicy: 'allow' })
+    expect(data.mcpTools).toEqual([{ name: 'linear_search', permissionStatus: 'allowed' }])
+  })
+
+  it('source get-permissions returns USAGE_ERROR', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'source', 'get-permissions', 'linear',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+  })
+
+  it('source get-mcp-tools returns USAGE_ERROR', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'source', 'get-mcp-tools', 'linear',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+  })
 })
