@@ -81,8 +81,6 @@ Manage workspace labels.
 - `datapilot label create --name "<name>" [--color "<color>"] [--parent-id <id|root>] [--value-type string|number|date]`
 - `datapilot label update <id> [--name "<name>"] [--color "<color>"] [--value-type string|number|date|none]`
 - `datapilot label delete <id>`
-- `datapilot label move <id> --parent <id|root>`
-- `datapilot label reorder [--parent <id|root>] <ordered-id-1> <ordered-id-2> ...`
 - `datapilot label auto-rule-list <id>`
 - `datapilot label auto-rule-add <id> --pattern "<regex>" [--flags "gi"] [--value-template "$1"] [--description "..."]`
 - `datapilot label auto-rule-remove <id> --index <n>`
@@ -98,8 +96,6 @@ datapilot label create --name "Bug" --color "accent"
 datapilot label create --name "Priority" --value-type number
 datapilot label update bug --input '{"name":"Bug Report","color":"destructive"}'
 datapilot label update priority --value-type none
-datapilot label move bug --parent root
-datapilot label reorder --parent root development content bug
 datapilot label auto-rule-add linear-issue --pattern "\\b([A-Z]{2,5}-\\d+)\\b" --value-template "$1"
 datapilot label auto-rule-list linear-issue
 datapilot label auto-rule-validate linear-issue
@@ -335,8 +331,6 @@ is exposed via `events tail`; this entity is request/response.
 - `datapilot session cancel <id>`
 - `datapilot session get-model <id>`
 - `datapilot session set-model <id> <model> [--connection <slug>]`
-- `datapilot session unread-summary`
-- `datapilot session mark-all-read`
 - `datapilot session get-files <id>`
 - `datapilot session get-notes <id>`
 - `datapilot session set-notes <id> [--notes "..."]`
@@ -381,9 +375,7 @@ sessions, etc.).
 - `datapilot workspace list`
 - `datapilot workspace get [<id>]`
 - `datapilot workspace create <path> [--name "<name>"]`
-- `datapilot workspace check-slug <slug>`
 - `datapilot workspace update-remote <id> --input '<json>'`
-- `datapilot workspace switch <id>`
 - `datapilot workspace permissions [<id>]`
 - `datapilot workspace settings [<id>]`
 - `datapilot workspace set-settings [<id>] --input '<json>'`
@@ -393,7 +385,6 @@ sessions, etc.).
 ```bash
 datapilot workspace list
 datapilot workspace create ~/work/team-ws --name "Team"
-datapilot workspace switch ws-abc123
 datapilot workspace settings ws-abc123
 datapilot workspace set-settings ws-abc123 --input '{"defaultMode":"ask"}'
 ```
