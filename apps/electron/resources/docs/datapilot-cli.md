@@ -218,7 +218,6 @@ Manage workspace automations stored in `automations.json`.
 - `datapilot automation last-executed`
 - `datapilot automation test [--input '<json>']`
 - `datapilot automation replay <id>`
-- `datapilot automation lint`
 - `datapilot automation validate`
 
 ### Examples
@@ -241,13 +240,11 @@ datapilot automation duplicate abc123
 datapilot automation history abc123 --limit 10
 datapilot automation last-executed
 datapilot automation test --input '{"automationId":"abc123","actions":[{"type":"prompt","prompt":"Test"}]}'
-datapilot automation lint
 datapilot automation delete abc123
 ```
 
 ### Notes
 - `--name` is required for `create` (or pass it inside `--input`); use `--input` with `actions` for multi-action automations.
-- `lint` runs hygiene checks (regex validity, missing actions, oversized prompt mention sets).
 - `last-executed` returns a map of all automation IDs to their last execution timestamp.
 - `validate` checks the workspace `automations.json` schema; it takes no input flags.
 <!-- cli:automation:end -->
@@ -330,7 +327,6 @@ is exposed via `events tail`; this entity is request/response.
 - `datapilot session get-files <id>`
 - `datapilot session get-notes <id>`
 - `datapilot session set-notes <id> [--notes "..."]`
-- `datapilot session export <id>`
 - `datapilot session share <id>`
 - `datapilot session share-html <file> --session <id>`
 
@@ -353,7 +349,6 @@ datapilot session create --name "Daily standup" --source linear --source github
 datapilot session create --name "Audit" --mode safe
 datapilot session send sess-abc "Summarize today's open PRs"
 datapilot session cancel sess-abc
-datapilot session export sess-abc
 datapilot session share sess-abc
 datapilot session share-html ./report.html --session sess-abc
 ```
