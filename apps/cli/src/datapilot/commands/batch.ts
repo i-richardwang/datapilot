@@ -94,7 +94,9 @@ export async function routeBatch(
     case 'items': {
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing batch id')
-      ok(await client.invoke('batches:getItems', ws, id))
+      const offset = intFlag(flags, 'offset') ?? 0
+      const limit = intFlag(flags, 'limit') ?? 100
+      ok(await client.invoke('batches:getItems', ws, id, offset, limit))
     }
 
     case 'validate': {

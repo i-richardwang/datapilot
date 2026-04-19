@@ -31,8 +31,8 @@ export async function routeSession(
 
   switch (action) {
     case 'list': {
-      const ws = await requireWorkspace(ctx)
-      ok(await client.invoke('sessions:get', ws))
+      await requireWorkspace(ctx)
+      ok(await client.invoke('sessions:get'))
     }
 
     case 'get': {
