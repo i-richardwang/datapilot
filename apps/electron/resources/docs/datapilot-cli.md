@@ -220,7 +220,6 @@ Manage workspace automations stored in `automations.json`.
 - `datapilot automation disable <id>`
 - `datapilot automation history <id> [--limit <n>]`
 - `datapilot automation test [--input '<json>']`
-- `datapilot automation replay <id>`
 - `datapilot automation validate`
 
 ### Examples
@@ -265,11 +264,9 @@ Manage batch processing jobs stored in `batches.json`.
 - `datapilot batch start <id>`
 - `datapilot batch pause <id>`
 - `datapilot batch resume <id>`
-- `datapilot batch state <id>`
 - `datapilot batch items <id> [--offset <n>] [--limit <n>]`
 - `datapilot batch validate`
 - `datapilot batch test <id> [--sample-size <n>]`
-- `datapilot batch test-result <test-id>`
 - `datapilot batch retry-item <batch-id> <item-id>`
 
 ### Examples
@@ -300,8 +297,8 @@ datapilot batch delete abc123
 ```
 
 ### Notes
-- `state` returns the persisted batch-state document; `items` returns the per-item breakdown. `items` supports `--offset` (default 0) and `--limit` (default 100) for pagination.
-- `test` runs a dry-run against a batch with optional sample size; pull the result back with `test-result`.
+- `items` returns the per-item breakdown, supporting `--offset` (default 0) and `--limit` (default 100) for pagination. Use `batch get` for progress information.
+- `test` runs a dry-run against a batch with optional sample size and returns the result directly.
 - `delete` removes the batch from `batches.json` and cleans up its `batch-state-{id}.json`.
 <!-- cli:batch:end -->
 

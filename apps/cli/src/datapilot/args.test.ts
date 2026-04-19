@@ -80,7 +80,7 @@ describe('parseArgs', () => {
   it('intFlag and boolFlag round-trip', () => {
     const a = parseArgs(['label', 'auto-rule-remove', 'lbl', '--index', '2'])
     expect(intFlag(a.flags, 'index')).toBe(2)
-    const b = parseArgs(['automation', 'replay', 'h-1', '--dry-run'])
+    const b = parseArgs(['automation', 'test', 'h-1', '--dry-run'])
     expect(boolFlag(b.flags, 'dry-run')).toBe(true)
   })
 })
