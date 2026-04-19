@@ -80,7 +80,7 @@ export async function routeAutomation(
       rejectUnknownFlags(flags, ['name', 'event'])
       const event = strFlag(flags, 'event')
       if (!event) {
-        const { VALID_EVENTS } = await import('@craft-agent/shared/automations')
+        const { VALID_EVENTS } = await import('../../vendor/automations.ts')
         fail('USAGE_ERROR', `Missing --event <EventName>. Valid events: ${VALID_EVENTS.join(', ')}`)
       }
       const input = (await parseInput(flags)) ?? {}

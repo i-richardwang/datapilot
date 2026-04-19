@@ -1,22 +1,46 @@
 {
-  "name": "@craft-agent/cli",
-  "version": "0.8.9",
+  "name": "datapilot-cli",
+  "version": "0.1.0-beta.0",
   "license": "Apache-2.0",
-  "description": "Unified datapilot CLI for the DataPilot server",
+  "description": "Thin CLI client for the DataPilot server — unified agent-friendly commands over WebSocket.",
+  "keywords": [
+    "datapilot",
+    "cli",
+    "agent",
+    "claude-code",
+    "websocket-rpc"
+  ],
+  "homepage": "https://github.com/i-richardwang/datapilot#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/i-richardwang/datapilot.git",
+    "directory": "apps/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/i-richardwang/datapilot/issues"
+  },
   "type": "module",
-  "main": "src/datapilot.ts",
   "bin": {
-    "datapilot": "src/datapilot.ts"
+    "datapilot": "dist/datapilot.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "start": "bun run src/datapilot.ts",
     "datapilot": "bun run src/datapilot.ts",
     "typecheck": "tsc --noEmit",
-    "test": "bun test src/"
-  },
-  "dependencies": {
-    "@craft-agent/shared": "workspace:*",
-    "@craft-agent/server-core": "workspace:*"
+    "test": "bun test src/",
+    "build": "bun run scripts/build.ts",
+    "prepublishOnly": "bun run build"
   },
   "devDependencies": {
     "typescript": "^5.8.2",
