@@ -7,7 +7,7 @@ import { strFlag, parseInput, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
-  'list', 'get', 'where', 'files', 'create', 'update', 'delete', 'validate',
+  'list', 'get', 'create', 'update', 'delete', 'validate',
 ] as const
 
 export async function routeSkill(
@@ -35,18 +35,6 @@ export async function routeSkill(
       const found = list.find((s) => s.slug === slug)
       if (!found) fail('NOT_FOUND', `Skill '${slug}' not found`)
       ok(found)
-    }
-
-    case 'where': {
-      const slug = positionals[0]
-      if (!slug) fail('USAGE_ERROR', 'Missing skill slug')
-      ok(await client.invoke('skills:where', ws, slug))
-    }
-
-    case 'files': {
-      const slug = positionals[0]
-      if (!slug) fail('USAGE_ERROR', 'Missing skill slug')
-      ok(await client.invoke('skills:getFiles', ws, slug))
     }
 
     case 'create': {

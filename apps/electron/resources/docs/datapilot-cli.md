@@ -170,8 +170,6 @@ Manage workspace skills stored under `skills/{slug}/SKILL.md`.
 ### Commands
 - `datapilot skill list`
 - `datapilot skill get <slug>`
-- `datapilot skill where <slug>`
-- `datapilot skill files <slug>`
 - `datapilot skill create --name "<name>" --description "<desc>" [--input '<json>']`
 - `datapilot skill update <slug> --input '<json>'`
 - `datapilot skill delete <slug>`
@@ -181,19 +179,15 @@ Manage workspace skills stored under `skills/{slug}/SKILL.md`.
 
 ```bash
 datapilot skill list
-datapilot skill where commit-helper
 datapilot skill create --name "Commit Helper" --description "Generate conventional commits"
 datapilot skill update commit-helper \
   --input '{"requiredSources":["github"],"body":"Use concise, imperative commit messages."}'
 datapilot skill validate commit-helper
-datapilot skill files commit-helper
 datapilot skill delete commit-helper
 ```
 
 ### Notes
 - `create` / `update` write `SKILL.md` frontmatter and content body.
-- `where` reports project/workspace/global resolution precedence.
-- `files` lists the skill's files (icon, attachments, etc.).
 <!-- cli:skill:end -->
 
 ---
