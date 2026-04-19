@@ -7,7 +7,7 @@ import { strFlag, parseInput, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
-  'list', 'get', 'create', 'update', 'delete', 'validate', 'test',
+  'list', 'get', 'create', 'update', 'delete', 'validate',
 ] as const
 
 export async function routeSource(
@@ -73,11 +73,7 @@ export async function routeSource(
       ok(await client.invoke('sources:validate', ws, slug))
     }
 
-    case 'test': {
-      const slug = positionals[0]
-      if (!slug) fail('USAGE_ERROR', 'Missing source slug')
-      ok(await client.invoke('sources:test', ws, slug))
-    }
+
   }
 
   fail('USAGE_ERROR', `Unhandled source action: ${action}`)

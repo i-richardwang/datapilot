@@ -113,7 +113,6 @@ Manage workspace sources stored under `sources/{slug}/`.
 - `datapilot source update <slug> --input '<json>'`
 - `datapilot source delete <slug>`
 - `datapilot source validate <slug>`
-- `datapilot source test <slug>`
 
 ### Required fields for `source create`
 
@@ -166,11 +165,7 @@ datapilot source create --name "Docs Folder" --provider "filesystem" --type loca
 
 datapilot source update linear --input '{"enabled":false}'
 datapilot source validate linear
-datapilot source test linear
-```
-
-### Notes
-- `test` is lightweight CLI validation; for full in-session auth/connection probing use the `source_test` MCP tool.
+``` -->
 <!-- cli:source:end -->
 
 ---
@@ -386,41 +381,4 @@ permissions and settings:
 }
 ```
 <!-- cli:workspace:end -->
-
----
-
-<!-- cli:server:start -->
-## Server
-
-Read-only introspection of a running datapilot server.
-
-### Commands
-- `datapilot server status`
-
-### Examples
-
-```bash
-datapilot server status
-```
-
-### Response
-
-Returns workspace runtime snapshot containing only the `workspaces` array:
-
-```json
-{
-  "workspaces": [
-    {
-      "id": "ws-abc123",
-      "name": "My Workspace",
-      "slug": "my-workspace",
-      "activeSessions": 3,
-      "automationCount": 5,
-      "schedulerRunning": true
-    }
-  ]
-}
-```
-<!-- cli:server:end -->
-
 
