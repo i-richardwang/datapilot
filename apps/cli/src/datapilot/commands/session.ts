@@ -1,8 +1,5 @@
 /**
  * session entity — wraps the sessions:* RPC channels for non-interactive use.
- *
- * Streaming send/follow uses `events tail --session <id>` rather than being
- * baked in here, so that this module stays request/response.
  */
 
 import { readFile } from 'node:fs/promises'

@@ -66,8 +66,6 @@ Exit codes:
 - `1` execution / internal failure (incl. transport failures)
 - `2` usage / validation / input failure
 
-`events tail` streams one JSON object per line instead of a single envelope.
-
 ---
 
 <!-- cli:label:start -->
@@ -315,8 +313,7 @@ datapilot batch delete abc123
 <!-- cli:session:start -->
 ## Session
 
-Manage sessions inside a workspace. Streaming output (live deltas, tool calls)
-is exposed via `events tail`; this entity is request/response.
+Manage sessions inside a workspace. This entity is request/response.
 
 ### Commands
 - `datapilot session list`
@@ -431,30 +428,4 @@ Returns workspace runtime snapshot containing only the `workspaces` array:
 ```
 <!-- cli:server:end -->
 
----
 
-<!-- cli:events:start -->
-## Events
-
-Subscribe to push events from the server. Default channel is `session:event`.
-
-### Commands
-- `datapilot events tail [--channel <name>] [--session <id>]`
-
-### Examples
-
-```bash
-# Tail session events for the current workspace
-datapilot events tail
-
-# Tail label-change events
-datapilot events tail --channel labels:changed
-
-# Filter to a specific session
-datapilot events tail --session sess-abc
-```
-
-### Notes
-- Output is newline-delimited JSON (`{channel, args, ts}`) on non-TTY stdout; compact human-readable lines on TTY.
-- The command runs until interrupted (Ctrl+C).
-<!-- cli:events:end -->
