@@ -32,7 +32,7 @@ import { routeBatch } from './datapilot/commands/batch.ts'
 import { routeSession } from './datapilot/commands/session.ts'
 import { routeWorkspace } from './datapilot/commands/workspace.ts'
 
-const VERSION = '0.1.0-phase3'
+const VERSION = '0.1.0'
 
 export async function main(argv: string[] = process.argv): Promise<void> {
   const args = parseArgs(argv.slice(2))
