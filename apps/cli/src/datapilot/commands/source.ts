@@ -8,8 +8,7 @@ import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
   'list', 'get', 'create', 'update', 'delete', 'validate', 'test',
-  'init-permissions',
-  'save-credentials', 'get-permissions', 'get-mcp-tools',
+  'get-permissions', 'get-mcp-tools',
 ] as const
 
 export async function routeSource(
@@ -75,20 +74,6 @@ export async function routeSource(
       const slug = positionals[0]
       if (!slug) fail('USAGE_ERROR', 'Missing source slug')
       ok(await client.invoke('sources:test', ws, slug))
-    }
-
-    case 'init-permissions': {
-      const slug = positionals[0]
-      if (!slug) fail('USAGE_ERROR', 'Missing source slug')
-      ok(await client.invoke('sources:initPermissions', ws, slug))
-    }
-
-    case 'save-credentials': {
-      const slug = positionals[0]
-      if (!slug) fail('USAGE_ERROR', 'Missing source slug')
-      const credential = strFlag(flags, 'credential')
-      if (!credential) fail('USAGE_ERROR', 'Missing --credential <value>')
-      ok(await client.invoke('sources:saveCredentials', ws, slug, credential))
     }
 
     case 'get-permissions': {
