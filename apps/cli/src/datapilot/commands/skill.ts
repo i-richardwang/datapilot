@@ -7,7 +7,7 @@ import { strFlag, parseInput, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
-  'list', 'get', 'create', 'update', 'delete', 'validate',
+  'list', 'get', 'create', 'update', 'delete',
 ] as const
 
 export async function routeSkill(
@@ -56,12 +56,6 @@ export async function routeSkill(
       if (!slug) fail('USAGE_ERROR', 'Missing skill slug')
       await client.invoke('skills:delete', ws, slug)
       ok({ deleted: slug })
-    }
-
-    case 'validate': {
-      const slug = positionals[0]
-      if (!slug) fail('USAGE_ERROR', 'Missing skill slug')
-      ok(await client.invoke('skills:validate', ws, slug))
     }
   }
 

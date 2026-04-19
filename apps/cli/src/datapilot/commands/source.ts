@@ -7,7 +7,7 @@ import { strFlag, parseInput, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
-  'list', 'get', 'create', 'update', 'delete', 'validate',
+  'list', 'get', 'create', 'update', 'delete',
 ] as const
 
 export async function routeSource(
@@ -65,12 +65,6 @@ export async function routeSource(
       if (!slug) fail('USAGE_ERROR', 'Missing source slug')
       await client.invoke('sources:delete', ws, slug)
       ok({ deleted: slug })
-    }
-
-    case 'validate': {
-      const slug = positionals[0]
-      if (!slug) fail('USAGE_ERROR', 'Missing source slug')
-      ok(await client.invoke('sources:validate', ws, slug))
     }
   }
 

@@ -10,7 +10,7 @@ const ACTIONS = [
   'list', 'get', 'create', 'update', 'delete',
   'start', 'pause', 'resume',
   'items',
-  'validate', 'test', 'retry-item',
+  'test', 'retry-item',
 ] as const
 
 export async function routeBatch(
@@ -88,10 +88,6 @@ export async function routeBatch(
       const offset = intFlag(flags, 'offset') ?? 0
       const limit = intFlag(flags, 'limit') ?? 100
       ok(await client.invoke('batches:getItems', ws, id, offset, limit))
-    }
-
-    case 'validate': {
-      ok(await client.invoke('batches:validate', ws))
     }
 
     case 'test': {

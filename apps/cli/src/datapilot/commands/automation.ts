@@ -41,7 +41,6 @@ const ACTIONS = [
   'list', 'get', 'create', 'update', 'delete',
   'enable', 'disable',
   'history', 'test',
-  'validate',
 ] as const
 
 export async function routeAutomation(
@@ -132,9 +131,6 @@ export async function routeAutomation(
       const payload = { workspaceId: ws, ...input }
       ok(await client.invoke('automations:test', payload))
     }
-
-    case 'validate':
-      ok(await client.invoke('automations:validate', ws))
   }
 
   fail('USAGE_ERROR', `Unhandled automation action: ${action}`)
