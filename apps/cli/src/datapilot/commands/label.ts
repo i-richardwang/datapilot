@@ -2,7 +2,7 @@
  * label entity — wraps the labels:* RPC channels.
  *
  * Actions: list, get, create, update, delete,
- *          auto-rule-list, auto-rule-add, auto-rule-remove, auto-rule-clear
+ *          auto-rule-add, auto-rule-remove, auto-rule-clear
  */
 
 import { ok, fail } from '../envelope.ts'
@@ -11,7 +11,7 @@ import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
   'list', 'get', 'create', 'update', 'delete',
-  'auto-rule-list', 'auto-rule-add', 'auto-rule-remove', 'auto-rule-clear',
+  'auto-rule-add', 'auto-rule-remove', 'auto-rule-clear',
 ] as const
 
 export async function routeLabel(
@@ -35,10 +35,13 @@ export async function routeLabel(
     case 'get': {
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing label id', { suggestion: 'datapilot label get <id>' })
-      const labels = (await client.invoke('labels:list', ws)) as Array<{ id: string }>
-      const found = findInTree(labels, id)
+      const [labels, autoRules] = await Promise.all([
+        client.invoke('labels:list', ws),
+        client.invoke('labels:autoRuleList', ws, id),
+      ])
+      const found = findInTree(labels as LabelNode[], id)
       if (!found) fail('NOT_FOUND', `Label '${id}' not found`)
-      ok(found)
+      ok({ ...found, autoRules })
     }
 
     case 'create': {
@@ -73,12 +76,6 @@ export async function routeLabel(
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing label id')
       ok(await client.invoke('labels:delete', ws, id))
-    }
-
-    case 'auto-rule-list': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing label id')
-      ok(await client.invoke('labels:autoRuleList', ws, id))
     }
 
     case 'auto-rule-add': {

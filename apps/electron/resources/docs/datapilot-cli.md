@@ -75,11 +75,10 @@ Manage workspace labels.
 
 ### Commands
 - `datapilot label list`
-- `datapilot label get <id>`
+- `datapilot label get <id>` — returns label with `autoRules`
 - `datapilot label create --name "<name>" [--color "<color>"] [--parent-id <id|root>] [--value-type string|number|date]`
 - `datapilot label update <id> [--name "<name>"] [--color "<color>"] [--value-type string|number|date|none]`
 - `datapilot label delete <id>`
-- `datapilot label auto-rule-list <id>`
 - `datapilot label auto-rule-add <id> --pattern "<regex>" [--flags "gi"] [--value-template "$1"] [--description "..."]`
 - `datapilot label auto-rule-remove <id> --index <n>`
 - `datapilot label auto-rule-clear <id>`
@@ -94,7 +93,6 @@ datapilot label create --name "Priority" --value-type number
 datapilot label update bug --input '{"name":"Bug Report","color":"destructive"}'
 datapilot label update priority --value-type none
 datapilot label auto-rule-add linear-issue --pattern "\\b([A-Z]{2,5}-\\d+)\\b" --value-template "$1"
-datapilot label auto-rule-list linear-issue
 ```
 
 ### Notes
@@ -261,14 +259,13 @@ Manage batch processing jobs stored in `batches.json`.
 
 ### Commands
 - `datapilot batch list`
-- `datapilot batch get <id>`
+- `datapilot batch get <id>` — returns batch with `progress`
 - `datapilot batch create --name "<name>" [--input '<json>']`
 - `datapilot batch update <id> --input '<json>'`
 - `datapilot batch delete <id>`
 - `datapilot batch start <id>`
 - `datapilot batch pause <id>`
 - `datapilot batch resume <id>`
-- `datapilot batch status <id>`
 - `datapilot batch state <id>`
 - `datapilot batch items <id> [--offset <n>] [--limit <n>]`
 - `datapilot batch validate`
@@ -291,7 +288,6 @@ datapilot batch update abc123 \
   --input '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
 
 datapilot batch start abc123
-datapilot batch status abc123
 datapilot batch items abc123
 
 # Paginated — skip first 20, fetch next 10
@@ -305,8 +301,7 @@ datapilot batch delete abc123
 ```
 
 ### Notes
-- `status` returns counts/state summary; `state` returns the persisted batch-state document.
-- `items` returns the per-item breakdown. Supports `--offset` (default 0) and `--limit` (default 100) for pagination.
+- `state` returns the persisted batch-state document; `items` returns the per-item breakdown. `items` supports `--offset` (default 0) and `--limit` (default 100) for pagination.
 - `test` runs a dry-run against a batch with optional sample size; pull the result back with `test-result`.
 - `delete` removes the batch from `batches.json` and cleans up its `batch-state-{id}.json`.
 <!-- cli:batch:end -->
