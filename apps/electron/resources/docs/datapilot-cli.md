@@ -348,14 +348,32 @@ sessions, etc.).
 ### Commands
 - `datapilot workspace list`
 - `datapilot workspace get [<id>]`
-- `datapilot workspace permissions [<id>]`
-- `datapilot workspace settings [<id>]`
 
 ### Examples
 
 ```bash
 datapilot workspace list
-datapilot workspace settings ws-abc123
+datapilot workspace get ws-abc123
+```
+
+### Response
+
+The `workspace get` command returns the workspace record enriched with
+permissions and settings:
+
+```json
+{
+  "id": "ws-abc123",
+  "name": "My Workspace",
+  "permissions": {
+    "admins": ["user-1"],
+    "members": ["user-2"]
+  },
+  "settings": {
+    "theme": "dark",
+    "language": "zh"
+  }
+}
 ```
 <!-- cli:workspace:end -->
 

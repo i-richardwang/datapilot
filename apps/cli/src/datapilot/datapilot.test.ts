@@ -375,6 +375,32 @@ describe('datapilot CLI', () => {
     expect((createArgs[1] as Record<string, unknown>).permissionMode).toBe('ask')
   })
 
+  it('workspace get returns merged permissions and settings', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1', name: 'Test Workspace' }],
+        'window:switchWorkspace': () => undefined,
+        'workspace:getPermissions': () => ({ admins: ['user-1'], members: ['user-2'] }),
+        'workspaceSettings:get': () => ({ theme: 'dark', language: 'zh' }),
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'workspace', 'get', 'ws-1',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    expect(r.envelope?.data).toEqual({
+      id: 'ws-1',
+      name: 'Test Workspace',
+      permissions: { admins: ['user-1'], members: ['user-2'] },
+      settings: { theme: 'dark', language: 'zh' },
+    })
+    // Verify the RPC calls were made
+    expect(server.requests.find((req) => req.channel === 'workspace:getPermissions')).toBeDefined()
+    expect(server.requests.find((req) => req.channel === 'workspaceSettings:get')).toBeDefined()
+  })
+
   it('permission entity is no longer routed', async () => {
     const r = await runCli(['--json', 'permission', 'list'])
     expect(r.exitCode).toBe(2)
