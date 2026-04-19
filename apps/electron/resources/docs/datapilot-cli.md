@@ -272,7 +272,7 @@ Manage batch processing jobs stored in `batches.json`.
 - `datapilot batch resume <id>`
 - `datapilot batch status <id>`
 - `datapilot batch state <id>`
-- `datapilot batch items <id>`
+- `datapilot batch items <id> [--offset <n>] [--limit <n>]`
 - `datapilot batch validate`
 - `datapilot batch test <id> [--sample-size <n>]`
 - `datapilot batch test-result <test-id>`
@@ -296,6 +296,9 @@ datapilot batch start abc123
 datapilot batch status abc123
 datapilot batch items abc123
 
+# Paginated — skip first 20, fetch next 10
+datapilot batch items abc123 --offset 20 --limit 10
+
 # Retry one failed item; the batch transitions paused → in_progress on resume
 datapilot batch retry-item abc123 item-42
 datapilot batch resume abc123
@@ -305,7 +308,7 @@ datapilot batch delete abc123
 
 ### Notes
 - `status` returns counts/state summary; `state` returns the persisted batch-state document.
-- `items` returns the per-item breakdown.
+- `items` returns the per-item breakdown. Supports `--offset` (default 0) and `--limit` (default 100) for pagination.
 - `test` runs a dry-run against a batch with optional sample size; pull the result back with `test-result`.
 - `delete` removes the batch from `batches.json` and cleans up its `batch-state-{id}.json`.
 <!-- cli:batch:end -->

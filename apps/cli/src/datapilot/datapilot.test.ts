@@ -463,4 +463,48 @@ describe('datapilot CLI', () => {
     expect(r.envelope?.ok).toBe(false)
     expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
   })
+
+  it('batch items sends default offset=0 and limit=100', async () => {
+    let lastArgs: unknown[] = []
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'batches:getItems': (args) => {
+          lastArgs = args
+          return { items: [], total: 0, offset: args[2] as number, limit: args[3] as number, runningOffset: 0 }
+        },
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'batch', 'items', 'abc123',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    expect(lastArgs[2]).toBe(0)
+    expect(lastArgs[3]).toBe(100)
+  })
+
+  it('batch items --offset 5 --limit 10 passes explicit pagination', async () => {
+    let lastArgs: unknown[] = []
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'batches:getItems': (args) => {
+          lastArgs = args
+          return { items: [], total: 50, offset: args[2] as number, limit: args[3] as number, runningOffset: 5 }
+        },
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'batch', 'items', 'abc123', '--offset', '5', '--limit', '10',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    expect(lastArgs[2]).toBe(5)
+    expect(lastArgs[3]).toBe(10)
+  })
 })
