@@ -182,7 +182,8 @@ export interface BatchExecutePromptParams {
   batchContext?: {
     batchId: string
     itemId: string
-    outputPath: string
+    /** Absolute output file path. Undefined when the batch has no `output` block. */
+    outputPath?: string
     outputSchema?: Record<string, unknown>
     toolProfile?: string
   }

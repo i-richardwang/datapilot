@@ -151,8 +151,8 @@ export interface BatchContext {
   batchId: string
   /** Item ID being processed */
   itemId: string
-  /** Output file path (absolute) */
-  outputPath: string
+  /** Output file path (absolute). Undefined when the batch has no `output` block configured. */
+  outputPath?: string
   /** JSON Schema for output validation (if configured) */
   outputSchema?: Record<string, unknown>
   /** Tool profile: 'minimal' restricts to WebSearch/WebFetch/Read/Bash + batch_output */

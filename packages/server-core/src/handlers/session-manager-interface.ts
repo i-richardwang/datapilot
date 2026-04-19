@@ -229,7 +229,7 @@ export interface ISessionManager {
     llmConnection?: string,
     model?: string,
     isBatch?: boolean,
-    batchContext?: { batchId: string; itemId: string; outputPath: string; outputSchema?: Record<string, unknown> },
+    batchContext?: { batchId: string; itemId: string; outputPath?: string; outputSchema?: Record<string, unknown> },
     automationName?: string,
     workingDirectory?: string,
   ): Promise<{ sessionId: string }>

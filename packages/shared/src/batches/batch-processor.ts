@@ -568,11 +568,13 @@ export class BatchProcessor {
         automationName: `Batch: ${config.name} — ${itemId}`,
       }
 
-      // Attach batch context (always present for batch sessions)
+      // Attach batch context (always present for batch sessions).
+      // `outputPath` is only set when the batch has an `output` block — downstream
+      // uses its presence to decide whether to expose the `batch_output` tool.
       params.batchContext = {
         batchId: batchId,
         itemId: itemId,
-        outputPath: config.output ? resolve(this.options.workspaceRootPath, config.output.path) : '',
+        outputPath: config.output ? resolve(this.options.workspaceRootPath, config.output.path) : undefined,
         outputSchema: config.output?.schema as Record<string, unknown> | undefined,
         toolProfile: config.execution?.toolProfile,
       }

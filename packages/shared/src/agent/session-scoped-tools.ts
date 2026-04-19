@@ -325,9 +325,13 @@ export function getSessionScopedTools(
     const batchCtx = getSessionBatchContext(sessionId);
     const isBatchSession = !!batchCtx;
     const isMinimalBatch = batchCtx?.toolProfile === 'minimal';
+    // Only expose `batch_output` when the batch actually declared an output block.
+    // Without this gate, side-effect batches (API calls, notifications) see the tool
+    // in their tool list and tend to "report a result" that was never asked for.
+    const includeBatchOutput = !!batchCtx?.outputPath;
     tools = getSessionToolDefs({
       includeDeveloperFeedback: FEATURE_FLAGS.developerFeedback,
-      includeBatchOutput: isBatchSession,
+      includeBatchOutput,
       batchMode: isBatchSession,
       minimalBatchMode: isMinimalBatch,
       disableOauth: FEATURE_FLAGS.disableOauth,
