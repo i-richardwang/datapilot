@@ -58,13 +58,13 @@ const GLOBAL_KEYS = new Set([
  * Flags whose presence alone is meaningful (no value consumed). Any flag not
  * in this set takes the next non-flag arg as its value. This is the canonical
  * boolean list — keep it synced with new boolean per-action flags as they're
- * added (currently: --stdin, --dry-run, --detach).
+ * added (currently: --stdin, --dry-run).
  */
 const BOOLEAN_FLAGS = new Set([
   // global
   'json', 'human', 'help', 'version',
   // per-action
-  'stdin', 'dry-run', 'detach',
+  'stdin', 'dry-run',
 ])
 
 function takesValue(key: string, next: string | undefined): boolean {

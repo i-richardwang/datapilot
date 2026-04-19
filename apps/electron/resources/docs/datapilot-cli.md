@@ -125,9 +125,7 @@ Manage workspace sources stored under `sources/{slug}/`.
 - `datapilot source delete <slug>`
 - `datapilot source validate <slug>`
 - `datapilot source test <slug>`
-- `datapilot source init-guide <slug>`
 - `datapilot source init-permissions <slug>`
-- `datapilot source auth-help <slug>`
 - `datapilot source save-credentials <slug> --credential <value>`
 - `datapilot source get-permissions <slug>`
 - `datapilot source get-mcp-tools <slug>`
@@ -164,15 +162,11 @@ datapilot source create --name "Docs Folder" --provider "filesystem" --type loca
 datapilot source update linear --input '{"enabled":false}'
 datapilot source validate linear
 datapilot source test linear
-datapilot source init-guide linear
 datapilot source init-permissions linear
-datapilot source auth-help linear
 ```
 
 ### Notes
-- `init-guide` scaffolds a starter `guide.md`.
 - `init-permissions` scaffolds read-only `permissions.json` patterns for Explore mode.
-- `auth-help` returns the recommended in-session auth tool and mode.
 - `test` is lightweight CLI validation; for full in-session auth/connection probing use the `source_test` MCP tool.
 <!-- cli:source:end -->
 
@@ -320,47 +314,6 @@ datapilot permission defaults
 
 ---
 
-<!-- cli:theme:start -->
-## Theme
-
-Manage app-level and workspace-level theme settings.
-
-### Commands
-- `datapilot theme get`
-- `datapilot theme list-presets`
-- `datapilot theme load-preset <id>`
-- `datapilot theme get-color`
-- `datapilot theme set-color <preset-id>`
-- `datapilot theme get-workspace-color`
-- `datapilot theme set-workspace-color [<preset-id|null>]`
-- `datapilot theme list-workspace-themes`
-- `datapilot theme set-override --input '<json>'`
-- `datapilot theme reset-override`
-- `datapilot theme validate [--theme <id> | --input '<json>']`
-
-### Examples
-
-```bash
-datapilot theme get
-datapilot theme list-presets
-datapilot theme load-preset dracula
-datapilot theme set-color nord
-datapilot theme set-workspace-color dracula
-# Clear workspace override (inherit app default)
-datapilot theme set-workspace-color
-datapilot theme set-override --input '{"accent":"oklch(0.62 0.21 293)"}'
-datapilot theme reset-override
-datapilot theme validate --theme nord
-```
-
-### Notes
-- Color presets must exist; `default` is always valid for `set-workspace-color`.
-- `set-override` validates `theme.json` shape before writing.
-- App override lives in `~/.datapilot/theme.json`; workspace overrides live under the workspace folder.
-<!-- cli:theme:end -->
-
----
-
 <!-- cli:batch:start -->
 ## Batch
 
@@ -491,12 +444,9 @@ datapilot workspace set-settings ws-abc123 --input '{"defaultMode":"ask"}'
 <!-- cli:server:start -->
 ## Server
 
-Local-server lifecycle. `start` runs in the foreground and writes a discovery
-file; other actions talk to a running server.
+Read-only introspection of a running datapilot server.
 
 ### Commands
-- `datapilot server start [--port <n>] [--host <addr>] [--server-entry <path>]`
-- `datapilot server stop`
 - `datapilot server health`
 - `datapilot server status`
 - `datapilot server versions`
@@ -506,15 +456,14 @@ file; other actions talk to a running server.
 ### Examples
 
 ```bash
-datapilot server start --port 9100
 datapilot server health
 datapilot server status
 datapilot server endpoint
-datapilot server stop
+datapilot server versions
+datapilot server home-dir
 ```
 
 ### Notes
-- `start` blocks until SIGINT/SIGTERM; backgrounding (`--detach`) is not yet supported — wrap with `nohup` / a service supervisor.
 - `endpoint` resolves the URL/token without connecting (useful for scripting).
 <!-- cli:server:end -->
 

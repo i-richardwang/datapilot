@@ -8,7 +8,7 @@ import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
   'list', 'get', 'create', 'update', 'delete', 'validate', 'test',
-  'init-guide', 'init-permissions', 'auth-help',
+  'init-permissions',
   'save-credentials', 'get-permissions', 'get-mcp-tools',
 ] as const
 
@@ -77,22 +77,10 @@ export async function routeSource(
       ok(await client.invoke('sources:test', ws, slug))
     }
 
-    case 'init-guide': {
-      const slug = positionals[0]
-      if (!slug) fail('USAGE_ERROR', 'Missing source slug')
-      ok(await client.invoke('sources:initGuide', ws, slug))
-    }
-
     case 'init-permissions': {
       const slug = positionals[0]
       if (!slug) fail('USAGE_ERROR', 'Missing source slug')
       ok(await client.invoke('sources:initPermissions', ws, slug))
-    }
-
-    case 'auth-help': {
-      const slug = positionals[0]
-      if (!slug) fail('USAGE_ERROR', 'Missing source slug')
-      ok(await client.invoke('sources:authHelp', ws, slug))
     }
 
     case 'save-credentials': {

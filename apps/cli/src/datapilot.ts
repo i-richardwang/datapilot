@@ -9,8 +9,8 @@
  *   All operations talk to a running server over WebSocket. Default target
  *   is `ws://127.0.0.1:9100`; override with `--url` or set
  *   $DATAPILOT_SERVER_URL. Token comes from `--token` /
- *   $DATAPILOT_SERVER_TOKEN, or from the discovery file written by
- *   `datapilot server start`.
+ *   $DATAPILOT_SERVER_TOKEN, or from the discovery file at
+ *   `~/.datapilot/.server.endpoint`.
  *
  * Output contract:
  *   - Non-TTY stdout: JSON envelope `{ok, data|error, warnings}`
@@ -29,7 +29,6 @@ import { routeSource } from './datapilot/commands/source.ts'
 import { routeAutomation } from './datapilot/commands/automation.ts'
 import { routeSkill } from './datapilot/commands/skill.ts'
 import { routePermission } from './datapilot/commands/permission.ts'
-import { routeTheme } from './datapilot/commands/theme.ts'
 import { routeBatch } from './datapilot/commands/batch.ts'
 import { routeSession } from './datapilot/commands/session.ts'
 import { routeWorkspace } from './datapilot/commands/workspace.ts'
@@ -82,7 +81,6 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       case 'automation': await routeAutomation(ctx, args.action, args.positionals, args.flags); break
       case 'skill': await routeSkill(ctx, args.action, args.positionals, args.flags); break
       case 'permission': await routePermission(ctx, args.action, args.positionals, args.flags); break
-      case 'theme': await routeTheme(ctx, args.action, args.positionals, args.flags); break
       case 'batch': await routeBatch(ctx, args.action, args.positionals, args.flags); break
       case 'session': await routeSession(ctx, args.action, args.positionals, args.flags); break
       case 'workspace': await routeWorkspace(ctx, args.action, args.positionals, args.flags); break
@@ -165,11 +163,10 @@ Entities:
   automation             Workspace automations
   skill                  Workspace skills
   permission             Workspace + per-source permission documents
-  theme                  App / workspace theme settings
   batch                  Batch processing jobs
   session                Sessions inside a workspace
   workspace              Workspaces themselves
-  server                 Local-server lifecycle (start, stop, health, status)
+  server                 Local-server health, status, endpoint, and version queries
   events                 Tail push events from the server
 
 Run 'datapilot <entity>' with no action to list that entity's actions.
@@ -178,7 +175,7 @@ Examples:
   datapilot label list
   datapilot label create --name TODO --color blue
   datapilot --url wss://remote source list
-  datapilot server start
+  datapilot server health
   datapilot --workspace ws-abc events tail --channel session:event
 `)
 }
