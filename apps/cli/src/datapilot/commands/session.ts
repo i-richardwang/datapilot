@@ -126,7 +126,8 @@ export async function routeSession(
     case 'share': {
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing session id')
-      ok(await client.invoke('sessions:share', id))
+      const ws = await requireWorkspace(ctx)
+      ok(await client.invoke('sessions:share', ws, id))
     }
 
     case 'share-html': {
