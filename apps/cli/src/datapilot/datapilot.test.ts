@@ -243,6 +243,46 @@ describe('datapilot CLI', () => {
     expect(r.envelope?.error?.message).toContain('--input')
   })
 
+  it('skill create merges --slug into input and invokes with 2 business args', async () => {
+    let lastArgs: unknown[] | null = null
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'skills:create': (args) => {
+          lastArgs = args
+          const input = args[1] as { slug: string; name: string; description: string }
+          return { slug: input.slug, path: `/skills/${input.slug}`, metadata: { name: input.name, description: input.description } }
+        },
+      },
+    })
+
+    // Path 1 — slug via --slug flag, other fields via --input
+    const viaFlag = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'skill', 'create', '--slug', 'test-skill',
+      '--input', '{"name":"Test","description":"desc"}',
+    ])
+    expect(viaFlag.exitCode).toBe(0)
+    expect(viaFlag.envelope?.ok).toBe(true)
+    expect((viaFlag.envelope?.data as Record<string, unknown>).slug).toBe('test-skill')
+    expect(lastArgs).not.toBeNull()
+    expect(lastArgs!.length).toBe(2)
+    expect(lastArgs![1]).toEqual({ slug: 'test-skill', name: 'Test', description: 'desc' })
+
+    // Path 2 — slug embedded inside --input
+    const viaInput = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'skill', 'create',
+      '--input', '{"slug":"test-skill-2","name":"Test 2","description":"d2"}',
+    ])
+    expect(viaInput.exitCode).toBe(0)
+    expect(viaInput.envelope?.ok).toBe(true)
+    expect((viaInput.envelope?.data as Record<string, unknown>).slug).toBe('test-skill-2')
+    expect(lastArgs!.length).toBe(2)
+    expect(lastArgs![1]).toEqual({ slug: 'test-skill-2', name: 'Test 2', description: 'd2' })
+  })
+
   it('TTY detection: --json forces envelope output', async () => {
     server = startMockServer({
       handlers: {
