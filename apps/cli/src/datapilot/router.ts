@@ -14,7 +14,6 @@ export const ENTITIES = [
   'source',
   'automation',
   'skill',
-  'permission',
   'batch',
   'session',
   'workspace',
