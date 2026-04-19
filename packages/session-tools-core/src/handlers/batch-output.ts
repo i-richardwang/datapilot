@@ -165,6 +165,16 @@ export async function handleBatchOutput(
 
   const { itemId, outputPath, outputSchema } = ctx.batchContext;
 
+  // Guard: this batch was not configured with an `output` block. The tool should
+  // have been filtered out at registration time, but defend the filesystem write
+  // in case a backend ever wires it through.
+  if (!outputPath) {
+    return errorResponse(
+      'batch_output is not available for this batch: no `output` block is configured. ' +
+      'Add an `output.path` to the batch config if you want to collect structured results.',
+    );
+  }
+
   // Normalize data: accept both object and stringified JSON
   const coerced = coerceData(args.data);
   if ('error' in coerced) {

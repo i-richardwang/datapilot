@@ -51,6 +51,19 @@ describe('handleBatchOutput', () => {
     expect(result.content[0]!.text).toContain('batch session')
   })
 
+  it('should reject when batch has no outputPath configured', async () => {
+    // Batch without an `output` block — outputPath is undefined. The registration
+    // gate should keep the tool out of the model's tool list; this asserts the
+    // handler also refuses to write, rather than silently writing to an empty path.
+    const ctx = createTestContext({
+      batchId: 'batch-1',
+      itemId: 'item-1',
+    })
+    const result = await handleBatchOutput(ctx, { data: { summary: 'test' } })
+    expect(result.isError).toBe(true)
+    expect(result.content[0]!.text).toContain('output')
+  })
+
   it('should write JSONL output with metadata', async () => {
     const outputPath = join(tempDir, 'output.jsonl')
     const ctx = createTestContext({
