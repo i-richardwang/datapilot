@@ -33,11 +33,8 @@ export async function routeWorkspace(
       const target = id ?? (await ctx.getWorkspace())
       const found = list.find((w) => w.id === target)
       if (!found) fail('NOT_FOUND', `Workspace '${target}' not found`)
-      const [permissions, settings] = await Promise.all([
-        client.invoke('workspace:getPermissions', target),
-        client.invoke('workspaceSettings:get', target),
-      ])
-      ok({ ...found, permissions, settings })
+      const settings = await client.invoke('workspaceSettings:get', target)
+      ok({ ...found, settings })
     }
   }
 

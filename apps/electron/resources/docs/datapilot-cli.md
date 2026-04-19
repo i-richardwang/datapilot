@@ -112,7 +112,6 @@ Manage workspace sources stored under `sources/{slug}/`.
 - `datapilot source create --name "<name>" --provider "<provider>" --type mcp|api|local [--input '<json>']`
 - `datapilot source update <slug> --input '<json>'`
 - `datapilot source delete <slug>`
-- `datapilot source validate <slug>`
 
 ### Required fields for `source create`
 
@@ -164,7 +163,6 @@ datapilot source create --name "Docs Folder" --provider "filesystem" --type loca
   --input '{"local":{"path":"~/Documents"}}'
 
 datapilot source update linear --input '{"enabled":false}'
-datapilot source validate linear
 ```
 <!-- cli:source:end -->
 
@@ -181,7 +179,6 @@ Manage workspace skills stored under `skills/{slug}/SKILL.md`.
 - `datapilot skill create --name "<name>" --description "<desc>" [--input '<json>']`
 - `datapilot skill update <slug> --input '<json>'`
 - `datapilot skill delete <slug>`
-- `datapilot skill validate <slug>`
 
 ### Examples
 
@@ -190,7 +187,6 @@ datapilot skill list
 datapilot skill create --name "Commit Helper" --description "Generate conventional commits"
 datapilot skill update commit-helper \
   --input '{"requiredSources":["github"],"body":"Use concise, imperative commit messages."}'
-datapilot skill validate commit-helper
 datapilot skill delete commit-helper
 ```
 
@@ -215,13 +211,11 @@ Manage workspace automations stored in `automations.json`.
 - `datapilot automation disable <id>`
 - `datapilot automation history <id> [--limit <n>]`
 - `datapilot automation test [--input '<json>']`
-- `datapilot automation validate`
 
 ### Examples
 
 ```bash
 datapilot automation list
-datapilot automation validate
 
 # Simple prompt automation
 datapilot automation create --event UserPromptSubmit --name "Summarize" \
@@ -240,7 +234,6 @@ datapilot automation delete abc123
 
 ### Notes
 - `--name` is required for `create` (or pass it inside `--input`); use `--input` with `actions` for multi-action automations.
-- `validate` checks the workspace `automations.json` schema; it takes no input flags.
 <!-- cli:automation:end -->
 
 ---
@@ -260,7 +253,6 @@ Manage batch processing jobs stored in `batches.json`.
 - `datapilot batch pause <id>`
 - `datapilot batch resume <id>`
 - `datapilot batch items <id> [--offset <n>] [--limit <n>]`
-- `datapilot batch validate`
 - `datapilot batch test <id> [--sample-size <n>]`
 - `datapilot batch retry-item <batch-id> <item-id>`
 
@@ -269,7 +261,6 @@ Manage batch processing jobs stored in `batches.json`.
 ```bash
 datapilot batch list
 datapilot batch get abc123
-datapilot batch validate
 
 # Create — most fields live under --input
 datapilot batch create --name "User Analysis" \
@@ -360,17 +351,12 @@ datapilot workspace get ws-abc123
 
 ### Response
 
-The `workspace get` command returns the workspace record enriched with
-permissions and settings:
+The `workspace get` command returns the workspace record enriched with settings:
 
 ```json
 {
   "id": "ws-abc123",
   "name": "My Workspace",
-  "permissions": {
-    "admins": ["user-1"],
-    "members": ["user-2"]
-  },
   "settings": {
     "theme": "dark",
     "language": "zh"

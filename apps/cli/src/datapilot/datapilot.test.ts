@@ -374,12 +374,11 @@ describe('datapilot CLI', () => {
     expect((createArgs[1] as Record<string, unknown>).permissionMode).toBe('ask')
   })
 
-  it('workspace get returns merged permissions and settings', async () => {
+  it('workspace get returns settings but not permissions', async () => {
     server = startMockServer({
       handlers: {
         'workspaces:get': () => [{ id: 'ws-1', name: 'Test Workspace' }],
         'window:switchWorkspace': () => undefined,
-        'workspace:getPermissions': () => ({ admins: ['user-1'], members: ['user-2'] }),
         'workspaceSettings:get': () => ({ theme: 'dark', language: 'zh' }),
       },
     })
@@ -392,11 +391,9 @@ describe('datapilot CLI', () => {
     expect(r.envelope?.data).toEqual({
       id: 'ws-1',
       name: 'Test Workspace',
-      permissions: { admins: ['user-1'], members: ['user-2'] },
       settings: { theme: 'dark', language: 'zh' },
     })
-    // Verify the RPC calls were made
-    expect(server.requests.find((req) => req.channel === 'workspace:getPermissions')).toBeDefined()
+    expect(r.envelope?.data).not.toHaveProperty('permissions')
     expect(server.requests.find((req) => req.channel === 'workspaceSettings:get')).toBeDefined()
   })
 
@@ -626,5 +623,37 @@ describe('datapilot CLI', () => {
     expect(r.envelope?.ok).toBe(false)
     expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
     expect(r.envelope?.error?.message).toContain('Unknown batch action: test-result')
+  })
+
+  it('batch validate returns USAGE_ERROR', async () => {
+    const r = await runCli(['--json', 'batch', 'validate'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('Unknown batch action: validate')
+  })
+
+  it('automation validate returns USAGE_ERROR', async () => {
+    const r = await runCli(['--json', 'automation', 'validate'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('Unknown automation action: validate')
+  })
+
+  it('skill validate returns USAGE_ERROR', async () => {
+    const r = await runCli(['--json', 'skill', 'validate', 'some-slug'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('Unknown skill action: validate')
+  })
+
+  it('source validate returns USAGE_ERROR', async () => {
+    const r = await runCli(['--json', 'source', 'validate', 'some-slug'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('Unknown source action: validate')
   })
 })
