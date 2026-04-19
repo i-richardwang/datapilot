@@ -14,8 +14,8 @@ import type { RouteCtx } from '../router.ts'
 const ACTIONS = [
   'list', 'get', 'create', 'delete',
   'messages', 'send', 'cancel',
-  'get-model', 'set-model',
-  'get-files', 'get-notes', 'set-notes',
+  'set-model',
+  'get-files',
   'share', 'share-html',
 ] as const
 
@@ -89,12 +89,6 @@ export async function routeSession(
       ok({ cancelled: id })
     }
 
-    case 'get-model': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing session id')
-      ok(await client.invoke('session:getModel', id))
-    }
-
     case 'set-model': {
       const id = positionals[0]
       const model = positionals[1]
@@ -108,19 +102,6 @@ export async function routeSession(
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing session id')
       ok(await client.invoke('sessions:getFiles', id))
-    }
-
-    case 'get-notes': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing session id')
-      ok(await client.invoke('sessions:getNotes', id))
-    }
-
-    case 'set-notes': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing session id')
-      const notes = strFlag(flags, 'notes') ?? positionals.slice(1).join(' ')
-      ok(await client.invoke('sessions:setNotes', id, notes))
     }
 
     case 'share': {

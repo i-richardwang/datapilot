@@ -308,11 +308,8 @@ is exposed via `events tail`; this entity is request/response.
 - `datapilot session messages <id>`
 - `datapilot session send <id> <message-text...>`
 - `datapilot session cancel <id>`
-- `datapilot session get-model <id>`
 - `datapilot session set-model <id> <model> [--connection <slug>]`
 - `datapilot session get-files <id>`
-- `datapilot session get-notes <id>`
-- `datapilot session set-notes <id> [--notes "..."]`
 - `datapilot session share <id>`
 - `datapilot session share-html <file> --session <id>`
 
