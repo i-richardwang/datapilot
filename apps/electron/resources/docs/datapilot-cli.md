@@ -222,15 +222,15 @@ Manage workspace automations stored in `automations.json`.
 ### Commands
 - `datapilot automation list`
 - `datapilot automation get <id>`
-- `datapilot automation create --event <EventName> [--prompt "..."] [--input '<json>']`
+- `datapilot automation create --event <EventName> --name "<name>" [--input '<json>']`
 - `datapilot automation update <id> [--input '<json>']`
 - `datapilot automation delete <id>`
 - `datapilot automation enable <id>`
 - `datapilot automation disable <id>`
 - `datapilot automation duplicate <id>`
 - `datapilot automation history <id> [--limit <n>]`
-- `datapilot automation last-executed <id>`
-- `datapilot automation test <id> [--match "..."]`
+- `datapilot automation last-executed`
+- `datapilot automation test [--input '<json>']`
 - `datapilot automation replay <id>`
 - `datapilot automation lint`
 - `datapilot automation validate`
@@ -241,27 +241,28 @@ Manage workspace automations stored in `automations.json`.
 datapilot automation list
 datapilot automation validate
 
-# Simple prompt automation
-datapilot automation create --event UserPromptSubmit --prompt "Summarize this prompt"
+# Simple automation with a name
+datapilot automation create --event UserPromptSubmit --name "Summarize"
 
 # Scheduled automation with nested config via --input
 datapilot automation create --event SchedulerTick \
-  --input '{"cron":"0 9 * * 1-5","actions":[{"type":"prompt","prompt":"Daily summary"}]}'
+  --input '{"name":"Daily Summary","cron":"0 9 * * 1-5","actions":[{"type":"prompt","prompt":"Daily summary"}]}'
 
 datapilot automation update abc123 --input '{"enabled":false}'
 datapilot automation enable abc123
 datapilot automation duplicate abc123
 datapilot automation history abc123 --limit 10
-datapilot automation last-executed abc123
-datapilot automation test abc123 --match "UserPromptSubmit"
+datapilot automation last-executed
+datapilot automation test --input '{"automationId":"abc123","actions":[{"type":"prompt","prompt":"Test"}]}'
 datapilot automation lint
 datapilot automation delete abc123
 ```
 
 ### Notes
-- `--prompt` is a shortcut that wraps the text as a prompt action; use `--input` with `actions` for multi-action automations.
+- `--name` is required for `create` (or pass it inside `--input`); use `--input` with `actions` for multi-action automations.
 - `lint` runs hygiene checks (regex validity, missing actions, oversized prompt mention sets).
-- `history` and `last-executed` read from `automations-history.jsonl` when present.
+- `last-executed` returns a map of all automation IDs to their last execution timestamp.
+- `validate` checks the workspace `automations.json` schema; it takes no input flags.
 <!-- cli:automation:end -->
 
 ---

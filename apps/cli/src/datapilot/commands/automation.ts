@@ -153,10 +153,8 @@ export async function routeAutomation(
       ok(await client.invoke('automations:replay', ws, id, resolved.eventName))
     }
 
-    case 'validate': {
-      const input = (await parseInput(flags)) ?? {}
-      ok(await client.invoke('automations:validate', ws, input))
-    }
+    case 'validate':
+      ok(await client.invoke('automations:validate', ws))
 
     case 'lint':
       ok(await client.invoke('automations:lint', ws))
