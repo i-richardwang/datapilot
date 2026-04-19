@@ -1597,7 +1597,8 @@ SKILLEOF`, 90_000, true, undefined, ctx.onEvent)
               !e.ok && e.ts > recentThreshold && e.webhook?.method === 'POST'
             )
             if (recentFailed) {
-              return `webhook failure recorded: method=${recentFailed.webhook.method}, url=${recentFailed.webhook.url?.slice(0, 50)}`
+              const w = (recentFailed as any).webhook
+              return `webhook failure recorded: method=${w.method}, url=${w.url?.slice(0, 50)}`
             }
 
             const latest = webhookEntries[webhookEntries.length - 1] as any

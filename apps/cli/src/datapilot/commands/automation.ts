@@ -41,7 +41,7 @@ const ACTIONS = [
   'list', 'get', 'create', 'update', 'delete',
   'enable', 'disable', 'duplicate',
   'history', 'last-executed', 'test', 'replay',
-  'validate', 'lint',
+  'validate',
 ] as const
 
 export async function routeAutomation(
@@ -155,9 +155,6 @@ export async function routeAutomation(
 
     case 'validate':
       ok(await client.invoke('automations:validate', ws))
-
-    case 'lint':
-      ok(await client.invoke('automations:lint', ws))
   }
 
   fail('USAGE_ERROR', `Unhandled automation action: ${action}`)

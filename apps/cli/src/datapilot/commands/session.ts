@@ -16,7 +16,7 @@ const ACTIONS = [
   'messages', 'send', 'cancel',
   'get-model', 'set-model',
   'get-files', 'get-notes', 'set-notes',
-  'export', 'share', 'share-html',
+  'share', 'share-html',
 ] as const
 
 export async function routeSession(
@@ -121,12 +121,6 @@ export async function routeSession(
       if (!id) fail('USAGE_ERROR', 'Missing session id')
       const notes = strFlag(flags, 'notes') ?? positionals.slice(1).join(' ')
       ok(await client.invoke('sessions:setNotes', id, notes))
-    }
-
-    case 'export': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing session id')
-      ok(await client.invoke('sessions:export', id))
     }
 
     case 'share': {

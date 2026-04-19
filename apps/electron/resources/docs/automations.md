@@ -35,7 +35,6 @@ datapilot automation duplicate <id>
 datapilot automation history [<id>] --limit 20
 datapilot automation last-executed <id>
 datapilot automation test <id> --match "..."
-datapilot automation lint
 datapilot automation validate
 ```
 
