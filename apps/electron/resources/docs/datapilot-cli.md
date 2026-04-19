@@ -241,8 +241,9 @@ Manage workspace automations stored in `automations.json`.
 datapilot automation list
 datapilot automation validate
 
-# Simple automation with a name
-datapilot automation create --event UserPromptSubmit --name "Summarize"
+# Simple prompt automation
+datapilot automation create --event UserPromptSubmit \
+  --input '{"name":"Summarize","actions":[{"type":"prompt","prompt":"Summarize this prompt"}]}'
 
 # Scheduled automation with nested config via --input
 datapilot automation create --event SchedulerTick \
