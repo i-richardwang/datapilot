@@ -15,7 +15,6 @@ const ACTIONS = [
   'list', 'get', 'create', 'delete',
   'messages', 'send', 'cancel',
   'get-model', 'set-model',
-  'unread-summary', 'mark-all-read',
   'get-files', 'get-notes', 'set-notes',
   'export', 'share', 'share-html',
 ] as const
@@ -103,16 +102,6 @@ export async function routeSession(
       const ws = await requireWorkspace(ctx)
       const connectionSlug = strFlag(flags, 'connection')
       ok(await client.invoke('session:setModel', id, ws, model, connectionSlug))
-    }
-
-    case 'unread-summary': {
-      const ws = await requireWorkspace(ctx)
-      ok(await client.invoke('sessions:getUnreadSummary', ws))
-    }
-
-    case 'mark-all-read': {
-      const ws = await requireWorkspace(ctx)
-      ok(await client.invoke('sessions:markAllRead', ws))
     }
 
     case 'get-files': {

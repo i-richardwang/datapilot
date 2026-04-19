@@ -7,8 +7,8 @@ import { strFlag, parseInput, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
-  'list', 'get', 'create', 'check-slug', 'update-remote',
-  'switch', 'permissions', 'settings', 'set-settings',
+  'list', 'get', 'create', 'update-remote',
+  'permissions', 'settings', 'set-settings',
 ] as const
 
 export async function routeWorkspace(
@@ -44,24 +44,11 @@ export async function routeWorkspace(
       ok(await client.invoke('workspaces:create', path, name))
     }
 
-    case 'check-slug': {
-      const slug = positionals[0]
-      if (!slug) fail('USAGE_ERROR', 'Missing slug')
-      ok(await client.invoke('workspaces:checkSlug', slug))
-    }
-
     case 'update-remote': {
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing workspace id')
       const input = (await parseInput(flags)) ?? {}
       ok(await client.invoke('workspaces:updateRemote', id, input))
-    }
-
-    case 'switch': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing workspace id')
-      await client.invoke('window:switchWorkspace', id)
-      ok({ active: id })
     }
 
     case 'permissions': {

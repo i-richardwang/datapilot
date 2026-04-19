@@ -1,7 +1,7 @@
 /**
  * label entity — wraps the labels:* RPC channels.
  *
- * Actions: list, get, create, update, delete, move, reorder,
+ * Actions: list, get, create, update, delete,
  *          auto-rule-list, auto-rule-add, auto-rule-remove, auto-rule-clear, auto-rule-validate
  */
 
@@ -10,7 +10,7 @@ import { strFlag, intFlag, parseInput, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
-  'list', 'get', 'create', 'update', 'delete', 'move', 'reorder',
+  'list', 'get', 'create', 'update', 'delete',
   'auto-rule-list', 'auto-rule-add', 'auto-rule-remove', 'auto-rule-clear', 'auto-rule-validate',
 ] as const
 
@@ -73,22 +73,6 @@ export async function routeLabel(
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing label id')
       ok(await client.invoke('labels:delete', ws, id))
-    }
-
-    case 'move': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing label id')
-      const parent = strFlag(flags, 'parent')
-      if (parent === undefined) fail('USAGE_ERROR', 'Missing --parent flag (use "root" for top-level)')
-      const newParentId = parent === 'root' ? null : parent
-      ok(await client.invoke('labels:move', ws, id, newParentId))
-    }
-
-    case 'reorder': {
-      if (positionals.length === 0) fail('USAGE_ERROR', 'Missing ordered IDs')
-      const parentFlag = strFlag(flags, 'parent')
-      const parentId = parentFlag === 'root' || parentFlag === undefined ? null : parentFlag
-      ok(await client.invoke('labels:reorder', ws, parentId, positionals))
     }
 
     case 'auto-rule-list': {
