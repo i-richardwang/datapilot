@@ -242,12 +242,12 @@ datapilot automation list
 datapilot automation validate
 
 # Simple prompt automation
-datapilot automation create --event UserPromptSubmit \
-  --input '{"name":"Summarize","actions":[{"type":"prompt","prompt":"Summarize this prompt"}]}'
+datapilot automation create --event UserPromptSubmit --name "Summarize" \
+  --input '{"actions":[{"type":"prompt","prompt":"Summarize this prompt"}]}'
 
 # Scheduled automation with nested config via --input
-datapilot automation create --event SchedulerTick \
-  --input '{"name":"Daily Summary","cron":"0 9 * * 1-5","actions":[{"type":"prompt","prompt":"Daily summary"}]}'
+datapilot automation create --event SchedulerTick --name "Daily Summary" \
+  --input '{"cron":"0 9 * * 1-5","actions":[{"type":"prompt","prompt":"Daily summary"}]}'
 
 datapilot automation update abc123 --input '{"enabled":false}'
 datapilot automation enable abc123
