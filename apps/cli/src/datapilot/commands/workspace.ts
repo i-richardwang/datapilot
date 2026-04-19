@@ -3,12 +3,11 @@
  */
 
 import { ok, fail } from '../envelope.ts'
-import { strFlag, parseInput, type Flags } from '../args.ts'
+import { type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
-  'list', 'get', 'create', 'update-remote',
-  'permissions', 'settings', 'set-settings',
+  'list', 'get', 'permissions', 'settings',
 ] as const
 
 export async function routeWorkspace(
@@ -37,20 +36,6 @@ export async function routeWorkspace(
       ok(found)
     }
 
-    case 'create': {
-      const path = positionals[0] ?? strFlag(flags, 'path')
-      if (!path) fail('USAGE_ERROR', 'Missing workspace path (positional or --path)')
-      const name = strFlag(flags, 'name') ?? 'workspace'
-      ok(await client.invoke('workspaces:create', path, name))
-    }
-
-    case 'update-remote': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing workspace id')
-      const input = (await parseInput(flags)) ?? {}
-      ok(await client.invoke('workspaces:updateRemote', id, input))
-    }
-
     case 'permissions': {
       const ws = positionals[0] ?? (await ctx.getWorkspace())
       if (!ws) fail('VALIDATION_ERROR', 'No workspace selected')
@@ -61,13 +46,6 @@ export async function routeWorkspace(
       const ws = positionals[0] ?? (await ctx.getWorkspace())
       if (!ws) fail('VALIDATION_ERROR', 'No workspace selected')
       ok(await client.invoke('workspaceSettings:get', ws))
-    }
-
-    case 'set-settings': {
-      const ws = positionals[0] ?? (await ctx.getWorkspace())
-      if (!ws) fail('VALIDATION_ERROR', 'No workspace selected')
-      const input = (await parseInput(flags)) ?? {}
-      ok(await client.invoke('workspaceSettings:update', ws, input))
     }
   }
 

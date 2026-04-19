@@ -359,25 +359,20 @@ datapilot session share-html ./report.html --session sess-abc
 <!-- cli:workspace:start -->
 ## Workspace
 
-Manage workspaces themselves (the top-level container for sources, labels,
+Query workspace metadata (the top-level container for sources, labels,
 sessions, etc.).
 
 ### Commands
 - `datapilot workspace list`
 - `datapilot workspace get [<id>]`
-- `datapilot workspace create <path> [--name "<name>"]`
-- `datapilot workspace update-remote <id> --input '<json>'`
 - `datapilot workspace permissions [<id>]`
 - `datapilot workspace settings [<id>]`
-- `datapilot workspace set-settings [<id>] --input '<json>'`
 
 ### Examples
 
 ```bash
 datapilot workspace list
-datapilot workspace create ~/work/team-ws --name "Team"
 datapilot workspace settings ws-abc123
-datapilot workspace set-settings ws-abc123 --input '{"defaultMode":"ask"}'
 ```
 <!-- cli:workspace:end -->
 
