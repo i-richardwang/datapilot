@@ -6,6 +6,37 @@ import { ok, fail } from '../envelope.ts'
 import { strFlag, intFlag, boolFlag, parseInput, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
+interface AutomationMatcher { id?: string; [key: string]: unknown }
+interface AutomationsListResult { automations?: Record<string, AutomationMatcher[]> }
+
+interface ResolvedAutomation {
+  eventName: string
+  matcherIndex: number
+  matcher: AutomationMatcher
+}
+
+/**
+ * Resolve an automation ID to (eventName, matcherIndex, matcher).
+ * Returns null if not found.
+ */
+async function resolveAutomationId(
+  client: RouteCtx['getClient'] extends () => Promise<infer T> ? T : never,
+  ws: string,
+  id: string,
+): Promise<ResolvedAutomation | null> {
+  const result = (await client.invoke('automations:list', ws)) as AutomationsListResult | null
+  if (!result?.automations) return null
+
+  for (const [eventName, matchers] of Object.entries(result.automations)) {
+    if (!Array.isArray(matchers)) continue
+    const matcherIndex = matchers.findIndex((m) => m.id === id)
+    if (matcherIndex !== -1) {
+      return { eventName, matcherIndex, matcher: matchers[matcherIndex]! }
+    }
+  }
+  return null
+}
+
 const ACTIONS = [
   'list', 'get', 'create', 'update', 'delete',
   'enable', 'disable', 'duplicate',
@@ -34,10 +65,9 @@ export async function routeAutomation(
     case 'get': {
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing automation id')
-      const list = (await client.invoke('automations:list', ws)) as Array<{ id: string }>
-      const found = list.find((a) => a.id === id)
-      if (!found) fail('NOT_FOUND', `Automation '${id}' not found`)
-      ok(found)
+      const resolved = await resolveAutomationId(client, ws, id)
+      if (!resolved) fail('NOT_FOUND', `Automation '${id}' not found`)
+      ok({ event: resolved.eventName, ...resolved.matcher })
     }
 
     case 'create': {
@@ -59,7 +89,9 @@ export async function routeAutomation(
     case 'delete': {
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing automation id')
-      await client.invoke('automations:delete', ws, id)
+      const resolved = await resolveAutomationId(client, ws, id)
+      if (!resolved) fail('NOT_FOUND', `Automation '${id}' not found`)
+      await client.invoke('automations:delete', ws, resolved.eventName, resolved.matcherIndex)
       ok({ deleted: id })
     }
 
