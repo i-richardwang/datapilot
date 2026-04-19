@@ -377,8 +377,8 @@ Manage batch processing jobs stored in `batches.json`.
 - `datapilot batch status <id>`
 - `datapilot batch state <id>`
 - `datapilot batch items <id>`
-- `datapilot batch validate [--input '<json>']`
-- `datapilot batch test --input '<json>'`
+- `datapilot batch validate`
+- `datapilot batch test <id> [--sample-size <n>]`
 - `datapilot batch test-result <test-id>`
 - `datapilot batch retry-item <batch-id> <item-id>`
 
@@ -410,7 +410,7 @@ datapilot batch delete abc123
 ### Notes
 - `status` returns counts/state summary; `state` returns the persisted batch-state document.
 - `items` returns the per-item breakdown.
-- `test` runs a dry-run against a payload supplied via `--input`; pull the result back with `test-result`.
+- `test` runs a dry-run against a batch with optional sample size; pull the result back with `test-result`.
 - `delete` removes the batch from `batches.json` and cleans up its `batch-state-{id}.json`.
 <!-- cli:batch:end -->
 
