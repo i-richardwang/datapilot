@@ -2,7 +2,7 @@
  * label entity — wraps the labels:* RPC channels.
  *
  * Actions: list, get, create, update, delete,
- *          auto-rule-add, auto-rule-remove, auto-rule-clear
+ *          auto-rule-add, auto-rule-remove
  */
 
 import { ok, fail } from '../envelope.ts'
@@ -11,7 +11,7 @@ import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
   'list', 'get', 'create', 'update', 'delete',
-  'auto-rule-add', 'auto-rule-remove', 'auto-rule-clear',
+  'auto-rule-add', 'auto-rule-remove',
 ] as const
 
 export async function routeLabel(
@@ -102,11 +102,6 @@ export async function routeLabel(
       ok(await client.invoke('labels:autoRuleRemove', ws, id, index))
     }
 
-    case 'auto-rule-clear': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing label id')
-      ok(await client.invoke('labels:autoRuleClear', ws, id))
-    }
   }
 
   fail('USAGE_ERROR', `Unhandled label action: ${action}`)
