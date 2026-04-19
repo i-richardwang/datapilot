@@ -8,11 +8,11 @@
 import {
   PROTOCOL_VERSION,
   type MessageEnvelope,
-} from '@craft-agent/shared/protocol'
+} from './vendor/protocol.ts'
 import {
   serializeEnvelope,
   deserializeEnvelope,
-} from '@craft-agent/server-core/transport'
+} from './vendor/transport.ts'
 
 // ---------------------------------------------------------------------------
 // Types

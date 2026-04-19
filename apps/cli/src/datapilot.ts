@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * datapilot — unified thin CLI client for the DataPilot server.
  *
@@ -169,6 +169,8 @@ Examples:
 `)
 }
 
-if (import.meta.main) {
-  main()
-}
+// This file is an executable entry point — never imported. Running it (via
+// `node dist/datapilot.js`, `bun run src/datapilot.ts`, or the installed
+// `datapilot` bin) always invokes `main()`. The `export` above is purely for
+// type-checking tools that may need to reference it.
+main()
