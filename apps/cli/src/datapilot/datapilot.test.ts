@@ -9,6 +9,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
+import { writeFile, unlink } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import {
   serializeEnvelope,
   deserializeEnvelope,
@@ -655,5 +657,122 @@ describe('datapilot CLI', () => {
     expect(r.envelope?.ok).toBe(false)
     expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
     expect(r.envelope?.error?.message).toContain('Unknown source action: validate')
+  })
+
+  it('session share <id> invokes sessions:share with workspace and session id', async () => {
+    let lastArgs: unknown[] = []
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'sessions:share': (args) => {
+          lastArgs = args
+          return { url: 'https://share.example.com/sess-abc' }
+        },
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'session', 'share', 'sess-abc',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    expect((r.envelope?.data as Record<string, unknown>).url).toBe('https://share.example.com/sess-abc')
+    expect(lastArgs[0]).toBe('ws-1')
+    expect(lastArgs[1]).toBe('sess-abc')
+  })
+
+  it('session share <id> --html <file> invokes sessions:shareHtml with html contents', async () => {
+    const htmlPath = join(tmpdir(), `datapilot-test-${Date.now()}.html`)
+    await writeFile(htmlPath, '<html><body>hello</body></html>')
+    try {
+      let lastArgs: unknown[] = []
+      server = startMockServer({
+        handlers: {
+          'workspaces:get': () => [{ id: 'ws-1' }],
+          'window:switchWorkspace': () => undefined,
+          'sessions:shareHtml': (args) => {
+            lastArgs = args
+            return { url: 'https://share.example.com/html-abc' }
+          },
+        },
+      })
+      const r = await runCli([
+        '--url', server.url, '--token', 't', '--json',
+        'session', 'share', 'sess-abc', '--html', htmlPath,
+      ])
+      expect(r.exitCode).toBe(0)
+      expect(r.envelope?.ok).toBe(true)
+      expect((r.envelope?.data as Record<string, unknown>).url).toBe('https://share.example.com/html-abc')
+      expect(lastArgs[0]).toBe('ws-1')
+      expect(lastArgs[1]).toBe('sess-abc')
+      expect(lastArgs[2]).toContain('<html>')
+    } finally {
+      await unlink(htmlPath).catch(() => undefined)
+    }
+  })
+
+  it('session share without id returns USAGE_ERROR with suggestion', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'session', 'share',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('Missing session id')
+  })
+
+  it('session share <id> --html <non-existent-file> returns NOT_FOUND', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'session', 'share', 'sess-abc', '--html', '/nonexistent/path/report.html',
+    ])
+    expect(r.exitCode).toBe(1)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('NOT_FOUND')
+    expect(r.envelope?.error?.message).toContain('/nonexistent/path/report.html')
+  })
+
+  it('session share <id> --html <empty-file> returns VALIDATION_ERROR', async () => {
+    const htmlPath = join(tmpdir(), `datapilot-test-empty-${Date.now()}.html`)
+    await writeFile(htmlPath, '')
+    try {
+      server = startMockServer({
+        handlers: {
+          'workspaces:get': () => [{ id: 'ws-1' }],
+          'window:switchWorkspace': () => undefined,
+        },
+      })
+      const r = await runCli([
+        '--url', server.url, '--token', 't', '--json',
+        'session', 'share', 'sess-abc', '--html', htmlPath,
+      ])
+      expect(r.exitCode).toBe(1)
+      expect(r.envelope?.ok).toBe(false)
+      expect(r.envelope?.error?.code).toBe('VALIDATION_ERROR')
+    } finally {
+      await unlink(htmlPath).catch(() => undefined)
+    }
+  })
+
+  it('session share-html returns USAGE_ERROR: Unknown session action', async () => {
+    const r = await runCli(['--json', 'session', 'share-html', 'report.html'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('Unknown session action: share-html')
   })
 })
