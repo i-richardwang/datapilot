@@ -71,19 +71,26 @@ export async function routeAutomation(
     }
 
     case 'create': {
+      const event = strFlag(flags, 'event')
+      if (!event) {
+        const { VALID_EVENTS } = await import('@craft-agent/shared/automations')
+        fail('USAGE_ERROR', `Missing --event <EventName>. Valid events: ${VALID_EVENTS.join(', ')}`)
+      }
       const input = (await parseInput(flags)) ?? {}
       if (!input.name && !strFlag(flags, 'name')) {
         fail('USAGE_ERROR', 'Missing --name (or pass full config via --input <json>)')
       }
-      const payload = input.name ? input : { ...input, name: strFlag(flags, 'name') }
-      ok(await client.invoke('automations:create', ws, payload))
+      const matcher = input.name ? input : { ...input, name: strFlag(flags, 'name') }
+      ok(await client.invoke('automations:create', ws, event, matcher))
     }
 
     case 'update': {
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing automation id')
+      const resolved = await resolveAutomationId(client, ws, id)
+      if (!resolved) fail('NOT_FOUND', `Automation '${id}' not found`)
       const input = (await parseInput(flags)) ?? {}
-      ok(await client.invoke('automations:update', ws, id, input))
+      ok(await client.invoke('automations:update', ws, resolved.eventName, resolved.matcherIndex, input))
     }
 
     case 'delete': {
