@@ -8,7 +8,6 @@ import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
   'list', 'get', 'create', 'update', 'delete', 'validate', 'test',
-  'get-permissions', 'get-mcp-tools',
 ] as const
 
 export async function routeSource(
@@ -35,7 +34,11 @@ export async function routeSource(
       const sources = (await client.invoke('sources:get', ws)) as Array<{ slug: string }>
       const found = sources.find((s) => s.slug === slug)
       if (!found) fail('NOT_FOUND', `Source '${slug}' not found`)
-      ok(found)
+      const [permissions, mcpTools] = await Promise.all([
+        client.invoke('sources:getPermissions', ws, slug),
+        client.invoke('sources:getMcpTools', ws, slug),
+      ])
+      ok({ ...found, permissions, mcpTools })
     }
 
     case 'create': {
@@ -74,18 +77,6 @@ export async function routeSource(
       const slug = positionals[0]
       if (!slug) fail('USAGE_ERROR', 'Missing source slug')
       ok(await client.invoke('sources:test', ws, slug))
-    }
-
-    case 'get-permissions': {
-      const slug = positionals[0]
-      if (!slug) fail('USAGE_ERROR', 'Missing source slug')
-      ok(await client.invoke('sources:getPermissions', ws, slug))
-    }
-
-    case 'get-mcp-tools': {
-      const slug = positionals[0]
-      if (!slug) fail('USAGE_ERROR', 'Missing source slug')
-      ok(await client.invoke('sources:getMcpTools', ws, slug))
     }
   }
 

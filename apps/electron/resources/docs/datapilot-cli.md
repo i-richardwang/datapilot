@@ -113,14 +113,12 @@ Manage workspace sources stored under `sources/{slug}/`.
 
 ### Commands
 - `datapilot source list`
-- `datapilot source get <slug>`
+- `datapilot source get <slug>` — returns source with `permissions` and `mcpTools`
 - `datapilot source create --name "<name>" --provider "<provider>" --type mcp|api|local [--input '<json>']`
 - `datapilot source update <slug> --input '<json>'`
 - `datapilot source delete <slug>`
 - `datapilot source validate <slug>`
 - `datapilot source test <slug>`
-- `datapilot source get-permissions <slug>`
-- `datapilot source get-mcp-tools <slug>`
 
 ### Required fields for `source create`
 
@@ -138,7 +136,27 @@ local `path`) live under nested keys passed via `--input`.
 ```bash
 datapilot source list
 datapilot source get linear
+```
 
+`source get <slug>` returns the source record merged with permissions and MCP tools:
+
+```json
+{
+  "slug": "linear",
+  "name": "Linear",
+  "provider": "linear",
+  "type": "mcp",
+  "permissions": {
+    "allowedTools": ["linear_search"],
+    "defaultPolicy": "allow"
+  },
+  "mcpTools": [
+    { "name": "linear_search", "permissionStatus": "allowed" }
+  ]
+}
+```
+
+```bash
 # MCP source — nested config via --input
 datapilot source create --name "Linear" --provider "linear" --type mcp \
   --input '{"mcp":{"transport":"http","url":"https://mcp.linear.app/sse","authType":"oauth"}}'
