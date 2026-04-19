@@ -85,7 +85,6 @@ Manage workspace labels.
 - `datapilot label auto-rule-add <id> --pattern "<regex>" [--flags "gi"] [--value-template "$1"] [--description "..."]`
 - `datapilot label auto-rule-remove <id> --index <n>`
 - `datapilot label auto-rule-clear <id>`
-- `datapilot label auto-rule-validate <id>`
 
 ### Examples
 
@@ -98,7 +97,6 @@ datapilot label update bug --input '{"name":"Bug Report","color":"destructive"}'
 datapilot label update priority --value-type none
 datapilot label auto-rule-add linear-issue --pattern "\\b([A-Z]{2,5}-\\d+)\\b" --value-template "$1"
 datapilot label auto-rule-list linear-issue
-datapilot label auto-rule-validate linear-issue
 ```
 
 ### Notes
@@ -213,9 +211,7 @@ Manage workspace automations stored in `automations.json`.
 - `datapilot automation delete <id>`
 - `datapilot automation enable <id>`
 - `datapilot automation disable <id>`
-- `datapilot automation duplicate <id>`
 - `datapilot automation history <id> [--limit <n>]`
-- `datapilot automation last-executed`
 - `datapilot automation test [--input '<json>']`
 - `datapilot automation replay <id>`
 - `datapilot automation validate`
@@ -236,16 +232,13 @@ datapilot automation create --event SchedulerTick --name "Daily Summary" \
 
 datapilot automation update abc123 --input '{"enabled":false}'
 datapilot automation enable abc123
-datapilot automation duplicate abc123
 datapilot automation history abc123 --limit 10
-datapilot automation last-executed
 datapilot automation test --input '{"automationId":"abc123","actions":[{"type":"prompt","prompt":"Test"}]}'
 datapilot automation delete abc123
 ```
 
 ### Notes
 - `--name` is required for `create` (or pass it inside `--input`); use `--input` with `actions` for multi-action automations.
-- `last-executed` returns a map of all automation IDs to their last execution timestamp.
 - `validate` checks the workspace `automations.json` schema; it takes no input flags.
 <!-- cli:automation:end -->
 
@@ -265,7 +258,6 @@ Manage batch processing jobs stored in `batches.json`.
 - `datapilot batch start <id>`
 - `datapilot batch pause <id>`
 - `datapilot batch resume <id>`
-- `datapilot batch duplicate <id>`
 - `datapilot batch status <id>`
 - `datapilot batch state <id>`
 - `datapilot batch items <id>`
