@@ -131,7 +131,6 @@ export async function routeAutomation(
       const payload = { workspaceId: ws, ...input }
       ok(await client.invoke('automations:test', payload))
     }
-
   }
 
   fail('USAGE_ERROR', `Unhandled automation action: ${action}`)

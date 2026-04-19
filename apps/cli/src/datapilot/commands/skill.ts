@@ -57,7 +57,6 @@ export async function routeSkill(
       await client.invoke('skills:delete', ws, slug)
       ok({ deleted: slug })
     }
-
   }
 
   fail('USAGE_ERROR', `Unhandled skill action: ${action}`)

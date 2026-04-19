@@ -66,7 +66,6 @@ export async function routeSource(
       await client.invoke('sources:delete', ws, slug)
       ok({ deleted: slug })
     }
-
   }
 
   fail('USAGE_ERROR', `Unhandled source action: ${action}`)
