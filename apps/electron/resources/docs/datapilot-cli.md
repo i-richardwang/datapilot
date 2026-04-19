@@ -121,8 +121,6 @@ Manage workspace sources stored under `sources/{slug}/`.
 - `datapilot source delete <slug>`
 - `datapilot source validate <slug>`
 - `datapilot source test <slug>`
-- `datapilot source init-permissions <slug>`
-- `datapilot source save-credentials <slug> --credential <value>`
 - `datapilot source get-permissions <slug>`
 - `datapilot source get-mcp-tools <slug>`
 
@@ -158,11 +156,9 @@ datapilot source create --name "Docs Folder" --provider "filesystem" --type loca
 datapilot source update linear --input '{"enabled":false}'
 datapilot source validate linear
 datapilot source test linear
-datapilot source init-permissions linear
 ```
 
 ### Notes
-- `init-permissions` scaffolds read-only `permissions.json` patterns for Explore mode.
 - `test` is lightweight CLI validation; for full in-session auth/connection probing use the `source_test` MCP tool.
 <!-- cli:source:end -->
 
