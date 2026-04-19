@@ -507,4 +507,80 @@ describe('datapilot CLI', () => {
     expect(lastArgs[2]).toBe(5)
     expect(lastArgs[3]).toBe(10)
   })
+
+  it('batch get returns merged response with progress', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'batches:list': () => [{ id: 'batch-1', name: 'Test Batch', status: 'running' }],
+        'batches:getStatus': () => ({ status: 'in_progress', pendingItems: 5, completedItems: 10 }),
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'batch', 'get', 'batch-1',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    const data = r.envelope?.data as Record<string, unknown>
+    expect(data.id).toBe('batch-1')
+    expect(data.name).toBe('Test Batch')
+    expect(data.progress).toEqual({ status: 'in_progress', pendingItems: 5, completedItems: 10 })
+    expect(server.requests.find((req) => req.channel === 'batches:getStatus')).toBeDefined()
+  })
+
+  it('batch status returns USAGE_ERROR', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'batch', 'status', 'batch-1',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+  })
+
+  it('label get returns merged response with autoRules', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'labels:list': () => [{ id: 'lbl-1', name: 'TODO', color: 'blue' }],
+        'labels:autoRuleList': () => [{ pattern: '\\bBUG\\b', flags: 'gi' }],
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'label', 'get', 'lbl-1',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    const data = r.envelope?.data as Record<string, unknown>
+    expect(data.id).toBe('lbl-1')
+    expect(data.name).toBe('TODO')
+    expect(data.autoRules).toEqual([{ pattern: '\\bBUG\\b', flags: 'gi' }])
+    expect(server.requests.find((req) => req.channel === 'labels:autoRuleList')).toBeDefined()
+  })
+
+  it('label auto-rule-list returns USAGE_ERROR', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'label', 'auto-rule-list', 'lbl-1',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+  })
 })

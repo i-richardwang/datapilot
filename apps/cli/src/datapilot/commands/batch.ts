@@ -9,7 +9,7 @@ import type { RouteCtx } from '../router.ts'
 const ACTIONS = [
   'list', 'get', 'create', 'update', 'delete',
   'start', 'pause', 'resume',
-  'status', 'state', 'items',
+  'state', 'items',
   'validate', 'test', 'test-result', 'retry-item',
 ] as const
 
@@ -34,10 +34,13 @@ export async function routeBatch(
     case 'get': {
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing batch id')
-      const list = (await client.invoke('batches:list', ws)) as Array<{ id: string }>
-      const found = list.find((b) => b.id === id)
+      const [list, progress] = await Promise.all([
+        client.invoke('batches:list', ws),
+        client.invoke('batches:getStatus', ws, id),
+      ])
+      const found = (list as Array<{ id: string }>).find((b) => b.id === id)
       if (!found) fail('NOT_FOUND', `Batch '${id}' not found`)
-      ok(found)
+      ok({ ...found, progress })
     }
 
     case 'create': {
@@ -77,12 +80,6 @@ export async function routeBatch(
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing batch id')
       ok(await client.invoke('batches:resume', ws, id))
-    }
-
-    case 'status': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing batch id')
-      ok(await client.invoke('batches:getStatus', ws, id))
     }
 
     case 'state': {
