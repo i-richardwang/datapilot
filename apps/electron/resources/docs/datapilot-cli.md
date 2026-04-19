@@ -376,24 +376,32 @@ datapilot workspace settings ws-abc123
 Read-only introspection of a running datapilot server.
 
 ### Commands
-- `datapilot server health`
 - `datapilot server status`
-- `datapilot server versions`
-- `datapilot server endpoint`
-- `datapilot server home-dir`
 
 ### Examples
 
 ```bash
-datapilot server health
 datapilot server status
-datapilot server endpoint
-datapilot server versions
-datapilot server home-dir
 ```
 
-### Notes
-- `endpoint` resolves the URL/token without connecting (useful for scripting).
+### Response
+
+Returns workspace runtime snapshot containing only the `workspaces` array:
+
+```json
+{
+  "workspaces": [
+    {
+      "id": "ws-abc123",
+      "name": "My Workspace",
+      "slug": "my-workspace",
+      "activeSessions": 3,
+      "automationCount": 5,
+      "schedulerRunning": true
+    }
+  ]
+}
+```
 <!-- cli:server:end -->
 
 ---
