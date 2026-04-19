@@ -221,6 +221,38 @@ export class UsageError extends Error {
   }
 }
 
+/**
+ * Reject any flag not in `allowed` (or `input` / `stdin`, which are universal).
+ *
+ * Enforces the "identity goes flat, data goes JSON" CLI rule: flat flags are
+ * only ever identity (`--name`) or schema-branch selectors (`--event`,
+ * `--provider`, `--type`) or read-side query params (`--limit`, `--offset`,
+ * `--sample-size`, `--index`, `--session`). Every data field must flow through
+ * `--input '<json>'` or `--stdin`. Unknown flags fail loudly here so removed
+ * flat flags can't be silently dropped.
+ *
+ * `renames` maps a flat-flag name to the JSON key it should go under when the
+ * mapping isn't the obvious camelCase (e.g. `mode` → `permissionMode`).
+ */
+export function rejectUnknownFlags(
+  flags: Flags,
+  allowed: readonly string[],
+  renames: Record<string, string> = {},
+): void {
+  const allowedSet = new Set<string>(['input', 'stdin', ...allowed])
+  for (const key of Object.keys(flags)) {
+    if (allowedSet.has(key)) continue
+    const jsonKey = renames[key] ?? camelize(key)
+    throw new UsageError(
+      `Unknown flag --${key}. Pass data fields via --input '<json>' (e.g., --input '{"${jsonKey}":"..."}').`,
+    )
+  }
+}
+
+function camelize(key: string): string {
+  return key.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())
+}
+
 async function readStdin(): Promise<string> {
   const chunks: string[] = []
   const decoder = new TextDecoder()

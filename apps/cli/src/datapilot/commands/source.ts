@@ -1,9 +1,14 @@
 /**
  * source entity — wraps the sources:* RPC channels.
+ *
+ * Flag rule: `create` keeps `--name` (identity) and `--provider` / `--type`
+ * (schema-branch selectors — nested `mcp` / `api` / `local` config only makes
+ * sense once `type` is known). All other fields go through `--input '<json>'`.
+ * `update` is `<slug>` + `--input` only.
  */
 
 import { ok, fail } from '../envelope.ts'
-import { strFlag, parseInput, type Flags } from '../args.ts'
+import { strFlag, parseInput, rejectUnknownFlags, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
@@ -26,9 +31,11 @@ export async function routeSource(
 
   switch (action) {
     case 'list':
+      rejectUnknownFlags(flags, [])
       ok(await client.invoke('sources:get', ws))
 
     case 'get': {
+      rejectUnknownFlags(flags, [])
       const slug = positionals[0]
       if (!slug) fail('USAGE_ERROR', 'Missing source slug')
       const sources = (await client.invoke('sources:get', ws)) as Array<{ slug: string }>
@@ -42,18 +49,20 @@ export async function routeSource(
     }
 
     case 'create': {
+      rejectUnknownFlags(flags, ['name', 'provider', 'type'])
       const input = (await parseInput(flags)) ?? {}
-      const name = (input.name as string) ?? strFlag(flags, 'name')
-      const provider = (input.provider as string) ?? strFlag(flags, 'provider')
-      const type = (input.type as string) ?? strFlag(flags, 'type')
+      const name = strFlag(flags, 'name') ?? (input.name as string | undefined)
+      const provider = strFlag(flags, 'provider') ?? (input.provider as string | undefined)
+      const type = strFlag(flags, 'type') ?? (input.type as string | undefined)
       if (!name || !provider || !type) {
         fail('USAGE_ERROR', 'Missing required fields: --name, --provider, --type (or --input <json>)')
       }
-      const payload: Record<string, unknown> = { name, provider, type, ...input }
+      const payload: Record<string, unknown> = { ...input, name, provider, type }
       ok(await client.invoke('sources:create', ws, payload))
     }
 
     case 'update': {
+      rejectUnknownFlags(flags, [])
       const slug = positionals[0]
       if (!slug) fail('USAGE_ERROR', 'Missing source slug')
       const input = (await parseInput(flags)) ?? {}
@@ -61,6 +70,7 @@ export async function routeSource(
     }
 
     case 'delete': {
+      rejectUnknownFlags(flags, [])
       const slug = positionals[0]
       if (!slug) fail('USAGE_ERROR', 'Missing source slug')
       await client.invoke('sources:delete', ws, slug)

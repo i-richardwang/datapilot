@@ -1,9 +1,14 @@
 /**
  * automation entity — wraps the automations:* RPC channels.
+ *
+ * Flag rule: `create` keeps `--name` (identity) and `--event` (schema-branch
+ * selector — the event type determines which matcher shape is valid). All
+ * other matcher fields flow through `--input '<json>'`. `update` is `<id>` +
+ * `--input` only. `history` keeps `--limit` as a query-param flat flag.
  */
 
 import { ok, fail } from '../envelope.ts'
-import { strFlag, intFlag, parseInput, type Flags } from '../args.ts'
+import { strFlag, intFlag, parseInput, rejectUnknownFlags, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 interface AutomationMatcher { id?: string; [key: string]: unknown }
@@ -59,9 +64,11 @@ export async function routeAutomation(
 
   switch (action) {
     case 'list':
+      rejectUnknownFlags(flags, [])
       ok(await client.invoke('automations:list', ws))
 
     case 'get': {
+      rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing automation id')
       const resolved = await resolveAutomationId(client, ws, id)
@@ -70,20 +77,23 @@ export async function routeAutomation(
     }
 
     case 'create': {
+      rejectUnknownFlags(flags, ['name', 'event'])
       const event = strFlag(flags, 'event')
       if (!event) {
         const { VALID_EVENTS } = await import('@craft-agent/shared/automations')
         fail('USAGE_ERROR', `Missing --event <EventName>. Valid events: ${VALID_EVENTS.join(', ')}`)
       }
       const input = (await parseInput(flags)) ?? {}
-      if (!input.name && !strFlag(flags, 'name')) {
+      const name = strFlag(flags, 'name') ?? (input.name as string | undefined)
+      if (!name) {
         fail('USAGE_ERROR', 'Missing --name (or pass full config via --input <json>)')
       }
-      const matcher = input.name ? input : { ...input, name: strFlag(flags, 'name') }
+      const matcher = { ...input, name }
       ok(await client.invoke('automations:create', ws, event, matcher))
     }
 
     case 'update': {
+      rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing automation id')
       const resolved = await resolveAutomationId(client, ws, id)
@@ -93,6 +103,7 @@ export async function routeAutomation(
     }
 
     case 'delete': {
+      rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing automation id')
       const resolved = await resolveAutomationId(client, ws, id)
@@ -102,6 +113,7 @@ export async function routeAutomation(
     }
 
     case 'enable': {
+      rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing automation id')
       const resolved = await resolveAutomationId(client, ws, id)
@@ -111,6 +123,7 @@ export async function routeAutomation(
     }
 
     case 'disable': {
+      rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing automation id')
       const resolved = await resolveAutomationId(client, ws, id)
@@ -120,6 +133,7 @@ export async function routeAutomation(
     }
 
     case 'history': {
+      rejectUnknownFlags(flags, ['limit'])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing automation id')
       const limit = intFlag(flags, 'limit') ?? 50
@@ -127,6 +141,7 @@ export async function routeAutomation(
     }
 
     case 'test': {
+      rejectUnknownFlags(flags, [])
       const input = (await parseInput(flags)) ?? {}
       const payload = { workspaceId: ws, ...input }
       ok(await client.invoke('automations:test', payload))

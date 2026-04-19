@@ -157,9 +157,9 @@ describeUnix('datapilot wrapper routes to the unified CLI', () => {
       DATAPILOT_SERVER_TOKEN: 'test-token',
     }
 
-    // Step 1 — label create
+    // Step 1 — label create (color is data → goes via --input)
     const create = await runWrapper(
-      ['--json', 'label', 'create', '--name', 'TODO', '--color', 'blue'],
+      ['--json', 'label', 'create', '--name', 'TODO', '--input', '{"color":"blue"}'],
       env,
     )
     expect(create.exitCode).toBe(0)

@@ -161,9 +161,10 @@ describe('datapilot CLI', () => {
       },
     })
 
+    // `--name` is flat identity; data fields like `color` flow through `--input`.
     const create = await runCli([
       '--url', server.url, '--token', 't', '--json',
-      'label', 'create', '--name', 'TODO', '--color', 'blue',
+      'label', 'create', '--name', 'TODO', '--input', '{"color":"blue"}',
     ])
     expect(create.exitCode).toBe(0)
     expect(create.envelope?.ok).toBe(true)
@@ -176,6 +177,78 @@ describe('datapilot CLI', () => {
     expect(list.exitCode).toBe(0)
     expect(list.envelope?.ok).toBe(true)
     expect(list.envelope?.data).toEqual([{ id: 'lbl-new', name: 'TODO', color: 'blue' }])
+  })
+
+  it('label create --color flat flag is rejected with USAGE_ERROR hinting at --input', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'label', 'create', '--name', 'TODO', '--color', 'blue',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('--color')
+    expect(r.envelope?.error?.message).toContain('--input')
+    expect(r.envelope?.error?.message).toContain('"color"')
+  })
+
+  it('label update rejects removed --name flat flag', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'label', 'update', 'lbl-1', '--name', 'Renamed',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('--name')
+  })
+
+  it('label auto-rule-add rejects removed --pattern flat flag', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'label', 'auto-rule-add', 'lbl-1', '--pattern', 'x',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('--pattern')
+  })
+
+  it('label auto-rule-add accepts pattern via --input', async () => {
+    let lastArgs: unknown[] = []
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'labels:autoRuleAdd': (args) => {
+          lastArgs = args
+          return { added: true }
+        },
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'label', 'auto-rule-add', 'lbl-1',
+      '--input', '{"pattern":"\\\\bBUG\\\\b","flags":"gi"}',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    expect(lastArgs[2]).toEqual({ pattern: '\\bBUG\\b', flags: 'gi' })
   })
 
   it('connection failure returns CONNECTION_ERROR envelope, exit 1', async () => {
@@ -255,44 +328,81 @@ describe('datapilot CLI', () => {
     expect(r.envelope?.error?.message).toContain('--input')
   })
 
-  it('skill create merges --slug into input and invokes with 2 business args', async () => {
+  it('skill create takes --name flat, description via --input; server-side auto-slug', async () => {
+    // Mirror the real server handler: slug is derived from name when absent,
+    // so the CLI never needs a `--slug` flat flag.
     let lastArgs: unknown[] | null = null
+    const slugify = (s: string) => s.toLowerCase().replace(/\s+/g, '-')
     server = startMockServer({
       handlers: {
         'workspaces:get': () => [{ id: 'ws-1' }],
         'window:switchWorkspace': () => undefined,
         'skills:create': (args) => {
           lastArgs = args
-          const input = args[1] as { slug: string; name: string; description: string }
-          return { slug: input.slug, path: `/skills/${input.slug}`, metadata: { name: input.name, description: input.description } }
+          const input = args[1] as { slug?: string; name: string; description: string }
+          const slug = input.slug ?? slugify(input.name)
+          return { slug, path: `/skills/${slug}`, metadata: { name: input.name, description: input.description } }
         },
       },
     })
 
-    // Path 1 — slug via --slug flag, other fields via --input
+    // Path 1 — `--name` flat, `--description` via `--input`; slug auto-derives.
     const viaFlag = await runCli([
       '--url', server.url, '--token', 't', '--json',
-      'skill', 'create', '--slug', 'test-skill',
-      '--input', '{"name":"Test","description":"desc"}',
+      'skill', 'create', '--name', 'Test Skill',
+      '--input', '{"description":"desc"}',
     ])
     expect(viaFlag.exitCode).toBe(0)
     expect(viaFlag.envelope?.ok).toBe(true)
     expect((viaFlag.envelope?.data as Record<string, unknown>).slug).toBe('test-skill')
     expect(lastArgs).not.toBeNull()
     expect(lastArgs!.length).toBe(2)
-    expect(lastArgs![1]).toEqual({ slug: 'test-skill', name: 'Test', description: 'desc' })
+    expect(lastArgs![1]).toEqual({ name: 'Test Skill', description: 'desc' })
 
-    // Path 2 — slug embedded inside --input
+    // Path 2 — explicit slug override via --input.
     const viaInput = await runCli([
       '--url', server.url, '--token', 't', '--json',
       'skill', 'create',
-      '--input', '{"slug":"test-skill-2","name":"Test 2","description":"d2"}',
+      '--input', '{"slug":"custom-slug","name":"Test 2","description":"d2"}',
     ])
     expect(viaInput.exitCode).toBe(0)
     expect(viaInput.envelope?.ok).toBe(true)
-    expect((viaInput.envelope?.data as Record<string, unknown>).slug).toBe('test-skill-2')
+    expect((viaInput.envelope?.data as Record<string, unknown>).slug).toBe('custom-slug')
     expect(lastArgs!.length).toBe(2)
-    expect(lastArgs![1]).toEqual({ slug: 'test-skill-2', name: 'Test 2', description: 'd2' })
+    expect(lastArgs![1]).toEqual({ slug: 'custom-slug', name: 'Test 2', description: 'd2' })
+  })
+
+  it('skill create rejects removed --slug flat flag', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'skill', 'create', '--slug', 'my-skill',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('--slug')
+    expect(r.envelope?.error?.message).toContain('--input')
+  })
+
+  it('skill create rejects removed --description flat flag', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'skill', 'create', '--name', 'My Skill', '--description', 'desc',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('--description')
   })
 
   it('TTY detection: --json forces envelope output', async () => {
@@ -334,25 +444,39 @@ describe('datapilot CLI', () => {
     expect((createArgs[1] as Record<string, unknown>).permissionMode).toBe('allow-all')
   })
 
-  it('session create --mode safe overrides the CLI default', async () => {
-    let createArgs: unknown[] = []
+  it('session create rejects removed --mode flat flag', async () => {
     server = startMockServer({
       handlers: {
         'workspaces:get': () => [{ id: 'ws-1' }],
         'window:switchWorkspace': () => undefined,
-        'sessions:create': (args) => {
-          createArgs = args
-          const opts = args[1] as { permissionMode?: string }
-          return { id: 'sess-1', permissionMode: opts.permissionMode }
-        },
       },
     })
     const r = await runCli([
       '--url', server.url, '--token', 't', '--json',
       'session', 'create', '--name', 'foo', '--mode', 'safe',
     ])
-    expect(r.exitCode).toBe(0)
-    expect((createArgs[1] as Record<string, unknown>).permissionMode).toBe('safe')
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('--mode')
+    // The rename hint should point at the JSON key, not the flat-flag name.
+    expect(r.envelope?.error?.message).toContain('"permissionMode"')
+  })
+
+  it('session create rejects removed --source flat flag', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'session', 'create', '--name', 'foo', '--source', 'linear',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('--source')
+    expect(r.envelope?.error?.message).toContain('"enabledSourceSlugs"')
   })
 
   it('session create --input {"permissionMode":"ask"} overrides the CLI default', async () => {
