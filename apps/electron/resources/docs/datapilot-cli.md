@@ -165,7 +165,7 @@ datapilot source create --name "Docs Folder" --provider "filesystem" --type loca
 
 datapilot source update linear --input '{"enabled":false}'
 datapilot source validate linear
-``` -->
+```
 <!-- cli:source:end -->
 
 ---

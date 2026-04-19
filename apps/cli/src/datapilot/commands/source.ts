@@ -72,8 +72,6 @@ export async function routeSource(
       if (!slug) fail('USAGE_ERROR', 'Missing source slug')
       ok(await client.invoke('sources:validate', ws, slug))
     }
-
-
   }
 
   fail('USAGE_ERROR', `Unhandled source action: ${action}`)

@@ -32,7 +32,6 @@ import { routeBatch } from './datapilot/commands/batch.ts'
 import { routeSession } from './datapilot/commands/session.ts'
 import { routeWorkspace } from './datapilot/commands/workspace.ts'
 
-
 const VERSION = '0.1.0-phase3'
 
 export async function main(argv: string[] = process.argv): Promise<void> {
@@ -81,7 +80,6 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       case 'batch': await routeBatch(ctx, args.action, args.positionals, args.flags); break
       case 'session': await routeSession(ctx, args.action, args.positionals, args.flags); break
       case 'workspace': await routeWorkspace(ctx, args.action, args.positionals, args.flags); break
-
     }
   } catch (e) {
     if (e instanceof ConnectionError) {
