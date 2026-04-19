@@ -304,7 +304,7 @@ Manage sessions inside a workspace. This entity is request/response.
 - `datapilot session send <id> <message-text...>`
 - `datapilot session cancel <id>`
 - `datapilot session share <id>`
-- `datapilot session share-html <file> --session <id>`
+- `datapilot session share <id> --html <file>`
 
 ### Permission mode default
 
@@ -326,7 +326,7 @@ datapilot session create --name "Audit" --mode safe
 datapilot session send sess-abc "Summarize today's open PRs"
 datapilot session cancel sess-abc
 datapilot session share sess-abc
-datapilot session share-html ./report.html --session sess-abc
+datapilot session share sess-abc --html ./report.html
 ```
 <!-- cli:session:end -->
 

@@ -11,7 +11,7 @@ import type { RouteCtx } from '../router.ts'
 const ACTIONS = [
   'list', 'get', 'create', 'delete',
   'messages', 'send', 'cancel',
-  'share', 'share-html',
+  'share',
 ] as const
 
 export async function routeSession(
@@ -85,34 +85,25 @@ export async function routeSession(
     }
 
     case 'share': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing session id')
-      const ws = await requireWorkspace(ctx)
-      ok(await client.invoke('sessions:share', ws, id))
-    }
-
-    case 'share-html': {
-      const filePath = positionals[0]
-      if (!filePath) {
-        fail('USAGE_ERROR', 'Missing HTML file path', {
-          suggestion: 'datapilot session share-html <file> [--session <id>]',
-        })
-      }
-      const id = strFlag(flags, 'session') ?? process.env.CRAFT_SESSION_ID
+      const id = positionals[0] ?? process.env.CRAFT_SESSION_ID
       if (!id) {
-        fail('USAGE_ERROR', 'Session ID required', {
-          suggestion: 'pass --session <id> or run inside a session where $CRAFT_SESSION_ID is set',
+        fail('USAGE_ERROR', 'Missing session id', {
+          suggestion: 'datapilot session share <id> [--html <file>]',
         })
       }
-      let html: string
-      try {
-        html = await readFile(resolve(filePath), 'utf8')
-      } catch (e) {
-        fail('NOT_FOUND', `Cannot read ${filePath}: ${(e as Error).message}`)
-      }
-      if (html.length === 0) fail('VALIDATION_ERROR', 'HTML file is empty')
+      const htmlPath = strFlag(flags, 'html')
       const ws = await requireWorkspace(ctx)
-      ok(await client.invoke('sessions:shareHtml', ws, id, html))
+      if (htmlPath) {
+        let html: string
+        try {
+          html = await readFile(resolve(htmlPath), 'utf8')
+        } catch (e) {
+          fail('NOT_FOUND', `Cannot read ${htmlPath}: ${(e as Error).message}`)
+        }
+        if (html.length === 0) fail('VALIDATION_ERROR', 'HTML file is empty')
+        ok(await client.invoke('sessions:shareHtml', ws, id, html))
+      }
+      ok(await client.invoke('sessions:share', ws, id))
     }
   }
 
