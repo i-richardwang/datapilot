@@ -53,7 +53,7 @@ export async function routeSession(
       const ws = await requireWorkspace(ctx)
       const input = (await parseInput(flags)) ?? {}
       const name = (input.name as string) ?? strFlag(flags, 'name')
-      const mode = (input.permissionMode as string) ?? strFlag(flags, 'mode')
+      const mode = (input.permissionMode as string) ?? strFlag(flags, 'mode') ?? 'allow-all'
       const sources = (input.enabledSourceSlugs as string[] | undefined) ?? listFlag(flags, 'source')
       const opts: Record<string, unknown> = { ...input }
       if (name) opts.name = name

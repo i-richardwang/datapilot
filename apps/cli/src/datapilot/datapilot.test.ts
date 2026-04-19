@@ -298,4 +298,77 @@ describe('datapilot CLI', () => {
     expect(r.envelope?.ok).toBe(true)
     expect(r.envelope?.data).toEqual([])
   })
+
+  it('session create without --mode defaults to allow-all', async () => {
+    let createArgs: unknown[] = []
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'sessions:create': (args) => {
+          createArgs = args
+          const opts = args[1] as { permissionMode?: string; name?: string }
+          return { id: 'sess-1', permissionMode: opts.permissionMode, name: opts.name }
+        },
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'session', 'create', '--name', 'foo',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    expect((r.envelope?.data as Record<string, unknown>).permissionMode).toBe('allow-all')
+    expect((createArgs[1] as Record<string, unknown>).permissionMode).toBe('allow-all')
+  })
+
+  it('session create --mode safe overrides the CLI default', async () => {
+    let createArgs: unknown[] = []
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'sessions:create': (args) => {
+          createArgs = args
+          const opts = args[1] as { permissionMode?: string }
+          return { id: 'sess-1', permissionMode: opts.permissionMode }
+        },
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'session', 'create', '--name', 'foo', '--mode', 'safe',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect((createArgs[1] as Record<string, unknown>).permissionMode).toBe('safe')
+  })
+
+  it('session create --input {"permissionMode":"ask"} overrides the CLI default', async () => {
+    let createArgs: unknown[] = []
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'sessions:create': (args) => {
+          createArgs = args
+          const opts = args[1] as { permissionMode?: string }
+          return { id: 'sess-1', permissionMode: opts.permissionMode }
+        },
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'session', 'create', '--input', '{"name":"foo","permissionMode":"ask"}',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect((createArgs[1] as Record<string, unknown>).permissionMode).toBe('ask')
+  })
+
+  it('permission entity is no longer routed', async () => {
+    const r = await runCli(['--json', 'permission', 'list'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('Unknown entity')
+  })
 })

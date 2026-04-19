@@ -28,7 +28,6 @@ import { routeLabel } from './datapilot/commands/label.ts'
 import { routeSource } from './datapilot/commands/source.ts'
 import { routeAutomation } from './datapilot/commands/automation.ts'
 import { routeSkill } from './datapilot/commands/skill.ts'
-import { routePermission } from './datapilot/commands/permission.ts'
 import { routeBatch } from './datapilot/commands/batch.ts'
 import { routeSession } from './datapilot/commands/session.ts'
 import { routeWorkspace } from './datapilot/commands/workspace.ts'
@@ -80,7 +79,6 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       case 'source': await routeSource(ctx, args.action, args.positionals, args.flags); break
       case 'automation': await routeAutomation(ctx, args.action, args.positionals, args.flags); break
       case 'skill': await routeSkill(ctx, args.action, args.positionals, args.flags); break
-      case 'permission': await routePermission(ctx, args.action, args.positionals, args.flags); break
       case 'batch': await routeBatch(ctx, args.action, args.positionals, args.flags); break
       case 'session': await routeSession(ctx, args.action, args.positionals, args.flags); break
       case 'workspace': await routeWorkspace(ctx, args.action, args.positionals, args.flags); break
@@ -162,7 +160,6 @@ Entities:
   source                 Workspace sources (MCP / API / local)
   automation             Workspace automations
   skill                  Workspace skills
-  permission             Workspace + per-source permission documents
   batch                  Batch processing jobs
   session                Sessions inside a workspace
   workspace              Workspaces themselves

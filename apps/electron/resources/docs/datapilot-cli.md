@@ -262,58 +262,6 @@ datapilot automation delete abc123
 
 ---
 
-<!-- cli:permission:start -->
-## Permission
-
-Manage Explore-mode permissions in `permissions.json` (workspace-level and
-per-source).
-
-### Commands
-- `datapilot permission list`
-- `datapilot permission get [--source <slug>]`
-- `datapilot permission set [--source <slug>] --input '<json>'`
-- `datapilot permission add-mcp-pattern "<pattern>" [--comment "..."] [--source <slug>]`
-- `datapilot permission add-api-endpoint --method GET|POST|... --path "<regex>" [--comment "..."] [--source <slug>]`
-- `datapilot permission add-bash-pattern "<pattern>" [--comment "..."] [--source <slug>]`
-- `datapilot permission add-write-path "<glob>" [--source <slug>]`
-- `datapilot permission remove <index> --type mcp|api|bash|write-path|blocked [--source <slug>]`
-- `datapilot permission validate [--source <slug>]`
-- `datapilot permission reset [--source <slug>]`
-- `datapilot permission defaults`
-
-### Scope
-
-Without `--source`: operates on workspace-level `permissions.json`.
-With `--source <slug>`: operates on that source's `permissions.json`
-(auto-scoped at runtime).
-
-### Examples
-
-```bash
-datapilot permission list
-datapilot permission get
-datapilot permission get --source linear
-datapilot permission add-mcp-pattern "list" --comment "List operations" --source linear
-datapilot permission add-api-endpoint --method GET --path ".*" --comment "All GET" --source stripe
-datapilot permission add-bash-pattern "^ls\\s" --comment "Allow ls"
-datapilot permission add-write-path "/tmp/**"
-datapilot permission remove 1 --type mcp --source linear
-datapilot permission set --source github \
-  --input '{"allowedMcpPatterns":[{"pattern":"list","comment":"List ops"}]}'
-datapilot permission validate
-datapilot permission validate --source linear
-datapilot permission reset --source linear
-datapilot permission defaults
-```
-
-### Notes
-- Source-level MCP patterns are auto-scoped at runtime (e.g., `list` becomes `mcp__<slug>__.*list`).
-- `remove` uses 0-based index within the specified rule type array. Use `get` to see indices.
-- `defaults` returns the built-in baseline permission set.
-<!-- cli:permission:end -->
-
----
-
 <!-- cli:batch:start -->
 ## Batch
 
@@ -396,11 +344,23 @@ is exposed via `events tail`; this entity is request/response.
 - `datapilot session share <id>`
 - `datapilot session share-html <file> --session <id>`
 
+### Permission mode default
+
+`session create` defaults to `--mode allow-all` when neither `--mode` nor
+`--input '{"permissionMode":"..."}'` is supplied. The CLI is invoked by agents
+running without a human to confirm `ask` prompts, so `allow-all` is the only
+mode that does not stall the session. Pass `--mode safe`, `--mode ask`, or
+set `permissionMode` via `--input` to override. Electron UI sessions keep
+their own `ask` default — this fallback lives only in the CLI layer.
+
 ### Examples
 
 ```bash
 datapilot session list
-datapilot session create --name "Daily standup" --mode safe --source linear --source github
+# --mode omitted → session starts in allow-all
+datapilot session create --name "Daily standup" --source linear --source github
+# explicit override
+datapilot session create --name "Audit" --mode safe
 datapilot session send sess-abc "Summarize today's open PRs"
 datapilot session cancel sess-abc
 datapilot session export sess-abc
