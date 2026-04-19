@@ -5,13 +5,13 @@
  * URL resolution order:
  *   1. --url flag
  *   2. $DATAPILOT_SERVER_URL env var
- *   3. discovery file at ~/.datapilot/.server.endpoint (written by `server start`)
+ *   3. discovery file at ~/.datapilot/.server.endpoint
  *   4. default ws://127.0.0.1:9100
  *
  * Token resolution mirrors the URL: --token, env, discovery file, then unset.
  *
- * If the connection fails, surface a clear error with a hint to start a
- * server — never silently spawn one.
+ * If the connection fails, surface a clear error and exit — never silently
+ * spawn a server.
  */
 
 import { homedir } from 'node:os'
@@ -89,7 +89,7 @@ export class ConnectionError extends Error {
   constructor(url: string, source: ResolvedEndpoint['source'], cause: string) {
     super(
       `no server detected at ${url} (${cause}); ` +
-      `start one with 'datapilot server start' or point elsewhere with --url`,
+      `point at a running server with --url or $DATAPILOT_SERVER_URL`,
     )
     this.url = url
     this.source = source

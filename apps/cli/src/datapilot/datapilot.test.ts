@@ -187,7 +187,7 @@ describe('datapilot CLI', () => {
     expect(r.envelope?.ok).toBe(false)
     expect(r.envelope?.error?.code).toBe('CONNECTION_ERROR')
     expect(r.envelope?.error?.message).toContain('no server detected')
-    expect(r.envelope?.error?.message).toContain('datapilot server start')
+    expect(r.envelope?.error?.message).toContain('--url')
   })
 
   it('unknown entity returns USAGE_ERROR with exit 2', async () => {
@@ -225,13 +225,6 @@ describe('datapilot CLI', () => {
     expect(r.exitCode).toBe(0)
     expect(r.envelope?.data).toEqual({ status: 'ok' })
     expect(server.requests.find((req) => req.channel === 'credentials:healthCheck')).toBeDefined()
-  })
-
-  it('--detach is rejected with USAGE_ERROR (Phase 4 scope)', async () => {
-    const r = await runCli(['--json', 'server', 'start', '--detach'])
-    expect(r.exitCode).toBe(2)
-    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
-    expect(r.envelope?.error?.message).toContain('--detach')
   })
 
   it('--input with non-object JSON returns USAGE_ERROR, not INTERNAL_ERROR', async () => {
