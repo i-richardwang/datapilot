@@ -3,7 +3,7 @@
  */
 
 import { ok, fail } from '../envelope.ts'
-import { strFlag, parseInput, type Flags } from '../args.ts'
+import { strFlag, intFlag, parseInput, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
@@ -104,13 +104,14 @@ export async function routeBatch(
     }
 
     case 'validate': {
-      const input = (await parseInput(flags)) ?? {}
-      ok(await client.invoke('batches:validate', ws, input))
+      ok(await client.invoke('batches:validate', ws))
     }
 
     case 'test': {
-      const input = (await parseInput(flags)) ?? {}
-      ok(await client.invoke('batches:test', ws, input))
+      const id = positionals[0]
+      if (!id) fail('USAGE_ERROR', 'Missing batch id')
+      const sampleSize = intFlag(flags, 'sample-size')
+      ok(await client.invoke('batches:test', ws, id, sampleSize))
     }
 
     case 'test-result': {
