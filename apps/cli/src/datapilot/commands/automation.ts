@@ -40,7 +40,7 @@ async function resolveAutomationId(
 const ACTIONS = [
   'list', 'get', 'create', 'update', 'delete',
   'enable', 'disable',
-  'history', 'test', 'replay',
+  'history', 'test',
   'validate',
 ] as const
 
@@ -131,14 +131,6 @@ export async function routeAutomation(
       const input = (await parseInput(flags)) ?? {}
       const payload = { workspaceId: ws, ...input }
       ok(await client.invoke('automations:test', payload))
-    }
-
-    case 'replay': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing automation id')
-      const resolved = await resolveAutomationId(client, ws, id)
-      if (!resolved) fail('NOT_FOUND', `Automation '${id}' not found`)
-      ok(await client.invoke('automations:replay', ws, id, resolved.eventName))
     }
 
     case 'validate':

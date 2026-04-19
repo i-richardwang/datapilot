@@ -604,4 +604,28 @@ describe('datapilot CLI', () => {
     expect(r.envelope?.ok).toBe(false)
     expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
   })
+
+  it('automation replay returns USAGE_ERROR', async () => {
+    const r = await runCli(['--json', 'automation', 'replay', 'abc123'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('Unknown automation action: replay')
+  })
+
+  it('batch state returns USAGE_ERROR', async () => {
+    const r = await runCli(['--json', 'batch', 'state', 'abc123'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('Unknown batch action: state')
+  })
+
+  it('batch test-result returns USAGE_ERROR', async () => {
+    const r = await runCli(['--json', 'batch', 'test-result', 'abc123'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('Unknown batch action: test-result')
+  })
 })
