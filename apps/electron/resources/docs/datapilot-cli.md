@@ -29,14 +29,40 @@ entities/actions.
 | `--help`, `-h` | Show help (entity-aware) |
 | `--version`, `-v` | Print CLI version |
 
+### Input rule
+
+One rule, no exceptions: **identity goes flat, data goes JSON.**
+
+- `create` accepts flat flags only for `--name` (identity) and
+  **schema-branch selectors** that decide which other fields are valid —
+  `--event` (automation), `--provider` and `--type` (source). Every other
+  field — `color`, `parentId`, `valueType`, `description`, `permissionMode`,
+  `enabledSourceSlugs`, matcher rules, etc. — goes through
+  `--input '<json>'` or `--stdin`.
+- `update` is strictly `<id>` + `--input '<json>'`. No data flat flags.
+- `enable`, `disable`, `start`, `pause`, `resume`, `cancel`, `delete` take
+  a positional id only.
+- Read-side query params (`--limit`, `--offset`, `--sample-size`, `--index`,
+  `--session`) stay as flat flags — they describe *how to read*, not what
+  the entity *is*.
+
+Anything not in that list gets rejected with `USAGE_ERROR` and a hint at the
+`--input` JSON key. Passing both `--input` and a flat identity flag is fine;
+flat flags win on conflict.
+
+> **Breaking change note (0.1.0-phase3+):** Several flat data flags that
+> previously worked (`label create --color`, `label update --name`,
+> `label auto-rule-add --pattern`, `skill create --slug`, `skill create
+> --description`, `session create --mode`, `session create --source`) now
+> fail fast. Move the value to `--input '{"<jsonKey>":"..."}'`.
+
 ### Input modes
 
-Per-action input is provided one of three ways (combine flat flags + structured
-input freely; flat flags override fields parsed from `--input`):
-
-- **Flat flags** for simple values, e.g. `--name "Bug" --color accent`
-- **`--input '<json>'`** for nested or bulk fields
-- **`--stdin`** to read a JSON object from piped stdin
+- **Flat flags** for identity (`--name`) and schema-branch selectors
+  (`--event`, `--provider`, `--type`).
+- **`--input '<json>'`** for every data field.
+- **`--stdin`** to read a JSON object from piped stdin (same semantics as
+  `--input`).
 
 ## Output contract
 
@@ -76,10 +102,10 @@ Manage workspace labels.
 ### Commands
 - `datapilot label list`
 - `datapilot label get <id>` — returns label with `autoRules`
-- `datapilot label create --name "<name>" [--color "<color>"] [--parent-id <id|root>] [--value-type string|number|date]`
-- `datapilot label update <id> [--name "<name>"] [--color "<color>"] [--value-type string|number|date|none]`
+- `datapilot label create --name "<name>" [--input '<json>']` — data fields (`color`, `parentId`, `valueType`) go in `--input`
+- `datapilot label update <id> --input '<json>'`
 - `datapilot label delete <id>`
-- `datapilot label auto-rule-add <id> --pattern "<regex>" [--flags "gi"] [--value-template "$1"] [--description "..."]`
+- `datapilot label auto-rule-add <id> --input '<json>'` — rule fields (`pattern`, `flags`, `valueTemplate`, `description`) go in `--input`
 - `datapilot label auto-rule-remove <id> --index <n>`
 
 ### Examples
@@ -87,16 +113,24 @@ Manage workspace labels.
 ```bash
 datapilot label list
 datapilot label get bug
-datapilot label create --name "Bug" --color "accent"
-datapilot label create --name "Priority" --value-type number
+
+# Identity flat, data via --input
+datapilot label create --name "Bug" --input '{"color":"accent"}'
+datapilot label create --name "Priority" --input '{"valueType":"number"}'
+
+# Update is strictly <id> + --input
 datapilot label update bug --input '{"name":"Bug Report","color":"destructive"}'
-datapilot label update priority --value-type none
-datapilot label auto-rule-add linear-issue --pattern "\\b([A-Z]{2,5}-\\d+)\\b" --value-template "$1"
+datapilot label update priority --input '{"valueType":"none"}'
+
+# Auto-rules: pattern is data, lives in --input
+datapilot label auto-rule-add linear-issue \
+  --input '{"pattern":"\\b([A-Z]{2,5}-\\d+)\\b","valueTemplate":"$1"}'
+datapilot label auto-rule-remove linear-issue --index 0
 ```
 
 ### Notes
 - IDs are stable slugs generated from the name on create.
-- Use `--value-type none` to clear a label's value type.
+- Pass `"valueType":"none"` inside `--input` to clear a label's value type.
 <!-- cli:label:end -->
 
 ---
@@ -115,11 +149,11 @@ Manage workspace sources stored under `sources/{slug}/`.
 
 ### Required fields for `source create`
 
-| Field | Description |
-|-------|-------------|
-| `--name` | Source display name |
-| `--provider` | Provider identifier (e.g., `linear`, `github`, `generic`) |
-| `--type` | `mcp`, `api`, or `local` |
+| Flat flag | Why flat | Description |
+|-------|----------|-------------|
+| `--name` | identity | Source display name |
+| `--provider` | schema-branch | Provider identifier (e.g., `linear`, `github`, `generic`) |
+| `--type` | schema-branch | `mcp`, `api`, or `local` — picks which nested config is valid |
 
 Type-specific fields (e.g. MCP `transport` / `url` / `authType`, API `baseUrl`,
 local `path`) live under nested keys passed via `--input`.
@@ -176,7 +210,7 @@ Manage workspace skills stored under `skills/{slug}/SKILL.md`.
 ### Commands
 - `datapilot skill list`
 - `datapilot skill get <slug>`
-- `datapilot skill create --name "<name>" --description "<desc>" [--input '<json>']`
+- `datapilot skill create --name "<name>" --input '<json>'` — `description` (required), `body`, `globs`, `requiredSources`, `alwaysAllow`, and an optional explicit `slug` live in `--input`
 - `datapilot skill update <slug> --input '<json>'`
 - `datapilot skill delete <slug>`
 
@@ -184,7 +218,12 @@ Manage workspace skills stored under `skills/{slug}/SKILL.md`.
 
 ```bash
 datapilot skill list
-datapilot skill create --name "Commit Helper" --description "Generate conventional commits"
+
+# Name is identity; everything else (including required `description`) via --input.
+# Slug is auto-derived from the name — pass `"slug":"..."` in --input to override.
+datapilot skill create --name "Commit Helper" \
+  --input '{"description":"Generate conventional commits"}'
+
 datapilot skill update commit-helper \
   --input '{"requiredSources":["github"],"body":"Use concise, imperative commit messages."}'
 datapilot skill delete commit-helper
@@ -192,6 +231,8 @@ datapilot skill delete commit-helper
 
 ### Notes
 - `create` / `update` write `SKILL.md` frontmatter and content body.
+- The server derives `slug` from `name` when not provided (see
+  `packages/server-core/src/handlers/rpc/skills.ts:145`).
 <!-- cli:skill:end -->
 
 ---
@@ -204,8 +245,8 @@ Manage workspace automations stored in `automations.json`.
 ### Commands
 - `datapilot automation list`
 - `datapilot automation get <id>`
-- `datapilot automation create --event <EventName> --name "<name>" [--input '<json>']`
-- `datapilot automation update <id> [--input '<json>']`
+- `datapilot automation create --event <EventName> --name "<name>" --input '<json>'`
+- `datapilot automation update <id> --input '<json>'`
 - `datapilot automation delete <id>`
 - `datapilot automation enable <id>`
 - `datapilot automation disable <id>`
@@ -298,7 +339,7 @@ Manage sessions inside a workspace. This entity is request/response.
 ### Commands
 - `datapilot session list`
 - `datapilot session get <id>`
-- `datapilot session create [--name "..."] [--mode safe|ask|allow-all] [--source <slug> ...] [--input '<json>']`
+- `datapilot session create [--name "..."] [--input '<json>']` — `permissionMode` and `enabledSourceSlugs` go in `--input`
 - `datapilot session delete <id>`
 - `datapilot session messages <id>`
 - `datapilot session send <id> <message-text...>`
@@ -308,21 +349,25 @@ Manage sessions inside a workspace. This entity is request/response.
 
 ### Permission mode default
 
-`session create` defaults to `--mode allow-all` when neither `--mode` nor
-`--input '{"permissionMode":"..."}'` is supplied. The CLI is invoked by agents
-running without a human to confirm `ask` prompts, so `allow-all` is the only
-mode that does not stall the session. Pass `--mode safe`, `--mode ask`, or
-set `permissionMode` via `--input` to override. Electron UI sessions keep
+`session create` defaults `permissionMode` to `allow-all` when neither the
+flat `--name` nor `--input '{"permissionMode":"..."}'` supplies one. The CLI
+is invoked by agents running without a human to confirm `ask` prompts, so
+`allow-all` is the only mode that does not stall the session. Override via
+`--input '{"permissionMode":"safe"}'` (or `"ask"`). Electron UI sessions keep
 their own `ask` default — this fallback lives only in the CLI layer.
 
 ### Examples
 
 ```bash
 datapilot session list
-# --mode omitted → session starts in allow-all
-datapilot session create --name "Daily standup" --source linear --source github
+
+# permissionMode omitted → session starts in allow-all
+datapilot session create --name "Daily standup" \
+  --input '{"enabledSourceSlugs":["linear","github"]}'
+
 # explicit override
-datapilot session create --name "Audit" --mode safe
+datapilot session create --name "Audit" --input '{"permissionMode":"safe"}'
+
 datapilot session send sess-abc "Summarize today's open PRs"
 datapilot session cancel sess-abc
 datapilot session share sess-abc

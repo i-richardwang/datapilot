@@ -3,10 +3,15 @@
  *
  * Actions: list, get, create, update, delete,
  *          auto-rule-add, auto-rule-remove
+ *
+ * Flag rule: flat flags are identity only (`--name` on create,
+ * `--index` on auto-rule-remove). Every other field — `color`,
+ * `parentId`, `valueType`, rule `pattern` / `flags` / `valueTemplate` /
+ * `description` — goes through `--input '<json>'` or `--stdin`.
  */
 
 import { ok, fail } from '../envelope.ts'
-import { strFlag, intFlag, parseInput, type Flags } from '../args.ts'
+import { strFlag, intFlag, parseInput, rejectUnknownFlags, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
@@ -30,9 +35,11 @@ export async function routeLabel(
 
   switch (action) {
     case 'list':
+      rejectUnknownFlags(flags, [])
       ok(await client.invoke('labels:list', ws))
 
     case 'get': {
+      rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing label id', { suggestion: 'datapilot label get <id>' })
       const [labels, autoRules] = await Promise.all([
@@ -45,56 +52,45 @@ export async function routeLabel(
     }
 
     case 'create': {
+      rejectUnknownFlags(flags, ['name'])
       const input = (await parseInput(flags)) ?? {}
-      const name = (input.name as string) ?? strFlag(flags, 'name')
+      const name = strFlag(flags, 'name') ?? (input.name as string | undefined)
       if (!name) fail('USAGE_ERROR', 'Missing --name', { suggestion: 'datapilot label create --name "<name>"' })
-      const payload: Record<string, unknown> = { name }
-      const color = (input.color as string) ?? strFlag(flags, 'color')
-      if (color) payload.color = color
-      const parentId = (input.parentId as string) ?? strFlag(flags, 'parent-id')
-      if (parentId) payload.parentId = parentId
-      const valueType = (input.valueType as string) ?? strFlag(flags, 'value-type')
-      if (valueType) payload.valueType = valueType
-      ok(await client.invoke('labels:create', ws, payload))
+      ok(await client.invoke('labels:create', ws, { ...input, name }))
     }
 
     case 'update': {
+      rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing label id')
       const input = (await parseInput(flags)) ?? {}
-      const updates: Record<string, unknown> = {}
-      const name = (input.name as string) ?? strFlag(flags, 'name')
-      if (name !== undefined) updates.name = name
-      const color = (input.color as string) ?? strFlag(flags, 'color')
-      if (color !== undefined) updates.color = color
-      const valueType = (input.valueType as string) ?? strFlag(flags, 'value-type')
-      if (valueType !== undefined) updates.valueType = valueType === 'none' ? '' : valueType
+      const updates: Record<string, unknown> = { ...input }
+      if (updates.valueType === 'none') updates.valueType = ''
       ok(await client.invoke('labels:update', ws, id, updates))
     }
 
     case 'delete': {
+      rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing label id')
       ok(await client.invoke('labels:delete', ws, id))
     }
 
     case 'auto-rule-add': {
+      rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing label id')
       const input = (await parseInput(flags)) ?? {}
-      const pattern = (input.pattern as string) ?? strFlag(flags, 'pattern')
-      if (!pattern) fail('USAGE_ERROR', 'Missing --pattern')
-      const rule: Record<string, unknown> = { pattern }
-      const ruleFlags = (input.flags as string) ?? strFlag(flags, 'flags')
-      if (ruleFlags) rule.flags = ruleFlags
-      const valueTemplate = (input.valueTemplate as string) ?? strFlag(flags, 'value-template')
-      if (valueTemplate) rule.valueTemplate = valueTemplate
-      const description = (input.description as string) ?? strFlag(flags, 'description')
-      if (description) rule.description = description
-      ok(await client.invoke('labels:autoRuleAdd', ws, id, rule))
+      if (!input.pattern) {
+        fail('USAGE_ERROR', 'Missing pattern', {
+          suggestion: `datapilot label auto-rule-add ${id} --input '{"pattern":"<regex>"}'`,
+        })
+      }
+      ok(await client.invoke('labels:autoRuleAdd', ws, id, input))
     }
 
     case 'auto-rule-remove': {
+      rejectUnknownFlags(flags, ['index'])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing label id')
       const index = intFlag(flags, 'index')

@@ -1,11 +1,20 @@
 /**
  * session entity — wraps the sessions:* RPC channels for non-interactive use.
+ *
+ * Flag rule: `create` keeps only `--name` (identity). `permissionMode` and
+ * `enabledSourceSlugs` — previously `--mode` / `--source` flat flags — flow
+ * through `--input '<json>'`. `share` keeps `--html <file>` as a query-param
+ * flat flag (it's a file path, not entity data) to switch upload mode.
+ *
+ * The CLI still defaults `permissionMode` to `allow-all` when neither the
+ * flat nor the JSON path supplies one, because agents running without a human
+ * can't satisfy `ask` prompts.
  */
 
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { ok, fail } from '../envelope.ts'
-import { strFlag, listFlag, parseInput, type Flags } from '../args.ts'
+import { strFlag, parseInput, rejectUnknownFlags, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
@@ -29,11 +38,13 @@ export async function routeSession(
 
   switch (action) {
     case 'list': {
+      rejectUnknownFlags(flags, [])
       await requireWorkspace(ctx)
       ok(await client.invoke('sessions:get'))
     }
 
     case 'get': {
+      rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing session id')
       const ws = await requireWorkspace(ctx)
@@ -44,19 +55,18 @@ export async function routeSession(
     }
 
     case 'create': {
+      rejectUnknownFlags(flags, ['name'], { mode: 'permissionMode', source: 'enabledSourceSlugs' })
       const ws = await requireWorkspace(ctx)
       const input = (await parseInput(flags)) ?? {}
-      const name = (input.name as string) ?? strFlag(flags, 'name')
-      const mode = (input.permissionMode as string) ?? strFlag(flags, 'mode') ?? 'allow-all'
-      const sources = (input.enabledSourceSlugs as string[] | undefined) ?? listFlag(flags, 'source')
+      const name = strFlag(flags, 'name') ?? (input.name as string | undefined)
       const opts: Record<string, unknown> = { ...input }
       if (name) opts.name = name
-      if (mode) opts.permissionMode = mode
-      if (sources?.length) opts.enabledSourceSlugs = sources
+      if (opts.permissionMode === undefined) opts.permissionMode = 'allow-all'
       ok(await client.invoke('sessions:create', ws, opts))
     }
 
     case 'delete': {
+      rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing session id')
       await client.invoke('sessions:delete', id)
@@ -64,12 +74,14 @@ export async function routeSession(
     }
 
     case 'messages': {
+      rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing session id')
       ok(await client.invoke('sessions:getMessages', id))
     }
 
     case 'send': {
+      rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing session id')
       const message = positionals.slice(1).join(' ')
@@ -78,6 +90,7 @@ export async function routeSession(
     }
 
     case 'cancel': {
+      rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing session id')
       await client.invoke('sessions:cancel', id)
@@ -85,6 +98,7 @@ export async function routeSession(
     }
 
     case 'share': {
+      rejectUnknownFlags(flags, ['html'])
       const id = positionals[0] ?? process.env.CRAFT_SESSION_ID
       if (!id) {
         fail('USAGE_ERROR', 'Missing session id', {
