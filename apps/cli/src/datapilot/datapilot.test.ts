@@ -212,30 +212,29 @@ describe('datapilot CLI', () => {
     expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
   })
 
-  it('server status returns only workspaces field', async () => {
+  it('server entity is no longer routed', async () => {
+    const r = await runCli(['--json', 'server', 'status'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('Unknown entity')
+  })
+
+  it('source test action returns USAGE_ERROR', async () => {
     server = startMockServer({
       handlers: {
-        'server:getStatus': () => ({
-          serverId: 'srv-123',
-          version: '1.0.0',
-          uptime: 3600,
-          connectedClients: 5,
-          memory: { heapUsed: 100, heapTotal: 200, rss: 300 },
-          workspaces: [{ id: 'ws-1', name: 'Test', slug: 'test', activeSessions: 2, automationCount: 3, schedulerRunning: true }],
-        }),
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
       },
     })
     const r = await runCli([
       '--url', server.url, '--token', 't', '--json',
-      'server', 'status',
+      'source', 'test', 'linear',
     ])
-    expect(r.exitCode).toBe(0)
-    expect(r.envelope?.ok).toBe(true)
-    // Should only contain workspaces, not serverId/version/uptime/connectedClients/memory
-    expect(r.envelope?.data).toEqual({
-      workspaces: [{ id: 'ws-1', name: 'Test', slug: 'test', activeSessions: 2, automationCount: 3, schedulerRunning: true }],
-    })
-    expect(server.requests.find((req) => req.channel === 'server:getStatus')).toBeDefined()
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('Unknown source action: test')
   })
 
   it('--input with non-object JSON returns USAGE_ERROR, not INTERNAL_ERROR', async () => {
