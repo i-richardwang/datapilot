@@ -18,7 +18,6 @@ export const ENTITIES = [
   'session',
   'workspace',
   'server',
-  'events',
 ] as const
 
 export type Entity = typeof ENTITIES[number]

@@ -32,7 +32,6 @@ import { routeBatch } from './datapilot/commands/batch.ts'
 import { routeSession } from './datapilot/commands/session.ts'
 import { routeWorkspace } from './datapilot/commands/workspace.ts'
 import { routeServer } from './datapilot/commands/server.ts'
-import { routeEvents } from './datapilot/commands/events.ts'
 
 const VERSION = '0.1.0-phase3'
 
@@ -83,7 +82,6 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       case 'session': await routeSession(ctx, args.action, args.positionals, args.flags); break
       case 'workspace': await routeWorkspace(ctx, args.action, args.positionals, args.flags); break
       case 'server': await routeServer(ctx, args.action, args.positionals, args.flags); break
-      case 'events': await routeEvents(ctx, args.action, args.positionals, args.flags); break
     }
   } catch (e) {
     if (e instanceof ConnectionError) {
@@ -164,7 +162,6 @@ Entities:
   session                Sessions inside a workspace
   workspace              Workspaces themselves
   server                 Local-server health, status, endpoint, and version queries
-  events                 Tail push events from the server
 
 Run 'datapilot <entity>' with no action to list that entity's actions.
 
@@ -173,7 +170,6 @@ Examples:
   datapilot label create --name TODO --color blue
   datapilot --url wss://remote source list
   datapilot server health
-  datapilot --workspace ws-abc events tail --channel session:event
 `)
 }
 
