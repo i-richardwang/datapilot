@@ -39,8 +39,8 @@ async function resolveAutomationId(
 
 const ACTIONS = [
   'list', 'get', 'create', 'update', 'delete',
-  'enable', 'disable', 'duplicate',
-  'history', 'last-executed', 'test', 'replay',
+  'enable', 'disable',
+  'history', 'test', 'replay',
   'validate',
 ] as const
 
@@ -120,24 +120,12 @@ export async function routeAutomation(
       ok({ disabled: id })
     }
 
-    case 'duplicate': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing automation id')
-      const resolved = await resolveAutomationId(client, ws, id)
-      if (!resolved) fail('NOT_FOUND', `Automation '${id}' not found`)
-      await client.invoke('automations:duplicate', ws, resolved.eventName, resolved.matcherIndex)
-      ok({ duplicated: id })
-    }
-
     case 'history': {
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing automation id')
       const limit = intFlag(flags, 'limit') ?? 50
       ok(await client.invoke('automations:getHistory', ws, id, limit))
     }
-
-    case 'last-executed':
-      ok(await client.invoke('automations:getLastExecuted', ws))
 
     case 'test': {
       const input = (await parseInput(flags)) ?? {}

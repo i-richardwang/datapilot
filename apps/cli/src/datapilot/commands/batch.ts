@@ -8,7 +8,7 @@ import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
   'list', 'get', 'create', 'update', 'delete',
-  'start', 'pause', 'resume', 'duplicate',
+  'start', 'pause', 'resume',
   'status', 'state', 'items',
   'validate', 'test', 'test-result', 'retry-item',
 ] as const
@@ -77,12 +77,6 @@ export async function routeBatch(
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing batch id')
       ok(await client.invoke('batches:resume', ws, id))
-    }
-
-    case 'duplicate': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing batch id')
-      ok(await client.invoke('batches:duplicate', ws, id))
     }
 
     case 'status': {
