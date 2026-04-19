@@ -98,19 +98,28 @@ export async function routeAutomation(
     case 'enable': {
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing automation id')
-      ok(await client.invoke('automations:setEnabled', ws, id, true))
+      const resolved = await resolveAutomationId(client, ws, id)
+      if (!resolved) fail('NOT_FOUND', `Automation '${id}' not found`)
+      await client.invoke('automations:setEnabled', ws, resolved.eventName, resolved.matcherIndex, true)
+      ok({ enabled: id })
     }
 
     case 'disable': {
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing automation id')
-      ok(await client.invoke('automations:setEnabled', ws, id, false))
+      const resolved = await resolveAutomationId(client, ws, id)
+      if (!resolved) fail('NOT_FOUND', `Automation '${id}' not found`)
+      await client.invoke('automations:setEnabled', ws, resolved.eventName, resolved.matcherIndex, false)
+      ok({ disabled: id })
     }
 
     case 'duplicate': {
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing automation id')
-      ok(await client.invoke('automations:duplicate', ws, id))
+      const resolved = await resolveAutomationId(client, ws, id)
+      if (!resolved) fail('NOT_FOUND', `Automation '${id}' not found`)
+      await client.invoke('automations:duplicate', ws, resolved.eventName, resolved.matcherIndex)
+      ok({ duplicated: id })
     }
 
     case 'history': {
