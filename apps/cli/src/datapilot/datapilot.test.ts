@@ -212,19 +212,30 @@ describe('datapilot CLI', () => {
     expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
   })
 
-  it('routes server health to credentials:healthCheck', async () => {
+  it('server status returns only workspaces field', async () => {
     server = startMockServer({
       handlers: {
-        'credentials:healthCheck': () => ({ status: 'ok' }),
+        'server:getStatus': () => ({
+          serverId: 'srv-123',
+          version: '1.0.0',
+          uptime: 3600,
+          connectedClients: 5,
+          memory: { heapUsed: 100, heapTotal: 200, rss: 300 },
+          workspaces: [{ id: 'ws-1', name: 'Test', slug: 'test', activeSessions: 2, automationCount: 3, schedulerRunning: true }],
+        }),
       },
     })
     const r = await runCli([
       '--url', server.url, '--token', 't', '--json',
-      'server', 'health',
+      'server', 'status',
     ])
     expect(r.exitCode).toBe(0)
-    expect(r.envelope?.data).toEqual({ status: 'ok' })
-    expect(server.requests.find((req) => req.channel === 'credentials:healthCheck')).toBeDefined()
+    expect(r.envelope?.ok).toBe(true)
+    // Should only contain workspaces, not serverId/version/uptime/connectedClients/memory
+    expect(r.envelope?.data).toEqual({
+      workspaces: [{ id: 'ws-1', name: 'Test', slug: 'test', activeSessions: 2, automationCount: 3, schedulerRunning: true }],
+    })
+    expect(server.requests.find((req) => req.channel === 'server:getStatus')).toBeDefined()
   })
 
   it('--input with non-object JSON returns USAGE_ERROR, not INTERNAL_ERROR', async () => {

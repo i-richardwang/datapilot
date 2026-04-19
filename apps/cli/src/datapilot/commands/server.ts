@@ -2,19 +2,14 @@
  * server entity — read-only introspection of the running datapilot server.
  *
  * Actions:
- *   health       Connect to a running server and report its health check.
- *   status       Report startup info: connected client count, uptime.
- *   versions     Print the server's reported runtime versions.
- *   endpoint     Print the resolved endpoint without connecting.
- *   home-dir     Print the server's home directory.
+ *   status       Return workspace runtime snapshot (active sessions, automation count, scheduler state).
  */
 
 import { ok, fail } from '../envelope.ts'
 import type { Flags } from '../args.ts'
-import { resolveEndpoint, type ConnectOptions } from '../transport.ts'
 import type { RouteCtx } from '../router.ts'
 
-const ACTIONS = ['health', 'status', 'versions', 'endpoint', 'home-dir'] as const
+const ACTIONS = ['status'] as const
 
 export async function routeServer(
   ctx: RouteCtx,
@@ -28,33 +23,12 @@ export async function routeServer(
   }
 
   switch (action) {
-    case 'endpoint': return cmdEndpoint(ctx)
-    case 'health': {
-      const client = await ctx.getClient()
-      ok(await client.invoke('credentials:healthCheck'))
-    }
     case 'status': {
       const client = await ctx.getClient()
-      ok(await client.invoke('server:getStatus'))
-    }
-    case 'versions': {
-      const client = await ctx.getClient()
-      ok(await client.invoke('system:versions'))
-    }
-    case 'home-dir': {
-      const client = await ctx.getClient()
-      ok(await client.invoke('system:homeDir'))
+      const full = await client.invoke('server:getStatus') as { workspaces: unknown[] }
+      ok({ workspaces: full.workspaces })
     }
   }
 
   fail('USAGE_ERROR', `Unhandled server action: ${action}`)
-}
-
-async function cmdEndpoint(ctx: RouteCtx): Promise<never> {
-  const opts: ConnectOptions = {
-    url: ctx.global.url,
-    token: ctx.global.token,
-  }
-  const endpoint = resolveEndpoint(opts)
-  ok({ url: endpoint.url, source: endpoint.source, hasToken: !!endpoint.token })
 }
