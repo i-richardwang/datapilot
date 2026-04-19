@@ -11,8 +11,6 @@ import type { RouteCtx } from '../router.ts'
 const ACTIONS = [
   'list', 'get', 'create', 'delete',
   'messages', 'send', 'cancel',
-  'set-model',
-  'get-files',
   'share', 'share-html',
 ] as const
 
@@ -84,21 +82,6 @@ export async function routeSession(
       if (!id) fail('USAGE_ERROR', 'Missing session id')
       await client.invoke('sessions:cancel', id)
       ok({ cancelled: id })
-    }
-
-    case 'set-model': {
-      const id = positionals[0]
-      const model = positionals[1]
-      if (!id || !model) fail('USAGE_ERROR', 'Usage: session set-model <id> <model>')
-      const ws = await requireWorkspace(ctx)
-      const connectionSlug = strFlag(flags, 'connection')
-      ok(await client.invoke('session:setModel', id, ws, model, connectionSlug))
-    }
-
-    case 'get-files': {
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing session id')
-      ok(await client.invoke('sessions:getFiles', id))
     }
 
     case 'share': {

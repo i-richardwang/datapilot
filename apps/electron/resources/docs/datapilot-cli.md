@@ -81,7 +81,6 @@ Manage workspace labels.
 - `datapilot label delete <id>`
 - `datapilot label auto-rule-add <id> --pattern "<regex>" [--flags "gi"] [--value-template "$1"] [--description "..."]`
 - `datapilot label auto-rule-remove <id> --index <n>`
-- `datapilot label auto-rule-clear <id>`
 
 ### Examples
 
@@ -321,8 +320,6 @@ Manage sessions inside a workspace. This entity is request/response.
 - `datapilot session messages <id>`
 - `datapilot session send <id> <message-text...>`
 - `datapilot session cancel <id>`
-- `datapilot session set-model <id> <model> [--connection <slug>]`
-- `datapilot session get-files <id>`
 - `datapilot session share <id>`
 - `datapilot session share-html <file> --session <id>`
 

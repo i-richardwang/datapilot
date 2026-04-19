@@ -583,4 +583,25 @@ describe('datapilot CLI', () => {
     expect(r.envelope?.ok).toBe(false)
     expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
   })
+
+  it('session set-model returns USAGE_ERROR', async () => {
+    const r = await runCli(['--json', 'session', 'set-model', 'sess-1', 'gpt-4'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+  })
+
+  it('session get-files returns USAGE_ERROR', async () => {
+    const r = await runCli(['--json', 'session', 'get-files', 'sess-1'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+  })
+
+  it('label auto-rule-clear returns USAGE_ERROR', async () => {
+    const r = await runCli(['--json', 'label', 'auto-rule-clear', 'lbl-1'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+  })
 })
