@@ -9,7 +9,7 @@
  * - /s/{id} - View shared session
  */
 
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileText } from 'lucide-react'
 import type { StoredSession } from '@craft-agent/core'
@@ -75,8 +75,6 @@ export function App() {
       return null
     }
   })
-  const passwordRef = useRef<string | null>(password)
-  useEffect(() => { passwordRef.current = password }, [password])
   const [isDark, setIsDark] = useState(() => {
     // Check system preference on mount
     return window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -236,24 +234,20 @@ export function App() {
   // Missing paths (old sessions without a manifest, or unreadable files at
   // share time) throw "Cannot load content" — the same fallback that was
   // shown before this route existed.
-  const sessionRef = useRef<StoredSession | null>(session)
-  useEffect(() => { sessionRef.current = session }, [session])
-
   const lookupAssetUrl = useCallback((path: string): string => {
-    const assets = sessionRef.current?.assets
+    const assets = session?.assets
     const entry = assets?.[path]
     if (!entry?.url) throw new Error('Cannot load content')
     return entry.url
-  }, [])
+  }, [session?.assets])
 
   const fetchAsset = useCallback(async (url: string): Promise<Response> => {
     const headers: Record<string, string> = {}
-    const pw = passwordRef.current
-    if (pw) headers['X-Share-Password'] = pw
+    if (password) headers['X-Share-Password'] = password
     const res = await fetch(url, { headers })
     if (!res.ok) throw new Error(`Failed to fetch asset: ${res.status}`)
     return res
-  }, [])
+  }, [password])
 
   const readFileAsText = useCallback(async (path: string): Promise<string> => {
     const res = await fetchAsset(lookupAssetUrl(path))
