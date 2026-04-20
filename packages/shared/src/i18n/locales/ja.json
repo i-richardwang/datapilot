@@ -1315,6 +1315,8 @@
   "webui.logOut": "ログアウト",
   "webui.passwordPrompt.description": "この共有リンクはパスワードで保護されています。表示するにはパスワードを入力してください。",
   "webui.passwordPrompt.invalid": "パスワードが正しくありません。もう一度お試しください。",
+  "webui.passwordPrompt.loadFailed": "読み込みに失敗しました (ステータス {{status}})",
+  "webui.passwordPrompt.networkError": "ネットワークエラー",
   "webui.passwordPrompt.placeholder": "パスワード",
   "webui.passwordPrompt.submit": "ロックを解除",
   "webui.passwordPrompt.title": "パスワードが必要です",

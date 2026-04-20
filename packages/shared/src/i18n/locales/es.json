@@ -1315,6 +1315,8 @@
   "webui.logOut": "Cerrar sesión",
   "webui.passwordPrompt.description": "Este enlace compartido está protegido con contraseña. Introduce la contraseña para verlo.",
   "webui.passwordPrompt.invalid": "Contraseña incorrecta. Inténtalo de nuevo.",
+  "webui.passwordPrompt.loadFailed": "Error al cargar (estado {{status}})",
+  "webui.passwordPrompt.networkError": "Error de red",
   "webui.passwordPrompt.placeholder": "Contraseña",
   "webui.passwordPrompt.submit": "Desbloquear",
   "webui.passwordPrompt.title": "Contraseña requerida",

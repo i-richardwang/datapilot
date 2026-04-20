@@ -35,6 +35,7 @@ import {
   verifyPassword,
 } from './password'
 import { renderPasswordGate } from './gate-page'
+import { getGateStringsForRequest } from './gate-locale'
 
 /** Max request body size (50 MB) */
 const MAX_BODY_SIZE = 50 * 1024 * 1024
@@ -310,7 +311,7 @@ export async function handleHtmlArtifactRoute(
 
   const gate = await checkPasswordGate(storage, 'html', id, req)
   if (gate.state === 'password_required' && prefersHtml(req)) {
-    return new Response(renderPasswordGate(path, 'html'), {
+    return new Response(renderPasswordGate(path, 'html', getGateStringsForRequest(req)), {
       status: 401,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
     })
@@ -366,7 +367,7 @@ export function createAssetHandler(storage: SessionStorage, baseUrl: string) {
       }
       const gate = await checkPasswordGate(storage, 'asset', id, req)
       if (gate.state === 'password_required' && prefersHtml(req)) {
-        return new Response(renderPasswordGate(path, 'download'), {
+        return new Response(renderPasswordGate(path, 'download', getGateStringsForRequest(req)), {
           status: 401,
           headers: { 'Content-Type': 'text/html; charset=utf-8' },
         })

@@ -1315,6 +1315,8 @@
   "webui.logOut": "Log Out",
   "webui.passwordPrompt.description": "This shared link is password-protected. Enter the password to view it.",
   "webui.passwordPrompt.invalid": "Incorrect password. Try again.",
+  "webui.passwordPrompt.loadFailed": "Failed to load (status {{status}})",
+  "webui.passwordPrompt.networkError": "Network error",
   "webui.passwordPrompt.placeholder": "Password",
   "webui.passwordPrompt.submit": "Unlock",
   "webui.passwordPrompt.title": "Password required",
