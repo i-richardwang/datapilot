@@ -1315,6 +1315,8 @@
   "webui.logOut": "Abmelden",
   "webui.passwordPrompt.description": "Dieser geteilte Link ist passwortgeschützt. Geben Sie das Passwort ein, um ihn anzuzeigen.",
   "webui.passwordPrompt.invalid": "Falsches Passwort. Bitte erneut versuchen.",
+  "webui.passwordPrompt.loadFailed": "Laden fehlgeschlagen (Status {{status}})",
+  "webui.passwordPrompt.networkError": "Netzwerkfehler",
   "webui.passwordPrompt.placeholder": "Passwort",
   "webui.passwordPrompt.submit": "Entsperren",
   "webui.passwordPrompt.title": "Passwort erforderlich",

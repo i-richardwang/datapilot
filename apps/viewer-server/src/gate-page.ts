@@ -6,7 +6,25 @@
  *
  * Kept dependency-free (no framework, no external assets) so it loads
  * even when the protected HTML is the only thing the viewer serves.
+ *
+ * The user-facing strings are pulled from `webui.passwordPrompt.*` in the
+ * shared locale registry via {@link GateStrings}; see `./gate-locale.ts`
+ * for the `Accept-Language` resolution.
  */
+
+import type { GateStrings } from './gate-locale'
+
+const HTML_ESCAPE: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+}
+
+function escapeHtml(input: string): string {
+  return input.replace(/[&<>"']/g, (c) => HTML_ESCAPE[c]!)
+}
 
 /**
  * @param url Path this gate protects (e.g. `/s/h/abc`). The gate fetches this
@@ -14,16 +32,30 @@
  * @param mode 'html' replaces the document with the fetched body; 'download'
  *             streams the returned bytes to a blob URL and navigates there
  *             (used for raw asset routes).
+ * @param strings Localized `webui.passwordPrompt.*` strings. Callers resolve
+ *                the locale from `Accept-Language` — see `./gate-locale.ts`.
  */
-export function renderPasswordGate(url: string, mode: 'html' | 'download'): string {
+export function renderPasswordGate(
+  url: string,
+  mode: 'html' | 'download',
+  strings: GateStrings,
+): string {
   const safeUrl = JSON.stringify(url)
   const isHtml = mode === 'html'
+  // Embed the error strings the client script needs as a JSON literal so we
+  // don't have to interpolate each occurrence separately (and JSON.stringify
+  // handles any quote / unicode escaping for us).
+  const clientStrings = JSON.stringify({
+    invalid: strings.invalid,
+    loadFailedTemplate: strings.loadFailedTemplate,
+    networkError: strings.networkError,
+  })
   return `<!doctype html>
-<html lang="en">
+<html lang="${escapeHtml(strings.locale)}">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Password required</title>
+<title>${escapeHtml(strings.title)}</title>
 <style>
   :root {
     color-scheme: light dark;
@@ -99,17 +131,18 @@ export function renderPasswordGate(url: string, mode: 'html' | 'download'): stri
 </head>
 <body>
 <div class="card">
-  <h1>Password required</h1>
-  <p>This share is protected. Enter the password to view it.</p>
+  <h1>${escapeHtml(strings.title)}</h1>
+  <p>${escapeHtml(strings.description)}</p>
   <form id="f">
     <input id="pw" type="password" autocomplete="current-password" autofocus required />
     <div class="error" id="err"></div>
-    <button id="submit" type="submit">Unlock</button>
+    <button id="submit" type="submit">${escapeHtml(strings.submit)}</button>
   </form>
 </div>
 <script>
 (function(){
   var url = ${safeUrl};
+  var messages = ${clientStrings};
   var key = 'viewer-share-pw:' + url;
   var pwEl = document.getElementById('pw');
   var errEl = document.getElementById('err');
@@ -133,8 +166,8 @@ export function renderPasswordGate(url: string, mode: 'html' | 'download'): stri
 
   async function unlock(password) {
     var res = await fetch(url, { headers: { 'x-share-password': password } });
-    if (res.status === 401) { setError('Incorrect password'); return false; }
-    if (!res.ok) { setError('Failed to load (status ' + res.status + ')'); return false; }
+    if (res.status === 401) { setError(messages.invalid); return false; }
+    if (!res.ok) { setError(messages.loadFailedTemplate.replace('{{status}}', String(res.status))); return false; }
     try { sessionStorage.setItem(key, password); } catch (_) {}
     ${isHtml
       ? `var text = await res.text(); writeHtml(text);`
@@ -149,7 +182,7 @@ export function renderPasswordGate(url: string, mode: 'html' | 'download'): stri
     try {
       await unlock(pwEl.value);
     } catch (err) {
-      setError('Network error');
+      setError(messages.networkError);
     } finally {
       btn.disabled = false;
     }

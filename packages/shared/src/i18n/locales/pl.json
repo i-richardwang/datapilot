@@ -1315,6 +1315,8 @@
   "webui.logOut": "Wyloguj się",
   "webui.passwordPrompt.description": "Ten udostępniony link jest chroniony hasłem. Wprowadź hasło, aby go wyświetlić.",
   "webui.passwordPrompt.invalid": "Nieprawidłowe hasło. Spróbuj ponownie.",
+  "webui.passwordPrompt.loadFailed": "Nie udało się załadować (status {{status}})",
+  "webui.passwordPrompt.networkError": "Błąd sieci",
   "webui.passwordPrompt.placeholder": "Hasło",
   "webui.passwordPrompt.submit": "Odblokuj",
   "webui.passwordPrompt.title": "Wymagane hasło",

@@ -1315,6 +1315,8 @@
   "webui.logOut": "退出登录",
   "webui.passwordPrompt.description": "此分享链接已设置密码保护。请输入密码以查看。",
   "webui.passwordPrompt.invalid": "密码错误，请重试。",
+  "webui.passwordPrompt.loadFailed": "加载失败（状态码 {{status}}）",
+  "webui.passwordPrompt.networkError": "网络错误",
   "webui.passwordPrompt.placeholder": "密码",
   "webui.passwordPrompt.submit": "解锁",
   "webui.passwordPrompt.title": "需要密码",

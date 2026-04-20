@@ -1315,6 +1315,8 @@
   "webui.logOut": "Kijelentkezés",
   "webui.passwordPrompt.description": "Ez a megosztott link jelszóval védett. A megtekintéshez add meg a jelszót.",
   "webui.passwordPrompt.invalid": "Hibás jelszó. Próbáld újra.",
+  "webui.passwordPrompt.loadFailed": "Sikertelen betöltés ({{status}} állapotkód)",
+  "webui.passwordPrompt.networkError": "Hálózati hiba",
   "webui.passwordPrompt.placeholder": "Jelszó",
   "webui.passwordPrompt.submit": "Feloldás",
   "webui.passwordPrompt.title": "Jelszó szükséges",
