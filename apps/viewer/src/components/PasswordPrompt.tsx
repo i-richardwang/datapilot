@@ -21,9 +21,8 @@ export function PasswordPrompt({ invalid, onSubmit }: PasswordPromptProps) {
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault()
-    const trimmed = value.trim()
-    if (!trimmed) return
-    onSubmit(trimmed)
+    if (value.length === 0) return
+    onSubmit(value)
   }, [value, onSubmit])
 
   return (
@@ -54,7 +53,7 @@ export function PasswordPrompt({ invalid, onSubmit }: PasswordPromptProps) {
       ) : null}
       <button
         type="submit"
-        disabled={!value.trim()}
+        disabled={value.length === 0}
         className="w-full px-4 py-2 rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {t('webui.passwordPrompt.submit')}

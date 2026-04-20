@@ -224,12 +224,8 @@ export class S3Storage implements SessionStorage {
   async setPasswordHash(kind: ShareKind, id: string, hash: string | null): Promise<void> {
     const Key = this.passwordKey(kind, id)
     if (hash == null) {
-      const { DeleteObjectCommand, HeadObjectCommand } = await import('@aws-sdk/client-s3')
-      try {
-        await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key }))
-      } catch {
-        return
-      }
+      // S3 DELETE is idempotent — removing a missing key returns 204, no Head needed.
+      const { DeleteObjectCommand } = await import('@aws-sdk/client-s3')
       await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key }))
       return
     }

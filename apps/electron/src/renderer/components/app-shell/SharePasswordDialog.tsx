@@ -68,15 +68,13 @@ export function SharePasswordDialog({
       : 'dialog.sharePassword.changeDescription'
 
   const submit = useCallback(async () => {
-    const trimmedNew = newPassword.trim()
-    const trimmedCurrent = currentPassword.trim()
-    if (!trimmedNew) return
+    if (newPassword.length === 0) return
     setIsBusy(true)
     try {
       if (mode === 'share') {
         const result = await window.electronAPI.sessionCommand(sessionId, {
           type: 'shareToViewer',
-          password: trimmedNew,
+          password: newPassword,
         }) as { success: boolean; url?: string; error?: string; hasPassword?: boolean } | undefined
         if (result?.success && result.url) {
           await navigator.clipboard.writeText(result.url)
@@ -95,8 +93,8 @@ export function SharePasswordDialog({
       } else {
         const result = await window.electronAPI.sessionCommand(sessionId, {
           type: 'setSharePassword',
-          currentPassword: needsCurrent ? trimmedCurrent : undefined,
-          newPassword: trimmedNew,
+          currentPassword: needsCurrent ? currentPassword : undefined,
+          newPassword: newPassword,
         }) as { success: boolean; error?: string; hasPassword?: boolean } | undefined
         if (result?.success) {
           toast.success(t('toast.sharePasswordUpdated'))
@@ -115,13 +113,12 @@ export function SharePasswordDialog({
 
   const removePassword = useCallback(async () => {
     if (!allowClear) return
-    const trimmedCurrent = currentPassword.trim()
-    if (!trimmedCurrent) return
+    if (currentPassword.length === 0) return
     setIsBusy(true)
     try {
       const result = await window.electronAPI.sessionCommand(sessionId, {
         type: 'setSharePassword',
-        currentPassword: trimmedCurrent,
+        currentPassword: currentPassword,
         newPassword: null,
       }) as { success: boolean; error?: string; hasPassword?: boolean } | undefined
       if (result?.success) {
@@ -191,7 +188,7 @@ export function SharePasswordDialog({
               type="button"
               variant="ghost"
               className="text-destructive"
-              disabled={isBusy || !currentPassword.trim()}
+              disabled={isBusy || currentPassword.length === 0}
               onClick={() => void removePassword()}
             >
               <LockOpen className="h-3.5 w-3.5 mr-1" />
@@ -206,8 +203,8 @@ export function SharePasswordDialog({
               onClick={() => void submit()}
               disabled={
                 isBusy ||
-                !newPassword.trim() ||
-                (needsCurrent && !currentPassword.trim())
+                newPassword.length === 0 ||
+                (needsCurrent && currentPassword.length === 0)
               }
             >
               {mode === 'share'

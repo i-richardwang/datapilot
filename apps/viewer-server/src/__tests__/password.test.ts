@@ -13,6 +13,11 @@ import { tmpdir } from 'node:os'
 
 import { createApiHandler, createAssetHandler, handleHtmlArtifactRoute } from '../routes'
 import { FsStorage } from '../storage/fs'
+import {
+  MAX_PASSWORD_LENGTH,
+  normalizePassword,
+  extractSubmittedPassword,
+} from '../password'
 
 const BASE_URL = 'http://test.local'
 
@@ -225,6 +230,88 @@ describe('viewer-server password protection', () => {
       // After removal, GET works without a password.
       const afterRemove = await handleApi(new Request(`${BASE_URL}/s/api/${id}`), `/s/api/${id}`)
       expect(afterRemove!.status).toBe(200)
+    })
+
+    it('preserves internal whitespace in the password end-to-end', async () => {
+      // Mirror the SPA/Electron dialog contract: the client must not trim, and
+      // the server must not trim. Leading/trailing whitespace is normalized
+      // away by HTTP itself, so we focus on the invariant we *can* enforce:
+      // internal whitespace is preserved byte-for-byte through the gate.
+      const secret = 'open sesame phrase'
+      const created = await handleApi(
+        new Request(`${BASE_URL}/s/api`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Share-Password': secret },
+          body: JSON.stringify({ v: 1 }),
+        }),
+        '/s/api',
+      )
+      const { id } = (await created!.json()) as { id: string }
+
+      // Collapsed-whitespace submission mismatches — proves we hash the exact bytes.
+      const collapsed = await handleApi(
+        new Request(`${BASE_URL}/s/api/${id}`, {
+          headers: { 'X-Share-Password': secret.replace(/\s+/g, ' ').replace(/ /g, '') },
+        }),
+        `/s/api/${id}`,
+      )
+      expect(collapsed!.status).toBe(401)
+
+      const exact = await handleApi(
+        new Request(`${BASE_URL}/s/api/${id}`, { headers: { 'X-Share-Password': secret } }),
+        `/s/api/${id}`,
+      )
+      expect(exact!.status).toBe(200)
+    })
+
+    it('normalizePassword / extractSubmittedPassword do not trim surrounding whitespace', () => {
+      // Clients must not .trim() either — this guard keeps the server-side
+      // contract symmetric with PasswordPrompt and SharePasswordDialog.
+      expect(normalizePassword('  spaced  ')).toBe('  spaced  ')
+      expect(normalizePassword('')).toBe(null)
+
+      const req = new Request('http://test.local/', {
+        headers: { 'X-Share-Password': 'hdr-value' },
+      })
+      expect(extractSubmittedPassword(req)).toBe('hdr-value')
+    })
+
+    it('rejects overlong password submissions at the helpers (no hasher involvement)', () => {
+      // extractSubmittedPassword and normalizePassword short-circuit past
+      // MAX_PASSWORD_LENGTH so Argon2id never sees an attacker-supplied
+      // megabyte blob. The body-size cap (MAX_BODY_SIZE) defends the
+      // request body; this cap is the equivalent defense for the header.
+      const huge = 'x'.repeat(MAX_PASSWORD_LENGTH + 1)
+
+      expect(normalizePassword(huge)).toBe(null)
+
+      const req = new Request('http://test.local/', {
+        headers: { 'X-Share-Password': huge },
+      })
+      expect(extractSubmittedPassword(req)).toBe(null)
+
+      // Exactly at the cap is still accepted.
+      const atCap = 'y'.repeat(MAX_PASSWORD_LENGTH)
+      expect(normalizePassword(atCap)).toBe(atCap)
+    })
+
+    it('treats an overlong creation password as "no password" (empty-string parity)', async () => {
+      const huge = 'y'.repeat(MAX_PASSWORD_LENGTH + 1)
+      const res = await handleApi(
+        new Request(`${BASE_URL}/s/api`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Share-Password': huge },
+          body: JSON.stringify({ v: 1 }),
+        }),
+        '/s/api',
+      )
+      expect(res!.status).toBe(201)
+      const { id, hasPassword } = (await res!.json()) as { id: string; hasPassword: boolean }
+      expect(hasPassword).toBe(false)
+
+      // No gate — unauthenticated GET succeeds.
+      const get = await handleApi(new Request(`${BASE_URL}/s/api/${id}`), `/s/api/${id}`)
+      expect(get!.status).toBe(200)
     })
 
     it('deleting a session removes its password sidecar', async () => {
