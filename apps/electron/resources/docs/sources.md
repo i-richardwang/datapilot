@@ -2,9 +2,9 @@
 
 This guide explains how to configure sources (MCP servers, APIs, local filesystems) in DataPilot.
 
-> **CLI-first workflow (recommended):** Use `datapilot source ...` commands instead of editing source config files directly.
-> - `datapilot source --help`
-> - Canonical command reference: [datapilot-cli.md](./datapilot-cli.md)
+> **CLI-first workflow (recommended):** Use `dtpilot source ...` commands instead of editing source config files directly.
+> - `dtpilot source --help`
+> - Canonical command reference: [dtpilot-cli.md](./dtpilot-cli.md)
 
 ## Source Setup Process
 
@@ -12,10 +12,10 @@ When a user wants to add a new source, follow this conversational setup process 
 
 ### 0. Search for Specialized Source Guide (REQUIRED FIRST STEP)
 
-**Before doing anything else**, search for a specialized guide using the datapilots-docs MCP:
+**Before doing anything else**, search for a specialized guide using the dtpilots-docs MCP:
 
 ```
-mcp__datapilots-docs__SearchCraftAgents({ query: "{service} source setup" })
+mcp__dtpilots-docs__SearchCraftAgents({ query: "{service} source setup" })
 ```
 
 **Available guides:** GitHub, Linear, Slack, Gmail, Google Calendar, Google Drive, Google Docs, Google Sheets, Outlook, Microsoft Calendar, Teams, SharePoint, Craft, Filesystem, Brave Search, Memory
@@ -208,7 +208,7 @@ Concrete examples tailored to the user's workflow:
 User: I want to add Linear
 
 Agent: [FIRST: Searches for Linear guide]
-       mcp__datapilots-docs__SearchCraftAgents({ query: "linear source setup" })
+       mcp__dtpilots-docs__SearchCraftAgents({ query: "linear source setup" })
 
 Agent: I found the Linear setup guide! A few questions:
 1. What will you primarily use Linear for? (issue tracking, sprint planning, reporting?)

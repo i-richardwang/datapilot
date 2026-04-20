@@ -102,7 +102,7 @@ export async function routeSession(
       const id = positionals[0] ?? process.env.CRAFT_SESSION_ID
       if (!id) {
         fail('USAGE_ERROR', 'Missing session id', {
-          suggestion: 'datapilot session share <id> [--html <file>]',
+          suggestion: 'dtpilot session share <id> [--html <file>]',
         })
       }
       const htmlPath = strFlag(flags, 'html')
