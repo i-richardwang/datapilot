@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 
-export type SharePasswordMode = 'share' | 'set' | 'change'
+export type SharePasswordMode = 'share' | 'change'
 
 export interface SharePasswordDialogProps {
   open: boolean
@@ -58,14 +58,10 @@ export function SharePasswordDialog({
 
   const titleKey = mode === 'share'
     ? 'dialog.sharePassword.shareTitle'
-    : mode === 'set'
-      ? 'dialog.sharePassword.setTitle'
-      : 'dialog.sharePassword.changeTitle'
+    : 'dialog.sharePassword.changeTitle'
   const descriptionKey = mode === 'share'
     ? 'dialog.sharePassword.shareDescription'
-    : mode === 'set'
-      ? 'dialog.sharePassword.setDescription'
-      : 'dialog.sharePassword.changeDescription'
+    : 'dialog.sharePassword.changeDescription'
 
   const submit = useCallback(async () => {
     if (newPassword.length === 0) return

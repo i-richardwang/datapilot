@@ -87,6 +87,8 @@ async function handlePasswordChange(
     }
     const ok = await verifyPassword(parsed.current, currentHash)
     if (!ok) return Response.json({ error: 'password_invalid' }, { status: 401 })
+  } else if (parsed.new != null) {
+    return Response.json({ error: 'password_already_set' }, { status: 400 })
   }
 
   if (parsed.new == null) {

@@ -403,8 +403,7 @@
   "dialog.sharePassword.newPlaceholder": "输入新密码",
   "dialog.sharePassword.remove": "移除密码",
   "dialog.sharePassword.saveAction": "保存",
-  "dialog.sharePassword.setDescription": "添加密码后，仅知道密码的人才能打开此共享链接。",
-  "dialog.sharePassword.setTitle": "设置共享密码",
+  
   "dialog.sharePassword.shareAction": "共享",
   "dialog.sharePassword.shareDescription": "使用密码保护此共享链接。任何打开链接的人都需要输入密码。",
   "dialog.sharePassword.shareTitle": "使用密码共享",
@@ -756,7 +755,7 @@
   "sessionMenu.openInNewWindow": "在新窗口中打开",
   "sessionMenu.regenerateTitle": "重新生成标题",
   "sessionMenu.sendToWorkspace": "发送到 Workspace...",
-  "sessionMenu.setSharePassword": "设置密码…",
+  
   "sessionMenu.share": "共享",
   "sessionMenu.sharePublic": "不使用密码共享",
   "sessionMenu.shareWithPassword": "使用密码共享…",

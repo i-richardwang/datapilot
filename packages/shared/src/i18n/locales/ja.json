@@ -403,8 +403,7 @@
   "dialog.sharePassword.newPlaceholder": "新しいパスワードを入力",
   "dialog.sharePassword.remove": "パスワードを削除",
   "dialog.sharePassword.saveAction": "保存",
-  "dialog.sharePassword.setDescription": "パスワードを追加すると、パスワードを知っている人のみがこの共有リンクを開けます。",
-  "dialog.sharePassword.setTitle": "共有パスワードを設定",
+  
   "dialog.sharePassword.shareAction": "共有",
   "dialog.sharePassword.shareDescription": "この共有リンクをパスワードで保護します。リンクを開く人はパスワードを入力する必要があります。",
   "dialog.sharePassword.shareTitle": "パスワード付きで共有",
@@ -756,7 +755,7 @@
   "sessionMenu.openInNewWindow": "新しいウィンドウで開く",
   "sessionMenu.regenerateTitle": "タイトルを再生成",
   "sessionMenu.sendToWorkspace": "Workspaceに送信...",
-  "sessionMenu.setSharePassword": "パスワードを設定…",
+  
   "sessionMenu.share": "共有",
   "sessionMenu.sharePublic": "パスワードなしで共有",
   "sessionMenu.shareWithPassword": "パスワード付きで共有…",
