@@ -8,11 +8,12 @@
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAtomValue, useSetAtom } from 'jotai'
-import { AlertCircle, Globe, Copy, RefreshCw, Link2Off, Info } from 'lucide-react'
+import { AlertCircle, Globe, Copy, RefreshCw, Link2Off, Info, Lock } from 'lucide-react'
 import { ChatDisplay, type ChatDisplayHandle } from '@/components/app-shell/ChatDisplay'
 import { SessionProvider, ShareCloudIconButton, ShareCloudMenuIcon } from '@craft-agent/ui'
 import { PanelHeader } from '@/components/app-shell/PanelHeader'
 import { SessionMenu } from '@/components/app-shell/SessionMenu'
+import { SharePasswordDialog, type SharePasswordMode } from '@/components/app-shell/SharePasswordDialog'
 import { SessionInfoPopover } from '@/components/app-shell/SessionInfoPopover'
 import { RenameDialog } from '@/components/ui/rename-dialog'
 import { toast } from 'sonner'
@@ -315,6 +316,7 @@ const ChatPage = React.memo(function ChatPage({ sessionId }: ChatPageProps) {
   const isFlagged = session?.isFlagged || sessionMeta?.isFlagged || false
   const isArchived = session?.isArchived || sessionMeta?.isArchived || false
   const sharedUrl = session?.sharedUrl || sessionMeta?.sharedUrl || null
+  const sharedPasswordSet = (session?.sharedPasswordSet ?? sessionMeta?.sharedPasswordSet) === true
   const currentSessionStatus = session?.sessionStatus || sessionMeta?.sessionStatus || 'todo'
   const hasMessages = !!(session?.messages?.length || sessionMeta?.lastFinalMessageId)
   const hasUnreadMessages = sessionMeta
@@ -426,59 +428,86 @@ const ChatPage = React.memo(function ChatPage({ sessionId }: ChatPageProps) {
     }
   }, [sessionId])
 
+  // Password-dialog state — single dialog handles share/set/change flows
+  const [passwordDialog, setPasswordDialog] = React.useState<{ open: boolean; mode: SharePasswordMode }>({
+    open: false,
+    mode: 'share',
+  })
+  const openPasswordDialog = React.useCallback((mode: SharePasswordMode) => {
+    setPasswordDialog({ open: true, mode })
+  }, [])
+
   // Share button with dropdown menu rendered in PanelHeader actions slot.
   // Uses the shared ShareCloudIconButton so the chrome + icon pair match
   // html-preview's share button 1:1 (see packages/ui ShareCloudIconButton).
   const shareButton = React.useMemo(() => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <ShareCloudIconButton
-          isShared={!!sharedUrl}
-          aria-label={sharedUrl ? 'Shared session options' : 'Share session'}
-        />
-      </DropdownMenuTrigger>
-      <StyledDropdownMenuContent align="end" sideOffset={8}>
-        {sharedUrl ? (
-          <>
-            <StyledDropdownMenuItem onClick={handleOpenInBrowser}>
-              <Globe className="h-3.5 w-3.5" />
-              <span className="flex-1">{t('sessionMenu.openInBrowser')}</span>
-            </StyledDropdownMenuItem>
-            <StyledDropdownMenuItem onClick={handleCopyLink}>
-              <Copy className="h-3.5 w-3.5" />
-              <span className="flex-1">{t('sessionMenu.copyLink')}</span>
-            </StyledDropdownMenuItem>
-            <StyledDropdownMenuItem onClick={handleUpdateShare}>
-              <RefreshCw className="h-3.5 w-3.5" />
-              <span className="flex-1">{t('sessionMenu.updateShare')}</span>
-            </StyledDropdownMenuItem>
-            <StyledDropdownMenuSeparator />
-            <StyledDropdownMenuItem onClick={handleRevokeShare} variant="destructive">
-              <Link2Off className="h-3.5 w-3.5" />
-              <span className="flex-1">{t('sessionMenu.stopSharing')}</span>
-            </StyledDropdownMenuItem>
-            <StyledDropdownMenuSeparator />
-            <StyledDropdownMenuItem onClick={() => window.electronAPI.openUrl('https://agents.craft.do/docs/go-further/sharing')}>
-              <Info className="h-3.5 w-3.5" />
-              <span className="flex-1">{t('chat.learnMore')}</span>
-            </StyledDropdownMenuItem>
-          </>
-        ) : (
-          <>
-            <StyledDropdownMenuItem onClick={handleShare}>
-              <ShareCloudMenuIcon />
-              <span className="flex-1">{t('chat.shareOnline')}</span>
-            </StyledDropdownMenuItem>
-            <StyledDropdownMenuSeparator />
-            <StyledDropdownMenuItem onClick={() => window.electronAPI.openUrl('https://agents.craft.do/docs/go-further/sharing')}>
-              <Info className="h-3.5 w-3.5" />
-              <span className="flex-1">{t('chat.learnMore')}</span>
-            </StyledDropdownMenuItem>
-          </>
-        )}
-      </StyledDropdownMenuContent>
-    </DropdownMenu>
-  ), [sharedUrl, handleShare, handleOpenInBrowser, handleCopyLink, handleUpdateShare, handleRevokeShare])
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <ShareCloudIconButton
+            isShared={!!sharedUrl}
+            aria-label={sharedUrl ? 'Shared session options' : 'Share session'}
+          />
+        </DropdownMenuTrigger>
+        <StyledDropdownMenuContent align="end" sideOffset={8}>
+          {sharedUrl ? (
+            <>
+              <StyledDropdownMenuItem onClick={handleOpenInBrowser}>
+                <Globe className="h-3.5 w-3.5" />
+                <span className="flex-1">{t('sessionMenu.openInBrowser')}</span>
+              </StyledDropdownMenuItem>
+              <StyledDropdownMenuItem onClick={handleCopyLink}>
+                <Copy className="h-3.5 w-3.5" />
+                <span className="flex-1">{t('sessionMenu.copyLink')}</span>
+              </StyledDropdownMenuItem>
+              <StyledDropdownMenuItem onClick={handleUpdateShare}>
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span className="flex-1">{t('sessionMenu.updateShare')}</span>
+              </StyledDropdownMenuItem>
+              {sharedPasswordSet && (
+                <StyledDropdownMenuItem onClick={() => openPasswordDialog('change')}>
+                  <Lock className="h-3.5 w-3.5" />
+                  <span className="flex-1">{t('sessionMenu.changeSharePassword')}</span>
+                </StyledDropdownMenuItem>
+              )}
+              <StyledDropdownMenuSeparator />
+              <StyledDropdownMenuItem onClick={handleRevokeShare} variant="destructive">
+                <Link2Off className="h-3.5 w-3.5" />
+                <span className="flex-1">{t('sessionMenu.stopSharing')}</span>
+              </StyledDropdownMenuItem>
+              <StyledDropdownMenuSeparator />
+              <StyledDropdownMenuItem onClick={() => window.electronAPI.openUrl('https://agents.craft.do/docs/go-further/sharing')}>
+                <Info className="h-3.5 w-3.5" />
+                <span className="flex-1">{t('chat.learnMore')}</span>
+              </StyledDropdownMenuItem>
+            </>
+          ) : (
+            <>
+              <StyledDropdownMenuItem onClick={handleShare}>
+                <ShareCloudMenuIcon />
+                <span className="flex-1">{t('sessionMenu.sharePublic')}</span>
+              </StyledDropdownMenuItem>
+              <StyledDropdownMenuItem onClick={() => openPasswordDialog('share')}>
+                <Lock className="h-3.5 w-3.5" />
+                <span className="flex-1">{t('sessionMenu.shareWithPassword')}</span>
+              </StyledDropdownMenuItem>
+              <StyledDropdownMenuSeparator />
+              <StyledDropdownMenuItem onClick={() => window.electronAPI.openUrl('https://agents.craft.do/docs/go-further/sharing')}>
+                <Info className="h-3.5 w-3.5" />
+                <span className="flex-1">{t('chat.learnMore')}</span>
+              </StyledDropdownMenuItem>
+            </>
+          )}
+        </StyledDropdownMenuContent>
+      </DropdownMenu>
+      <SharePasswordDialog
+        open={passwordDialog.open}
+        onOpenChange={(next) => setPasswordDialog((prev) => ({ ...prev, open: next }))}
+        mode={passwordDialog.mode}
+        sessionId={sessionId}
+      />
+    </>
+  ), [sharedUrl, sharedPasswordSet, sessionId, passwordDialog, openPasswordDialog, handleShare, handleOpenInBrowser, handleCopyLink, handleUpdateShare, handleRevokeShare, t])
 
   const compactInfoButton = React.useMemo(() => {
     if (!isCompactMode || !sessionMeta) return undefined
