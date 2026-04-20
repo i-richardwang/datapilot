@@ -238,6 +238,7 @@ export function createApiHandler(storage: SessionStorage, baseUrl: string) {
       const gate = await checkPasswordGate(storage, 'session', id, req)
       if (gate.state !== 'ok') return blockedResponse(gate.state)
       const data = await storage.load(id)
+      if (!data) return Response.json({ error: 'Not found' }, { status: 404 })
       return Response.json(data)
     }
 
@@ -315,6 +316,7 @@ export async function handleHtmlArtifactRoute(
   if (gate.state !== 'ok') return blockedResponse(gate.state)
 
   const html = await storage.loadHtml(id)
+  if (html == null) return new Response('Not found', { status: 404 })
   return new Response(html, {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
   })
@@ -369,8 +371,9 @@ export function createAssetHandler(storage: SessionStorage, baseUrl: string) {
       }
       if (gate.state !== 'ok') return blockedResponse(gate.state)
       const asset = await storage.loadAsset(id)
-      return new Response(asset!.data, {
-        headers: { 'Content-Type': asset!.mimeType },
+      if (!asset) return new Response('Not found', { status: 404 })
+      return new Response(asset.data, {
+        headers: { 'Content-Type': asset.mimeType },
       })
     }
 
