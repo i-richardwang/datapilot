@@ -27,6 +27,23 @@ export class FsStorage implements SessionStorage {
     await mkdir(this.assetsDir, { recursive: true })
   }
 
+  async exists(kind: ShareKind, id: string): Promise<boolean> {
+    switch (kind) {
+      case 'session': {
+        const file = Bun.file(this.filePath(id))
+        return await file.exists()
+      }
+      case 'html': {
+        const file = Bun.file(this.htmlPath(id))
+        return await file.exists()
+      }
+      case 'asset': {
+        const file = Bun.file(this.assetPath(id))
+        return await file.exists()
+      }
+    }
+  }
+
   private filePath(id: string): string {
     return join(this.dataDir, `${id}.json`)
   }

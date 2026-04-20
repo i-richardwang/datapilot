@@ -451,4 +451,379 @@ describe('viewer-server password protection', () => {
       expect(await ok!.text()).toBe('hello-bytes')
     })
   })
+
+  // ---------------------------------------------------------------------
+  // Fetch order verification: password gate checked BEFORE content load
+  // ---------------------------------------------------------------------
+
+  describe('fetch order verification', () => {
+    it('session GET does not load content on wrong password', async () => {
+      const secret = 'fetch-order-test'
+      const created = await handleApi(
+        new Request(`${BASE_URL}/s/api`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Share-Password': secret },
+          body: JSON.stringify({ v: 1 }),
+        }),
+        '/s/api',
+      )
+      const { id } = (await created!.json()) as { id: string }
+
+      let loadCalled = false
+      const wrappedStorage = new Proxy(storage, {
+        get(target, prop) {
+          if (prop === 'load') {
+            return async (...args: any[]) => {
+              loadCalled = true
+              return (target as any).load(...args)
+            }
+          }
+          if (prop === 'exists') {
+            return async (...args: any[]) => {
+              return (target as any).exists(...args)
+            }
+          }
+          if (prop === 'loadPasswordHash') {
+            return async (...args: any[]) => {
+              return (target as any).loadPasswordHash(...args)
+            }
+          }
+          return (target as any)[prop]
+        },
+      })
+
+      const handleApiWrapped = createApiHandler(wrappedStorage, BASE_URL)
+      await handleApiWrapped(
+        new Request(`${BASE_URL}/s/api/${id}`, { headers: { 'X-Share-Password': 'wrong' } }),
+        `/s/api/${id}`,
+      )
+      expect(loadCalled).toBe(false)
+    })
+
+    it('session GET loads content on correct password', async () => {
+      const secret = 'fetch-order-test'
+      const created = await handleApi(
+        new Request(`${BASE_URL}/s/api`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Share-Password': secret },
+          body: JSON.stringify({ v: 1 }),
+        }),
+        '/s/api',
+      )
+      const { id } = (await created!.json()) as { id: string }
+
+      let loadCalled = false
+      const wrappedStorage = new Proxy(storage, {
+        get(target, prop) {
+          if (prop === 'load') {
+            return async (...args: any[]) => {
+              loadCalled = true
+              return (target as any).load(...args)
+            }
+          }
+          if (prop === 'exists') {
+            return async (...args: any[]) => {
+              return (target as any).exists(...args)
+            }
+          }
+          if (prop === 'loadPasswordHash') {
+            return async (...args: any[]) => {
+              return (target as any).loadPasswordHash(...args)
+            }
+          }
+          return (target as any)[prop]
+        },
+      })
+
+      const handleApiWrapped = createApiHandler(wrappedStorage, BASE_URL)
+      const res = await handleApiWrapped(
+        new Request(`${BASE_URL}/s/api/${id}`, { headers: { 'X-Share-Password': secret } }),
+        `/s/api/${id}`,
+      )
+      expect(loadCalled).toBe(true)
+      expect(res!.status).toBe(200)
+    })
+
+    it('session GET returns 404 for missing ID without loading content', async () => {
+      let loadCalled = false
+      const wrappedStorage = new Proxy(storage, {
+        get(target, prop) {
+          if (prop === 'load') {
+            return async (...args: any[]) => {
+              loadCalled = true
+              return (target as any).load(...args)
+            }
+          }
+          if (prop === 'exists') {
+            return async (...args: any[]) => {
+              return (target as any).exists(...args)
+            }
+          }
+          if (prop === 'loadPasswordHash') {
+            return async (...args: any[]) => {
+              return (target as any).loadPasswordHash(...args)
+            }
+          }
+          return (target as any)[prop]
+        },
+      })
+
+      const handleApiWrapped = createApiHandler(wrappedStorage, BASE_URL)
+      const res = await handleApiWrapped(
+        new Request(`${BASE_URL}/s/api/does-not-exist`),
+        '/s/api/does-not-exist',
+      )
+      expect(res!.status).toBe(404)
+      expect(loadCalled).toBe(false)
+    })
+
+    it('HTML GET does not load content on wrong password', async () => {
+      const secret = 'html-fetch-order'
+      const created = await handleApi(
+        new Request(`${BASE_URL}/s/api/html`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/html; charset=utf-8', 'X-Share-Password': secret },
+          body: '<p>secret content</p>',
+        }),
+        '/s/api/html',
+      )
+      const { id } = (await created!.json()) as { id: string }
+
+      let loadHtmlCalled = false
+      const wrappedStorage = new Proxy(storage, {
+        get(target, prop) {
+          if (prop === 'loadHtml') {
+            return async (...args: any[]) => {
+              loadHtmlCalled = true
+              return (target as any).loadHtml(...args)
+            }
+          }
+          if (prop === 'exists') {
+            return async (...args: any[]) => {
+              return (target as any).exists(...args)
+            }
+          }
+          if (prop === 'loadPasswordHash') {
+            return async (...args: any[]) => {
+              return (target as any).loadPasswordHash(...args)
+            }
+          }
+          return (target as any)[prop]
+        },
+      })
+
+      const res = await handleHtmlArtifactRoute(
+        wrappedStorage,
+        new Request(`${BASE_URL}/s/h/${id}`, { headers: { Accept: 'application/json' } }),
+        `/s/h/${id}`,
+      )
+      expect(res!.status).toBe(401)
+      expect(loadHtmlCalled).toBe(false)
+    })
+
+    it('HTML GET loads content on correct password', async () => {
+      const secret = 'html-fetch-order'
+      const created = await handleApi(
+        new Request(`${BASE_URL}/s/api/html`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/html; charset=utf-8', 'X-Share-Password': secret },
+          body: '<p>secret content</p>',
+        }),
+        '/s/api/html',
+      )
+      const { id } = (await created!.json()) as { id: string }
+
+      let loadHtmlCalled = false
+      const wrappedStorage = new Proxy(storage, {
+        get(target, prop) {
+          if (prop === 'loadHtml') {
+            return async (...args: any[]) => {
+              loadHtmlCalled = true
+              return (target as any).loadHtml(...args)
+            }
+          }
+          if (prop === 'exists') {
+            return async (...args: any[]) => {
+              return (target as any).exists(...args)
+            }
+          }
+          if (prop === 'loadPasswordHash') {
+            return async (...args: any[]) => {
+              return (target as any).loadPasswordHash(...args)
+            }
+          }
+          return (target as any)[prop]
+        },
+      })
+
+      const res = await handleHtmlArtifactRoute(
+        wrappedStorage,
+        new Request(`${BASE_URL}/s/h/${id}`, {
+          headers: { 'X-Share-Password': secret, Accept: 'text/html' },
+        }),
+        `/s/h/${id}`,
+      )
+      expect(loadHtmlCalled).toBe(true)
+      expect(res!.status).toBe(200)
+    })
+
+    it('HTML GET returns 404 for missing ID without loading content', async () => {
+      let loadHtmlCalled = false
+      const wrappedStorage = new Proxy(storage, {
+        get(target, prop) {
+          if (prop === 'loadHtml') {
+            return async (...args: any[]) => {
+              loadHtmlCalled = true
+              return (target as any).loadHtml(...args)
+            }
+          }
+          if (prop === 'exists') {
+            return async (...args: any[]) => {
+              return (target as any).exists(...args)
+            }
+          }
+          if (prop === 'loadPasswordHash') {
+            return async (...args: any[]) => {
+              return (target as any).loadPasswordHash(...args)
+            }
+          }
+          return (target as any)[prop]
+        },
+      })
+
+      const res = await handleHtmlArtifactRoute(
+        wrappedStorage,
+        new Request(`${BASE_URL}/s/h/does-not-exist`),
+        '/s/h/does-not-exist',
+      )
+      expect(res!.status).toBe(404)
+      expect(loadHtmlCalled).toBe(false)
+    })
+
+    it('asset GET does not load content on wrong password', async () => {
+      const secret = 'asset-fetch-order'
+      const bytes = new TextEncoder().encode('large-asset-content')
+      const created = await handleAsset(
+        new Request(`${BASE_URL}/s/a`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain', 'X-Share-Password': secret },
+          body: bytes,
+        }),
+        '/s/a',
+      )
+      const { id } = (await created!.json()) as { id: string }
+
+      let loadAssetCalled = false
+      const wrappedStorage = new Proxy(storage, {
+        get(target, prop) {
+          if (prop === 'loadAsset') {
+            return async (...args: any[]) => {
+              loadAssetCalled = true
+              return (target as any).loadAsset(...args)
+            }
+          }
+          if (prop === 'exists') {
+            return async (...args: any[]) => {
+              return (target as any).exists(...args)
+            }
+          }
+          if (prop === 'loadPasswordHash') {
+            return async (...args: any[]) => {
+              return (target as any).loadPasswordHash(...args)
+            }
+          }
+          return (target as any)[prop]
+        },
+      })
+
+      const handleAssetWrapped = createAssetHandler(wrappedStorage, BASE_URL)
+      const res = await handleAssetWrapped(
+        new Request(`${BASE_URL}/s/a/${id}`, { method: 'GET', headers: { Accept: '*/*' } }),
+        `/s/a/${id}`,
+      )
+      expect(res!.status).toBe(401)
+      expect(loadAssetCalled).toBe(false)
+    })
+
+    it('asset GET loads content on correct password', async () => {
+      const secret = 'asset-fetch-order'
+      const bytes = new TextEncoder().encode('large-asset-content')
+      const created = await handleAsset(
+        new Request(`${BASE_URL}/s/a`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain', 'X-Share-Password': secret },
+          body: bytes,
+        }),
+        '/s/a',
+      )
+      const { id } = (await created!.json()) as { id: string }
+
+      let loadAssetCalled = false
+      const wrappedStorage = new Proxy(storage, {
+        get(target, prop) {
+          if (prop === 'loadAsset') {
+            return async (...args: any[]) => {
+              loadAssetCalled = true
+              return (target as any).loadAsset(...args)
+            }
+          }
+          if (prop === 'exists') {
+            return async (...args: any[]) => {
+              return (target as any).exists(...args)
+            }
+          }
+          if (prop === 'loadPasswordHash') {
+            return async (...args: any[]) => {
+              return (target as any).loadPasswordHash(...args)
+            }
+          }
+          return (target as any)[prop]
+        },
+      })
+
+      const handleAssetWrapped = createAssetHandler(wrappedStorage, BASE_URL)
+      const res = await handleAssetWrapped(
+        new Request(`${BASE_URL}/s/a/${id}`, {
+          method: 'GET',
+          headers: { 'X-Share-Password': secret },
+        }),
+        `/s/a/${id}`,
+      )
+      expect(loadAssetCalled).toBe(true)
+      expect(res!.status).toBe(200)
+    })
+
+    it('asset GET returns 404 for missing ID without loading content', async () => {
+      let loadAssetCalled = false
+      const wrappedStorage = new Proxy(storage, {
+        get(target, prop) {
+          if (prop === 'loadAsset') {
+            return async (...args: any[]) => {
+              loadAssetCalled = true
+              return (target as any).loadAsset(...args)
+            }
+          }
+          if (prop === 'exists') {
+            return async (...args: any[]) => {
+              return (target as any).exists(...args)
+            }
+          }
+          if (prop === 'loadPasswordHash') {
+            return async (...args: any[]) => {
+              return (target as any).loadPasswordHash(...args)
+            }
+          }
+          return (target as any)[prop]
+        },
+      })
+
+      const handleAssetWrapped = createAssetHandler(wrappedStorage, BASE_URL)
+      const res = await handleAssetWrapped(
+        new Request(`${BASE_URL}/s/a/does-not-exist`, { method: 'GET' }),
+        '/s/a/does-not-exist',
+      )
+      expect(res!.status).toBe(404)
+      expect(loadAssetCalled).toBe(false)
+    })
+  })
 })

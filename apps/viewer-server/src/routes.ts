@@ -232,12 +232,12 @@ export function createApiHandler(storage: SessionStorage, baseUrl: string) {
 
     // GET /s/api/{id} — read
     if (req.method === 'GET') {
-      const data = await storage.load(id)
-      if (!data) {
+      if (!(await storage.exists('session', id))) {
         return Response.json({ error: 'Not found' }, { status: 404 })
       }
       const gate = await checkPasswordGate(storage, 'session', id, req)
       if (gate.state !== 'ok') return blockedResponse(gate.state)
+      const data = await storage.load(id)
       return Response.json(data)
     }
 
@@ -301,8 +301,7 @@ export async function handleHtmlArtifactRoute(
   const id = match?.[1]
   if (!id) return null
 
-  const html = await storage.loadHtml(id)
-  if (html == null) {
+  if (!(await storage.exists('html', id))) {
     return new Response('Not found', { status: 404 })
   }
 
@@ -315,6 +314,7 @@ export async function handleHtmlArtifactRoute(
   }
   if (gate.state !== 'ok') return blockedResponse(gate.state)
 
+  const html = await storage.loadHtml(id)
   return new Response(html, {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
   })
@@ -357,8 +357,7 @@ export function createAssetHandler(storage: SessionStorage, baseUrl: string) {
     const id = idMatch[1]!
 
     if (req.method === 'GET') {
-      const asset = await storage.loadAsset(id)
-      if (!asset) {
+      if (!(await storage.exists('asset', id))) {
         return new Response('Not found', { status: 404 })
       }
       const gate = await checkPasswordGate(storage, 'asset', id, req)
@@ -369,8 +368,9 @@ export function createAssetHandler(storage: SessionStorage, baseUrl: string) {
         })
       }
       if (gate.state !== 'ok') return blockedResponse(gate.state)
-      return new Response(asset.data, {
-        headers: { 'Content-Type': asset.mimeType },
+      const asset = await storage.loadAsset(id)
+      return new Response(asset!.data, {
+        headers: { 'Content-Type': asset!.mimeType },
       })
     }
 
