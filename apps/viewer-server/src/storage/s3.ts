@@ -33,6 +33,24 @@ export class S3Storage implements SessionStorage {
     })
   }
 
+  async exists(kind: ShareKind, id: string): Promise<boolean> {
+    const { HeadObjectCommand } = await import('@aws-sdk/client-s3')
+    let key: string
+    switch (kind) {
+      case 'session': key = this.key(id); break
+      case 'html': key = this.htmlKey(id); break
+      case 'asset': key = this.assetKey(id); break
+    }
+    try {
+      await this.client.send(
+        new HeadObjectCommand({ Bucket: this.bucket, Key: key })
+      )
+      return true
+    } catch {
+      return false
+    }
+  }
+
   private key(id: string): string {
     return `sessions/${id}.json`
   }

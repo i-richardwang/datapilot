@@ -8,6 +8,9 @@
 export type ShareKind = 'session' | 'html' | 'asset'
 
 export interface SessionStorage {
+  /** Check if a share exists (cheap operation to distinguish 404 from 401). */
+  exists(kind: ShareKind, id: string): Promise<boolean>
+
   /** Save a session JSON blob by ID. */
   save(id: string, data: unknown): Promise<void>
 
