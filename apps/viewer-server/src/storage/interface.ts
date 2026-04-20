@@ -4,6 +4,9 @@
  * Implementations: filesystem (default) and S3-compatible object storage.
  */
 
+/** The three kinds of share that can be password-protected. */
+export type ShareKind = 'session' | 'html' | 'asset'
+
 export interface SessionStorage {
   /** Save a session JSON blob by ID. */
   save(id: string, data: unknown): Promise<void>
@@ -34,6 +37,14 @@ export interface SessionStorage {
 
   /** Delete an asset by ID. Returns true if it existed. */
   deleteAsset(id: string): Promise<boolean>
+
+  /**
+   * Password metadata — opt-in. Implementations persist the hash as a sidecar
+   * next to the content so the share content itself stays bytes-for-bytes
+   * identical to the no-password case.
+   */
+  setPasswordHash(kind: ShareKind, id: string, hash: string | null): Promise<void>
+  loadPasswordHash(kind: ShareKind, id: string): Promise<string | null>
 }
 
 /** Generate a URL-safe short ID (similar to the format used by the official viewer). */

@@ -97,7 +97,7 @@ describe('viewer-server HTML artifact endpoints', () => {
       )
       const { id } = (await upload!.json()) as { id: string; url: string }
 
-      const res = await handleHtmlArtifactRoute(storage, `/s/h/${id}`)
+      const res = await handleHtmlArtifactRoute(storage, new Request(`${BASE_URL}/s/h/${id}`), `/s/h/${id}`)
       expect(res).not.toBeNull()
       expect(res!.status).toBe(200)
       expect(res!.headers.get('Content-Type')).toBe('text/html; charset=utf-8')
@@ -105,7 +105,11 @@ describe('viewer-server HTML artifact endpoints', () => {
     })
 
     it('returns 404 when the id does not exist', async () => {
-      const res = await handleHtmlArtifactRoute(storage, '/s/h/this-id-does-not-exist')
+      const res = await handleHtmlArtifactRoute(
+        storage,
+        new Request(`${BASE_URL}/s/h/this-id-does-not-exist`),
+        '/s/h/this-id-does-not-exist',
+      )
       expect(res).not.toBeNull()
       expect(res!.status).toBe(404)
     })
@@ -139,7 +143,7 @@ describe('viewer-server HTML artifact endpoints', () => {
       expect(putBody.id).toBe(id)
       expect(putBody.url).toBe(`${BASE_URL}/s/h/${id}`)
 
-      const getRes = await handleHtmlArtifactRoute(storage, `/s/h/${id}`)
+      const getRes = await handleHtmlArtifactRoute(storage, new Request(`${BASE_URL}/s/h/${id}`), `/s/h/${id}`)
       expect(getRes!.status).toBe(200)
       expect(await getRes!.text()).toBe(updated)
     })
@@ -178,7 +182,7 @@ describe('viewer-server HTML artifact endpoints', () => {
       expect(delRes).not.toBeNull()
       expect(delRes!.status).toBe(204)
 
-      const getRes = await handleHtmlArtifactRoute(storage, `/s/h/${id}`)
+      const getRes = await handleHtmlArtifactRoute(storage, new Request(`${BASE_URL}/s/h/${id}`), `/s/h/${id}`)
       expect(getRes!.status).toBe(404)
     })
 

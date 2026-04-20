@@ -4,12 +4,13 @@
  * Sessions: {dataDir}/{id}.json
  * HTML artifacts: {dataDir}/html/{id}.html
  * File assets: {dataDir}/assets/{id} (raw bytes) + {dataDir}/assets/{id}.meta (mime type)
+ * Password hashes: {path-of-content}.pwd (opt-in; absent when share has no password)
  * Suitable for single-machine deployments. Requires a mounted volume in Docker.
  */
 
 import { join } from 'node:path'
 import { mkdir } from 'node:fs/promises'
-import type { SessionStorage } from './interface'
+import type { SessionStorage, ShareKind } from './interface'
 
 export class FsStorage implements SessionStorage {
   private readonly htmlDir: string
@@ -49,6 +50,7 @@ export class FsStorage implements SessionStorage {
     const { unlink } = await import('node:fs/promises')
     try {
       await unlink(this.filePath(id))
+      await this.setPasswordHash('session', id, null)
       return true
     } catch (err: any) {
       if (err.code === 'ENOENT') return false
@@ -77,6 +79,7 @@ export class FsStorage implements SessionStorage {
     const { unlink } = await import('node:fs/promises')
     try {
       await unlink(this.htmlPath(id))
+      await this.setPasswordHash('html', id, null)
       return true
     } catch (err: any) {
       if (err.code === 'ENOENT') return false
@@ -120,6 +123,36 @@ export class FsStorage implements SessionStorage {
     } catch (err: any) {
       if (err.code !== 'ENOENT') throw err
     }
+    await this.setPasswordHash('asset', id, null)
     return existed
+  }
+
+  private passwordPath(kind: ShareKind, id: string): string {
+    switch (kind) {
+      case 'session': return `${this.filePath(id)}.pwd`
+      case 'html': return `${this.htmlPath(id)}.pwd`
+      case 'asset': return `${this.assetPath(id)}.pwd`
+    }
+  }
+
+  async setPasswordHash(kind: ShareKind, id: string, hash: string | null): Promise<void> {
+    const path = this.passwordPath(kind, id)
+    if (hash == null) {
+      const { unlink } = await import('node:fs/promises')
+      try {
+        await unlink(path)
+      } catch (err: any) {
+        if (err.code !== 'ENOENT') throw err
+      }
+      return
+    }
+    await Bun.write(path, hash)
+  }
+
+  async loadPasswordHash(kind: ShareKind, id: string): Promise<string | null> {
+    const file = Bun.file(this.passwordPath(kind, id))
+    if (!(await file.exists())) return null
+    const hash = (await file.text()).trim()
+    return hash.length > 0 ? hash : null
   }
 }

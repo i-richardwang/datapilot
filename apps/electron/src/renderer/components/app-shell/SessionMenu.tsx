@@ -34,6 +34,7 @@ import {
   AppWindow,
   Columns2,
   CloudUpload,
+  Lock,
   RefreshCw,
   Tag,
   Send,
@@ -46,6 +47,7 @@ import type { SessionStatus } from '@/config/session-status-config'
 import type { LabelConfig } from '@craft-agent/shared/labels'
 import { extractLabelId } from '@craft-agent/shared/labels'
 import { LabelMenuItems, StatusMenuItems, ShareMenuItems } from './SessionMenuParts'
+import { SharePasswordDialog, type SharePasswordMode } from './SharePasswordDialog'
 import { getFileManagerName } from '@/lib/platform'
 import type { SessionMeta } from '@/atoms/sessions'
 import { getSessionStatus, hasUnreadMeta, hasMessagesMeta } from '@/utils/session'
@@ -102,10 +104,19 @@ export function SessionMenu({
   const isFlagged = item.isFlagged ?? false
   const isArchived = item.isArchived ?? false
   const sharedUrl = item.sharedUrl
+  const sharedPasswordSet = item.sharedPasswordSet === true
   const currentSessionStatus = getSessionStatus(item)
   const sessionLabels = item.labels ?? []
   const _hasMessages = hasMessagesMeta(item)
   const _hasUnread = hasUnreadMeta(item)
+
+  // Password-dialog state — single dialog handles share/set/change flows
+  const [passwordDialog, setPasswordDialog] = React.useState<{ open: boolean; mode: SharePasswordMode }>({
+    open: false,
+    mode: 'share',
+  })
+  const openPasswordDialog = (mode: SharePasswordMode) => setPasswordDialog({ open: true, mode })
+
   // Share handlers
   const handleShare = async () => {
     const result = await window.electronAPI.sessionCommand(sessionId, { type: 'shareToViewer' }) as { success: boolean; url?: string; error?: string } | undefined
@@ -175,21 +186,53 @@ export function SessionMenu({
     <>
       {/* Share/Shared based on shared state */}
       {!sharedUrl ? (
-        <MenuItem onClick={handleShare}>
-          <CloudUpload className="h-3.5 w-3.5" />
-          <span className="flex-1">{t("sessionMenu.share")}</span>
-        </MenuItem>
-      ) : (
         <Sub>
           <SubTrigger className="pr-2">
             <CloudUpload className="h-3.5 w-3.5" />
+            <span className="flex-1">{t("sessionMenu.share")}</span>
+          </SubTrigger>
+          <SubContent>
+            <MenuItem onClick={handleShare}>
+              <CloudUpload className="h-3.5 w-3.5" />
+              <span className="flex-1">{t("sessionMenu.sharePublic")}</span>
+            </MenuItem>
+            <MenuItem onClick={() => openPasswordDialog('share')}>
+              <Lock className="h-3.5 w-3.5" />
+              <span className="flex-1">{t("sessionMenu.shareWithPassword")}</span>
+            </MenuItem>
+          </SubContent>
+        </Sub>
+      ) : (
+        <Sub>
+          <SubTrigger className="pr-2">
+            {sharedPasswordSet ? (
+              <Lock className="h-3.5 w-3.5" />
+            ) : (
+              <CloudUpload className="h-3.5 w-3.5" />
+            )}
             <span className="flex-1">{t("sessionMenu.shared")}</span>
           </SubTrigger>
           <SubContent>
             <ShareMenuItems sessionId={sessionId} sharedUrl={sharedUrl} menu={{ MenuItem, Separator }} />
+            <Separator />
+            <MenuItem onClick={() => openPasswordDialog(sharedPasswordSet ? 'change' : 'set')}>
+              <Lock className="h-3.5 w-3.5" />
+              <span className="flex-1">
+                {sharedPasswordSet
+                  ? t("sessionMenu.changeSharePassword")
+                  : t("sessionMenu.setSharePassword")}
+              </span>
+            </MenuItem>
           </SubContent>
         </Sub>
       )}
+
+      <SharePasswordDialog
+        open={passwordDialog.open}
+        onOpenChange={(next) => setPasswordDialog((prev) => ({ ...prev, open: next }))}
+        mode={passwordDialog.mode}
+        sessionId={sessionId}
+      />
 
       {/* Send to Workspace — visible when at least one other workspace exists */}
       {hasRemoteWorkspaces && onSendToWorkspace && (

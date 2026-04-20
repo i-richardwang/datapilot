@@ -55,7 +55,9 @@ export const sessions = sqliteTable('sessions', {
   // Sharing
   sharedUrl: text('shared_url'),
   sharedId: text('shared_id'),
-  /** HTML shares keyed by sha256(html) — JSON object: { [hash]: { sharedUrl, sharedId } } */
+  /** True when the share is currently password-protected on the viewer-server. Hash is NOT stored locally. */
+  sharedPasswordSet: integer('shared_password_set', { mode: 'boolean' }),
+  /** HTML shares keyed by sha256(html) — JSON object: { [hash]: { sharedUrl, sharedId, passwordSet? } } */
   htmlShares: text('html_shares', { mode: 'json' }),
   /** Uploaded file assets keyed by original local src path — JSON: { [srcPath]: { mimeType, url } } */
   assets: text('assets', { mode: 'json' }),

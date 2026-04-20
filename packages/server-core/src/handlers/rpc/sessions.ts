@@ -280,17 +280,26 @@ export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): 
         return sessionPath ? { success: true, path: sessionPath } : { success: false }
       }
       case 'shareToViewer':
-        return sessionManager.shareToViewer(sessionId)
+        return sessionManager.shareToViewer(sessionId, command.password ?? null)
       case 'updateShare':
-        return sessionManager.updateShare(sessionId)
+        return sessionManager.updateShare(sessionId, command.password ?? null)
       case 'revokeShare':
-        return sessionManager.revokeShare(sessionId)
+        return sessionManager.revokeShare(sessionId, command.password ?? null)
+      case 'setSharePassword':
+        return sessionManager.setSharePassword(sessionId, command.currentPassword ?? null, command.newPassword)
       case 'shareHtml':
-        return sessionManager.shareHtml(sessionId, command.html)
+        return sessionManager.shareHtml(sessionId, command.html, command.password ?? null)
       case 'updateHtml':
-        return sessionManager.updateHtml(sessionId, command.sharedId, command.html)
+        return sessionManager.updateHtml(sessionId, command.sharedId, command.html, command.password ?? null)
       case 'revokeHtml':
-        return sessionManager.revokeHtml(sessionId, command.sharedId)
+        return sessionManager.revokeHtml(sessionId, command.sharedId, command.password ?? null)
+      case 'setHtmlSharePassword':
+        return sessionManager.setHtmlSharePassword(
+          sessionId,
+          command.sharedId,
+          command.currentPassword ?? null,
+          command.newPassword,
+        )
       case 'refreshTitle':
         log.info(`IPC: refreshTitle received for session ${sessionId}`)
         return sessionManager.refreshTitle(sessionId)
@@ -515,7 +524,7 @@ export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): 
   })
 
   // Share a session: upload its bundle to the public viewer and persist sharedUrl/sharedId.
-  server.handle(RPC_CHANNELS.sessions.SHARE, async (_ctx, workspaceId: string, sessionId: string) => {
+  server.handle(RPC_CHANNELS.sessions.SHARE, async (_ctx, workspaceId: string, sessionId: string, password?: string | null) => {
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (!workspace) throw new Error(`Workspace not found: ${workspaceId}`)
 
@@ -525,22 +534,29 @@ export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): 
     const stored = loadSession(workspace.rootPath, sessionId)
     if (!stored) throw new Error(`Session '${sessionId}' not found in workspace`)
 
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (password && password.length > 0) headers['X-Share-Password'] = password
+
     const response = await fetch(`${VIEWER_URL}/s/api`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(stored),
     })
     if (!response.ok) {
       if (response.status === 413) throw new Error('Session is too large to share')
       throw new Error(`Upload failed (status ${response.status})`)
     }
-    const data = await response.json() as { id: string; url: string }
-    await updateSessionMetadata(workspace.rootPath, sessionId, { sharedUrl: data.url, sharedId: data.id })
-    return { url: data.url, id: data.id }
+    const data = await response.json() as { id: string; url: string; hasPassword?: boolean }
+    await updateSessionMetadata(workspace.rootPath, sessionId, {
+      sharedUrl: data.url,
+      sharedId: data.id,
+      sharedPasswordSet: data.hasPassword === true ? true : undefined,
+    })
+    return { url: data.url, id: data.id, hasPassword: data.hasPassword === true }
   })
 
   // Share an HTML artifact for a session: dedupes by sha256(html) against session's htmlShares.
-  server.handle(RPC_CHANNELS.sessions.SHARE_HTML, async (_ctx, workspaceId: string, sessionId: string, html: string) => {
+  server.handle(RPC_CHANNELS.sessions.SHARE_HTML, async (_ctx, workspaceId: string, sessionId: string, html: string, password?: string | null) => {
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (!workspace) throw new Error(`Workspace not found: ${workspaceId}`)
     if (!html || html.length === 0) throw new Error('HTML payload is empty')
@@ -554,20 +570,26 @@ export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): 
 
     const contentHash = createHash('sha256').update(html).digest('hex')
     const existing = stored.htmlShares?.[contentHash]
-    if (existing) return { url: existing.sharedUrl, id: existing.sharedId, deduped: true }
+    if (existing) return { url: existing.sharedUrl, id: existing.sharedId, deduped: true, hasPassword: existing.passwordSet === true }
+
+    const headers: Record<string, string> = { 'Content-Type': 'text/html; charset=utf-8' }
+    if (password && password.length > 0) headers['X-Share-Password'] = password
 
     const response = await fetch(`${VIEWER_URL}/s/api/html`, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      headers,
       body: html,
     })
     if (!response.ok) {
       if (response.status === 413) throw new Error('HTML is too large to share')
       throw new Error(`Upload failed (status ${response.status})`)
     }
-    const data = await response.json() as { id: string; url: string }
-    const nextShares = { ...(stored.htmlShares ?? {}), [contentHash]: { sharedUrl: data.url, sharedId: data.id } }
+    const data = await response.json() as { id: string; url: string; hasPassword?: boolean }
+    const nextShares = {
+      ...(stored.htmlShares ?? {}),
+      [contentHash]: { sharedUrl: data.url, sharedId: data.id, passwordSet: data.hasPassword === true ? true : undefined },
+    }
     await updateSessionMetadata(workspace.rootPath, sessionId, { htmlShares: nextShares })
-    return { url: data.url, id: data.id, deduped: false }
+    return { url: data.url, id: data.id, deduped: false, hasPassword: data.hasPassword === true }
   })
 }

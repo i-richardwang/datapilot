@@ -31,6 +31,7 @@ import {
 } from '@craft-agent/ui'
 import { SessionUpload } from './components/SessionUpload'
 import { Header } from './components/Header'
+import { PasswordPrompt } from './components/PasswordPrompt'
 
 /** Default session ID for development */
 const DEV_SESSION_ID = 'tz5-13I84pwK_he'
@@ -50,12 +51,32 @@ function getSessionIdFromUrl(): string | null {
   return null
 }
 
+/**
+ * Per-share sessionStorage key for the share password. Same tab survives reloads;
+ * a fresh tab re-prompts. We never write passwords to localStorage.
+ */
+function sharePasswordKey(sessionId: string): string {
+  return `viewer-share-pw:/s/${sessionId}`
+}
+
 export function App() {
   const { t } = useTranslation()
   const [session, setSession] = useState<StoredSession | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(() => getSessionIdFromUrl())
+  const [passwordState, setPasswordState] = useState<'none' | 'required' | 'invalid'>('none')
+  const [password, setPassword] = useState<string | null>(() => {
+    const id = getSessionIdFromUrl()
+    if (!id) return null
+    try {
+      return window.sessionStorage.getItem(sharePasswordKey(id))
+    } catch {
+      return null
+    }
+  })
+  const passwordRef = useRef<string | null>(password)
+  useEffect(() => { passwordRef.current = password }, [password])
   const [isDark, setIsDark] = useState(() => {
     // Check system preference on mount
     return window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -70,7 +91,21 @@ export function App() {
       setError(null)
 
       try {
-        const response = await fetch(`/s/api/${sessionId}`)
+        const headers: Record<string, string> = {}
+        if (password) headers['X-Share-Password'] = password
+
+        const response = await fetch(`/s/api/${sessionId}`, { headers })
+        if (response.status === 401) {
+          const body = await response.json().catch(() => ({} as { error?: string }))
+          setPasswordState(body?.error === 'password_invalid' ? 'invalid' : 'required')
+          setSession(null)
+          // Stored password no longer works — drop it so asset reads don't send stale headers.
+          if (password) {
+            try { window.sessionStorage.removeItem(sharePasswordKey(sessionId)) } catch {}
+            setPassword(null)
+          }
+          return
+        }
         if (!response.ok) {
           if (response.status === 404) {
             setError(t('errors.sessionNotFound'))
@@ -81,6 +116,7 @@ export function App() {
         }
 
         const data = await response.json()
+        setPasswordState('none')
         setSession(data)
       } catch (err) {
         console.error('Failed to fetch session:', err)
@@ -91,6 +127,12 @@ export function App() {
     }
 
     fetchSession()
+  }, [sessionId, password])
+
+  const handlePasswordSubmit = useCallback((entered: string) => {
+    if (!sessionId || !entered) return
+    try { window.sessionStorage.setItem(sharePasswordKey(sessionId), entered) } catch {}
+    setPassword(entered)
   }, [sessionId])
 
   // Handle browser navigation
@@ -98,7 +140,15 @@ export function App() {
     const handlePopState = () => {
       const newId = getSessionIdFromUrl()
       setSessionId(newId)
-      if (!newId) {
+      setPasswordState('none')
+      if (newId) {
+        try {
+          setPassword(window.sessionStorage.getItem(sharePasswordKey(newId)))
+        } catch {
+          setPassword(null)
+        }
+      } else {
+        setPassword(null)
         setSession(null)
         setError(null)
       }
@@ -129,6 +179,8 @@ export function App() {
     setSession(null)
     setSessionId(null)
     setError(null)
+    setPasswordState('none')
+    setPassword(null)
     // Update URL to root
     window.history.pushState({}, '', '/')
   }, [])
@@ -194,17 +246,22 @@ export function App() {
     return entry.url
   }, [])
 
-  const readFileAsText = useCallback(async (path: string): Promise<string> => {
-    const url = lookupAssetUrl(path)
-    const res = await fetch(url)
+  const fetchAsset = useCallback(async (url: string): Promise<Response> => {
+    const headers: Record<string, string> = {}
+    const pw = passwordRef.current
+    if (pw) headers['X-Share-Password'] = pw
+    const res = await fetch(url, { headers })
     if (!res.ok) throw new Error(`Failed to fetch asset: ${res.status}`)
+    return res
+  }, [])
+
+  const readFileAsText = useCallback(async (path: string): Promise<string> => {
+    const res = await fetchAsset(lookupAssetUrl(path))
     return res.text()
-  }, [lookupAssetUrl])
+  }, [lookupAssetUrl, fetchAsset])
 
   const readFileAsDataUrl = useCallback(async (path: string): Promise<string> => {
-    const url = lookupAssetUrl(path)
-    const res = await fetch(url)
-    if (!res.ok) throw new Error(`Failed to fetch asset: ${res.status}`)
+    const res = await fetchAsset(lookupAssetUrl(path))
     const blob = await res.blob()
     return await new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -212,14 +269,12 @@ export function App() {
       reader.onerror = () => reject(reader.error ?? new Error('Failed to read asset'))
       reader.readAsDataURL(blob)
     })
-  }, [lookupAssetUrl])
+  }, [lookupAssetUrl, fetchAsset])
 
   const readFileAsBinary = useCallback(async (path: string): Promise<Uint8Array> => {
-    const url = lookupAssetUrl(path)
-    const res = await fetch(url)
-    if (!res.ok) throw new Error(`Failed to fetch asset: ${res.status}`)
+    const res = await fetchAsset(lookupAssetUrl(path))
     return new Uint8Array(await res.arrayBuffer())
-  }, [lookupAssetUrl])
+  }, [lookupAssetUrl, fetchAsset])
 
   // Old sessions (shared before asset upload existed) have no `assets` map;
   // we deliberately leave `onReadFile*` undefined in that case so the block
@@ -261,6 +316,13 @@ export function App() {
           <div className="text-center text-muted-foreground">
             <div className="animate-pulse">Loading session...</div>
           </div>
+        </div>
+      ) : passwordState !== 'none' ? (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <PasswordPrompt
+            invalid={passwordState === 'invalid'}
+            onSubmit={handlePasswordSubmit}
+          />
         </div>
       ) : error ? (
         <div className="flex-1 flex items-center justify-center p-8">

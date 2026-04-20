@@ -9,7 +9,7 @@
  *   VIEWER_S3_REGION            — Region (default: "auto" for R2)
  */
 
-import type { SessionStorage } from './interface'
+import type { SessionStorage, ShareKind } from './interface'
 
 export class S3Storage implements SessionStorage {
   private client: any
@@ -43,6 +43,14 @@ export class S3Storage implements SessionStorage {
 
   private assetKey(id: string): string {
     return `assets/${id}`
+  }
+
+  private passwordKey(kind: ShareKind, id: string): string {
+    switch (kind) {
+      case 'session': return `${this.key(id)}.pwd`
+      case 'html': return `${this.htmlKey(id)}.pwd`
+      case 'asset': return `${this.assetKey(id)}.pwd`
+    }
   }
 
   async save(id: string, data: unknown): Promise<void> {
@@ -90,6 +98,7 @@ export class S3Storage implements SessionStorage {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: this.key(id) })
     )
+    await this.setPasswordHash('session', id, null)
     return true
   }
 
@@ -158,6 +167,7 @@ export class S3Storage implements SessionStorage {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: this.htmlKey(id) })
     )
+    await this.setPasswordHash('html', id, null)
     return true
   }
 
@@ -207,6 +217,47 @@ export class S3Storage implements SessionStorage {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: this.assetKey(id) })
     )
+    await this.setPasswordHash('asset', id, null)
     return true
+  }
+
+  async setPasswordHash(kind: ShareKind, id: string, hash: string | null): Promise<void> {
+    const Key = this.passwordKey(kind, id)
+    if (hash == null) {
+      const { DeleteObjectCommand, HeadObjectCommand } = await import('@aws-sdk/client-s3')
+      try {
+        await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key }))
+      } catch {
+        return
+      }
+      await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key }))
+      return
+    }
+    const { PutObjectCommand } = await import('@aws-sdk/client-s3')
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key,
+        Body: hash,
+        ContentType: 'text/plain; charset=utf-8',
+      })
+    )
+  }
+
+  async loadPasswordHash(kind: ShareKind, id: string): Promise<string | null> {
+    const { GetObjectCommand } = await import('@aws-sdk/client-s3')
+    try {
+      const response = await this.client.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: this.passwordKey(kind, id) })
+      )
+      const body = await response.Body?.transformToString()
+      const hash = body?.trim() ?? ''
+      return hash.length > 0 ? hash : null
+    } catch (err: any) {
+      if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
+        return null
+      }
+      throw err
+    }
   }
 }

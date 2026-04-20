@@ -125,19 +125,25 @@ export function collectReferencedFilePaths(messages: StoredMessage[]): string[] 
  * Upload one asset to the viewer-server. Raw bytes in, `{ id, url }` out.
  * The viewer-server uses content sha256 as the id so repeated uploads with
  * identical bytes deduplicate automatically (cheap and idempotent).
+ *
+ * When `password` is set, the asset is uploaded behind the same gate as the
+ * session itself so `/s/a/{id}` GETs also require the shared password.
  */
 async function uploadAsset(
   viewerUrl: string,
   bytes: Uint8Array,
   mimeType: string,
+  password?: string | null,
 ): Promise<{ id: string; url: string }> {
   // Upload a copied ArrayBuffer — it's the one body type that typechecks
   // under both the DOM lib (used in viewer/electron renderer) and the Bun
   // fetch types that server-core is built against.
   const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+  const headers: Record<string, string> = { 'Content-Type': mimeType }
+  if (password && password.length > 0) headers['X-Share-Password'] = password
   const response = await fetch(`${viewerUrl}/s/a`, {
     method: 'POST',
-    headers: { 'Content-Type': mimeType },
+    headers,
     body: ab as ArrayBuffer,
   })
   if (!response.ok) {
@@ -157,13 +163,14 @@ export async function buildAssetsManifest(
   paths: string[],
   viewerUrl: string,
   onError?: (path: string, error: unknown) => void,
+  password?: string | null,
 ): Promise<Record<string, SharedAssetInfo>> {
   const manifest: Record<string, SharedAssetInfo> = {}
   for (const path of paths) {
     try {
       const buffer = await readFile(path)
       const mimeType = mimeFromPath(path)
-      const { url } = await uploadAsset(viewerUrl, new Uint8Array(buffer), mimeType)
+      const { url } = await uploadAsset(viewerUrl, new Uint8Array(buffer), mimeType, password)
       manifest[path] = { mimeType, url }
     } catch (error) {
       onError?.(path, error)
@@ -187,8 +194,10 @@ export function parseAssetIdFromUrl(url: string): string | null {
  * swallowed (logged by the caller) because revoke is a best-effort cleanup —
  * orphans are still unreachable without the session URL.
  */
-export async function deleteAsset(viewerUrl: string, id: string): Promise<void> {
-  const response = await fetch(`${viewerUrl}/s/a/${id}`, { method: 'DELETE' })
+export async function deleteAsset(viewerUrl: string, id: string, password?: string | null): Promise<void> {
+  const headers: Record<string, string> = {}
+  if (password && password.length > 0) headers['X-Share-Password'] = password
+  const response = await fetch(`${viewerUrl}/s/a/${id}`, { method: 'DELETE', headers })
   if (!response.ok && response.status !== 404) {
     throw new Error(`Delete asset ${id} failed: ${response.status}`)
   }

@@ -199,6 +199,7 @@ function sessionToRow(session: StoredSession, workspaceRootPath: string): typeof
     thinkingLevel: session.thinkingLevel ?? null,
     sharedUrl: session.sharedUrl ?? null,
     sharedId: session.sharedId ?? null,
+    sharedPasswordSet: session.sharedPasswordSet ?? null,
     htmlShares: session.htmlShares ?? null,
     assets: session.assets ?? null,
     pendingPlanExecution: session.pendingPlanExecution ?? null,
@@ -251,6 +252,7 @@ function rowToSessionConfig(row: SessionRow, workspaceRootPath: string): Session
     thinkingLevel: row.thinkingLevel as SessionConfig['thinkingLevel'],
     sharedUrl: row.sharedUrl ?? undefined,
     sharedId: row.sharedId ?? undefined,
+    sharedPasswordSet: row.sharedPasswordSet ?? undefined,
     htmlShares: (row.htmlShares as SessionConfig['htmlShares']) ?? undefined,
     assets: (row.assets as SessionConfig['assets']) ?? undefined,
     pendingPlanExecution: row.pendingPlanExecution as SessionConfig['pendingPlanExecution'],
@@ -292,6 +294,7 @@ function rowToMetadata(row: SessionRow, workspaceRootPath: string): SessionMetad
     planCount: planCount > 0 ? planCount : undefined,
     sharedUrl: row.sharedUrl ?? undefined,
     sharedId: row.sharedId ?? undefined,
+    sharedPasswordSet: row.sharedPasswordSet ?? undefined,
     htmlShares: (row.htmlShares as SessionConfig['htmlShares']) ?? undefined,
     assets: (row.assets as SessionConfig['assets']) ?? undefined,
     workingDirectory: row.workingDirectory ? expandPath(row.workingDirectory) : undefined,
@@ -664,6 +667,7 @@ export async function updateSessionMetadata(
     | 'permissionMode'
     | 'sharedUrl'
     | 'sharedId'
+    | 'sharedPasswordSet'
     | 'htmlShares'
     | 'assets'
     | 'model'
@@ -689,6 +693,7 @@ export async function updateSessionMetadata(
   if ('hasUnread' in updates) set.hasUnread = updates.hasUnread ?? false;
   if ('sharedUrl' in updates) set.sharedUrl = updates.sharedUrl ?? null;
   if ('sharedId' in updates) set.sharedId = updates.sharedId ?? null;
+  if ('sharedPasswordSet' in updates) set.sharedPasswordSet = updates.sharedPasswordSet ?? null;
   if ('htmlShares' in updates) set.htmlShares = updates.htmlShares ?? null;
   if ('assets' in updates) set.assets = updates.assets ?? null;
   if (updates.model !== undefined) set.model = updates.model;
