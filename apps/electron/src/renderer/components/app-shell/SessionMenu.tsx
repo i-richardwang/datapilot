@@ -214,15 +214,15 @@ export function SessionMenu({
           </SubTrigger>
           <SubContent>
             <ShareMenuItems sessionId={sessionId} sharedUrl={sharedUrl} menu={{ MenuItem, Separator }} />
-            <Separator />
-            <MenuItem onClick={() => openPasswordDialog(sharedPasswordSet ? 'change' : 'set')}>
-              <Lock className="h-3.5 w-3.5" />
-              <span className="flex-1">
-                {sharedPasswordSet
-                  ? t("sessionMenu.changeSharePassword")
-                  : t("sessionMenu.setSharePassword")}
-              </span>
-            </MenuItem>
+            {sharedPasswordSet && (
+              <>
+                <Separator />
+                <MenuItem onClick={() => openPasswordDialog('change')}>
+                  <Lock className="h-3.5 w-3.5" />
+                  <span className="flex-1">{t("sessionMenu.changeSharePassword")}</span>
+                </MenuItem>
+              </>
+            )}
           </SubContent>
         </Sub>
       )}

@@ -4343,7 +4343,8 @@ export class SessionManager implements ISessionManager {
         if (response.status === 404) {
           return { success: false, error: 'Shared session not found' }
         }
-        return { success: false, error: `Password update failed (status ${response.status})` }
+        const errorData = await response.json() as { error?: string }
+        return { success: false, error: errorData?.error ?? `Password update failed (status ${response.status})` }
       }
 
       const data = await response.json() as { hasPassword?: boolean }
