@@ -162,11 +162,6 @@ export const BrowserToolSchema = z.object({
   ]).describe('Browser command as a string (e.g., "click @e1") or array (e.g., ["evaluate", "var x = 1; x + 2"]). Array mode preserves semicolons and whitespace in arguments.'),
 });
 
-export const BatchTestSchema = z.object({
-  batchId: z.string().describe('The batch ID to test'),
-  sampleSize: z.number().int().min(1).optional().describe('Number of random items to test (default: 3)'),
-});
-
 export const SpawnSessionSchema = z.object({
   help: z.boolean().optional().describe('If true, returns available connections, models, and sources instead of creating a session'),
   prompt: z.string().optional().describe('Instructions for the new session (required when not in help mode)'),
@@ -427,29 +422,6 @@ Put text/content directly in the 'prompt' parameter. Do NOT pass inline text via
 Only use 'attachments' for existing file paths on disk - the tool loads file content automatically.
 For large files (>2000 lines), use {path, startLine, endLine} to select a portion.`,
 
-  batch_test: `Test a batch by running a random sample of items before committing to a full run.
-
-Use this to validate prompt quality, output schema, and overall workflow before processing all items.
-
-**Parameters:**
-- \`batchId\` (required): The batch ID to test
-- \`sampleSize\` (optional): Number of random items to sample (default: 3)
-
-**Behavior:**
-- Runs real sessions with the same configuration as production
-- Only processes a random sample of items
-- Writes output to a separate file: \`{output-path}.test.jsonl\`
-- State tracked separately — does not affect production batch state
-- Blocks until all sampled items complete
-
-**Iterative workflow:**
-1. Create batch config via CLI
-2. Call \`batch_test\` to run a sample
-3. Read the test output file to evaluate results
-4. Update prompt/schema via CLI if needed
-5. Repeat 2-4 until satisfied
-6. Start the full batch`,
-
   spawn_session: `Create a new session that runs independently with its own prompt, connection, model, and sources.
 
 Use this to delegate tasks to parallel sessions — research, analysis, drafts, or any work that benefits from separate context.
@@ -566,7 +538,6 @@ export const SESSION_TOOL_DEFS: SessionToolDef[] = [
   { name: 'render_template', description: TOOL_DESCRIPTIONS.render_template, inputSchema: RenderTemplateSchema, executionMode: 'registry', safeMode: 'allow', handler: handleRenderTemplate },
   { name: 'send_developer_feedback', description: TOOL_DESCRIPTIONS.send_developer_feedback, inputSchema: SendDeveloperFeedbackSchema, executionMode: 'registry', safeMode: 'allow', handler: handleSendDeveloperFeedback },
   { name: 'batch_output', description: TOOL_DESCRIPTIONS.batch_output, inputSchema: BatchOutputSchema, executionMode: 'registry', safeMode: 'allow', handler: handleBatchOutput },
-  { name: 'batch_test', description: TOOL_DESCRIPTIONS.batch_test, inputSchema: BatchTestSchema, executionMode: 'backend', safeMode: 'block', handler: null },
   { name: 'call_llm', description: TOOL_DESCRIPTIONS.call_llm, inputSchema: CallLlmSchema, executionMode: 'backend', safeMode: 'allow', readOnly: true, handler: null },
   { name: 'spawn_session', description: TOOL_DESCRIPTIONS.spawn_session, inputSchema: SpawnSessionSchema, executionMode: 'backend', safeMode: 'block', handler: null },
   // Browser tool (backend-specific — requires BrowserPaneManager in Electron)
@@ -623,7 +594,6 @@ export const BATCH_EXCLUDED_TOOLS = new Set([
   'transform_data',
   'send_developer_feedback',
   'call_llm',
-  'batch_test',
   'browser_tool',
   'spawn_session',
 ]);

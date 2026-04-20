@@ -450,58 +450,6 @@ async function handleSpawnSession(
 }
 
 // ============================================================
-// batch_test Handler (backend-specific)
-// ============================================================
-
-async function handleBatchTest(
-  args: Record<string, unknown>,
-  config: SessionConfig,
-): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
-  // Primary path: PreToolUse intercept injects _precomputedResult (works on Codex).
-  const precomputed = args?._precomputedResult as string | undefined;
-
-  if (precomputed) {
-    try {
-      const parsed = JSON.parse(precomputed);
-      if (parsed.error) {
-        return errorResponse(`batch_test failed: ${parsed.error}`);
-      }
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(parsed, null, 2) }],
-      };
-    } catch {
-      return errorResponse(`batch_test: Failed to parse _precomputedResult: ${precomputed.slice(0, 200)}`);
-    }
-  }
-
-  // Fallback path: HTTP callback to agent (for Copilot where PreToolUse doesn't fire for MCP tools).
-  if (config.callbackPort) {
-    try {
-      const resp = await fetch(`http://127.0.0.1:${config.callbackPort}/batch-test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(args),
-        signal: AbortSignal.timeout(CALLBACK_TOOL_TIMEOUT_MS),
-      });
-      const result = await resp.json() as Record<string, unknown>;
-      if (result.error) {
-        return errorResponse(`batch_test failed: ${result.error}`);
-      }
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
-      };
-    } catch (err) {
-      return errorResponse(`batch_test callback failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-
-  return errorResponse(
-    'batch_test requires either PreToolUse intercept (_precomputedResult) or ' +
-    'HTTP callback (DATAPILOT_LLM_CALLBACK_PORT). Neither is available.'
-  );
-}
-
-// ============================================================
 // MCP Server Setup
 // ============================================================
 
@@ -604,11 +552,6 @@ async function main() {
       // spawn_session has backend-specific execution (precomputed result / HTTP callback)
       if (name === 'spawn_session') {
         return await handleSpawnSession(toolArgs as Record<string, unknown>, config);
-      }
-
-      // batch_test has backend-specific execution (precomputed result / HTTP callback)
-      if (name === 'batch_test') {
-        return await handleBatchTest(toolArgs as Record<string, unknown>, config);
       }
 
       // Check canonical session tool registry first (feature-filtered)

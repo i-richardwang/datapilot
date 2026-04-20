@@ -12,7 +12,6 @@
 
 import type { LLMQueryRequest, LLMQueryResult } from './llm-tool.ts';
 import type { SpawnSessionFn } from './spawn-session-tool.ts';
-import type { BatchTestFn } from './batch-test-tool.ts';
 import type { BrowserPaneFns } from './browser-tools.ts';
 import type { AuthRequest } from '@craft-agent/session-tools-core';
 import { debug } from '../utils/debug.ts';
@@ -44,12 +43,6 @@ export interface SessionScopedToolCallbacks {
    * Each agent backend delegates to its onSpawnSession callback.
    */
   spawnSessionFn?: SpawnSessionFn;
-
-  /**
-   * Callback for batch_test tool — runs a random sample of batch items for validation.
-   * Delegates to BatchProcessor.test() via the session manager.
-   */
-  batchTestFn?: BatchTestFn;
 
   /**
    * Browser pane functions for browser_* tools.

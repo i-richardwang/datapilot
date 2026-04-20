@@ -621,12 +621,6 @@ export class ClaudeAgent extends BaseAgent {
       },
       queryFn: (request) => this.queryLlm(request),
       spawnSessionFn: (input) => this.preExecuteSpawnSession(input),
-      batchTestFn: (batchId, sampleSize) => {
-        if (!this.onBatchTest) {
-          throw new Error('batch_test is not available in this context.');
-        }
-        return this.onBatchTest(batchId, sampleSize);
-      },
     });
 
     // Start config watcher for hot-reloading source changes
@@ -1209,7 +1203,6 @@ export class ClaudeAgent extends BaseAgent {
                   }
                 }
 
-                case 'batch_test_intercept':
                 case 'call_llm_intercept':
                 case 'spawn_session_intercept':
                   // Claude's session tools run in-process via SDK — just allow

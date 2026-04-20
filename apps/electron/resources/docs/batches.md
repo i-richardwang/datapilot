@@ -227,10 +227,14 @@ Before running a full batch, always test with a random sample to validate your p
 
 ### How to Test
 
-Use the `batch_test` tool to run a random sample:
+Run a random sample via CLI:
 
-- `batchId` (required): The batch ID to test
-- `sampleSize` (optional): Number of random items (default: 3)
+```bash
+dtpilot batch test <batch-id> [--sample-size N]
+```
+
+- `<batch-id>` (required): The batch ID to test
+- `--sample-size` (optional): Number of random items (default: 3)
 
 The test runs real sessions with the same configuration as production, but:
 - Only processes a random sample of items
@@ -240,7 +244,7 @@ The test runs real sessions with the same configuration as production, but:
 
 ### Test Result
 
-`batch_test` blocks until all sampled items complete and returns a JSON result:
+The CLI command blocks until all sampled items complete and returns a JSON result:
 
 - `status` — `"completed"` or `"failed"`
 - `sampleSize` — Number of items tested
@@ -251,7 +255,7 @@ The test runs real sessions with the same configuration as production, but:
 ### Iterative Workflow
 
 1. Create the batch configuration using CLI
-2. Call `batch_test` to run a sample
+2. Run `dtpilot batch test <batch-id>` to validate a sample
 3. **Review** the results (see Review Checklist below)
 4. If issues found, update the prompt or schema using CLI (`dtpilot batch update`)
 5. Repeat steps 2-4 until satisfied

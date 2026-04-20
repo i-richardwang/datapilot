@@ -571,9 +571,6 @@ export interface AgentBackend {
 
   /** Called when agent requests spawning a new session */
   onSpawnSession: ((request: import('../base-agent.ts').SpawnSessionRequest) => Promise<import('../base-agent.ts').SpawnSessionResult>) | null;
-
-  /** Called when agent requests testing a batch with a random sample */
-  onBatchTest: ((batchId: string, sampleSize?: number) => Promise<import('../../batches/types.ts').TestBatchResult>) | null;
 }
 
 /**

@@ -124,7 +124,7 @@ Won't conflict unless upstream adds similarly-named features.
 
 - Batch context registry: `registerSessionBatchContext()`, `getSessionBatchContext()`, `cleanupSessionBatchContext()`
 - Passes `batchContext`, `includeBatchOutput`, `batchMode`, `disableOauth/Browser/Validation/Templates` through tool init flow
-- In batch mode, conditionally skips `spawn_session`, `batch_test`, `browser_tool`
+- In batch mode, conditionally skips `spawn_session`, `browser_tool`
 
 **Conflict trigger:** upstream refactors tool initialization or caching strategy.
 

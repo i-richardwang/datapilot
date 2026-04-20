@@ -3584,13 +3584,6 @@ export class SessionManager implements ISessionManager {
         }
       }
 
-      // Wire up onBatchTest to delegate to BatchProcessor.test()
-      managed.agent.onBatchTest = async (batchId, sampleSize) => {
-        sessionLog.info(`Batch test request from session ${managed.id}: batch="${batchId}" sampleSize=${sampleSize ?? 'default'}`)
-        const processor = this.ensureBatchProcessor(managed.workspace.rootPath, managed.workspace.id!)
-        return processor.test(batchId, sampleSize)
-      }
-
       // Wire up session self-management tools (set_session_labels, set_session_status, etc.)
       mergeSessionScopedToolCallbacks(managed.id, {
         setSessionLabelsFn: (sessionId: string | undefined, labels: string[]) => {

@@ -35,7 +35,6 @@ import {
 } from '@craft-agent/session-tools-core';
 import { createLLMTool, type LLMQueryRequest, type LLMQueryResult } from './llm-tool.ts';
 import { createSpawnSessionTool, type SpawnSessionFn } from './spawn-session-tool.ts';
-import { createBatchTestTool, type BatchTestFn } from './batch-test-tool.ts';
 import { createBrowserTools, type BrowserPaneFns } from './browser-tools.ts';
 import { FEATURE_FLAGS } from '../feature-flags.ts';
 import { getBrowserToolEnabled } from '../config/storage.ts';
@@ -78,7 +77,6 @@ import { attachSessionSelfManagementBindings } from './session-self-management-b
 
 /** Backend-executed session tools currently supported by the Claude adapter layer. */
 export const CLAUDE_BACKEND_SESSION_TOOL_NAMES = new Set<string>([
-  'batch_test',
   'call_llm',
   'spawn_session',
   'browser_tool',
@@ -363,16 +361,6 @@ export function getSessionScopedTools(
           getSpawnSessionFn: () => {
             const callbacks = getSessionScopedToolCallbacks(sessionId);
             return callbacks?.spawnSessionFn;
-          },
-        }),
-      );
-
-      tools.push(
-        createBatchTestTool({
-          sessionId,
-          getBatchTestFn: () => {
-            const callbacks = getSessionScopedToolCallbacks(sessionId);
-            return callbacks?.batchTestFn;
           },
         }),
       );
