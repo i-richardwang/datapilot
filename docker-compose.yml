@@ -13,16 +13,18 @@ services:
       context: .
       dockerfile: Dockerfile.server
       args:
-        - DATAPILOT_DISABLE_OAUTH=${DATAPILOT_DISABLE_OAUTH:-}
-        - DATAPILOT_DISABLE_BROWSER=${DATAPILOT_DISABLE_BROWSER:-}
+        - DATAPILOT_DISABLE_OAUTH=${DATAPILOT_DISABLE_OAUTH:-1}
+        - DATAPILOT_DISABLE_BROWSER=${DATAPILOT_DISABLE_BROWSER:-1}
         - DATAPILOT_DISABLE_VALIDATION=${DATAPILOT_DISABLE_VALIDATION:-}
         - DATAPILOT_DISABLE_TEMPLATES=${DATAPILOT_DISABLE_TEMPLATES:-}
-        - DATAPILOT_LITE_UI=${DATAPILOT_LITE_UI:-}
+        - DATAPILOT_LITE_UI=${DATAPILOT_LITE_UI:-1}
     ports:
       - "${DATAPILOT_RPC_PORT:-9100}:9100"
     environment:
       - DATAPILOT_SERVER_TOKEN=${DATAPILOT_SERVER_TOKEN}
       - DATAPILOT_WEBUI_PASSWORD=${DATAPILOT_WEBUI_PASSWORD:-}
+      - DATAPILOT_RPC_HOST=0.0.0.0
+      - DATAPILOT_RPC_PORT=9100
       - DATAPILOT_HEALTH_PORT=9101
     volumes:
       - ${DATAPILOT_DATA_DIR:-~/.datapilot}:/home/datapilot/.datapilot
@@ -38,9 +40,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.viewer
+    depends_on:
+      - server
     ports:
       - "${VIEWER_PORT:-9101}:9101"
     environment:
+      - VIEWER_HOST=0.0.0.0
+      - VIEWER_PORT=9101
       - VIEWER_BASE_URL=${VIEWER_BASE_URL:-http://localhost:9101}
     volumes:
       - ${VIEWER_DATA_DIR:-viewer-data}:/data
