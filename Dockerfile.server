@@ -64,7 +64,8 @@ COPY apps/viewer-server/package.json apps/viewer-server/
 COPY apps/webui/package.json apps/webui/
 
 # Skip better-sqlite3 native build — Docker runs on Bun which uses built-in bun:sqlite
-RUN bun install --frozen-lockfile --ignore-scripts
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile --ignore-scripts
 
 # Copy source
 COPY . .
