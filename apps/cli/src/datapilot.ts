@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * datapilot — unified thin CLI client for the DataPilot server.
+ * dtpilot — unified thin CLI client for the DataPilot server.
  *
  * Usage:
- *   datapilot [global-flags] <entity> <action> [args...] [flags...]
+ *   dtpilot [global-flags] <entity> <action> [args...] [flags...]
  *
  * Connection model:
  *   All operations talk to a running server over WebSocket. Default target
@@ -32,7 +32,7 @@ import { routeBatch } from './datapilot/commands/batch.ts'
 import { routeSession } from './datapilot/commands/session.ts'
 import { routeWorkspace } from './datapilot/commands/workspace.ts'
 
-const VERSION = '0.1.0'
+const VERSION = '0.1.1'
 
 export async function main(argv: string[] = process.argv): Promise<void> {
   const args = parseArgs(argv.slice(2))
@@ -50,7 +50,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
 
   if (!args.entity) {
     if (args.global.json) {
-      ok({ usage: 'datapilot <entity> <action> [args]', entities: ENTITIES })
+      ok({ usage: 'dtpilot <entity> <action> [args]', entities: ENTITIES })
     }
     printHelp()
     process.exit(0)
@@ -66,7 +66,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   if (args.global.help) {
     ok({
       entity: args.entity,
-      hint: `Run 'datapilot ${args.entity}' (no action) to list available actions`,
+      hint: `Run 'dtpilot ${args.entity}' (no action) to list available actions`,
     })
   }
 
@@ -135,10 +135,10 @@ function createCtx(args: ReturnType<typeof parseArgs>): RouteCtx {
 }
 
 function printHelp(): void {
-  process.stdout.write(`datapilot — unified CLI for the DataPilot server
+  process.stdout.write(`dtpilot — unified CLI for the DataPilot server
 
 Usage:
-  datapilot [global-flags] <entity> <action> [positionals...] [flags...]
+  dtpilot [global-flags] <entity> <action> [positionals...] [flags...]
 
 Global flags:
   --url <ws-url>         Server URL (default: ws://127.0.0.1:9100, env: DATAPILOT_SERVER_URL)
@@ -160,17 +160,17 @@ Entities:
   session                Sessions inside a workspace
   workspace              Workspaces themselves
 
-Run 'datapilot <entity>' with no action to list that entity's actions.
+Run 'dtpilot <entity>' with no action to list that entity's actions.
 
 Examples:
-  datapilot label list
-  datapilot label create --name TODO --color blue
-  datapilot --url wss://remote source list
+  dtpilot label list
+  dtpilot label create --name TODO --color blue
+  dtpilot --url wss://remote source list
 `)
 }
 
 // This file is an executable entry point — never imported. Running it (via
 // `node dist/datapilot.js`, `bun run src/datapilot.ts`, or the installed
-// `datapilot` bin) always invokes `main()`. The `export` above is purely for
+// `dtpilot` bin) always invokes `main()`. The `export` above is purely for
 // type-checking tools that may need to reference it.
 main()

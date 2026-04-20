@@ -4,7 +4,7 @@ This guide explains how to configure custom permission rules for Explore mode.
 
 Safe Mode is configured by a human in advance through the Electron UI or by
 editing the JSON files documented below directly. Agents using the
-`datapilot` CLI cannot mutate these rules — the sandbox is fixed before the
+`dtpilot` CLI cannot mutate these rules — the sandbox is fixed before the
 agent starts.
 
 ## Overview

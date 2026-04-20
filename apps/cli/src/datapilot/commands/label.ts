@@ -41,7 +41,7 @@ export async function routeLabel(
     case 'get': {
       rejectUnknownFlags(flags, [])
       const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing label id', { suggestion: 'datapilot label get <id>' })
+      if (!id) fail('USAGE_ERROR', 'Missing label id', { suggestion: 'dtpilot label get <id>' })
       const [labels, autoRules] = await Promise.all([
         client.invoke('labels:list', ws),
         client.invoke('labels:autoRuleList', ws, id),
@@ -55,7 +55,7 @@ export async function routeLabel(
       rejectUnknownFlags(flags, ['name'])
       const input = (await parseInput(flags)) ?? {}
       const name = strFlag(flags, 'name') ?? (input.name as string | undefined)
-      if (!name) fail('USAGE_ERROR', 'Missing --name', { suggestion: 'datapilot label create --name "<name>"' })
+      if (!name) fail('USAGE_ERROR', 'Missing --name', { suggestion: 'dtpilot label create --name "<name>"' })
       ok(await client.invoke('labels:create', ws, { ...input, name }))
     }
 
@@ -83,7 +83,7 @@ export async function routeLabel(
       const input = (await parseInput(flags)) ?? {}
       if (!input.pattern) {
         fail('USAGE_ERROR', 'Missing pattern', {
-          suggestion: `datapilot label auto-rule-add ${id} --input '{"pattern":"<regex>"}'`,
+          suggestion: `dtpilot label auto-rule-add ${id} --input '{"pattern":"<regex>"}'`,
         })
       }
       ok(await client.invoke('labels:autoRuleAdd', ws, id, input))
@@ -105,7 +105,7 @@ export async function routeLabel(
 
 async function requireWorkspace(ctx: RouteCtx): Promise<string> {
   const ws = await ctx.getWorkspace()
-  if (!ws) fail('VALIDATION_ERROR', 'No workspace available — pass --workspace <id> or create one with `datapilot workspace create`')
+  if (!ws) fail('VALIDATION_ERROR', 'No workspace available — pass --workspace <id> or create one with `dtpilot workspace create`')
   return ws
 }
 

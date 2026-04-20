@@ -7,17 +7,17 @@ This guide explains batch processing in DataPilot — running actions across lar
 ## CLI Commands
 
 ```bash
-datapilot batch list
-datapilot batch get <id>
-datapilot batch validate
-datapilot batch status <id>
-datapilot batch status <id> --items
-datapilot batch create --name "My batch" --source data.csv --id-field id --prompt-file prompt.txt
-datapilot batch create --name "Extraction" --source data.csv --id-field id --prompt-file prompt.txt --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
-datapilot batch update <id> --name "Renamed" --concurrency 5
-datapilot batch update <id> --patch '{"execution":{"retryOnFailure":true}}'
-datapilot batch retry <id> <item-id>
-datapilot batch delete <id>
+dtpilot batch list
+dtpilot batch get <id>
+dtpilot batch validate
+dtpilot batch status <id>
+dtpilot batch status <id> --items
+dtpilot batch create --name "My batch" --source data.csv --id-field id --prompt-file prompt.txt
+dtpilot batch create --name "Extraction" --source data.csv --id-field id --prompt-file prompt.txt --output-path output/results.jsonl --output-schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}'
+dtpilot batch update <id> --name "Renamed" --concurrency 5
+dtpilot batch update <id> --patch '{"execution":{"retryOnFailure":true}}'
+dtpilot batch retry <id> <item-id>
+dtpilot batch delete <id>
 ```
 
 ## What Are Batches?
@@ -76,7 +76,7 @@ Create a welcome email for $BATCH_ITEM_NAME at $BATCH_ITEM_EMAIL (account $BATCH
 ```
 
 ```bash
-datapilot batch create --name "Onboarding" --source users.csv --id-field user_id --prompt-file prompt.txt
+dtpilot batch create --name "Onboarding" --source users.csv --id-field user_id --prompt-file prompt.txt
 ```
 
 Additional action fields (set via `--patch`):
@@ -99,14 +99,14 @@ These fields control how items are processed. Common ones have dedicated flags; 
 Example using `--patch` for fields without dedicated flags:
 
 ```bash
-datapilot batch update <id> --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
+dtpilot batch update <id> --patch '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
 ```
 
 To manually retry a specific failed item without restarting the entire batch:
 
 ```bash
-datapilot batch status <id> --items    # find failed items
-datapilot batch retry <id> <item-id>   # reset to pending
+dtpilot batch status <id> --items    # find failed items
+dtpilot batch retry <id> <item-id>   # reset to pending
 ```
 
 If the batch has already completed or failed, `retry` sets it to `paused` — the user resumes the batch to re-execute the item.
@@ -149,7 +149,7 @@ The `--output-schema` flag takes a JSON Schema string with `type: "object"`:
 Example:
 
 ```bash
-datapilot batch create --name "User Analysis" --source data/users.csv --id-field user_id \
+dtpilot batch create --name "User Analysis" --source data/users.csv --id-field user_id \
   --prompt-file prompt.txt \
   --output-path output/user-analysis.jsonl \
   --output-schema '{"type":"object","properties":{"summary":{"type":"string","description":"One-sentence summary"},"risk_level":{"type":"string","enum":["low","medium","high"]},"score":{"type":"number","description":"Risk score 0-100"}},"required":["summary","risk_level"]}'
@@ -168,7 +168,7 @@ Their role is $BATCH_ITEM_ROLE and they joined on $BATCH_ITEM_START_DATE.
 ```
 
 ```bash
-datapilot batch create \
+dtpilot batch create \
   --name "User Onboarding Summaries" \
   --source data/new-users.csv \
   --id-field user_id \
@@ -190,7 +190,7 @@ in the $BATCH_ITEM_REGION region. Include budget analysis and key milestones.
 ```
 
 ```bash
-datapilot batch create \
+dtpilot batch create \
   --name "Quarterly Report Generation" \
   --source data/projects.json \
   --id-field project_id \
@@ -211,7 +211,7 @@ Text: $BATCH_ITEM_TEXT
 ```
 
 ```bash
-datapilot batch create \
+dtpilot batch create \
   --name "Content Translation" \
   --source data/content-to-translate.jsonl \
   --id-field content_id \
@@ -253,7 +253,7 @@ The test runs real sessions with the same configuration as production, but:
 1. Create the batch configuration using CLI
 2. Call `batch_test` to run a sample
 3. **Review** the results (see Review Checklist below)
-4. If issues found, update the prompt or schema using CLI (`datapilot batch update`)
+4. If issues found, update the prompt or schema using CLI (`dtpilot batch update`)
 5. Repeat steps 2-4 until satisfied
 6. Tell the user the batch is ready — the user starts the full batch from the UI
 
@@ -308,7 +308,7 @@ Individual items within a batch have their own status:
 | `pending` | Item has not been processed yet |
 | `running` | Item is currently being processed in a session |
 | `completed` | Item was processed successfully |
-| `failed` | Item processing failed (retried automatically if `retryOnFailure` is enabled, or manually via `datapilot batch retry`) |
+| `failed` | Item processing failed (retried automatically if `retryOnFailure` is enabled, or manually via `dtpilot batch retry`) |
 | `skipped` | Item was skipped |
 
 ## Validation
@@ -316,7 +316,7 @@ Individual items within a batch have their own status:
 The CLI validates configuration automatically on `create` and `update`. You can also run validation explicitly:
 
 ```bash
-datapilot batch validate
+dtpilot batch validate
 ```
 
 Or use the `config_validate` tool with `target: "batches"`.

@@ -51,7 +51,7 @@ export async function routeSkill(
       const name = strFlag(flags, 'name') ?? (input.name as string | undefined)
       if (!name) {
         fail('USAGE_ERROR', 'Missing --name', {
-          suggestion: `datapilot skill create --name "<name>" --input '{"description":"..."}'`,
+          suggestion: `dtpilot skill create --name "<name>" --input '{"description":"..."}'`,
         })
       }
       ok(await client.invoke('skills:create', ws, { ...input, name }))

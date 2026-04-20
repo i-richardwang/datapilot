@@ -2,8 +2,8 @@
 
 Labels are additive tags that can be applied to sessions. Unlike statuses (which are exclusive — one per session), labels are multi-select (many per session). They support hierarchical organization via nested JSON trees.
 
-> **CLI-first workflow (recommended):** Use `datapilot label ...` commands instead of editing JSON directly.
-> - `datapilot label --help`
+> **CLI-first workflow (recommended):** Use `dtpilot label ...` commands instead of editing JSON directly.
+> - `dtpilot label --help`
 > - Canonical command reference: [datapilot-cli.md](./datapilot-cli.md)
 
 ## Storage Locations
@@ -139,15 +139,15 @@ The optional `valueType` in config is a hint only — the parser always infers f
 
 ## Adding Labels
 
-Prefer `datapilot` commands:
+Prefer `dtpilot` commands:
 
 ```bash
-datapilot label create --name "Bug" --color "destructive"
-datapilot label create --name "Priority" --color "accent" --value-type number
-datapilot label create --name "Due Date" --color "info" --value-type date
-datapilot label create --name "Project" --color "foreground/60"
-datapilot label create --name "Alpha" --color "info" --parent-id project
-datapilot label create --name "Beta" --color "success" --parent-id project
+dtpilot label create --name "Bug" --color "destructive"
+dtpilot label create --name "Priority" --color "accent" --value-type number
+dtpilot label create --name "Due Date" --color "info" --value-type date
+dtpilot label create --name "Project" --color "foreground/60"
+dtpilot label create --name "Alpha" --color "info" --parent-id project
+dtpilot label create --name "Beta" --color "success" --parent-id project
 ```
 
 Use direct JSON edits only for bulk/manual operations where CLI is not sufficient.

@@ -2,8 +2,8 @@
 
 This guide explains how to configure sources (MCP servers, APIs, local filesystems) in DataPilot.
 
-> **CLI-first workflow (recommended):** Use `datapilot source ...` commands instead of editing source config files directly.
-> - `datapilot source --help`
+> **CLI-first workflow (recommended):** Use `dtpilot source ...` commands instead of editing source config files directly.
+> - `dtpilot source --help`
 > - Canonical command reference: [datapilot-cli.md](./datapilot-cli.md)
 
 ## Source Setup Process
