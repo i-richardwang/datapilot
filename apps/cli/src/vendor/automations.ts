@@ -3,7 +3,7 @@
  *
  * Keep in sync with `packages/shared/src/automations/types.ts` (APP_EVENTS +
  * AGENT_EVENTS) and `schemas.ts` (DEPRECATED_EVENT_ALIASES keys). This is only
- * used to render the error message when `datapilot automation create` is
+ * used to render the error message when `dtpilot automation create` is
  * invoked without a valid `--event`.
  */
 
