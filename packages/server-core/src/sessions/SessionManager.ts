@@ -779,6 +779,8 @@ interface ManagedSession {
   sharedUrl?: string
   // Shared session ID in viewer (for revoke)
   sharedId?: string
+  // True when the active share is password-protected on the viewer-server.
+  sharedPasswordSet?: boolean
   // Shared HTML artifacts for this session, keyed by sha256(html) content hash.
   // Strictly session-scoped — never reused across sessions.
   htmlShares?: Record<string, import('@craft-agent/shared/protocol').HtmlShareInfo>
@@ -2209,6 +2211,8 @@ export class SessionManager implements ISessionManager {
       managed.enabledSourceSlugs = storedSession.enabledSourceSlugs
       managed.sharedUrl = storedSession.sharedUrl
       managed.sharedId = storedSession.sharedId
+      managed.sharedPasswordSet = storedSession.sharedPasswordSet
+      managed.htmlShares = storedSession.htmlShares
       // Sync name from disk - ensures title persistence across lazy loading
       managed.name = storedSession.name
       // Restore LLM connection state - ensures correct provider on resume
@@ -4025,12 +4029,18 @@ export class SessionManager implements ISessionManager {
   /**
    * Share session to the web viewer
    * Uploads session data and returns shareable URL
+   *
+   * When `password` is a non-empty string, the share is created behind a
+   * password gate on the viewer-server; assets uploaded for this share are
+   * gated with the same password so the full session round-trips uniformly.
    */
-  async shareToViewer(sessionId: string): Promise<import('@craft-agent/shared/protocol').ShareResult> {
+  async shareToViewer(sessionId: string, password?: string | null): Promise<import('@craft-agent/shared/protocol').ShareResult> {
     const managed = this.sessions.get(sessionId)
     if (!managed) {
       return { success: false, error: 'Session not found' }
     }
+
+    const hasPassword = typeof password === 'string' && password.length > 0
 
     // Signal async operation start for shimmer effect
     managed.isAsyncOperationOngoing = true
@@ -4053,15 +4063,18 @@ export class SessionManager implements ISessionManager {
       const assets = paths.length > 0
         ? await buildAssetsManifest(paths, VIEWER_URL, (path, error) => {
             sessionLog.warn(`Skipping unreadable asset for share: ${path}`, error)
-          })
+          }, hasPassword ? password : null)
         : {}
       if (Object.keys(assets).length > 0) {
         storedSession.assets = assets
       }
 
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (hasPassword) headers['X-Share-Password'] = password!
+
       const response = await fetch(`${VIEWER_URL}/s/api`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(storedSession)
       })
 
@@ -4073,22 +4086,24 @@ export class SessionManager implements ISessionManager {
         return { success: false, error: 'Failed to upload session' }
       }
 
-      const data = await response.json() as { id: string; url: string }
+      const data = await response.json() as { id: string; url: string; hasPassword?: boolean }
 
       // Store shared info in session
       managed.sharedUrl = data.url
       managed.sharedId = data.id
+      managed.sharedPasswordSet = data.hasPassword === true ? true : undefined
       const workspaceRootPath = managed.workspace.rootPath
       await updateSessionMetadata(workspaceRootPath, sessionId, {
         sharedUrl: data.url,
         sharedId: data.id,
+        sharedPasswordSet: data.hasPassword === true ? true : undefined,
         assets: Object.keys(assets).length > 0 ? assets : undefined,
       })
 
-      sessionLog.info(`Session ${sessionId} shared at ${data.url}`)
+      sessionLog.info(`Session ${sessionId} shared at ${data.url}${data.hasPassword ? ' (password-protected)' : ''}`)
       // Notify all windows for this workspace
       this.sendEvent({ type: 'session_shared', sessionId, sharedUrl: data.url }, managed.workspace.id)
-      return { success: true, url: data.url }
+      return { success: true, url: data.url, hasPassword: data.hasPassword === true }
     } catch (error) {
       sessionLog.error('Share error:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
@@ -4101,9 +4116,13 @@ export class SessionManager implements ISessionManager {
 
   /**
    * Update an existing shared session
-   * Re-uploads session data to the same URL
+   * Re-uploads session data to the same URL.
+   *
+   * When the share is gated, `password` must match so the viewer-server
+   * accepts the PUT / DELETE requests. Callers that skip the password get a
+   * 401 back as `{ success: false, error: 'password_required' | 'password_invalid' }`.
    */
-  async updateShare(sessionId: string): Promise<import('@craft-agent/shared/protocol').ShareResult> {
+  async updateShare(sessionId: string, password?: string | null): Promise<import('@craft-agent/shared/protocol').ShareResult> {
     const managed = this.sessions.get(sessionId)
     if (!managed) {
       return { success: false, error: 'Session not found' }
@@ -4111,6 +4130,8 @@ export class SessionManager implements ISessionManager {
     if (!managed.sharedId) {
       return { success: false, error: 'Session not shared' }
     }
+
+    const pwHeader = typeof password === 'string' && password.length > 0 ? password : null
 
     // Signal async operation start for shimmer effect
     managed.isAsyncOperationOngoing = true
@@ -4134,18 +4155,24 @@ export class SessionManager implements ISessionManager {
       const assets = paths.length > 0
         ? await buildAssetsManifest(paths, VIEWER_URL, (path, error) => {
             sessionLog.warn(`Skipping unreadable asset for update: ${path}`, error)
-          })
+          }, pwHeader)
         : {}
       storedSession.assets = Object.keys(assets).length > 0 ? assets : undefined
 
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (pwHeader) headers['X-Share-Password'] = pwHeader
+
       const response = await fetch(`${VIEWER_URL}/s/api/${managed.sharedId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(storedSession)
       })
 
       if (!response.ok) {
         sessionLog.error(`Update share failed with status ${response.status}`)
+        if (response.status === 401) {
+          return { success: false, error: pwHeader ? 'password_invalid' : 'password_required', hasPassword: true }
+        }
         if (response.status === 413) {
           return { success: false, error: 'Session file is too large to share' }
         }
@@ -4163,7 +4190,7 @@ export class SessionManager implements ISessionManager {
       }
       await Promise.all(
         [...orphanIds].map(id =>
-          deleteSharedAsset(VIEWER_URL, id).catch(err => {
+          deleteSharedAsset(VIEWER_URL, id, pwHeader).catch(err => {
             sessionLog.warn(`Failed to delete orphan asset ${id}`, err)
           })
         )
@@ -4174,7 +4201,7 @@ export class SessionManager implements ISessionManager {
       })
 
       sessionLog.info(`Session ${sessionId} share updated at ${managed.sharedUrl}`)
-      return { success: true, url: managed.sharedUrl }
+      return { success: true, url: managed.sharedUrl, hasPassword: managed.sharedPasswordSet === true ? true : undefined }
     } catch (error) {
       sessionLog.error('Update share error:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
@@ -4187,9 +4214,12 @@ export class SessionManager implements ISessionManager {
 
   /**
    * Revoke a shared session
-   * Deletes from viewer and clears local shared state
+   * Deletes from viewer and clears local shared state.
+   *
+   * Gated shares require `password` to pass the viewer-server gate — a missing
+   * or wrong password is surfaced so the UI can reprompt.
    */
-  async revokeShare(sessionId: string): Promise<import('@craft-agent/shared/protocol').ShareResult> {
+  async revokeShare(sessionId: string, password?: string | null): Promise<import('@craft-agent/shared/protocol').ShareResult> {
     const managed = this.sessions.get(sessionId)
     if (!managed) {
       return { success: false, error: 'Session not found' }
@@ -4197,6 +4227,8 @@ export class SessionManager implements ISessionManager {
     if (!managed.sharedId) {
       return { success: false, error: 'Session not shared' }
     }
+
+    const pwHeader = typeof password === 'string' && password.length > 0 ? password : null
 
     // Signal async operation start for shimmer effect
     managed.isAsyncOperationOngoing = true
@@ -4215,13 +4247,19 @@ export class SessionManager implements ISessionManager {
         if (id) assetIds.add(id)
       }
 
+      const headers: Record<string, string> = {}
+      if (pwHeader) headers['X-Share-Password'] = pwHeader
+
       const response = await fetch(
         `${VIEWER_URL}/s/api/${managed.sharedId}`,
-        { method: 'DELETE' }
+        { method: 'DELETE', headers }
       )
 
       if (!response.ok) {
         sessionLog.error(`Revoke failed with status ${response.status}`)
+        if (response.status === 401) {
+          return { success: false, error: pwHeader ? 'password_invalid' : 'password_required', hasPassword: true }
+        }
         return { success: false, error: 'Failed to revoke share' }
       }
 
@@ -4230,7 +4268,7 @@ export class SessionManager implements ISessionManager {
       // functionality and follow-up revokes will retry.
       await Promise.all(
         [...assetIds].map(id =>
-          deleteSharedAsset(VIEWER_URL, id).catch(err => {
+          deleteSharedAsset(VIEWER_URL, id, pwHeader).catch(err => {
             sessionLog.warn(`Failed to delete asset ${id} during revoke`, err)
           })
         )
@@ -4239,10 +4277,12 @@ export class SessionManager implements ISessionManager {
       // Clear shared info
       delete managed.sharedUrl
       delete managed.sharedId
+      delete managed.sharedPasswordSet
       const workspaceRootPath = managed.workspace.rootPath
       await updateSessionMetadata(workspaceRootPath, sessionId, {
         sharedUrl: undefined,
         sharedId: undefined,
+        sharedPasswordSet: undefined,
         assets: undefined,
       })
 
@@ -4260,6 +4300,68 @@ export class SessionManager implements ISessionManager {
     }
   }
 
+  /**
+   * Set, change, or remove the password on an already-shared session.
+   *
+   * - `newPassword == null` removes the gate (making the existing URL readable
+   *   without a password again).
+   * - When the session is already gated, `currentPassword` must be the correct
+   *   current one; otherwise the viewer-server returns 401 and we surface the
+   *   failure without touching local state.
+   *
+   * Leaves the content and URL intact; only the stored password hash changes.
+   */
+  async setSharePassword(
+    sessionId: string,
+    currentPassword: string | null | undefined,
+    newPassword: string | null,
+  ): Promise<import('@craft-agent/shared/protocol').ShareResult> {
+    const managed = this.sessions.get(sessionId)
+    if (!managed) {
+      return { success: false, error: 'Session not found' }
+    }
+    if (!managed.sharedId) {
+      return { success: false, error: 'Session not shared' }
+    }
+
+    try {
+      const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+      const response = await fetch(`${VIEWER_URL}/s/api/${managed.sharedId}/password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current: currentPassword ?? null, new: newPassword }),
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          return {
+            success: false,
+            error: currentPassword && currentPassword.length > 0 ? 'password_invalid' : 'password_required',
+            hasPassword: true,
+          }
+        }
+        if (response.status === 404) {
+          return { success: false, error: 'Shared session not found' }
+        }
+        return { success: false, error: `Password update failed (status ${response.status})` }
+      }
+
+      const data = await response.json() as { hasPassword?: boolean }
+      const hasPassword = data.hasPassword === true
+
+      managed.sharedPasswordSet = hasPassword ? true : undefined
+      await updateSessionMetadata(managed.workspace.rootPath, sessionId, {
+        sharedPasswordSet: hasPassword ? true : undefined,
+      })
+
+      sessionLog.info(`Session ${sessionId} password ${hasPassword ? 'updated' : 'removed'}`)
+      return { success: true, url: managed.sharedUrl, hasPassword }
+    } catch (error) {
+      sessionLog.error('setSharePassword error:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
   // ============================================
   // HTML Artifact Sharing (session-scoped)
   // ============================================
@@ -4267,8 +4369,12 @@ export class SessionManager implements ISessionManager {
   /**
    * Upload an HTML artifact for a session. Indexed by sha256(html) so repeated
    * shares of the same content from the same session return the same URL.
+   *
+   * When `password` is supplied, the viewer-server stores an argon2id hash and
+   * gates subsequent reads; the per-session record tracks that state so the UI
+   * can offer 'change/remove' paths without re-querying the server.
    */
-  async shareHtml(sessionId: string, html: string): Promise<import('@craft-agent/shared/protocol').ShareHtmlResult> {
+  async shareHtml(sessionId: string, html: string, password?: string | null): Promise<import('@craft-agent/shared/protocol').ShareHtmlResult> {
     const managed = this.sessions.get(sessionId)
     if (!managed) {
       return { success: false, error: 'Session not found' }
@@ -4277,6 +4383,7 @@ export class SessionManager implements ISessionManager {
       return { success: false, error: 'HTML body is empty' }
     }
 
+    const hasPassword = typeof password === 'string' && password.length > 0
     const contentHash = createHash('sha256').update(html).digest('hex')
     const existing = managed.htmlShares?.[contentHash]
     if (existing) {
@@ -4285,14 +4392,18 @@ export class SessionManager implements ISessionManager {
         sharedUrl: existing.sharedUrl,
         sharedId: existing.sharedId,
         contentHash,
+        hasPassword: existing.passwordSet === true,
       }
     }
 
     try {
       const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+      const headers: Record<string, string> = { 'Content-Type': 'text/html; charset=utf-8' }
+      if (hasPassword) headers['X-Share-Password'] = password!
+
       const response = await fetch(`${VIEWER_URL}/s/api/html`, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        headers,
         body: html,
       })
 
@@ -4304,14 +4415,18 @@ export class SessionManager implements ISessionManager {
         return { success: false, error: `Upload failed (status ${response.status})` }
       }
 
-      const data = await response.json() as { id: string; url: string }
-      const nextShares = { ...(managed.htmlShares ?? {}), [contentHash]: { sharedUrl: data.url, sharedId: data.id } }
+      const data = await response.json() as { id: string; url: string; hasPassword?: boolean }
+      const passwordSet = data.hasPassword === true
+      const nextShares = {
+        ...(managed.htmlShares ?? {}),
+        [contentHash]: { sharedUrl: data.url, sharedId: data.id, passwordSet: passwordSet ? true : undefined },
+      }
       managed.htmlShares = nextShares
       await updateSessionMetadata(managed.workspace.rootPath, sessionId, { htmlShares: nextShares })
 
-      sessionLog.info(`HTML artifact ${data.id} shared for session ${sessionId}`)
+      sessionLog.info(`HTML artifact ${data.id} shared for session ${sessionId}${passwordSet ? ' (password-protected)' : ''}`)
       this.sendEvent({ type: 'session_html_shares_changed', sessionId, htmlShares: nextShares }, managed.workspace.id)
-      return { success: true, sharedUrl: data.url, sharedId: data.id, contentHash }
+      return { success: true, sharedUrl: data.url, sharedId: data.id, contentHash, hasPassword: passwordSet }
     } catch (error) {
       sessionLog.error('shareHtml error:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
@@ -4321,8 +4436,11 @@ export class SessionManager implements ISessionManager {
   /**
    * Overwrite an existing HTML artifact with new content. Re-indexes the share
    * under the new content hash while keeping the same sharedId (and therefore URL).
+   *
+   * When the artifact is gated, `password` must match so the viewer-server
+   * accepts the PUT.
    */
-  async updateHtml(sessionId: string, sharedId: string, html: string): Promise<import('@craft-agent/shared/protocol').ShareHtmlResult> {
+  async updateHtml(sessionId: string, sharedId: string, html: string, password?: string | null): Promise<import('@craft-agent/shared/protocol').ShareHtmlResult> {
     const managed = this.sessions.get(sessionId)
     if (!managed) {
       return { success: false, error: 'Session not found' }
@@ -4336,17 +4454,24 @@ export class SessionManager implements ISessionManager {
       return { success: false, error: 'HTML share not found' }
     }
     const [previousHash, existing] = existingEntry
+    const pwHeader = typeof password === 'string' && password.length > 0 ? password : null
 
     try {
       const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+      const headers: Record<string, string> = { 'Content-Type': 'text/html; charset=utf-8' }
+      if (pwHeader) headers['X-Share-Password'] = pwHeader
+
       const response = await fetch(`${VIEWER_URL}/s/api/html/${sharedId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        headers,
         body: html,
       })
 
       if (!response.ok) {
         sessionLog.error(`HTML update share failed with status ${response.status}`)
+        if (response.status === 401) {
+          return { success: false, error: pwHeader ? 'password_invalid' : 'password_required' }
+        }
         if (response.status === 404) {
           return { success: false, error: 'Shared HTML not found' }
         }
@@ -4359,13 +4484,14 @@ export class SessionManager implements ISessionManager {
       const contentHash = createHash('sha256').update(html).digest('hex')
       const nextShares = { ...(managed.htmlShares ?? {}) }
       if (previousHash !== contentHash) delete nextShares[previousHash]
-      nextShares[contentHash] = { sharedUrl: existing.sharedUrl, sharedId }
+      const passwordSet = existing.passwordSet === true
+      nextShares[contentHash] = { sharedUrl: existing.sharedUrl, sharedId, passwordSet: passwordSet ? true : undefined }
       managed.htmlShares = nextShares
       await updateSessionMetadata(managed.workspace.rootPath, sessionId, { htmlShares: nextShares })
 
       sessionLog.info(`HTML artifact ${sharedId} updated for session ${sessionId}`)
       this.sendEvent({ type: 'session_html_shares_changed', sessionId, htmlShares: nextShares }, managed.workspace.id)
-      return { success: true, sharedUrl: existing.sharedUrl, sharedId, contentHash }
+      return { success: true, sharedUrl: existing.sharedUrl, sharedId, contentHash, hasPassword: passwordSet }
     } catch (error) {
       sessionLog.error('updateHtml error:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
@@ -4373,7 +4499,7 @@ export class SessionManager implements ISessionManager {
   }
 
   /** Revoke a previously shared HTML artifact. */
-  async revokeHtml(sessionId: string, sharedId: string): Promise<import('@craft-agent/shared/protocol').RevokeHtmlResult> {
+  async revokeHtml(sessionId: string, sharedId: string, password?: string | null): Promise<import('@craft-agent/shared/protocol').RevokeHtmlResult> {
     const managed = this.sessions.get(sessionId)
     if (!managed) {
       return { success: false, error: 'Session not found' }
@@ -4384,14 +4510,20 @@ export class SessionManager implements ISessionManager {
       return { success: false, error: 'HTML share not found' }
     }
     const [hash] = existingEntry
+    const pwHeader = typeof password === 'string' && password.length > 0 ? password : null
 
     try {
       const { VIEWER_URL } = await import('@craft-agent/shared/branding')
-      const response = await fetch(`${VIEWER_URL}/s/api/html/${sharedId}`, { method: 'DELETE' })
+      const headers: Record<string, string> = {}
+      if (pwHeader) headers['X-Share-Password'] = pwHeader
+      const response = await fetch(`${VIEWER_URL}/s/api/html/${sharedId}`, { method: 'DELETE', headers })
 
       // Treat 404 as "already gone" — local state should still be cleared.
       if (!response.ok && response.status !== 404) {
         sessionLog.error(`HTML revoke failed with status ${response.status}`)
+        if (response.status === 401) {
+          return { success: false, error: pwHeader ? 'password_invalid' : 'password_required' }
+        }
         return { success: false, error: `Revoke failed (status ${response.status})` }
       }
 
@@ -4405,6 +4537,67 @@ export class SessionManager implements ISessionManager {
       return { success: true }
     } catch (error) {
       sessionLog.error('revokeHtml error:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
+  /**
+   * Set, change, or remove the password on a single HTML artifact. Mirrors
+   * `setSharePassword` but scoped to the `htmlShares[hash]` entry; the URL and
+   * content are left intact.
+   */
+  async setHtmlSharePassword(
+    sessionId: string,
+    sharedId: string,
+    currentPassword: string | null | undefined,
+    newPassword: string | null,
+  ): Promise<import('@craft-agent/shared/protocol').ShareHtmlResult> {
+    const managed = this.sessions.get(sessionId)
+    if (!managed) {
+      return { success: false, error: 'Session not found' }
+    }
+
+    const existingEntry = Object.entries(managed.htmlShares ?? {}).find(([, v]) => v.sharedId === sharedId)
+    if (!existingEntry) {
+      return { success: false, error: 'HTML share not found' }
+    }
+    const [contentHash, existing] = existingEntry
+
+    try {
+      const { VIEWER_URL } = await import('@craft-agent/shared/branding')
+      const response = await fetch(`${VIEWER_URL}/s/api/html/${sharedId}/password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current: currentPassword ?? null, new: newPassword }),
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          return {
+            success: false,
+            error: currentPassword && currentPassword.length > 0 ? 'password_invalid' : 'password_required',
+          }
+        }
+        if (response.status === 404) {
+          return { success: false, error: 'Shared HTML not found' }
+        }
+        return { success: false, error: `Password update failed (status ${response.status})` }
+      }
+
+      const data = await response.json() as { hasPassword?: boolean }
+      const hasPassword = data.hasPassword === true
+      const nextShares = {
+        ...(managed.htmlShares ?? {}),
+        [contentHash]: { sharedUrl: existing.sharedUrl, sharedId, passwordSet: hasPassword ? true : undefined },
+      }
+      managed.htmlShares = nextShares
+      await updateSessionMetadata(managed.workspace.rootPath, sessionId, { htmlShares: nextShares })
+
+      sessionLog.info(`HTML artifact ${sharedId} password ${hasPassword ? 'updated' : 'removed'}`)
+      this.sendEvent({ type: 'session_html_shares_changed', sessionId, htmlShares: nextShares }, managed.workspace.id)
+      return { success: true, sharedUrl: existing.sharedUrl, sharedId, contentHash, hasPassword }
+    } catch (error) {
+      sessionLog.error('setHtmlSharePassword error:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
   }

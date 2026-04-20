@@ -43,6 +43,8 @@ export type BuiltInStatusId = 'todo' | 'in-progress' | 'needs-review' | 'done' |
 export interface HtmlShareInfo {
   sharedUrl: string
   sharedId: string
+  /** True when this HTML artifact is currently password-protected. */
+  passwordSet?: boolean
 }
 
 /**
@@ -77,6 +79,8 @@ export interface Session {
   sessionFolderPath?: string
   sharedUrl?: string
   sharedId?: string
+  /** True when the shared session is currently password-protected. */
+  sharedPasswordSet?: boolean
   /**
    * Shared HTML artifacts for this session, keyed by sha256(html) content hash.
    * Strictly session-scoped — shares never travel across sessions.
@@ -248,12 +252,14 @@ export type SessionCommand =
   | { type: 'setLabels'; labels: string[] }
   | { type: 'showInFinder' }
   | { type: 'copyPath' }
-  | { type: 'shareToViewer' }
-  | { type: 'updateShare' }
-  | { type: 'revokeShare' }
-  | { type: 'shareHtml'; html: string }
-  | { type: 'updateHtml'; sharedId: string; html: string }
-  | { type: 'revokeHtml'; sharedId: string }
+  | { type: 'shareToViewer'; password?: string }
+  | { type: 'updateShare'; password?: string }
+  | { type: 'revokeShare'; password?: string }
+  | { type: 'setSharePassword'; currentPassword?: string; newPassword: string | null }
+  | { type: 'shareHtml'; html: string; password?: string }
+  | { type: 'updateHtml'; sharedId: string; html: string; password?: string }
+  | { type: 'revokeHtml'; sharedId: string; password?: string }
+  | { type: 'setHtmlSharePassword'; sharedId: string; currentPassword?: string; newPassword: string | null }
   | { type: 'refreshTitle' }
   | { type: 'setConnection'; connectionSlug: string }
   | { type: 'setPendingPlanExecution'; planPath: string; draftInputSnapshot?: string }
@@ -459,15 +465,19 @@ export interface ShareResult {
   success: boolean
   url?: string
   error?: string
+  /** True when the share is currently password-protected. Absent means "not changed / unknown". */
+  hasPassword?: boolean
 }
 
 /**
  * Result of a shareHtml / updateHtml session command.
  * On success, returns the public URL and stable sharedId; shareHtml also
  * returns the contentHash under which the share is indexed.
+ *
+ * `hasPassword` reflects the current gate state of the artifact on success.
  */
 export type ShareHtmlResult =
-  | { success: true; sharedUrl: string; sharedId: string; contentHash: string }
+  | { success: true; sharedUrl: string; sharedId: string; contentHash: string; hasPassword?: boolean }
   | { success: false; error: string }
 
 /** Result of a revokeHtml session command. */

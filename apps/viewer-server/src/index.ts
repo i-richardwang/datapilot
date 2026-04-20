@@ -134,7 +134,7 @@ const server = Bun.serve({
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Headers': 'Content-Type, X-Share-Password',
         },
       })
     }
@@ -155,7 +155,7 @@ const server = Bun.serve({
 
     // HTML artifact routes: GET /s/h/{id} — must come before SPA fallback
     if (req.method === 'GET') {
-      const htmlResponse = await handleHtmlArtifactRoute(storage, path)
+      const htmlResponse = await handleHtmlArtifactRoute(storage, req, path)
       if (htmlResponse) {
         htmlResponse.headers.set('Access-Control-Allow-Origin', '*')
         return htmlResponse

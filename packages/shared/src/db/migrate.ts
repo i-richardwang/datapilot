@@ -211,6 +211,14 @@ const WORKSPACE_MIGRATIONS: Migration[] = [
       ALTER TABLE sessions ADD COLUMN assets TEXT;
     `,
   },
+  {
+    name: '0004_shared_password_set',
+    sql: `
+      -- Boolean flag indicating whether the shared session is password-protected
+      -- on the viewer-server. The hash itself lives on the viewer-server only.
+      ALTER TABLE sessions ADD COLUMN shared_password_set INTEGER;
+    `,
+  },
 ];
 
 /**

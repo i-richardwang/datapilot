@@ -33,6 +33,11 @@ export interface SessionMeta {
   sharedUrl?: string
   /** Shared session ID in viewer (for revoke) */
   sharedId?: string
+  /**
+   * True when the shared session is currently password-protected on the
+   * viewer-server. Drives the lock icon + set/change/remove menu items.
+   */
+  sharedPasswordSet?: boolean
   /** ID of the last final (non-intermediate) assistant message - for unread detection */
   lastFinalMessageId?: string
   /**

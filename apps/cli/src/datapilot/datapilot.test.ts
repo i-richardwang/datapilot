@@ -836,6 +836,57 @@ describe('datapilot CLI', () => {
     }
   })
 
+  it('session share <id> --password <pw> forwards password to sessions:share', async () => {
+    let lastArgs: unknown[] = []
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'sessions:share': (args) => {
+          lastArgs = args
+          return { url: 'https://share.example.com/sess-abc', id: 'sess-abc', hasPassword: true }
+        },
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'session', 'share', 'sess-abc', '--password', 'hunter2',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    expect(lastArgs[0]).toBe('ws-1')
+    expect(lastArgs[1]).toBe('sess-abc')
+    expect(lastArgs[2]).toBe('hunter2')
+  })
+
+  it('session share <id> --html <file> --password <pw> forwards password to sessions:shareHtml', async () => {
+    const htmlPath = join(tmpdir(), `datapilot-test-${Date.now()}.html`)
+    await writeFile(htmlPath, '<html><body>locked</body></html>')
+    try {
+      let lastArgs: unknown[] = []
+      server = startMockServer({
+        handlers: {
+          'workspaces:get': () => [{ id: 'ws-1' }],
+          'window:switchWorkspace': () => undefined,
+          'sessions:shareHtml': (args) => {
+            lastArgs = args
+            return { url: 'https://share.example.com/html-abc', id: 'html-abc', hasPassword: true }
+          },
+        },
+      })
+      const r = await runCli([
+        '--url', server.url, '--token', 't', '--json',
+        'session', 'share', 'sess-abc', '--html', htmlPath, '--password', 'hunter2',
+      ])
+      expect(r.exitCode).toBe(0)
+      expect(r.envelope?.ok).toBe(true)
+      expect(lastArgs[2]).toContain('<html>')
+      expect(lastArgs[3]).toBe('hunter2')
+    } finally {
+      await unlink(htmlPath).catch(() => undefined)
+    }
+  })
+
   it('session share without id returns USAGE_ERROR with suggestion', async () => {
     server = startMockServer({
       handlers: {

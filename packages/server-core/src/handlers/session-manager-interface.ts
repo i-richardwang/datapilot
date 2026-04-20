@@ -128,17 +128,35 @@ export interface ISessionManager {
   // Sharing
   // ---------------------------------------------------------------------------
 
-  shareToViewer(sessionId: string): Promise<ShareResult>
-  updateShare(sessionId: string): Promise<ShareResult>
-  revokeShare(sessionId: string): Promise<ShareResult>
+  shareToViewer(sessionId: string, password?: string | null): Promise<ShareResult>
+  updateShare(sessionId: string, password?: string | null): Promise<ShareResult>
+  revokeShare(sessionId: string, password?: string | null): Promise<ShareResult>
+  /**
+   * Set, change, or remove the password on an already-shared session. When the
+   * session currently has a password, callers must supply `currentPassword` for
+   * the rewrite to succeed (so URL possession alone can't strip the gate).
+   * Pass `newPassword: null` to remove the gate entirely.
+   */
+  setSharePassword(
+    sessionId: string,
+    currentPassword: string | null | undefined,
+    newPassword: string | null,
+  ): Promise<ShareResult>
 
   /**
    * HTML artifact sharing — per-session map keyed by sha256(html).
    * Result shapes align with ShareHtmlResult / RevokeHtmlResult.
    */
-  shareHtml(sessionId: string, html: string): Promise<ShareHtmlResult>
-  updateHtml(sessionId: string, sharedId: string, html: string): Promise<ShareHtmlResult>
-  revokeHtml(sessionId: string, sharedId: string): Promise<RevokeHtmlResult>
+  shareHtml(sessionId: string, html: string, password?: string | null): Promise<ShareHtmlResult>
+  updateHtml(sessionId: string, sharedId: string, html: string, password?: string | null): Promise<ShareHtmlResult>
+  revokeHtml(sessionId: string, sharedId: string, password?: string | null): Promise<RevokeHtmlResult>
+  /** Same semantics as setSharePassword but for a single HTML artifact. */
+  setHtmlSharePassword(
+    sessionId: string,
+    sharedId: string,
+    currentPassword: string | null | undefined,
+    newPassword: string | null,
+  ): Promise<ShareHtmlResult>
 
   // ---------------------------------------------------------------------------
   // Export / Import

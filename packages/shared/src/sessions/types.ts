@@ -37,7 +37,7 @@ export const SESSION_PERSISTENT_FIELDS = [
   // Model/Connection
   'model', 'llmConnection', 'connectionLocked', 'thinkingLevel',
   // Sharing
-  'sharedUrl', 'sharedId', 'htmlShares', 'assets',
+  'sharedUrl', 'sharedId', 'sharedPasswordSet', 'htmlShares', 'assets',
   // Plan execution
   'pendingPlanExecution',
   // Archive
@@ -100,6 +100,12 @@ export type { StoredMessage } from '@craft-agent/core/types';
 export interface HtmlShareInfo {
   sharedUrl: string;
   sharedId: string;
+  /**
+   * True when this HTML artifact is currently protected by a password.
+   * Absent/false = anyone with the URL can view. Only the boolean is stored
+   * locally — the hash lives on the viewer-server.
+   */
+  passwordSet?: boolean;
 }
 
 /**
@@ -159,6 +165,12 @@ export interface SessionConfig {
   sharedUrl?: string;
   /** Shared session ID in viewer (for revoke) */
   sharedId?: string;
+  /**
+   * True when the shared session is currently protected by a password. Absent
+   * on legacy shares (back-compat: no sidecar = no password). The hash itself
+   * never lives on the sharer's disk — only this boolean summary does.
+   */
+  sharedPasswordSet?: boolean;
   /**
    * Shared HTML artifacts for this session, keyed by sha256(html) content hash.
    * Strictly session-scoped: shares are not reused across sessions.
@@ -291,6 +303,11 @@ export interface SessionHeader {
   /** Shared session ID in viewer (for revoke) */
   sharedId?: string;
   /**
+   * True when the shared session is currently protected by a password.
+   * Mirrored from SessionConfig for fast session list rendering.
+   */
+  sharedPasswordSet?: boolean;
+  /**
    * Shared HTML artifacts for this session, keyed by sha256(html) content hash.
    * Strictly session-scoped: shares are not reused across sessions.
    */
@@ -384,6 +401,11 @@ export interface SessionMetadata {
   sharedUrl?: string;
   /** Shared session ID in viewer (for revoke) */
   sharedId?: string;
+  /**
+   * True when the shared session is currently protected by a password.
+   * Surfaces on the session list so the "Shared" badge can render a lock icon.
+   */
+  sharedPasswordSet?: boolean;
   /**
    * Shared HTML artifacts for this session, keyed by sha256(html) content hash.
    * Strictly session-scoped: shares are not reused across sessions.

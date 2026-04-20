@@ -98,14 +98,15 @@ export async function routeSession(
     }
 
     case 'share': {
-      rejectUnknownFlags(flags, ['html'])
+      rejectUnknownFlags(flags, ['html', 'password'])
       const id = positionals[0] ?? process.env.CRAFT_SESSION_ID
       if (!id) {
         fail('USAGE_ERROR', 'Missing session id', {
-          suggestion: 'dtpilot session share <id> [--html <file>]',
+          suggestion: 'dtpilot session share <id> [--html <file>] [--password <pw>]',
         })
       }
       const htmlPath = strFlag(flags, 'html')
+      const password = strFlag(flags, 'password') ?? null
       const ws = await requireWorkspace(ctx)
       if (htmlPath) {
         let html: string
@@ -115,9 +116,9 @@ export async function routeSession(
           fail('NOT_FOUND', `Cannot read ${htmlPath}: ${(e as Error).message}`)
         }
         if (html.length === 0) fail('VALIDATION_ERROR', 'HTML file is empty')
-        ok(await client.invoke('sessions:shareHtml', ws, id, html))
+        ok(await client.invoke('sessions:shareHtml', ws, id, html, password))
       }
-      ok(await client.invoke('sessions:share', ws, id))
+      ok(await client.invoke('sessions:share', ws, id, password))
     }
   }
 
