@@ -1,5 +1,5 @@
 {
-  "name": "datapilot-cli",
+  "name": "dtpilot",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "description": "Thin CLI client for the DataPilot server — unified agent-friendly commands over WebSocket.",

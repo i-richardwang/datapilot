@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Build script for the `datapilot-cli` npm package.
+ * Build script for the `dtpilot` npm package.
  *
  * Produces a single-file ESM bundle at `dist/datapilot.js` that can run on
  * Node.js >=22 with no external dependencies. The vendored copies in

@@ -1,12 +1,14 @@
-# datapilot-cli
+# dtpilot
 
 Thin CLI client for a running [DataPilot](https://github.com/i-richardwang/datapilot) server. The CLI is designed to be driven by external agent tools (Claude Code, Codex, etc.) — every capability is reachable through a uniform `entity action` grammar with flat flags for identity and JSON input for data.
 
 ## Install
 
 ```bash
-npm install -g datapilot-cli
+npm install -g dtpilot
 ```
+
+The package is published as `dtpilot` (short form); the installed binary is `datapilot`.
 
 Requires **Node.js ≥ 22** (for native `WebSocket` and `crypto.randomUUID`). No runtime dependencies are pulled in.
 
