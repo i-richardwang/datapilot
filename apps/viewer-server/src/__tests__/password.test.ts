@@ -159,7 +159,7 @@ describe('viewer-server password protection', () => {
       expect(delOk!.status).toBe(200)
     })
 
-    it('password-change endpoint sets, rotates, and removes the password', async () => {
+    it('password-change endpoint rotates and removes the password (but not first-time-set)', async () => {
       // Create without password
       const created = await handleApi(
         new Request(`${BASE_URL}/s/api`, {
@@ -171,8 +171,8 @@ describe('viewer-server password protection', () => {
       )
       const { id } = (await created!.json()) as { id: string }
 
-      // Set password (no current needed because none is set yet)
-      const set = await handleApi(
+      // First-time-set is rejected — must use share-with-password at creation time
+      const setBad = await handleApi(
         new Request(`${BASE_URL}/s/api/${id}/password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -180,55 +180,71 @@ describe('viewer-server password protection', () => {
         }),
         `/s/api/${id}/password`,
       )
-      expect(set!.status).toBe(200)
-      expect(await set!.json()).toEqual({ hasPassword: true })
+      expect(setBad!.status).toBe(400)
+      expect(await setBad!.json()).toEqual({ error: 'password_already_set' })
+
+      // Share still works without password (no hash was written)
+      const stillOpen = await handleApi(new Request(`${BASE_URL}/s/api/${id}`), `/s/api/${id}`)
+      expect(stillOpen!.status).toBe(200)
+
+      // To set a password, user must unshare and re-share with password at creation time.
+      // For this test, create a new share with password via header
+      const withPw = await handleApi(
+        new Request(`${BASE_URL}/s/api`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Share-Password': 'first' },
+          body: JSON.stringify({ v: 2 }),
+        }),
+        '/s/api',
+      )
+      const { id: id2 } = (await withPw!.json()) as { id: string }
 
       // Rotate password — wrong current is rejected
       const rotateBad = await handleApi(
-        new Request(`${BASE_URL}/s/api/${id}/password`, {
+        new Request(`${BASE_URL}/s/api/${id2}/password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ current: 'wrong', new: 'second' }),
         }),
-        `/s/api/${id}/password`,
+        `/s/api/${id2}/password`,
       )
       expect(rotateBad!.status).toBe(401)
 
       // Rotate password — correct current accepted
       const rotate = await handleApi(
-        new Request(`${BASE_URL}/s/api/${id}/password`, {
+        new Request(`${BASE_URL}/s/api/${id2}/password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ current: 'first', new: 'second' }),
         }),
-        `/s/api/${id}/password`,
+        `/s/api/${id2}/password`,
       )
       expect(rotate!.status).toBe(200)
 
       // Remove password — requires correct current
       const removeBad = await handleApi(
-        new Request(`${BASE_URL}/s/api/${id}/password`, {
+        new Request(`${BASE_URL}/s/api/${id2}/password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ current: null, new: null }),
         }),
-        `/s/api/${id}/password`,
+        `/s/api/${id2}/password`,
       )
       expect(removeBad!.status).toBe(401)
 
       const remove = await handleApi(
-        new Request(`${BASE_URL}/s/api/${id}/password`, {
+        new Request(`${BASE_URL}/s/api/${id2}/password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ current: 'second', new: null }),
         }),
-        `/s/api/${id}/password`,
+        `/s/api/${id2}/password`,
       )
       expect(remove!.status).toBe(200)
       expect(await remove!.json()).toEqual({ hasPassword: false })
 
       // After removal, GET works without a password.
-      const afterRemove = await handleApi(new Request(`${BASE_URL}/s/api/${id}`), `/s/api/${id}`)
+      const afterRemove = await handleApi(new Request(`${BASE_URL}/s/api/${id2}`), `/s/api/${id2}`)
       expect(afterRemove!.status).toBe(200)
     })
 
@@ -408,6 +424,37 @@ describe('viewer-server password protection', () => {
       expect(res!.status).toBe(200)
       expect(await res!.text()).toBe('<!doctype html><p>public</p>')
     })
+
+    it('first-time-set password on unprotected HTML artifact is rejected', async () => {
+      const created = await handleApi(
+        new Request(`${BASE_URL}/s/api/html`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          body: '<!doctype html><p>public</p>',
+        }),
+        '/s/api/html',
+      )
+      const { id } = (await created!.json()) as { id: string }
+
+      const setBad = await handleApi(
+        new Request(`${BASE_URL}/s/api/html/${id}/password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ current: null, new: 'x' }),
+        }),
+        `/s/api/html/${id}/password`,
+      )
+      expect(setBad!.status).toBe(400)
+      expect(await setBad!.json()).toEqual({ error: 'password_already_set' })
+
+      // Still accessible without password
+      const stillOpen = await handleHtmlArtifactRoute(
+        storage,
+        new Request(`${BASE_URL}/s/h/${id}`, { headers: { Accept: 'text/html' } }),
+        `/s/h/${id}`,
+      )
+      expect(stillOpen!.status).toBe(200)
+    })
   })
 
   // ---------------------------------------------------------------------
@@ -449,6 +496,37 @@ describe('viewer-server password protection', () => {
       )
       expect(ok!.status).toBe(200)
       expect(await ok!.text()).toBe('hello-bytes')
+    })
+
+    it('first-time-set password on unprotected asset is rejected', async () => {
+      const bytes = new TextEncoder().encode('public-data')
+      const created = await handleAsset(
+        new Request(`${BASE_URL}/s/a`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+          body: bytes,
+        }),
+        '/s/a',
+      )
+      const { id } = (await created!.json()) as { id: string }
+
+      const setBad = await handleApi(
+        new Request(`${BASE_URL}/s/api/asset/${id}/password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ current: null, new: 'x' }),
+        }),
+        `/s/api/asset/${id}/password`,
+      )
+      expect(setBad!.status).toBe(400)
+      expect(await setBad!.json()).toEqual({ error: 'password_already_set' })
+
+      // Still accessible without password
+      const stillOpen = await handleAsset(
+        new Request(`${BASE_URL}/s/a/${id}`, { method: 'GET', headers: { Accept: '*/*' } }),
+        `/s/a/${id}`,
+      )
+      expect(stillOpen!.status).toBe(200)
     })
   })
 })

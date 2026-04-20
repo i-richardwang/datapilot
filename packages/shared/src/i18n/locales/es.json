@@ -403,7 +403,6 @@
   "dialog.sharePassword.newPlaceholder": "Introduce la nueva contraseña",
   "dialog.sharePassword.remove": "Quitar contraseña",
   "dialog.sharePassword.saveAction": "Guardar",
-  
   "dialog.sharePassword.shareAction": "Compartir",
   "dialog.sharePassword.shareDescription": "Protege este enlace compartido con una contraseña. Quien abra el enlace deberá introducirla.",
   "dialog.sharePassword.shareTitle": "Compartir con contraseña",
@@ -755,7 +754,6 @@
   "sessionMenu.openInNewWindow": "Abrir en nueva ventana",
   "sessionMenu.regenerateTitle": "Regenerar título",
   "sessionMenu.sendToWorkspace": "Enviar a Workspace...",
-  
   "sessionMenu.share": "Compartir",
   "sessionMenu.sharePublic": "Compartir sin contraseña",
   "sessionMenu.shareWithPassword": "Compartir con contraseña…",

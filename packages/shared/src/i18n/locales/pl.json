@@ -403,7 +403,6 @@
   "dialog.sharePassword.newPlaceholder": "Wprowadź nowe hasło",
   "dialog.sharePassword.remove": "Usuń hasło",
   "dialog.sharePassword.saveAction": "Zapisz",
-  
   "dialog.sharePassword.shareAction": "Udostępnij",
   "dialog.sharePassword.shareDescription": "Zabezpiecz ten udostępniony link hasłem. Każdy, kto otworzy link, będzie musiał je wprowadzić.",
   "dialog.sharePassword.shareTitle": "Udostępnij z hasłem",
@@ -755,7 +754,6 @@
   "sessionMenu.openInNewWindow": "Otwórz w nowym oknie",
   "sessionMenu.regenerateTitle": "Wygeneruj tytuł ponownie",
   "sessionMenu.sendToWorkspace": "Wyślij do Workspace...",
-  
   "sessionMenu.share": "Udostępnij",
   "sessionMenu.sharePublic": "Udostępnij bez hasła",
   "sessionMenu.shareWithPassword": "Udostępnij z hasłem…",

@@ -403,7 +403,6 @@
   "dialog.sharePassword.newPlaceholder": "Add meg az új jelszót",
   "dialog.sharePassword.remove": "Jelszó eltávolítása",
   "dialog.sharePassword.saveAction": "Mentés",
-  
   "dialog.sharePassword.shareAction": "Megosztás",
   "dialog.sharePassword.shareDescription": "Védd meg ezt a megosztott linket jelszóval. Mindenkinek, aki megnyitja a linket, meg kell adnia azt.",
   "dialog.sharePassword.shareTitle": "Megosztás jelszóval",
@@ -755,7 +754,6 @@
   "sessionMenu.openInNewWindow": "Megnyitás új ablakban",
   "sessionMenu.regenerateTitle": "Cím újragenerálása",
   "sessionMenu.sendToWorkspace": "Küldés munkaterületre...",
-  
   "sessionMenu.share": "Megosztás",
   "sessionMenu.sharePublic": "Megosztás jelszó nélkül",
   "sessionMenu.shareWithPassword": "Megosztás jelszóval…",
