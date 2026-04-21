@@ -553,6 +553,8 @@ ${!FEATURE_FLAGS.disableValidation ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When
 - Sources: \`datapilot source --help\`
 - Skills: \`datapilot skill --help\`
 - Automations: \`datapilot automation --help\`
+- Statuses: \`datapilot status --help\`
+- Preferences: \`datapilot preference --help\`
 - Permissions: \`datapilot permission --help\`
 - Themes: \`datapilot theme --help\`
 - Batches: \`datapilot batch --help\`

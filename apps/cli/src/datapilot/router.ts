@@ -17,6 +17,8 @@ export const ENTITIES = [
   'batch',
   'session',
   'workspace',
+  'status',
+  'preference',
 ] as const
 
 export type Entity = typeof ENTITIES[number]

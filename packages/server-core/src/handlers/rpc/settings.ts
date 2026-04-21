@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'path'
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
-import { getPreferencesPath, getSessionDraft, setSessionDraft, deleteSessionDraft, getAllSessionDrafts, getWorkspaceByNameOrId, getDefaultThinkingLevel, setDefaultThinkingLevel } from '@craft-agent/shared/config'
+import { getPreferencesPath, getSessionDraft, setSessionDraft, deleteSessionDraft, getAllSessionDrafts, getWorkspaceByNameOrId, getDefaultThinkingLevel, setDefaultThinkingLevel, loadPreferences, updatePreferences, UserPreferencesSchema } from '@craft-agent/shared/config'
 import { isValidThinkingLevel, normalizeThinkingLevel } from '@craft-agent/shared/agent/thinking-levels'
 import { getWorkspaceOrThrow } from '@craft-agent/server-core/handlers'
 import type { RpcServer } from '@craft-agent/server-core/transport'
@@ -14,6 +14,8 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.workspace.SETTINGS_UPDATE,
   RPC_CHANNELS.preferences.READ,
   RPC_CHANNELS.preferences.WRITE,
+  RPC_CHANNELS.preferences.GET,
+  RPC_CHANNELS.preferences.UPDATE,
   RPC_CHANNELS.drafts.GET,
   RPC_CHANNELS.drafts.SET,
   RPC_CHANNELS.drafts.DELETE,
@@ -191,6 +193,25 @@ export function registerSettingsHandlers(server: RpcServer, deps: HandlerDeps): 
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
     }
+  })
+
+  // Get user preferences as a structured object (preferred for programmatic access)
+  server.handle(RPC_CHANNELS.preferences.GET, async () => {
+    return loadPreferences()
+  })
+
+  // Update user preferences (schema-validated partial merge)
+  server.handle(RPC_CHANNELS.preferences.UPDATE, async (_, updates: unknown) => {
+    const parsed = UserPreferencesSchema.partial().safeParse(updates)
+    if (!parsed.success) {
+      const detail = parsed.error.issues
+        .map((i) => `${i.path.join('.') || 'root'}: ${i.message}`)
+        .join('; ')
+      const err = new Error(`Invalid preferences input: ${detail}`)
+      ;(err as { code?: string }).code = 'VALIDATION_ERROR'
+      throw err
+    }
+    return updatePreferences(parsed.data)
   })
 
   // ============================================================

@@ -31,6 +31,8 @@ import { routeSkill } from './datapilot/commands/skill.ts'
 import { routeBatch } from './datapilot/commands/batch.ts'
 import { routeSession } from './datapilot/commands/session.ts'
 import { routeWorkspace } from './datapilot/commands/workspace.ts'
+import { routeStatus } from './datapilot/commands/status.ts'
+import { routePreference } from './datapilot/commands/preference.ts'
 
 const VERSION = '0.1.1'
 
@@ -80,6 +82,8 @@ export async function main(argv: string[] = process.argv): Promise<void> {
       case 'batch': await routeBatch(ctx, args.action, args.positionals, args.flags); break
       case 'session': await routeSession(ctx, args.action, args.positionals, args.flags); break
       case 'workspace': await routeWorkspace(ctx, args.action, args.positionals, args.flags); break
+      case 'status': await routeStatus(ctx, args.action, args.positionals, args.flags); break
+      case 'preference': await routePreference(ctx, args.action, args.positionals, args.flags); break
     }
   } catch (e) {
     if (e instanceof ConnectionError) {
@@ -88,7 +92,13 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     if (e instanceof UsageError) {
       fail('USAGE_ERROR', e.message)
     }
+    // RPC errors from the server carry a `.code` property — surface
+    // `VALIDATION_ERROR` / `NOT_FOUND` directly instead of collapsing into
+    // `INTERNAL_ERROR`, so schema failures are actionable to callers.
+    const rpcCode = (e as { code?: unknown })?.code
     const msg = e instanceof Error ? e.message : String(e)
+    if (rpcCode === 'VALIDATION_ERROR') fail('VALIDATION_ERROR', msg)
+    if (rpcCode === 'NOT_FOUND') fail('NOT_FOUND', msg)
     fail('INTERNAL_ERROR', msg)
   } finally {
     ctx.destroyClient()
@@ -159,6 +169,8 @@ Entities:
   batch                  Batch processing jobs
   session                Sessions inside a workspace
   workspace              Workspaces themselves
+  status                 Workspace session statuses
+  preference             User preferences (name, timezone, language, notes)
 
 Run 'dtpilot <entity>' with no action to list that entity's actions.
 

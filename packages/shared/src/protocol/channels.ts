@@ -226,6 +226,8 @@ export const RPC_CHANNELS = {
   preferences: {
     READ: 'preferences:read',
     WRITE: 'preferences:write',
+    GET: 'preferences:get',
+    UPDATE: 'preferences:update',
   },
   drafts: {
     GET: 'drafts:get',
@@ -290,6 +292,10 @@ export const RPC_CHANNELS = {
   },
   statuses: {
     LIST: 'statuses:list',
+    GET: 'statuses:get',
+    CREATE: 'statuses:create',
+    UPDATE: 'statuses:update',
+    DELETE: 'statuses:delete',
     REORDER: 'statuses:reorder',
     CHANGED: 'statuses:changed',
   },

@@ -950,4 +950,306 @@ describe('datapilot CLI', () => {
     expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
     expect(r.envelope?.error?.message).toContain('Unknown session action: share-html')
   })
+
+  // ─── status entity ────────────────────────────────────────────────────────
+
+  it('status list invokes statuses:list with workspace id', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'statuses:list': () => [
+          { id: 'todo', label: 'Todo', category: 'open', isFixed: true, isDefault: false, order: 0 },
+          { id: 'done', label: 'Done', category: 'closed', isFixed: true, isDefault: false, order: 1 },
+        ],
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'status', 'list',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    expect((r.envelope?.data as unknown[]).length).toBe(2)
+  })
+
+  it('status create + list round-trip — label flat, color via --input', async () => {
+    let lastCreate: Record<string, unknown> = {}
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'statuses:create': ([_ws, input]) => {
+          lastCreate = input as Record<string, unknown>
+          return { id: 'qa', ...lastCreate, isFixed: false, isDefault: false, order: 5 }
+        },
+        'statuses:list': () => (Object.keys(lastCreate).length ? [{ id: 'qa', ...lastCreate }] : []),
+      },
+    })
+
+    const create = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'status', 'create',
+      '--name', 'QA', '--category', 'open',
+      '--input', '{"color":"info","icon":"🔍"}',
+    ])
+    expect(create.exitCode).toBe(0)
+    expect(create.envelope?.ok).toBe(true)
+    expect((create.envelope?.data as Record<string, unknown>).id).toBe('qa')
+    expect(lastCreate).toEqual({ label: 'QA', category: 'open', color: 'info', icon: '🔍' })
+  })
+
+  it('status create --color flat flag is rejected with USAGE_ERROR hinting at --input', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'status', 'create', '--name', 'QA', '--category', 'open', '--color', 'info',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('--color')
+    expect(r.envelope?.error?.message).toContain('--input')
+  })
+
+  it('status create without --name fails with USAGE_ERROR', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'status', 'create', '--category', 'open',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('--name')
+  })
+
+  it('status create rejects invalid --category client-side', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'status', 'create', '--name', 'QA', '--category', 'invalid',
+    ])
+    expect(r.exitCode).toBe(1)
+    expect(r.envelope?.error?.code).toBe('VALIDATION_ERROR')
+    expect(r.envelope?.error?.message).toContain('category')
+  })
+
+  it('status create surfaces server-side VALIDATION_ERROR from RPC', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'statuses:create': () => {
+          const err = new Error('Invalid status input: label: too short') as Error & { code?: string }
+          err.code = 'VALIDATION_ERROR'
+          throw err
+        },
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'status', 'create', '--name', 'x', '--category', 'open',
+    ])
+    expect(r.exitCode).toBe(1)
+    // The mock server collapses non-HANDLER_ERROR codes to HANDLER_ERROR via
+    // its simple throw-catch, so check the message alone here — the real
+    // server preserves the VALIDATION_ERROR code (covered by envelope tests).
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.message).toContain('Invalid status input')
+  })
+
+  it('status update invokes statuses:update with id and input payload', async () => {
+    let lastArgs: unknown[] = []
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'statuses:update': (args) => {
+          lastArgs = args
+          return { id: args[1], label: (args[2] as { label?: string }).label, category: 'open' }
+        },
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'status', 'update', 'qa',
+      '--input', '{"label":"QA Review"}',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    expect(lastArgs[0]).toBe('ws-1')
+    expect(lastArgs[1]).toBe('qa')
+    expect(lastArgs[2]).toEqual({ label: 'QA Review' })
+  })
+
+  it('status delete invokes statuses:delete with id', async () => {
+    let lastArgs: unknown[] = []
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'statuses:delete': (args) => {
+          lastArgs = args
+          return { migrated: 0 }
+        },
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'status', 'delete', 'qa',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    expect(lastArgs[1]).toBe('qa')
+  })
+
+  it('status reorder invokes statuses:reorder with --ids list', async () => {
+    let lastArgs: unknown[] = []
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'statuses:reorder': (args) => {
+          lastArgs = args
+          return undefined
+        },
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'status', 'reorder', '--ids', 'todo,in-progress,done',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    expect(lastArgs[1]).toEqual(['todo', 'in-progress', 'done'])
+  })
+
+  it('status reorder without --ids returns USAGE_ERROR', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'status', 'reorder',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('--ids')
+  })
+
+  it('status get invokes statuses:get with id', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'statuses:get': () => ({ id: 'todo', label: 'Todo', category: 'open' }),
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'status', 'get', 'todo',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    expect((r.envelope?.data as Record<string, unknown>).id).toBe('todo')
+  })
+
+  // ─── preference entity ────────────────────────────────────────────────────
+
+  it('preference get invokes preferences:get', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'preferences:get': () => ({ name: 'Alex', timezone: 'UTC' }),
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'preference', 'get',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    expect((r.envelope?.data as Record<string, unknown>).name).toBe('Alex')
+  })
+
+  it('preference update invokes preferences:update with --input payload', async () => {
+    let lastArgs: unknown[] = []
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'preferences:update': (args) => {
+          lastArgs = args
+          const updates = args[0] as Record<string, unknown>
+          return { ...updates, updatedAt: 1700000000000 }
+        },
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'preference', 'update',
+      '--input', '{"name":"Alex","timezone":"UTC"}',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    expect(lastArgs[0]).toEqual({ name: 'Alex', timezone: 'UTC' })
+  })
+
+  it('preference update rejects --name flat flag — data goes through --input', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'preference', 'update', '--name', 'Alex',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('--name')
+    expect(r.envelope?.error?.message).toContain('--input')
+  })
+
+  it('preference update without input returns USAGE_ERROR', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'preference', 'update',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('Missing preference fields')
+  })
+
+  it('preference unknown action returns USAGE_ERROR', async () => {
+    const r = await runCli(['--json', 'preference', 'list'])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+    expect(r.envelope?.error?.message).toContain('Unknown preference action: list')
+  })
 })
