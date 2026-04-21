@@ -328,8 +328,8 @@ ${workspaceContext}
 - Sources: \`datapilot source list\`, \`datapilot source create --name "..." --type mcp\`
 - Skills: \`datapilot skill list\`, \`datapilot skill create --name "..." --description "..."\`
 - Automations: \`datapilot automation list\`, \`datapilot automation create --event ... --prompt "..."\`
-- Permissions: \`datapilot permission list\`, \`datapilot permission get\`
-- Themes: \`datapilot theme get\`, \`datapilot theme set-color-theme <id>\`
+- Statuses: \`datapilot status list\`, \`datapilot status create --label "..."\`
+- Preferences: \`datapilot preference get\`, \`datapilot preference update --input '{...}'\`
 `;
 }
 
@@ -528,10 +528,8 @@ ${isBatch ? '' : `## Configuration Documentation
 | Skills | \`${DOC_REFS.skills}\` | BEFORE creating custom skills |
 | Automations | \`${DOC_REFS.hooks}\` | BEFORE creating/modifying automations |
 | Batches | \`${DOC_REFS.batches}\` | BEFORE creating/modifying batch processing jobs |
-| Themes | \`${DOC_REFS.themes}\` | BEFORE customizing colors |
 | Statuses | \`${DOC_REFS.statuses}\` | When user mentions statuses or workflow states |
 | Labels | \`${DOC_REFS.labels}\` | BEFORE creating/modifying labels |
-| Tool Icons | \`${DOC_REFS.toolIcons}\` | BEFORE modifying tool icon mappings |
 ${!FEATURE_FLAGS.disableValidation ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When creating diagrams |` : ''}
 | Data Tables | \`${DOC_REFS.dataTables}\` | When working with datasets of 20+ rows |
 | HTML Preview | \`${DOC_REFS.htmlPreview}\` | When rendering HTML content (emails, reports) |
@@ -545,7 +543,7 @@ ${!FEATURE_FLAGS.disableValidation ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When
 
 ## DataPilot CLI
 
-**You MUST use the \`datapilot\` CLI to manage workspace configuration.** Direct file edits are blocked — labels, sources, statuses, and views are stored in SQLite (not JSON files), and all other config domains (automations, skills, permissions, themes) are guarded by the CLI.
+**You MUST use the \`datapilot\` CLI to manage workspace configuration.** Direct file edits are blocked — labels, sources, statuses, and views are stored in SQLite (not JSON files), and all other config domains (automations, skills) are guarded by the CLI.
 
 \`datapilot\` is a thin client over the local DataPilot server. Every command is \`datapilot <entity> <action>\`. Output is a JSON envelope (\`{ok, data|error, warnings}\`) on non-TTY stdout — agents can parse stdout directly. Pass structured input with \`--input '<json>'\` (legacy used \`--json\` for this; \`--json\` is now the global "force JSON output" flag).
 
@@ -555,8 +553,6 @@ ${!FEATURE_FLAGS.disableValidation ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When
 - Automations: \`datapilot automation --help\`
 - Statuses: \`datapilot status --help\`
 - Preferences: \`datapilot preference --help\`
-- Permissions: \`datapilot permission --help\`
-- Themes: \`datapilot theme --help\`
 - Batches: \`datapilot batch --help\`
 - Sessions: \`datapilot session --help\` (incl. \`session share <id>\`)
 - HTML sharing: \`datapilot session share-html --help\`

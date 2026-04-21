@@ -845,7 +845,7 @@ export class ClaudeAgent extends BaseAgent {
       ];
 
       // Build MCP servers config
-      // Mini agents: only session tools (config_validate) to minimize token usage
+      // Mini agents: only session tools (skill_validate) to minimize token usage
       // Regular agents: full set including preferences, docs, and user sources
 
       // Build per-source proxy servers from centralized MCP pool (if available)

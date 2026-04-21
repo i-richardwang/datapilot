@@ -130,7 +130,6 @@ const EDIT_CONFIGS: Record<EditContextKey, (location: string) => EditConfig> = {
         'Their intent is likely to update the setting immediately unless otherwise specified. ' +
         'The permissions.json file configures Explore mode rules. It can contain: allowedBashPatterns, ' +
         'allowedMcpPatterns, allowedApiEndpoints, blockedTools, and allowedWritePaths. ' +
-        'After editing, call config_validate with target "permissions" to verify the changes. ' +
         'Confirm clearly when done.',
     },
     example: "Allow running 'make build' in Explore mode",
@@ -151,7 +150,6 @@ const EDIT_CONFIGS: Record<EditContextKey, (location: string) => EditConfig> = {
         'It can contain: allowedBashPatterns, allowedMcpPatterns, allowedApiEndpoints, blockedTools, and allowedWritePaths. ' +
         'Each pattern can be a string or an object with pattern and comment fields. ' +
         'Be careful - these are app-wide defaults. ' +
-        'After editing, call config_validate with target "permissions" to verify the changes. ' +
         'Confirm clearly when done.',
     },
     example: 'Allow git fetch command',
@@ -248,7 +246,6 @@ const EDIT_CONFIGS: Record<EditContextKey, (location: string) => EditConfig> = {
         'The user is editing source-level permissions (permissions.json). ' +
         'These rules are auto-scoped to this source - write simple patterns without prefixes. ' +
         'For MCP: use allowedMcpPatterns (e.g., "list", "get"). For API: use allowedApiEndpoints. ' +
-        'After editing, call config_validate with target "permissions" and the source slug to verify the changes. ' +
         'Confirm clearly when done.',
     },
     example: 'Allow list operations in Explore mode',
@@ -269,7 +266,6 @@ const EDIT_CONFIGS: Record<EditContextKey, (location: string) => EditConfig> = {
         'Use allowedMcpPatterns to allow specific tools (e.g., ["list_*", "get_*"] for read-only). ' +
         'Use blockedTools to explicitly block specific tools. ' +
         'Patterns are auto-scoped to this source. ' +
-        'After editing, call config_validate with target "permissions" and the source slug to verify the changes. ' +
         'Confirm clearly when done.',
     },
     example: 'Only allow read operations (list, get, search)',
@@ -289,7 +285,6 @@ const EDIT_CONFIGS: Record<EditContextKey, (location: string) => EditConfig> = {
         'The user is editing the notes field in their preferences (~/.datapilot/preferences.json). ' +
         'This is a JSON file. Only modify the "notes" field unless explicitly asked otherwise. ' +
         'The notes field is free-form text that provides context about the user to the AI. ' +
-        'After editing, call config_validate with target "preferences" to verify the changes. ' +
         'Confirm clearly when done.',
     },
     example: 'Add coding style preferences',
@@ -412,7 +407,6 @@ const EDIT_CONFIGS: Record<EditContextKey, (location: string) => EditConfig> = {
         'Fixed statuses (todo, done, cancelled) cannot be deleted but can be reordered or have their label changed. ' +
         'Icon can be an emoji, an https URL, or a local filename like "name.svg" that maps to statuses/icons/name.svg. ' +
         'Category "open" shows in inbox, "closed" shows in archive. ' +
-        'After editing, call config_validate with target "statuses" to verify the changes. ' +
         'Confirm clearly when done.',
     },
     example: 'Add a "Blocked" status',
@@ -527,7 +521,6 @@ const EDIT_CONFIGS: Record<EditContextKey, (location: string) => EditConfig> = {
         'Each tool has: id (unique slug), displayName (shown in UI), icon (filename like "git.ico"), commands (array of CLI command names). ' +
         'Supported icon formats: .png, .ico, .svg, .jpg. Icons display at 20x20px. ' +
         'Read ~/.datapilot/docs/tool-icons.md for full format reference. ' +
-        'After editing, call config_validate with target "tool-icons" to verify the changes are valid. ' +
         'Confirm clearly when done.',
     },
     example: 'Add an icon for my custom CLI tool "deploy"',

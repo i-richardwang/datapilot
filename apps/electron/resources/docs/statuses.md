@@ -187,11 +187,7 @@ Adjust `order` values for existing statuses as needed.
 
 ## Validation
 
-**IMPORTANT**: Always validate after creating or editing statuses:
-
-```
-config_validate({ target: "statuses" })
-```
+Statuses are validated automatically by the `dtpilot status` CLI on every create/update/reorder. Invalid input returns a `VALIDATION_ERROR` envelope with the offending field.
 
 This validates:
 - Required fixed statuses exist (`todo`, `done`, `cancelled`)

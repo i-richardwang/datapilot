@@ -323,8 +323,6 @@ The CLI validates configuration automatically on `create` and `update`. You can 
 dtpilot batch validate
 ```
 
-Or use the `config_validate` tool with `target: "batches"`.
-
 **Common validation errors:**
 - Missing required fields (`name`, `source`, `action`)
 - Empty `source.path` or `source.idField`
