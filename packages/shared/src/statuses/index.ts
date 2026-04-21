@@ -16,5 +16,8 @@ export * from './crud.ts';
 // Validation
 export * from './validation.ts';
 
+// Input schemas (Zod)
+export * from './schemas.ts';
+
 // Default icons
 export * from './default-icons.ts';

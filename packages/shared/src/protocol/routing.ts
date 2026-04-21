@@ -324,6 +324,8 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   // preferences — workspace-level preferences
   RPC_CHANNELS.preferences.READ,
   RPC_CHANNELS.preferences.WRITE,
+  RPC_CHANNELS.preferences.GET,
+  RPC_CHANNELS.preferences.UPDATE,
 
   // drafts — workspace content
   RPC_CHANNELS.drafts.GET,
@@ -386,6 +388,10 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
 
   // statuses — workspace metadata
   RPC_CHANNELS.statuses.LIST,
+  RPC_CHANNELS.statuses.GET,
+  RPC_CHANNELS.statuses.CREATE,
+  RPC_CHANNELS.statuses.UPDATE,
+  RPC_CHANNELS.statuses.DELETE,
   RPC_CHANNELS.statuses.REORDER,
   RPC_CHANNELS.statuses.CHANGED,
 
