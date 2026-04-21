@@ -18,7 +18,6 @@ import type { ToolResult } from './types.ts';
 
 // Handlers
 import { handleSubmitPlan } from './handlers/submit-plan.ts';
-import { handleConfigValidate } from './handlers/config-validate.ts';
 import { handleSkillValidate } from './handlers/skill-validate.ts';
 import { handleMermaidValidate } from './handlers/mermaid-validate.ts';
 import { handleSourceTest } from './handlers/source-test.ts';
@@ -47,12 +46,6 @@ import { handleSendAgentMessage } from './handlers/send-agent-message.ts';
 
 export const SubmitPlanSchema = z.object({
   planPath: z.string().describe('Absolute path to the plan markdown file you wrote'),
-});
-
-export const ConfigValidateSchema = z.object({
-  target: z.enum(['config', 'sources', 'statuses', 'preferences', 'permissions', 'automations', 'batches', 'tool-icons', 'all'])
-    .describe('Which config file(s) to validate'),
-  sourceSlug: z.string().optional().describe('Validate a specific source by slug'),
 });
 
 export const SkillValidateSchema = z.object({
@@ -227,22 +220,6 @@ The plan will be displayed to the user in a special formatted view.
 - No further tool calls or text output will be processed after this tool returns
 - The conversation will resume when the user responds (accept, modify, or reject the plan)
 - Do NOT include any text or tool calls after SubmitPlan - they will not be executed`,
-
-  config_validate: `Validate DataPilot configuration files.
-
-Use this after editing configuration files to check for errors before they take effect.
-Returns structured validation results with errors, warnings, and suggestions.
-
-**Targets:**
-- \`config\`: Validates config.json (workspaces, model, settings)
-- \`sources\`: Validates all source config.json files
-- \`statuses\`: Validates statuses config.json
-- \`preferences\`: Validates preferences.json
-- \`permissions\`: Validates permissions.json files
-- \`automations\`: Validates automations.json configuration
-- \`batches\`: Validates batches.json configuration
-- \`tool-icons\`: Validates tool-icons.json
-- \`all\`: Validates all configuration files`,
 
   skill_validate: `Validate a skill's SKILL.md file.
 
@@ -523,7 +500,6 @@ export type SessionToolDef = RegistrySessionToolDef | BackendSessionToolDef;
 
 export const SESSION_TOOL_DEFS: SessionToolDef[] = [
   { name: 'SubmitPlan', description: TOOL_DESCRIPTIONS.SubmitPlan, inputSchema: SubmitPlanSchema, executionMode: 'registry', safeMode: 'allow', handler: handleSubmitPlan },
-  { name: 'config_validate', description: TOOL_DESCRIPTIONS.config_validate, inputSchema: ConfigValidateSchema, executionMode: 'registry', safeMode: 'allow', readOnly: true, handler: handleConfigValidate },
   { name: 'skill_validate', description: TOOL_DESCRIPTIONS.skill_validate, inputSchema: SkillValidateSchema, executionMode: 'registry', safeMode: 'allow', readOnly: true, handler: handleSkillValidate },
   { name: 'mermaid_validate', description: TOOL_DESCRIPTIONS.mermaid_validate, inputSchema: MermaidValidateSchema, executionMode: 'registry', safeMode: 'allow', readOnly: true, handler: handleMermaidValidate },
   { name: 'source_test', description: TOOL_DESCRIPTIONS.source_test, inputSchema: SourceTestSchema, executionMode: 'registry', safeMode: 'allow', handler: handleSourceTest },
@@ -580,7 +556,6 @@ export const TEMPLATE_TOOLS = new Set([
 /** Tools excluded in batch mode (no human interaction, no UI rendering, no session management) */
 export const BATCH_EXCLUDED_TOOLS = new Set([
   'SubmitPlan',
-  'config_validate',
   'skill_validate',
   'mermaid_validate',
   'source_test',

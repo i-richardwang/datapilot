@@ -747,18 +747,7 @@ A single automation can have both prompt and webhook actions. They execute in or
 
 Automations are validated when:
 1. The workspace is loaded
-2. You edit automations.json (via PreToolUse hook)
-3. You run `config_validate` with target `automations` or `all`
-
-**Using config_validate:**
-
-Ask DataPilot to validate your automations configuration:
-
-```
-Validate my automations configuration
-```
-
-Or use the `config_validate` tool directly with `target: "automations"`.
+2. You create/update an automation via the `dtpilot automation` CLI (invalid input returns a `VALIDATION_ERROR` envelope)
 
 **Common validation errors:**
 - Invalid JSON syntax

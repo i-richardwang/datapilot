@@ -32,8 +32,8 @@ export function successResponse(text: string): ToolResult {
  * distinguishable from successes, we prefix the output text with "[ERROR]".
  * The model can then parse this prefix to understand the tool call failed.
  *
- * This covers all session MCP tool errors (source_test, config_validate,
- * skill_validate, SubmitPlan, credential_prompt, oauth triggers, etc.).
+ * This covers all session MCP tool errors (source_test, skill_validate,
+ * SubmitPlan, credential_prompt, oauth triggers, etc.).
  *
  * See also: blockWithReason() in packages/shared/src/agent/mode-manager.ts
  * which applies the same prefix for permission-mode blocks.

@@ -231,7 +231,6 @@ export function cleanupSessionScopedTools(sessionId: string): void {
 const TOOL_DESCRIPTIONS: Record<string, string> = {
   ...BASE_DESCRIPTIONS,
   // Claude-specific enrichments with DOC_REFs
-  config_validate: BASE_DESCRIPTIONS.config_validate + `\n\n**Reference:** ${DOC_REFS.sources}`,
   skill_validate: BASE_DESCRIPTIONS.skill_validate + `\n\n**Reference:** ${DOC_REFS.skills}`,
   mermaid_validate: BASE_DESCRIPTIONS.mermaid_validate + `\n\n**Reference:** ${DOC_REFS.mermaid}`,
   source_test: BASE_DESCRIPTIONS.source_test + `\n\n**Reference:** ${DOC_REFS.sources}`,

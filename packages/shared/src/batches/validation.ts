@@ -13,7 +13,7 @@ import type { ValidationResult, ValidationIssue } from '../config/validators.ts'
 
 /**
  * Validate batches config from a JSON string (no disk reads).
- * Used by config_validate tool to validate before writing to disk.
+ * Used by the `dtpilot batch` CLI to validate before writing to disk.
  */
 export function validateBatchesContent(jsonString: string, fileName?: string): ValidationResult {
   const file = fileName ?? BATCHES_CONFIG_FILE

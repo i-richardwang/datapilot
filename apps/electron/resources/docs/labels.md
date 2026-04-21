@@ -171,11 +171,7 @@ When creating or modifying labels, follow these conventions unless the user expl
 
 ## Validation
 
-**IMPORTANT**: Always validate after creating or editing labels:
-
-```
-config_validate({ target: "labels" })
-```
+Labels are validated automatically by the `dtpilot label` CLI on every create/update/import. Invalid input returns a `VALIDATION_ERROR` envelope with the offending field.
 
 This validates:
 - Valid JSON and recursive schema structure

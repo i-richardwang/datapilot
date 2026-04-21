@@ -549,7 +549,6 @@ async function resolveToolDisplayMeta(
         'session': {
           'SubmitPlan': 'Submit Plan',
           'call_llm': 'LLM Query',
-          'config_validate': 'Validate Config',
           'skill_validate': 'Validate Skill',
           'mermaid_validate': 'Validate Mermaid',
           'source_test': 'Test Source',

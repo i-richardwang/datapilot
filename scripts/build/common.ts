@@ -415,7 +415,7 @@ export function copyInterceptorBundle(config: BuildConfig): void {
 
 /**
  * Copy Session MCP Server to packaged app resources.
- * The session server provides session-scoped tools (SubmitPlan, config_validate, etc.) for agent sessions.
+ * The session server provides session-scoped tools (SubmitPlan, skill_validate, etc.) for agent sessions.
  */
 export function copySessionServer(config: BuildConfig): void {
   const { rootDir, electronDir } = config;

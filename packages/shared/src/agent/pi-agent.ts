@@ -450,7 +450,7 @@ export class PiAgent extends BaseAgent {
     }
 
     // Register session-scoped tools as proxy tools in the subprocess.
-    // These tools (SubmitPlan, config_validate, source auth, call_llm, etc.)
+    // These tools (SubmitPlan, skill_validate, source auth, call_llm, etc.)
     // are executed in the main process when the LLM calls them.
     this.assertBackendSessionToolParity();
     const batchCtx = getSessionBatchContext(this._sessionId);
@@ -1257,7 +1257,7 @@ export class PiAgent extends BaseAgent {
   /**
    * Route a proxy tool call to the appropriate handler based on tool name.
    *
-   * - Session tools (SubmitPlan, config_validate, etc.) -> session-tools-core handlers
+   * - Session tools (SubmitPlan, skill_validate, etc.) -> session-tools-core handlers
    * - call_llm -> preExecuteCallLlm (BaseAgent)
    * - mcp__* tools -> MCP server proxy (TODO)
    * - api_* tools -> API source proxy (TODO)
