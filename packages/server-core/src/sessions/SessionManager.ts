@@ -7472,7 +7472,7 @@ export class SessionManager implements ISessionManager {
     const session = await this.createSession(workspaceId, {
       name: sessionName,
       labels: resolvedLabels,
-      permissionMode: permissionMode || 'safe',
+      permissionMode: permissionMode,
       enabledSourceSlugs: resolved?.sourceSlugs,
       llmConnection,
       model,
