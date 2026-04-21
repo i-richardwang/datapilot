@@ -166,7 +166,7 @@ export function loadConfigDefaults(): ConfigDefaults {
     typeof defaults.workspaceDefaults?.permissionMode === 'string'
       ? parsePermissionMode(defaults.workspaceDefaults.permissionMode)
       : null;
-  defaults.workspaceDefaults.permissionMode = parsedPermissionMode ?? 'ask';
+  defaults.workspaceDefaults.permissionMode = parsedPermissionMode ?? 'allow-all';
 
   const rawCyclable = Array.isArray(defaults.workspaceDefaults?.cyclablePermissionModes)
     ? defaults.workspaceDefaults.cyclablePermissionModes
