@@ -3,6 +3,7 @@ import type { ISessionManager } from './session-manager-interface'
 import type { IOAuthFlowStore } from './oauth-flow-store-interface'
 import type { IBrowserPaneManager } from './browser-pane-manager-interface'
 import type { IWindowManager } from './window-manager-interface'
+import type { IMessagingGatewayRegistry } from './messaging-registry-interface'
 
 /**
  * Narrow dep bag for handlers that only touch platform services.
@@ -36,4 +37,5 @@ export interface HandlerDeps<
   windowManager?: TWindowManager
   browserPaneManager?: TBrowserPaneManager
   oauthFlowStore: TOAuthFlowStore
+  messagingRegistry?: IMessagingGatewayRegistry
 }

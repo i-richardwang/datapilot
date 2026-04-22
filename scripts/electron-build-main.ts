@@ -20,6 +20,9 @@ const PI_AGENT_SERVER_OUTPUT = join(PI_AGENT_SERVER_DIR, "dist/index.js");
 const DATAPILOT_CLI_DIR = join(ROOT_DIR, "apps/cli");
 const DATAPILOT_CLI_SRC = join(DATAPILOT_CLI_DIR, "src/datapilot.ts");
 const DATAPILOT_CLI_OUTPUT = join(DATAPILOT_CLI_DIR, "dist/datapilot.js");
+const WA_WORKER_DIR = join(ROOT_DIR, "packages/messaging-whatsapp-worker");
+const WA_WORKER_SOURCE = join(WA_WORKER_DIR, "src/worker.ts");
+const WA_WORKER_OUTPUT = join(WA_WORKER_DIR, "dist/worker.cjs");
 
 // Load .env file if it exists
 function loadEnvFile(): void {
@@ -298,6 +301,59 @@ async function buildCraftCli(): Promise<void> {
   console.log("✅ DataPilot CLI built successfully");
 }
 
+// Build the WhatsApp worker (Baileys-backed subprocess spawned by WhatsAppAdapter)
+async function buildWhatsAppWorker(): Promise<void> {
+  if (!existsSync(WA_WORKER_SOURCE)) {
+    console.log("⏭️  WhatsApp worker skipped (package not found)");
+    return;
+  }
+
+  console.log("📨 Building WhatsApp worker...");
+
+  const workerDistDir = join(WA_WORKER_DIR, "dist");
+  if (!existsSync(workerDistDir)) {
+    mkdirSync(workerDistDir, { recursive: true });
+  }
+
+  // Baileys is bundled INTO worker.cjs (not external) so the packaged app is
+  // self-contained. Dynamic `import('@whiskeysockets/baileys')` is resolved
+  // at bundle time because the specifier is a literal.
+  const proc = spawn({
+    cmd: [
+      "bun", "run", "esbuild",
+      WA_WORKER_SOURCE,
+      "--bundle",
+      "--platform=node",
+      "--format=cjs",
+      "--target=node20",
+      `--outfile=${WA_WORKER_OUTPUT}`,
+      "--external:electron",
+      // Baileys' runtime-optional features — wrapped in try/catch at the
+      // call site and not used by DataPilot (we send text + documents, no
+      // link previews, no inline image processing, no terminal QR).
+      "--external:link-preview-js",
+      "--external:qrcode-terminal",
+      "--external:jimp",
+    ],
+    cwd: ROOT_DIR,
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    console.error("❌ WhatsApp worker build failed with exit code", exitCode);
+    process.exit(exitCode);
+  }
+
+  if (!existsSync(WA_WORKER_OUTPUT)) {
+    console.error("❌ WhatsApp worker output not found at", WA_WORKER_OUTPUT);
+    process.exit(1);
+  }
+
+  console.log("✅ WhatsApp worker built successfully");
+}
+
 async function main(): Promise<void> {
   loadEnvFile();
 
@@ -322,6 +378,9 @@ async function main(): Promise<void> {
   // Build unified network interceptor (CJS bundle for Node.js --require)
   await buildInterceptor();
 
+  // Build WhatsApp worker (Baileys subprocess — optional package)
+  await buildWhatsAppWorker();
+
   const buildDefines = getBuildDefines();
 
   console.log("🔨 Building main process...");
@@ -337,6 +396,13 @@ async function main(): Promise<void> {
       "--external:electron",
       "--external:better-sqlite3",
       "--external:bun:sqlite",
+      // Replace grammY's bundled polyfills (node-fetch@2 + abort-controller@3)
+      // with native Node globals. esbuild otherwise renames the polyfill's
+      // `class AbortSignal` to `_AbortSignal` to dodge collision with the
+      // global, which then breaks node-fetch@2's `constructor.name` check and
+      // fails every Telegram API call with a TypeError.
+      "--alias:node-fetch=./apps/electron/src/main/shims/node-fetch.cjs",
+      "--alias:abort-controller=./apps/electron/src/main/shims/abort-controller.cjs",
       ...buildDefines,
     ],
     cwd: ROOT_DIR,

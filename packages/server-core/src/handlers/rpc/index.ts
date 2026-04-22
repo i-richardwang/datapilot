@@ -24,6 +24,7 @@ import { registerStatusesHandlers } from './statuses'
 import { registerSystemCoreHandlers } from './system'
 import { registerTransferHandlers } from './transfer'
 import { registerWorkspaceCoreHandlers } from './workspace'
+import { registerMessagingHandlers } from './messaging'
 
 /**
  * Register every RPC handler provided by server-core.
@@ -56,4 +57,5 @@ export function registerServerCoreRpcHandlers(
   registerSystemCoreHandlers(server, deps)
   registerTransferHandlers(server)
   registerWorkspaceCoreHandlers(server, deps)
+  registerMessagingHandlers(server, deps)
 }
