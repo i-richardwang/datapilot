@@ -475,7 +475,7 @@ export class TelegramAdapter implements PlatformAdapter {
 
     const localPath = join(
       tmpdir(),
-      `craft-agent-messaging-${randomBytes(8).toString('hex')}${ext}`,
+      `datapilot-messaging-${randomBytes(8).toString('hex')}${ext}`,
     )
     writeFileSync(localPath, buf)
     return { localPath, fileName, fileSize: buf.byteLength }
