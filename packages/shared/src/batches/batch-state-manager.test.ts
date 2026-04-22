@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'bun:test'
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { autoRegisterDriver } from '../db/driver.ts'
 import {
   getBatchStatePath,
   loadBatchState,
@@ -12,6 +13,10 @@ import {
   isBatchDone,
 } from './batch-state-manager.db.ts'
 import type { BatchState } from './types.ts'
+
+beforeAll(async () => {
+  await autoRegisterDriver();
+});
 
 describe('batch-state-manager', () => {
   let tempDir: string

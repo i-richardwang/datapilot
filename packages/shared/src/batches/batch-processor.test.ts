@@ -1,11 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach, mock } from 'bun:test'
+import { describe, it, expect, beforeAll, beforeEach, afterEach, mock } from 'bun:test'
 import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { autoRegisterDriver } from '../db/driver.ts'
 import { BatchProcessor } from './batch-processor.ts'
 import { loadBatchState } from './batch-state-manager.db.ts'
 import { BATCH_STATE_FILE_PREFIX } from './constants.ts'
 import type { BatchSystemOptions, BatchExecutePromptParams, BatchProgress } from './types.ts'
+
+beforeAll(async () => {
+  await autoRegisterDriver();
+});
 
 /** Wait for background dispatch (fire-and-forget) to settle */
 const tick = (ms = 50) => new Promise((resolve) => setTimeout(resolve, ms))
