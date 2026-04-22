@@ -33,8 +33,14 @@ LABEL org.opencontainers.image.licenses="Apache-2.0"
 # Pinned to the same version used by build-server.ts (scripts/build/common.ts).
 COPY --from=ghcr.io/astral-sh/uv:0.10.6 /uv /usr/local/bin/uv
 
+# Install system deps + Node.js (required by the WhatsApp worker subprocess;
+# Bun cannot run Baileys' crypto deps). Pin Node to a major via NodeSource so
+# upgrades are explicit — must match the --target in scripts/build-wa-worker.ts.
+ARG NODE_MAJOR=20
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates git gosu ripgrep && \
+    apt-get install -y --no-install-recommends ca-certificates git gosu ripgrep curl gnupg && \
+    curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user (Claude Code SDK refuses to run as root).
@@ -57,6 +63,8 @@ COPY packages/session-tools-core/package.json packages/session-tools-core/
 COPY packages/session-mcp-server/package.json packages/session-mcp-server/
 COPY packages/pi-agent-server/package.json packages/pi-agent-server/
 COPY packages/ui/package.json packages/ui/
+COPY packages/messaging-gateway/package.json packages/messaging-gateway/
+COPY packages/messaging-whatsapp-worker/package.json packages/messaging-whatsapp-worker/
 COPY apps/electron/package.json apps/electron/
 COPY apps/cli/package.json apps/cli/
 COPY apps/viewer/package.json apps/viewer/
@@ -76,6 +84,9 @@ RUN bun build packages/session-mcp-server/src/index.ts \
     bun build packages/pi-agent-server/src/index.ts \
       --outfile packages/pi-agent-server/dist/index.js --target node --format cjs
 
+# Build the WhatsApp worker bundle (CJS, Node target — Bun cannot run it).
+RUN bun run scripts/build-wa-worker.ts
+
 # Build web UI assets (served by the server on the RPC port)
 # Granular feature flags — set to "1" to disable/enable the corresponding feature.
 ARG DATAPILOT_DISABLE_OAUTH="1"
@@ -88,7 +99,10 @@ ENV DATAPILOT_DISABLE_BROWSER=$DATAPILOT_DISABLE_BROWSER
 ENV DATAPILOT_DISABLE_VALIDATION=$DATAPILOT_DISABLE_VALIDATION
 ENV DATAPILOT_DISABLE_TEMPLATES=$DATAPILOT_DISABLE_TEMPLATES
 ENV DATAPILOT_LITE_UI=$DATAPILOT_LITE_UI
-RUN bunx vite build --config apps/webui/vite.config.ts
+# vite's bundler runs under Node (via shebang in vite's bin) and hits V8's
+# default ~2GB heap cap on the rendering phase (>5k modules). Raise to 4GB
+# so low-RAM build hosts (e.g. 4GB VPS) can complete the build.
+RUN NODE_OPTIONS="--max-old-space-size=4096" bunx vite build --config apps/webui/vite.config.ts
 
 # Pre-create .datapilot so Docker named volumes inherit the correct permissions.
 RUN mkdir -p /home/datapilot/.datapilot
@@ -120,6 +134,13 @@ ENV DATAPILOT_RESOURCES_PATH=/app/apps/electron/resources
 ENV DATAPILOT_PYTHON=/opt/datapilot-py/bin/python
 ENV DATAPILOT_UV=/usr/local/bin/uv
 ENV DATAPILOT_SCRIPTS=/app/apps/electron/resources/scripts
+# WhatsApp worker — Bun cannot run the CJS worker, so we point the adapter at
+# system `node` (installed above). If DATAPILOT_BUNDLED_ASSETS_ROOT changes,
+# update DATAPILOT_MESSAGING_WA_WORKER to match; the default in packages/server
+# resolves against DATAPILOT_BUNDLED_ASSETS_ROOT, but the layout above flattens
+# to /app.
+ENV DATAPILOT_MESSAGING_WA_WORKER=/app/packages/messaging-whatsapp-worker/dist/worker.cjs
+ENV DATAPILOT_MESSAGING_NODE_BIN=node
 ENV PATH="/opt/datapilot-py/bin:/app/apps/electron/resources/bin:${PATH}"
 
 EXPOSE 9100

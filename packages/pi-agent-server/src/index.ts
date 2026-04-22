@@ -54,7 +54,7 @@ import { bedrockProviderModule } from '@mariozechner/pi-ai/bedrock-provider';
 setBedrockProviderModule(bedrockProviderModule);
 
 // Model resolution (extracted for testability + custom-endpoint precedence)
-import { resolvePiModel } from './model-resolution.ts';
+import { resolvePiModel, isDeniedMiniModelId, isModelNotFoundError } from './model-resolution.ts';
 import { buildCustomEndpointModelDef, type CustomEndpointModelOverrides } from './custom-endpoint-models.ts';
 
 // Direct source imports from shared (bundled by bun build)
@@ -851,20 +851,7 @@ async function queryLlm(request: LLMQueryRequest): Promise<LLMQueryResult> {
   // Create authenticated registry upfront — used by both the provider guard and the ephemeral session.
   const { authStorage, modelRegistry } = createAuthenticatedRegistry();
 
-  const isModelNotFoundError = (message: string): boolean => {
-    const normalized = message.toLowerCase();
-    return (
-      normalized.includes('model_not_found') ||
-      normalized.includes('does not exist') ||
-      normalized.includes('no such model') ||
-      normalized.includes('requested model') && normalized.includes('not') && normalized.includes('exist')
-    );
-  };
-
-  const isDeniedMiniModelId = (modelId: string): boolean => {
-    const bare = modelId.startsWith('pi/') ? modelId.slice(3) : modelId;
-    return bare === 'codex-mini-latest';
-  };
+  const piAuthProvider = initConfig.piAuth?.provider;
 
   // If piAuth is set, ensure the mini model uses the same provider.
   // Pi SDK will fail with "No API key found" if the model requires a different provider.
@@ -876,7 +863,7 @@ async function queryLlm(request: LLMQueryRequest): Promise<LLMQueryResult> {
     const resolved = resolvePiModel(modelRegistry, bareModel, authProvider, shouldPreferCustomEndpoint());
     const resolvedProvider = (resolved as any)?.provider;
     const isCompatible = resolvedProvider === authProvider || resolvedProvider === 'custom-endpoint';
-    if (!resolved || !isCompatible || isDeniedMiniModelId(model)) {
+    if (!resolved || !isCompatible || isDeniedMiniModelId(model, piAuthProvider)) {
       const fallback = getDefaultSummarizationModel();
       debugLog(`[queryLlm] Model ${bareModel} incompatible with ${authProvider} (resolved: ${resolvedProvider}), falling back to ${fallback}`);
       model = fallback;
@@ -992,7 +979,7 @@ async function queryLlm(request: LLMQueryRequest): Promise<LLMQueryResult> {
     'pi/gpt-5-mini',
     initConfig.miniModel,
     getDefaultSummarizationModel(),
-  ].filter((candidate): candidate is string => !!candidate && !isDeniedMiniModelId(candidate));
+  ].filter((candidate): candidate is string => !!candidate && !isDeniedMiniModelId(candidate, piAuthProvider));
 
   const triedModels = new Set<string>();
   let currentModel = model;

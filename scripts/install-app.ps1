@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 
 $GITHUB_REPO = "i-richardwang/datapilot"
 $GITHUB_RELEASES_URL = "https://github.com/$GITHUB_REPO/releases"
-$DOWNLOAD_DIR = "$env:TEMP\craft-agent-install"
+$DOWNLOAD_DIR = "$env:TEMP\datapilot-install"
 $APP_NAME = "DataPilot"
 
 # Colors for output

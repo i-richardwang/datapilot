@@ -157,6 +157,35 @@ export class PiAgent extends BaseAgent {
     this.subprocessErrorRepeatCount = 0;
   }
 
+  // Ring buffer of recent subprocess stderr. Always on (independent of DATAPILOT_DEBUG)
+  // so that connection-test and other failures can surface what the subprocess
+  // actually said, instead of a bare "timed out" with no context.
+  private stderrBuffer: string[] = [];
+  private stderrBufferBytes = 0;
+  private static readonly STDERR_BUFFER_MAX_BYTES = 8 * 1024;
+
+  private recordStderr(chunk: string): void {
+    if (!chunk) return;
+    // If a single chunk is larger than the cap, keep only its tail so the
+    // buffer always holds the most-recent output even in pathological cases.
+    const effective = chunk.length > PiAgent.STDERR_BUFFER_MAX_BYTES
+      ? chunk.slice(chunk.length - PiAgent.STDERR_BUFFER_MAX_BYTES)
+      : chunk;
+    this.stderrBuffer.push(effective);
+    this.stderrBufferBytes += effective.length;
+    // Drop oldest chunks until we're back under the cap, but always keep at
+    // least one entry so a single-chunk tail survives.
+    while (this.stderrBufferBytes > PiAgent.STDERR_BUFFER_MAX_BYTES && this.stderrBuffer.length > 1) {
+      const dropped = this.stderrBuffer.shift()!;
+      this.stderrBufferBytes -= dropped.length;
+    }
+  }
+
+  /** Returns the most recent subprocess stderr output (up to ~8KB). Empty string if nothing captured. */
+  getRecentStderr(): string {
+    return this.stderrBuffer.join('');
+  }
+
   // Pending permission requests (used by handlePreToolUseRequest for ask-mode prompting)
   private pendingPermissions: Map<string, {
     resolve: (allowed: boolean) => void;
@@ -384,11 +413,15 @@ export class PiAgent extends BaseAgent {
       this.handleLine(line);
     });
 
-    // Forward stderr to debug log
+    // Always capture stderr into a bounded ring buffer so callers (e.g. the
+    // connection-test timeout path in factory.ts) can surface it on failure.
+    // Keep the DATAPILOT_DEBUG-gated log for interactive dev work.
     child.stderr?.on('data', (data: Buffer) => {
-      const text = data.toString().trim();
-      if (text) {
-        this.debug(`[subprocess stderr] ${text}`);
+      const text = data.toString();
+      this.recordStderr(text);
+      const trimmed = text.trim();
+      if (trimmed) {
+        this.debug(`[subprocess stderr] ${trimmed}`);
       }
     });
 
