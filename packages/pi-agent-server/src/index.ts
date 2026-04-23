@@ -17,7 +17,7 @@
 import http from 'node:http';
 import { createInterface } from 'node:readline';
 import { join } from 'node:path';
-import { mkdirSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 
 // Pi SDK
@@ -26,6 +26,9 @@ import {
   SessionManager as PiSessionManager,
   AuthStorage as PiAuthStorage,
   ModelRegistry as PiModelRegistry,
+  SettingsManager as PiSettingsManager,
+  DefaultResourceLoader as PiDefaultResourceLoader,
+  formatSkillsForPrompt,
   codingTools,
 } from '@mariozechner/pi-coding-agent';
 import type {
@@ -64,6 +67,12 @@ import { buildCallLlmRequest, withTimeout, LLM_QUERY_TIMEOUT_MS } from '../../sh
 import type { LLMQueryRequest, LLMQueryResult } from '../../shared/src/agent/llm-tool.ts';
 import { PI_TOOL_NAME_MAP, THINKING_TO_PI } from '../../shared/src/agent/backend/pi/constants.ts';
 import { getDefaultSummarizationModel } from '../../shared/src/config/models.ts';
+import {
+  GLOBAL_AGENT_SKILLS_DIR,
+  PROJECT_AGENT_SKILLS_DIR,
+} from '../../shared/src/skills/storage.ts';
+import { getWorkspaceSkillsPath } from '../../shared/src/workspaces/storage.ts';
+import { findAllProjectContextFiles } from '../../shared/src/prompts/system.ts';
 import { createWebFetchTool } from './tools/web-fetch.ts';
 import { resolveSearchProvider } from './tools/search/resolve-provider.ts';
 import { createSearchTool } from './tools/search/create-search-tool.ts';
@@ -478,6 +487,82 @@ function createAuthenticatedRegistry(): {
   return { authStorage, modelRegistry };
 }
 
+// ============================================================
+// DataPilot resource loader (skill discovery + context files)
+// ============================================================
+
+type LoadedAgentsFile = { path: string; content: string };
+
+/**
+ * DataPilot stores skills in three directories, in ascending priority:
+ *   - global:    ~/.agents/skills/
+ *   - workspace: {workspaceRootPath}/skills/
+ *   - project:   {cwd}/.agents/skills/
+ *
+ * Pi SDK's DefaultResourceLoader can discover skills from arbitrary
+ * directories via `additionalSkillPaths`. Missing directories are skipped
+ * here so they do not surface as loader diagnostics.
+ */
+function buildDataPilotSkillPaths(cwd: string, workspaceRootPath?: string): string[] {
+  const paths: string[] = [];
+  if (existsSync(GLOBAL_AGENT_SKILLS_DIR)) {
+    paths.push(GLOBAL_AGENT_SKILLS_DIR);
+  }
+  if (workspaceRootPath) {
+    const wsSkills = getWorkspaceSkillsPath(workspaceRootPath);
+    if (existsSync(wsSkills)) paths.push(wsSkills);
+  }
+  const projSkills = join(cwd, PROJECT_AGENT_SKILLS_DIR);
+  if (existsSync(projSkills)) paths.push(projSkills);
+  return paths;
+}
+
+/**
+ * DataPilot's monorepo-aware discovery of AGENTS.md / CLAUDE.md files.
+ * The Pi SDK's default loader only walks ancestors of cwd; DataPilot also
+ * picks up nested package context files (see findAllProjectContextFiles).
+ */
+function loadDataPilotAgentsFiles(cwd: string): LoadedAgentsFile[] {
+  const relativePaths = findAllProjectContextFiles(cwd);
+  const files: LoadedAgentsFile[] = [];
+  for (const rel of relativePaths) {
+    const abs = join(cwd, rel);
+    try {
+      const content = readFileSync(abs, 'utf-8');
+      files.push({ path: abs, content });
+    } catch {
+      // Skip unreadable files — deliberately silent to match DataPilot behavior.
+    }
+  }
+  return files;
+}
+
+/**
+ * Build the suffix appended to DataPilot's per-turn system prompt so the
+ * Pi agent sees loaded project context files and skills without having to
+ * Read them manually. Mirrors the SDK's `buildSystemPrompt` layout so the
+ * format is identical to what the SDK would emit.
+ */
+function formatResourceLoaderSuffix(session: AgentSession): string {
+  const contextFiles = session.resourceLoader.getAgentsFiles().agentsFiles;
+  const skills = session.resourceLoader.getSkills().skills;
+  const activeTools = session.getActiveToolNames();
+  const hasRead = activeTools.length === 0 || activeTools.includes('read');
+
+  let suffix = '';
+  if (contextFiles.length > 0) {
+    suffix += '\n\n# Project Context\n\n';
+    suffix += 'Project-specific instructions and guidelines:\n\n';
+    for (const { path: filePath, content } of contextFiles) {
+      suffix += `## ${filePath}\n\n${content}\n\n`;
+    }
+  }
+  if (hasRead && skills.length > 0) {
+    suffix += formatSkillsForPrompt(skills);
+  }
+  return suffix;
+}
+
 async function ensureSession(): Promise<AgentSession> {
   if (piSession) return piSession;
   if (!initConfig) throw new Error('Cannot create session: init not received');
@@ -524,11 +609,15 @@ async function ensureSession(): Promise<AgentSession> {
   };
 
   // Extension isolation: set agentDir to a temp directory under session path
-  // to prevent loading global Pi extensions from ~/.pi/agent
+  // to prevent loading global Pi extensions from ~/.pi/agent.
+  // The session-isolated agentDir is also handed to the DefaultResourceLoader
+  // below so Pi's skill/context-file discovery stays sandboxed.
+  let resolvedAgentDir: string | undefined;
   if (initConfig.sessionPath) {
     const agentDir = initConfig.agentDir || join(initConfig.sessionPath, '.pi-agent');
     mkdirSync(agentDir, { recursive: true });
     sessionOptions.agentDir = agentDir;
+    resolvedAgentDir = agentDir;
 
     // Session resume: use a per-Craft-session directory so the Pi SDK can
     // persist and resume its own session across subprocess restarts.
@@ -602,6 +691,37 @@ async function ensureSession(): Promise<AgentSession> {
   const piThinkingLevel = THINKING_TO_PI[initConfig.thinkingLevel as keyof typeof THINKING_TO_PI];
   if (piThinkingLevel) {
     sessionOptions.thinkingLevel = piThinkingLevel;
+  }
+
+  // Install a DefaultResourceLoader that knows about DataPilot's skill layout
+  // (~/.agents/skills, {workspace}/skills, {cwd}/.agents/skills) and its
+  // monorepo-aware AGENTS.md / CLAUDE.md discovery. agentDir stays pinned to
+  // the session-isolated dir so global Pi extensions never leak in.
+  try {
+    const settingsManager = PiSettingsManager.create(cwd, resolvedAgentDir);
+    sessionOptions.settingsManager = settingsManager;
+
+    const additionalSkillPaths = buildDataPilotSkillPaths(cwd, initConfig.workspaceRootPath);
+    debugLog(`DataPilot skill paths: ${additionalSkillPaths.join(', ') || '(none)'}`);
+
+    const resourceLoader = new PiDefaultResourceLoader({
+      cwd,
+      agentDir: resolvedAgentDir,
+      settingsManager,
+      additionalSkillPaths,
+      agentsFilesOverride: () => ({ agentsFiles: loadDataPilotAgentsFiles(cwd) }),
+    });
+    await resourceLoader.reload();
+    sessionOptions.resourceLoader = resourceLoader;
+
+    const loadedSkills = resourceLoader.getSkills().skills;
+    const loadedAgentsFiles = resourceLoader.getAgentsFiles().agentsFiles;
+    debugLog(
+      `Resource loader: ${loadedSkills.length} skills, ${loadedAgentsFiles.length} context files`,
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    debugLog(`Failed to build DataPilot resource loader, falling back to defaults: ${msg}`);
   }
 
   // Create the session
@@ -1234,9 +1354,12 @@ async function handlePrompt(msg: Extract<InboundMessage, { type: 'prompt' }>): P
 
     const session = await ensureSession();
 
-    // Set system prompt
+    // Set system prompt. DataPilot builds the prompt body itself, but the Pi
+    // SDK's resource loader holds the discovered skills + AGENTS.md/CLAUDE.md
+    // content — append it so the agent sees both without having to Read.
     if (msg.systemPrompt) {
-      session.agent.state.systemPrompt = msg.systemPrompt;
+      const suffix = formatResourceLoaderSuffix(session);
+      session.agent.state.systemPrompt = suffix ? msg.systemPrompt + suffix : msg.systemPrompt;
     }
 
     // Wire up event handler
