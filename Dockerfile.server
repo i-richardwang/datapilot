@@ -23,24 +23,25 @@
 #     datapilot-server
 # =============================================================================
 
-FROM oven/bun:1.3-slim
+FROM nikolaik/python-nodejs:python3.12-nodejs20-slim
+
+# Reset SHELL to default — nikolaik image sets bash -euo pipefail which breaks some commands
+SHELL ["/bin/sh", "-c"]
 
 LABEL org.opencontainers.image.source="https://github.com/i-richardwang/datapilot"
 LABEL org.opencontainers.image.description="DataPilot Server — headless AI workflow server"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 
 # Install uv (Python package manager) — doc tools use uv to run Python scripts.
-# Pinned to the same version used by build-server.ts (scripts/build/common.ts).
 COPY --from=ghcr.io/astral-sh/uv:0.10.6 /uv /usr/local/bin/uv
 
-# Install system deps + Node.js (required by the WhatsApp worker subprocess;
-# Bun cannot run Baileys' crypto deps). Pin Node to a major via NodeSource so
-# upgrades are explicit — must match the --target in scripts/build-wa-worker.ts.
-ARG NODE_MAJOR=20
+# Copy bun binary from official image
+COPY --from=oven/bun:1.3-slim /usr/local/bin/bun /usr/local/bin/bun
+RUN ln -s /usr/local/bin/bun /usr/local/bin/bunx
+
+# Install system deps
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates git gosu ripgrep curl gnupg && \
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - && \
-    apt-get install -y --no-install-recommends nodejs && \
     rm -rf /var/lib/apt/lists/*
 
 # Create non-root user (Claude Code SDK refuses to run as root).
@@ -73,7 +74,8 @@ COPY apps/webui/package.json apps/webui/
 
 # Skip better-sqlite3 native build — Docker runs on Bun which uses built-in bun:sqlite
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install --frozen-lockfile --ignore-scripts
+    bun install --frozen-lockfile --ignore-scripts || \
+    (rm -rf /root/.bun/install/cache/* && bun install --frozen-lockfile --ignore-scripts)
 
 # Copy source
 COPY . .
@@ -114,14 +116,14 @@ RUN find /app -not -perm -o=r -exec chmod o+r {} + && \
     find /app -type d -not -perm -o=x -exec chmod o+x {} + && \
     chmod -R 777 /home/datapilot
 
-# Pre-install Python 3.12 + common data-science packages into a dedicated venv.
+# Pre-install common data-science packages into a dedicated venv.
+# Base image already ships Python 3.12 + pip; we create a venv via uv for isolation.
 # - DATAPILOT_PYTHON: used by transform_data runtime resolver for direct Python access
 # - PATH addition: makes python3/pip available in Bash for exploratory analysis
-RUN UV_PYTHON_INSTALL_DIR=/opt/uv-python uv python install 3.12 && \
-    UV_PYTHON_INSTALL_DIR=/opt/uv-python uv venv /opt/datapilot-py --python 3.12 && \
+RUN uv venv /opt/datapilot-py --python python3 && \
     uv pip install --python /opt/datapilot-py/bin/python \
       pandas numpy pyarrow polars openpyxl xlsxwriter && \
-    chmod -R a+rX /opt/datapilot-py /opt/uv-python
+    chmod -R a+rX /opt/datapilot-py
 
 ENV DATAPILOT_RPC_HOST=0.0.0.0
 ENV DATAPILOT_RPC_PORT=9100
