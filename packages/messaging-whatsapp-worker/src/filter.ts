@@ -61,11 +61,37 @@ export type InboundDecision =
   | { action: 'emit'; text: string }
   | {
       action: 'skip'
-      reason: 'malformed' | 'own_echo_id' | 'own_echo_prefix' | 'own_outbound' | 'empty'
+      reason:
+        | 'malformed'
+        | 'own_echo_id'
+        | 'own_echo_prefix'
+        | 'own_outbound'
+        | 'non_self_chat_inbound'
+        | 'empty'
     }
 
 /**
+ * True when `remoteJid` is the account's self-chat (compared against the
+ * phone-number JID and the LID form, both stripped of device suffix).
+ */
+function isSelfChatJid(
+  remoteJid: string,
+  selfJid: string | null,
+  selfLid: string | null,
+): boolean {
+  const bareRemote = bareJid(remoteJid)
+  if (bareRemote === null) return false
+  if (selfJid !== null && bareRemote === selfJid) return true
+  if (selfLid !== null && bareRemote === selfLid) return true
+  return false
+}
+
+/**
  * Decide what to do with a single upsert message.
+ *
+ * Semantics of `selfChatMode`: "only operate in the account's self-chat."
+ * Both directions are gated symmetrically — outbound from other devices AND
+ * inbound from contacts are dropped when they are not in the self-chat.
  *
  * Precedence for `fromMe=true`:
  *   1. id in sentIds         → skip (our own echo, primary defence)
@@ -74,7 +100,10 @@ export type InboundDecision =
  *   4. empty                  → skip
  *   5. otherwise              → emit (phone/desktop typing in self-chat)
  *
- * For `fromMe=false`: empty → skip, otherwise emit.
+ * For `fromMe=false`:
+ *   1. selfChatMode on AND not self-chat → skip (contacts/groups DMing us)
+ *   2. empty                              → skip
+ *   3. otherwise                          → emit
  */
 export function classifyInbound(
   msg: Record<string, unknown>,
@@ -84,17 +113,12 @@ export function classifyInbound(
   if (!key || !key.remoteJid || !key.id) return { action: 'skip', reason: 'malformed' }
 
   const text = extractText(msg)
+  const inSelfChat = isSelfChatJid(key.remoteJid, ctx.selfJid, ctx.selfLid)
 
   if (key.fromMe) {
     if (ctx.sentIds.has(key.id)) return { action: 'skip', reason: 'own_echo_id' }
 
-    const bareRemote = bareJid(key.remoteJid)
-    const isSelfChat =
-      ctx.selfChatMode &&
-      bareRemote !== null &&
-      ((ctx.selfJid !== null && bareRemote === ctx.selfJid) ||
-        (ctx.selfLid !== null && bareRemote === ctx.selfLid))
-    if (!isSelfChat) return { action: 'skip', reason: 'own_outbound' }
+    if (!ctx.selfChatMode || !inSelfChat) return { action: 'skip', reason: 'own_outbound' }
 
     if (ctx.responsePrefix && text.startsWith(ctx.responsePrefix)) {
       return { action: 'skip', reason: 'own_echo_prefix' }
@@ -102,6 +126,10 @@ export function classifyInbound(
 
     if (!text) return { action: 'skip', reason: 'empty' }
     return { action: 'emit', text }
+  }
+
+  if (ctx.selfChatMode && !inSelfChat) {
+    return { action: 'skip', reason: 'non_self_chat_inbound' }
   }
 
   if (!text) return { action: 'skip', reason: 'empty' }

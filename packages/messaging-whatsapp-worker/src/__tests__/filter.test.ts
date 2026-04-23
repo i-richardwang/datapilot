@@ -114,15 +114,18 @@ describe('extractText', () => {
 // classifyInbound
 // ---------------------------------------------------------------------------
 
-describe('classifyInbound — fromMe=false (normal inbound)', () => {
-  test('emits a contact message with text', () => {
+describe('classifyInbound — fromMe=false in selfChatMode (gated)', () => {
+  test('drops contact DM when selfChatMode is on and chat is not self-chat', () => {
     const d = classifyInbound(makeMsg({ text: 'hi', jid: OTHER }), ctx())
-    expect(d).toEqual({ action: 'emit', text: 'hi' })
+    expect(d).toEqual({ action: 'skip', reason: 'non_self_chat_inbound' })
   })
 
-  test('skips when text is empty', () => {
-    const d = classifyInbound(makeMsg({ jid: OTHER }), ctx())
-    expect(d).toEqual({ action: 'skip', reason: 'empty' })
+  test('drops group message (group JID is not self-chat)', () => {
+    const d = classifyInbound(
+      makeMsg({ text: 'hi all', jid: '1203630012345@g.us' }),
+      ctx(),
+    )
+    expect(d).toEqual({ action: 'skip', reason: 'non_self_chat_inbound' })
   })
 
   test('skips malformed messages missing the key', () => {
@@ -223,12 +226,20 @@ describe('classifyInbound — selfChatMode disabled (back-compat)', () => {
     expect(d).toEqual({ action: 'skip', reason: 'own_outbound' })
   })
 
-  test('still accepts normal incoming from contacts', () => {
+  test('accepts normal incoming from contacts when selfChatMode is off', () => {
     const d = classifyInbound(
       makeMsg({ jid: OTHER, text: 'hi from contact' }),
       ctx({ selfChatMode: false }),
     )
     expect(d).toEqual({ action: 'emit', text: 'hi from contact' })
+  })
+
+  test('still drops empty contact messages when selfChatMode is off', () => {
+    const d = classifyInbound(
+      makeMsg({ jid: OTHER }),
+      ctx({ selfChatMode: false }),
+    )
+    expect(d).toEqual({ action: 'skip', reason: 'empty' })
   })
 })
 
