@@ -71,6 +71,7 @@ import {
   GLOBAL_AGENT_SKILLS_DIR,
   PROJECT_AGENT_SKILLS_DIR,
 } from '../../shared/src/skills/storage.ts';
+import { getWorkspaceSkillsPath } from '../../shared/src/workspaces/storage.ts';
 import { findAllProjectContextFiles } from '../../shared/src/prompts/system.ts';
 import { createWebFetchTool } from './tools/web-fetch.ts';
 import { resolveSearchProvider } from './tools/search/resolve-provider.ts';
@@ -508,8 +509,7 @@ function buildDataPilotSkillPaths(cwd: string, workspaceRootPath?: string): stri
     paths.push(GLOBAL_AGENT_SKILLS_DIR);
   }
   if (workspaceRootPath) {
-    // Matches getWorkspaceSkillsPath() in shared/workspaces/storage.ts
-    const wsSkills = join(workspaceRootPath, 'skills');
+    const wsSkills = getWorkspaceSkillsPath(workspaceRootPath);
     if (existsSync(wsSkills)) paths.push(wsSkills);
   }
   const projSkills = join(cwd, PROJECT_AGENT_SKILLS_DIR);
