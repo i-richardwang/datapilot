@@ -11,6 +11,7 @@ import {
   BROWSER_TOOLS,
   VALIDATION_TOOLS,
   TEMPLATE_TOOLS,
+  SANDBOX_TOOLS,
 } from './tool-defs.ts';
 
 describe('session tool filtering helpers', () => {
@@ -127,14 +128,51 @@ describe('session tool filtering helpers', () => {
       expect(removed).toEqual(VALIDATION_TOOLS);
     });
 
-    it('disableTemplates excludes exactly the TEMPLATE_TOOLS set', () => {
+    it('disableTemplates excludes TEMPLATE_TOOLS plus script_sandbox (OR logic)', () => {
       const base = getSessionToolDefs();
       const filtered = getSessionToolDefs({ disableTemplates: true });
 
       const removed = new Set(
         base.filter(d => !filtered.some(f => f.name === d.name)).map(d => d.name)
       );
-      expect(removed).toEqual(TEMPLATE_TOOLS);
+      const expectedRemoved = new Set([...TEMPLATE_TOOLS, ...SANDBOX_TOOLS]);
+      expect(removed).toEqual(expectedRemoved);
+      // disableTemplates also removes script_sandbox (OR logic)
+      expect(filtered.some(d => d.name === 'script_sandbox')).toBe(false);
+    });
+
+    it('disableSandbox excludes exactly the SANDBOX_TOOLS set', () => {
+      const base = getSessionToolDefs();
+      const filtered = getSessionToolDefs({ disableSandbox: true });
+
+      const removed = new Set(
+        base.filter(d => !filtered.some(f => f.name === d.name)).map(d => d.name)
+      );
+      expect(removed).toEqual(SANDBOX_TOOLS);
+    });
+
+    it('disableSandbox does not affect render_template', () => {
+      const filtered = getSessionToolDefs({ disableSandbox: true });
+
+      expect(filtered.some(d => d.name === 'render_template')).toBe(true);
+      expect(filtered.some(d => d.name === 'script_sandbox')).toBe(false);
+    });
+
+    it('disableTemplates filters both render_template and script_sandbox', () => {
+      const filtered = getSessionToolDefs({ disableTemplates: true });
+
+      expect(filtered.some(d => d.name === 'render_template')).toBe(false);
+      expect(filtered.some(d => d.name === 'script_sandbox')).toBe(false);
+    });
+
+    it('disableSandbox and disableTemplates are OR logic for script_sandbox', () => {
+      const sandboxOnly = getSessionToolDefs({ disableSandbox: true });
+      expect(sandboxOnly.some(d => d.name === 'script_sandbox')).toBe(false);
+      expect(sandboxOnly.some(d => d.name === 'render_template')).toBe(true);
+
+      const templatesOnly = getSessionToolDefs({ disableTemplates: true });
+      expect(templatesOnly.some(d => d.name === 'script_sandbox')).toBe(false);
+      expect(templatesOnly.some(d => d.name === 'render_template')).toBe(false);
     });
 
     it('flags are independent — disabling one category does not affect others', () => {
@@ -153,10 +191,11 @@ describe('session tool filtering helpers', () => {
         disableBrowser: true,
         disableValidation: true,
         disableTemplates: true,
+        disableSandbox: true,
       });
       const names = new Set(filtered.map(d => d.name));
 
-      const allDisabled = new Set([...OAUTH_TOOLS, ...BROWSER_TOOLS, ...VALIDATION_TOOLS, ...TEMPLATE_TOOLS]);
+      const allDisabled = new Set([...OAUTH_TOOLS, ...BROWSER_TOOLS, ...VALIDATION_TOOLS, ...TEMPLATE_TOOLS, ...SANDBOX_TOOLS]);
       for (const tool of allDisabled) {
         expect(names.has(tool)).toBe(false);
       }

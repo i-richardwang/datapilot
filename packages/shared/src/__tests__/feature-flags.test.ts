@@ -1,11 +1,12 @@
 import { describe, it, expect, afterEach } from 'bun:test';
-import { isDevRuntime, isDeveloperFeedbackEnabled, isEmbeddedServerEnabled } from '../feature-flags.ts';
+import { isDevRuntime, isDeveloperFeedbackEnabled, isEmbeddedServerEnabled, isSandboxDisabled } from '../feature-flags.ts';
 
 const ORIGINAL_ENV = {
   NODE_ENV: process.env.NODE_ENV,
   DATAPILOT_DEBUG: process.env.DATAPILOT_DEBUG,
   CRAFT_FEATURE_DEVELOPER_FEEDBACK: process.env.CRAFT_FEATURE_DEVELOPER_FEEDBACK,
   CRAFT_FEATURE_EMBEDDED_SERVER: process.env.CRAFT_FEATURE_EMBEDDED_SERVER,
+  DATAPILOT_DISABLE_SANDBOX: process.env.DATAPILOT_DISABLE_SANDBOX,
 };
 
 afterEach(() => {
@@ -20,6 +21,9 @@ afterEach(() => {
 
   if (ORIGINAL_ENV.CRAFT_FEATURE_EMBEDDED_SERVER === undefined) delete process.env.CRAFT_FEATURE_EMBEDDED_SERVER;
   else process.env.CRAFT_FEATURE_EMBEDDED_SERVER = ORIGINAL_ENV.CRAFT_FEATURE_EMBEDDED_SERVER;
+
+  if (ORIGINAL_ENV.DATAPILOT_DISABLE_SANDBOX === undefined) delete process.env.DATAPILOT_DISABLE_SANDBOX;
+  else process.env.DATAPILOT_DISABLE_SANDBOX = ORIGINAL_ENV.DATAPILOT_DISABLE_SANDBOX;
 });
 
 describe('feature-flags runtime helpers', () => {
@@ -76,5 +80,35 @@ describe('feature-flags runtime helpers', () => {
     process.env.CRAFT_FEATURE_EMBEDDED_SERVER = '0';
 
     expect(isEmbeddedServerEnabled()).toBe(false);
+  });
+
+  it('isSandboxDisabled defaults to false when no override is set', () => {
+    delete process.env.DATAPILOT_DISABLE_SANDBOX;
+
+    expect(isSandboxDisabled()).toBe(false);
+  });
+
+  it('isSandboxDisabled returns true when set to "1"', () => {
+    process.env.DATAPILOT_DISABLE_SANDBOX = '1';
+
+    expect(isSandboxDisabled()).toBe(true);
+  });
+
+  it('isSandboxDisabled returns true when set to "true"', () => {
+    process.env.DATAPILOT_DISABLE_SANDBOX = 'true';
+
+    expect(isSandboxDisabled()).toBe(true);
+  });
+
+  it('isSandboxDisabled returns false when set to "0"', () => {
+    process.env.DATAPILOT_DISABLE_SANDBOX = '0';
+
+    expect(isSandboxDisabled()).toBe(false);
+  });
+
+  it('isSandboxDisabled returns false when set to empty string', () => {
+    process.env.DATAPILOT_DISABLE_SANDBOX = '';
+
+    expect(isSandboxDisabled()).toBe(false);
   });
 });
