@@ -69,6 +69,9 @@ import { getFileManagerName } from '@/lib/platform'
 import { ActionRegistryProvider } from '@/actions'
 import { toast } from 'sonner'
 
+/** True when running in web UI (browser) rather than Electron. */
+const isWebMode = window.electronAPI.getRuntimeEnvironment() === 'web'
+
 type AppState = 'loading' | 'onboarding' | 'reauth' | 'workspace-picker' | 'ready'
 
 /** Type for the Jotai store returned by useStore() */
@@ -1719,7 +1722,8 @@ export default function App() {
     // Read file as binary Uint8Array (used by PDF preview blocks)
     onReadFileBinary: (path: string) => window.electronAPI.readFileBinary(path),
     // Reveal a file in the system file manager (Finder on macOS, Explorer on Windows, etc.)
-    onRevealInFinder: (path: string) => {
+    // Hidden in web mode — no filesystem access, so menu item is omitted via undefined check.
+    onRevealInFinder: isWebMode ? undefined : (path: string) => {
       window.electronAPI.showInFolder(path).catch(() => {})
     },
     // Platform-specific file manager name for UI labels

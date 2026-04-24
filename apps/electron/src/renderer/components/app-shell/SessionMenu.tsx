@@ -53,6 +53,9 @@ import type { SessionMeta } from '@/atoms/sessions'
 import { getSessionStatus, hasUnreadMeta, hasMessagesMeta } from '@/utils/session'
 import { MessagingSessionMenuItem } from '@/components/messaging/MessagingSessionMenuItem'
 
+/** True when running in web UI (browser) rather than Electron. */
+const isWebMode = window.electronAPI.getRuntimeEnvironment() === 'web'
+
 export interface SessionMenuProps {
   /** Session data — display state is derived from this */
   item: SessionMeta
@@ -356,11 +359,13 @@ export function SessionMenu({
         <span className="flex-1">{t("sessionMenu.openInNewWindow")}</span>
       </MenuItem>
 
-      {/* Show in file manager */}
-      <MenuItem onClick={handleShowInFinder}>
-        <FolderOpen className="h-3.5 w-3.5" />
-        <span className="flex-1">{t("sessionMenu.showInFileManager", { fileManager: getFileManagerName() })}</span>
-      </MenuItem>
+      {/* Show in file manager — hidden in web mode */}
+      {!isWebMode && (
+        <MenuItem onClick={handleShowInFinder}>
+          <FolderOpen className="h-3.5 w-3.5" />
+          <span className="flex-1">{t("sessionMenu.showInFileManager", { fileManager: getFileManagerName() })}</span>
+        </MenuItem>
+      )}
 
       {/* Copy Path */}
       <MenuItem onClick={handleCopyPath}>
