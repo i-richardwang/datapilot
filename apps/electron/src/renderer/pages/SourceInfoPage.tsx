@@ -30,6 +30,9 @@ import {
 import type { LoadedSource, McpToolWithPermission } from '../../shared/types'
 import type { PermissionsConfigFile } from '@craft-agent/shared/agent/modes'
 
+/** True when running in web UI (browser) rather than Electron. */
+const isWebMode = window.electronAPI.getRuntimeEnvironment() === 'web'
+
 interface SourceInfoPageProps {
   sourceSlug: string
   workspaceId: string
@@ -370,7 +373,7 @@ export default function SourceInfoPage({ sourceSlug, workspaceId, onDelete }: So
             sourceSlug={sourceSlug}
             sourceName={sourceName}
             onOpenInNewWindow={handleOpenInNewWindow}
-            onShowInFinder={handleOpenSourceFolder}
+            onShowInFinder={!isWebMode ? handleOpenSourceFolder : undefined}
             onDelete={handleDelete}
           />
         }
@@ -424,12 +427,16 @@ export default function SourceInfoPage({ sourceSlug, workspaceId, onDelete }: So
               <Info_Table.Row label={t('common.type')} value={source.config.type.toUpperCase()} />
               {sourceUrl && (
                 <Info_Table.Row label={t('common.url')}>
-                  <button
-                    onClick={handleOpenUrl}
-                    className="truncate hover:underline text-foreground focus:outline-none focus-visible:underline text-left block w-full"
-                  >
-                    {sourceUrl}
-                  </button>
+                  {isWebMode && !(sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://')) ? (
+                    <span>{sourceUrl}</span>
+                  ) : (
+                    <button
+                      onClick={handleOpenUrl}
+                      className="truncate hover:underline text-foreground focus:outline-none focus-visible:underline text-left block w-full"
+                    >
+                      {sourceUrl}
+                    </button>
+                  )}
                 </Info_Table.Row>
               )}
               <Info_Table.Row label={t('sourceInfo.lastTested')} value={formatRelativeTime(source.config.lastTestedAt, t)} />

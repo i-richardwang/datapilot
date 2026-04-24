@@ -24,6 +24,9 @@ import {
 } from '@/components/info'
 import type { LoadedSkill } from '../../shared/types'
 
+/** True when running in web UI (browser) rather than Electron. */
+const isWebMode = window.electronAPI.getRuntimeEnvironment() === 'web'
+
 interface SkillInfoPageProps {
   skillSlug: string
   workspaceId: string
@@ -149,8 +152,7 @@ export default function SkillInfoPage({ skillSlug, workspaceId, workingDirectory
             skillSlug={skillSlug}
             skillName={skillName}
             onOpenInNewWindow={handleOpenInNewWindow}
-            onShowInFinder={handleOpenInFinder}
-            canShowInFinder={canRevealLocally}
+            onShowInFinder={!isWebMode && canRevealLocally ? handleOpenInFinder : undefined}
             onDelete={canDeleteSkill ? handleDelete : undefined}
             canDelete={canDeleteSkill}
             deleteLabel={canDeleteSkill ? t('skillInfo.deleteSkill') : t('skillInfo.managedByProject')}
@@ -194,12 +196,16 @@ export default function SkillInfoPage({ skillSlug, workspaceId, workingDirectory
                  t('skillInfo.sourceWorkspace')}
               </Info_Table.Row>
               <Info_Table.Row label={t('common.location')}>
-                <button
-                  onClick={handleLocationClick}
-                  className="hover:underline cursor-pointer text-left"
-                >
-                  {formatPath(skill.path)}
-                </button>
+                {isWebMode ? (
+                  <span>{formatPath(skill.path)}</span>
+                ) : (
+                  <button
+                    onClick={handleLocationClick}
+                    className="hover:underline cursor-pointer text-left"
+                  >
+                    {formatPath(skill.path)}
+                  </button>
+                )}
               </Info_Table.Row>
               {skill.metadata.requiredSources && skill.metadata.requiredSources.length > 0 && (
                 <Info_Table.Row label={t('skillInfo.requiredSources')}>
