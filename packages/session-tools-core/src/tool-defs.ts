@@ -611,7 +611,7 @@ export interface SessionToolFilterOptions {
   disableBrowser?: boolean;
   /** Exclude validation tools (mermaid_validate, skill_validate). Defaults to false. */
   disableValidation?: boolean;
-  /** Exclude template rendering tool (render_template). Defaults to false. */
+  /** Exclude template rendering tool (render_template); also excludes script_sandbox when true (OR logic with disableSandbox). Defaults to false. */
   disableTemplates?: boolean;
   /** Exclude sandbox execution tool (script_sandbox). Defaults to false.
    *  script_sandbox is also excluded when disableTemplates is true (OR logic). */

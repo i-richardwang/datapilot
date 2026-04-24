@@ -86,9 +86,9 @@ export function isValidationDisabled(): boolean {
 }
 
 /**
- * Build-time check: disable template tools (render_template, and — when
- * DATAPILOT_DISABLE_SANDBOX is also unset — script_sandbox).
+ * Build-time check: disable template tools (render_template).
  *
+ * Also filters script_sandbox when true (OR logic with disableSandbox).
  * Set DATAPILOT_DISABLE_TEMPLATES=1 at build time to enable.
  */
 export function isTemplatesDisabled(): boolean {
@@ -100,11 +100,11 @@ export function isTemplatesDisabled(): boolean {
 /**
  * Build-time check: disable sandbox tool (script_sandbox).
  *
- * Allows script_sandbox to be disabled independently of render_template.
- * When either disableSandbox or disableTemplates is true, script_sandbox
- * is filtered from the tool list (OR logic).
+ * Filters script_sandbox independently of render_template. When either
+ * disableSandbox or disableTemplates is true, script_sandbox is excluded
+ * from the tool list (OR logic).
  *
- * Set DATAPILOT_DISABLE_SANDBOX=1 to disable. Defaults to enabled.
+ * Set DATAPILOT_DISABLE_SANDBOX=1 at build time to enable.
  */
 export function isSandboxDisabled(): boolean {
   const override = parseBooleanEnv(process.env.DATAPILOT_DISABLE_SANDBOX);
@@ -149,7 +149,7 @@ export const FEATURE_FLAGS = {
   get disableValidation(): boolean {
     return isValidationDisabled();
   },
-  /** Disable template tools (render_template, and — when disableSandbox is also unset — script_sandbox). */
+  /** Disable template tools (render_template); also filters script_sandbox via OR logic with disableSandbox. */
   get disableTemplates(): boolean {
     return isTemplatesDisabled();
   },
