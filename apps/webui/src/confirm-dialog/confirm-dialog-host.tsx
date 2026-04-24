@@ -5,14 +5,16 @@
  * `requestConfirmDialog(...)` which resolves once the user picks an option in
  * the host component mounted near the app root. Visually this matches the
  * project's other Radix Dialog confirmations (e.g. delete-automation) — same
- * overlay, sizing, buttons, focus/ESC behavior.
+ * overlay, sizing, buttons, focus/ESC behavior, title + description layout
+ * with optional `<strong>` highlighting inside the description.
  */
 
 import { useSyncExternalStore } from 'react'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -22,6 +24,14 @@ import { Button } from '@/components/ui/button'
 export interface ConfirmDialogOptions {
   /** Already-translated title text shown in the dialog header. */
   title: string
+  /**
+   * Optional description rendered below the title. Provide an i18n key so the
+   * host can run it through `<Trans>` — that gives us `<strong>{{name}}</strong>`
+   * support to match the delete-automation dialog's style.
+   */
+  descriptionI18nKey?: string
+  /** Interpolation values for `descriptionI18nKey`. */
+  descriptionValues?: Record<string, unknown>
   /** Already-translated label for the confirm button. */
   confirmLabel: string
   /** If true, the confirm button uses the destructive variant. */
@@ -77,6 +87,7 @@ export function ConfirmDialogHost() {
   const { t } = useTranslation()
 
   const open = request !== null
+  const descriptionKey = request?.descriptionI18nKey
 
   return (
     <Dialog
@@ -85,9 +96,18 @@ export function ConfirmDialogHost() {
         if (!next) settle(false)
       }}
     >
-      <DialogContent showCloseButton={false} aria-describedby={undefined}>
+      <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{request?.title ?? ''}</DialogTitle>
+          {descriptionKey && (
+            <DialogDescription>
+              <Trans
+                i18nKey={descriptionKey}
+                values={request?.descriptionValues}
+                components={{ strong: <strong /> }}
+              />
+            </DialogDescription>
+          )}
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={() => settle(false)}>
