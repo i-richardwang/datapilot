@@ -86,12 +86,28 @@ export function isValidationDisabled(): boolean {
 }
 
 /**
- * Build-time check: disable template and sandbox tools (render_template, script_sandbox).
+ * Build-time check: disable template tools (render_template, and — when
+ * DATAPILOT_DISABLE_SANDBOX is also unset — script_sandbox).
  *
  * Set DATAPILOT_DISABLE_TEMPLATES=1 at build time to enable.
  */
 export function isTemplatesDisabled(): boolean {
   const override = parseBooleanEnv(process.env.DATAPILOT_DISABLE_TEMPLATES);
+  if (override !== undefined) return override;
+  return false;
+}
+
+/**
+ * Build-time check: disable sandbox tool (script_sandbox).
+ *
+ * Allows script_sandbox to be disabled independently of render_template.
+ * When either disableSandbox or disableTemplates is true, script_sandbox
+ * is filtered from the tool list (OR logic).
+ *
+ * Set DATAPILOT_DISABLE_SANDBOX=1 to disable. Defaults to enabled.
+ */
+export function isSandboxDisabled(): boolean {
+  const override = parseBooleanEnv(process.env.DATAPILOT_DISABLE_SANDBOX);
   if (override !== undefined) return override;
   return false;
 }
@@ -133,9 +149,13 @@ export const FEATURE_FLAGS = {
   get disableValidation(): boolean {
     return isValidationDisabled();
   },
-  /** Disable template and sandbox tools (render_template, script_sandbox). */
+  /** Disable template tools (render_template, and — when disableSandbox is also unset — script_sandbox). */
   get disableTemplates(): boolean {
     return isTemplatesDisabled();
+  },
+  /** Disable sandbox tool (script_sandbox) independently of templates. */
+  get disableSandbox(): boolean {
+    return isSandboxDisabled();
   },
   /** Streamlined UI — hides non-essential elements and extra statuses. */
   get liteUi(): boolean {

@@ -565,9 +565,13 @@ export const VALIDATION_TOOLS = new Set([
   'skill_validate',
 ]);
 
-/** Template rendering and sandbox tools. Disabled via DATAPILOT_DISABLE_TEMPLATES. */
+/** Template rendering tools. Disabled via DATAPILOT_DISABLE_TEMPLATES. */
 export const TEMPLATE_TOOLS = new Set([
   'render_template',
+]);
+
+/** Sandbox execution tool. Disabled via DATAPILOT_DISABLE_SANDBOX or DATAPILOT_DISABLE_TEMPLATES (OR logic). */
+export const SANDBOX_TOOLS = new Set([
   'script_sandbox',
 ]);
 
@@ -607,8 +611,11 @@ export interface SessionToolFilterOptions {
   disableBrowser?: boolean;
   /** Exclude validation tools (mermaid_validate, skill_validate). Defaults to false. */
   disableValidation?: boolean;
-  /** Exclude template and sandbox tools (render_template, script_sandbox). Defaults to false. */
+  /** Exclude template rendering tool (render_template). Defaults to false. */
   disableTemplates?: boolean;
+  /** Exclude sandbox execution tool (script_sandbox). Defaults to false.
+   *  script_sandbox is also excluded when disableTemplates is true (OR logic). */
+  disableSandbox?: boolean;
   /** Exclude UI/interaction tools for batch-spawned sessions. Defaults to false. */
   batchMode?: boolean;
   /** Minimal batch profile: only include tools in MINIMAL_BATCH_SESSION_TOOLS. Defaults to false. */
@@ -628,6 +635,7 @@ export function getSessionToolDefs(options?: SessionToolFilterOptions): SessionT
   const disableBrowser = options?.disableBrowser ?? false;
   const disableValidation = options?.disableValidation ?? false;
   const disableTemplates = options?.disableTemplates ?? false;
+  const disableSandbox = options?.disableSandbox ?? false;
   const batchMode = options?.batchMode ?? false;
   const minimalBatchMode = options?.minimalBatchMode ?? false;
 
@@ -648,6 +656,9 @@ export function getSessionToolDefs(options?: SessionToolFilterOptions): SessionT
       return false;
     }
     if (disableTemplates && TEMPLATE_TOOLS.has(def.name)) {
+      return false;
+    }
+    if ((disableSandbox || disableTemplates) && SANDBOX_TOOLS.has(def.name)) {
       return false;
     }
     if (minimalBatchMode) {
@@ -773,6 +784,7 @@ export function getToolDefsAsJsonSchema(opts?: {
   disableBrowser?: boolean;
   disableValidation?: boolean;
   disableTemplates?: boolean;
+  disableSandbox?: boolean;
   batchMode?: boolean;
 }): JsonSchemaToolDef[] {
   const prefix = opts?.prefix || '';
@@ -783,6 +795,7 @@ export function getToolDefsAsJsonSchema(opts?: {
     disableBrowser: opts?.disableBrowser,
     disableValidation: opts?.disableValidation,
     disableTemplates: opts?.disableTemplates,
+    disableSandbox: opts?.disableSandbox,
     batchMode: opts?.batchMode,
   });
 

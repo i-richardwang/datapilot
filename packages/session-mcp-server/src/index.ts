@@ -265,6 +265,7 @@ function createSessionTools(includeDeveloperFeedback: boolean): Tool[] {
     disableBrowser: FEATURE_FLAGS.disableBrowser,
     disableValidation: FEATURE_FLAGS.disableValidation,
     disableTemplates: FEATURE_FLAGS.disableTemplates,
+    disableSandbox: FEATURE_FLAGS.disableSandbox,
   }).map(def => ({
     name: def.name,
     description: def.description,
@@ -516,6 +517,7 @@ async function main() {
     disableBrowser: FEATURE_FLAGS.disableBrowser,
     disableValidation: FEATURE_FLAGS.disableValidation,
     disableTemplates: FEATURE_FLAGS.disableTemplates,
+    disableSandbox: FEATURE_FLAGS.disableSandbox,
   });
 
   // Create MCP server
