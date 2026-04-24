@@ -13,6 +13,7 @@ import { WsRpcClient } from '../../../electron/src/transport/client'
 import { buildClientApi } from '../../../electron/src/transport/build-api'
 import { CHANNEL_MAP } from '../../../electron/src/transport/channel-map'
 import type { ElectronAPI, TransportConnectionState } from '../../../electron/src/shared/types'
+import { requestConfirmDialog } from '../confirm-dialog/confirm-dialog-host'
 
 // ---------------------------------------------------------------------------
 // Web file picker (replaces native Electron dialog)
@@ -229,9 +230,19 @@ export function createWebApi(options: WebApiOptions): {
     openSkillInEditor: () => Promise.resolve(),
     openSkillInFinder: () => Promise.resolve(),
 
-    // Confirmation dialogs — use browser confirm()
-    showLogoutConfirmation: () => Promise.resolve(window.confirm(i18n.t('dialog.logoutConfirmation'))),
-    showDeleteSessionConfirmation: (name: string) => Promise.resolve(window.confirm(i18n.t('dialog.deleteSessionConfirmation', { name }))),
+    // Confirmation dialogs — render the project's Radix Dialog so the UI
+    // matches other in-app confirmations (e.g. delete-automation). The RPC
+    // signature stays Promise<boolean>; callers don't need to change.
+    showLogoutConfirmation: () => requestConfirmDialog({
+      title: i18n.t('dialog.logoutConfirmation'),
+      confirmLabel: i18n.t('webui.logOut'),
+      destructive: true,
+    }),
+    showDeleteSessionConfirmation: (name: string) => requestConfirmDialog({
+      title: i18n.t('dialog.deleteSessionConfirmation', { name }),
+      confirmLabel: i18n.t('common.delete'),
+      destructive: true,
+    }),
 
     // Power settings — not applicable
     getKeepAwakeWhileRunning: () => Promise.resolve(false),

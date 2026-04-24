@@ -9,6 +9,7 @@ import { setupI18n } from '@craft-agent/shared/i18n'
 import { initReactI18next } from 'react-i18next'
 import { useTranslation } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
+import { ConfirmDialogHost } from './confirm-dialog/confirm-dialog-host'
 import './index.css'
 
 // Initialize i18n before any React rendering
@@ -45,6 +46,7 @@ function Root() {
     <ThemeProvider activeWorkspaceId={workspaceId}>
       <App />
       <Toaster />
+      <ConfirmDialogHost />
     </ThemeProvider>
   )
 }
