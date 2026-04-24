@@ -25,6 +25,9 @@ import {
 import { useMenuComponents } from '@/components/ui/menu-context'
 import { getFileManagerName } from '@/lib/platform'
 
+/** True when running in web UI (browser) rather than Electron. */
+const isWebMode = window.electronAPI.getRuntimeEnvironment() === 'web'
+
 export interface SourceMenuProps {
   /** Source slug */
   sourceSlug: string
@@ -32,7 +35,7 @@ export interface SourceMenuProps {
   sourceName: string
   /** Callbacks */
   onOpenInNewWindow: () => void
-  onShowInFinder: () => void
+  onShowInFinder?: () => void
   onDelete: () => void
   /** Send to another workspace (omit to hide the option) */
   onSendToWorkspace?: () => void
@@ -63,11 +66,13 @@ export function SourceMenu({
         <span className="flex-1">{t("sidebarMenu.openInNewWindow")}</span>
       </MenuItem>
 
-      {/* Show in file manager */}
-      <MenuItem onClick={onShowInFinder}>
-        <FolderOpen className="h-3.5 w-3.5" />
-        <span className="flex-1">{t("sessionMenu.showInFileManager", { fileManager: getFileManagerName() })}</span>
-      </MenuItem>
+      {/* Show in file manager — hidden in web mode */}
+      {!isWebMode && onShowInFinder && (
+        <MenuItem onClick={onShowInFinder}>
+          <FolderOpen className="h-3.5 w-3.5" />
+          <span className="flex-1">{t("sessionMenu.showInFileManager", { fileManager: getFileManagerName() })}</span>
+        </MenuItem>
+      )}
 
       {/* Send to another workspace */}
       {onSendToWorkspace && (

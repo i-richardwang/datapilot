@@ -30,6 +30,9 @@ import {
 import type { LoadedSource, McpToolWithPermission } from '../../shared/types'
 import type { PermissionsConfigFile } from '@craft-agent/shared/agent/modes'
 
+/** True when running in web UI (browser) rather than Electron. */
+const isWebMode = window.electronAPI.getRuntimeEnvironment() === 'web'
+
 interface SourceInfoPageProps {
   sourceSlug: string
   workspaceId: string
@@ -370,7 +373,7 @@ export default function SourceInfoPage({ sourceSlug, workspaceId, onDelete }: So
             sourceSlug={sourceSlug}
             sourceName={sourceName}
             onOpenInNewWindow={handleOpenInNewWindow}
-            onShowInFinder={handleOpenSourceFolder}
+            onShowInFinder={!isWebMode ? handleOpenSourceFolder : undefined}
             onDelete={handleDelete}
           />
         }
