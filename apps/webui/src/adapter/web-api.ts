@@ -234,12 +234,15 @@ export function createWebApi(options: WebApiOptions): {
     // matches other in-app confirmations (e.g. delete-automation). The RPC
     // signature stays Promise<boolean>; callers don't need to change.
     showLogoutConfirmation: () => requestConfirmDialog({
-      title: i18n.t('dialog.logoutConfirmation'),
+      title: i18n.t('dialog.logout.title'),
+      descriptionI18nKey: 'dialog.logout.description',
       confirmLabel: i18n.t('webui.logOut'),
       destructive: true,
     }),
     showDeleteSessionConfirmation: (name: string) => requestConfirmDialog({
-      title: i18n.t('dialog.deleteSessionConfirmation', { name }),
+      title: i18n.t('dialog.deleteSession.title'),
+      descriptionI18nKey: 'dialog.deleteSession.description',
+      descriptionValues: { name },
       confirmLabel: i18n.t('common.delete'),
       destructive: true,
     }),
