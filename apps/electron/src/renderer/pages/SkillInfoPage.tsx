@@ -24,6 +24,9 @@ import {
 } from '@/components/info'
 import type { LoadedSkill } from '../../shared/types'
 
+/** True when running in web UI (browser) rather than Electron. */
+const isWebMode = window.electronAPI.getRuntimeEnvironment() === 'web'
+
 interface SkillInfoPageProps {
   skillSlug: string
   workspaceId: string
@@ -149,8 +152,7 @@ export default function SkillInfoPage({ skillSlug, workspaceId, workingDirectory
             skillSlug={skillSlug}
             skillName={skillName}
             onOpenInNewWindow={handleOpenInNewWindow}
-            onShowInFinder={handleOpenInFinder}
-            canShowInFinder={canRevealLocally}
+            onShowInFinder={!isWebMode && canRevealLocally ? handleOpenInFinder : undefined}
             onDelete={canDeleteSkill ? handleDelete : undefined}
             canDelete={canDeleteSkill}
             deleteLabel={canDeleteSkill ? t('skillInfo.deleteSkill') : t('skillInfo.managedByProject')}

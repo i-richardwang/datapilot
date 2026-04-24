@@ -11,6 +11,9 @@ import { EditPopover, getEditConfig } from '@/components/ui/EditPopover'
 import { useActiveWorkspace, useAppShellContext } from '@/context/AppShellContext'
 import type { LoadedSkill } from '../../../shared/types'
 
+/** True when running in web UI (browser) rather than Electron. */
+const isWebMode = window.electronAPI.getRuntimeEnvironment() === 'web'
+
 export interface SkillsListPanelProps {
   skills: LoadedSkill[]
   onDeleteSkill: (skillSlug: string) => void
@@ -88,12 +91,9 @@ export function SkillsListPanel({
             skillSlug={skill.slug}
             skillName={skill.metadata.name}
             onOpenInNewWindow={() => window.electronAPI.openUrl(`craftagents://skills/skill/${skill.slug}?window=focused`)}
-            onShowInFinder={() => {
-              if (canRevealLocally) {
-                void window.electronAPI.showInFolder(`${skill.path}/SKILL.md`)
-              }
-            }}
-            canShowInFinder={canRevealLocally}
+            onShowInFinder={!isWebMode && canRevealLocally ? () => {
+              void window.electronAPI.showInFolder(`${skill.path}/SKILL.md`)
+            } : undefined}
             onDelete={skill.source === 'workspace' ? () => onDeleteSkill(skill.slug) : undefined}
             canDelete={skill.source === 'workspace'}
             deleteLabel={skill.source === 'workspace' ? t('skillsList.deleteSkill') : t('skillsList.managedByProject')}

@@ -25,6 +25,9 @@ import { HeaderMenu } from '@/components/ui/HeaderMenu'
 import { routes } from '@/lib/navigate'
 import { getFileManagerName } from '@/lib/platform'
 
+/** True when running in web UI (browser) rather than Electron. */
+const isWebMode = window.electronAPI.getRuntimeEnvironment() === 'web'
+
 interface PreferencesFormState {
   name: string
   timezone: string
@@ -186,13 +189,15 @@ export default function PreferencesPage() {
   // Header actions
   const headerActions = (
     <div className="flex items-center gap-1.5">
-      <button
-        onClick={() => window.electronAPI.showInFolder('~/.datapilot/preferences.json')}
-        className="flex items-center gap-1 text-xs h-7 px-2 rounded-md bg-foreground/5 hover:bg-foreground/10 text-muted-foreground"
-        title={`Show in ${getFileManagerName()}`}
-      >
-        <ExternalLink className="h-3 w-3" />
-      </button>
+      {!isWebMode && (
+        <button
+          onClick={() => window.electronAPI.showInFolder('~/.datapilot/preferences.json')}
+          className="flex items-center gap-1 text-xs h-7 px-2 rounded-md bg-foreground/5 hover:bg-foreground/10 text-muted-foreground"
+          title={`Show in ${getFileManagerName()}`}
+        >
+          <ExternalLink className="h-3 w-3" />
+        </button>
+      )}
       <div className={`flex items-center gap-1.5 transition-opacity ${isDirty ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <button
           onClick={handleRevert}

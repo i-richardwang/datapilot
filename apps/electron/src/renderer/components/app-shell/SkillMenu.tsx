@@ -25,6 +25,9 @@ import {
 import { useMenuComponents } from '@/components/ui/menu-context'
 import { getFileManagerName } from '@/lib/platform'
 
+/** True when running in web UI (browser) rather than Electron. */
+const isWebMode = window.electronAPI.getRuntimeEnvironment() === 'web'
+
 export interface SkillMenuProps {
   /** Skill slug */
   skillSlug: string
@@ -32,9 +35,8 @@ export interface SkillMenuProps {
   skillName: string
   /** Callbacks */
   onOpenInNewWindow: () => void
-  onShowInFinder: () => void
+  onShowInFinder?: () => void
   onDelete?: () => void
-  canShowInFinder?: boolean
   canDelete?: boolean
   deleteLabel?: string
   /** Send to another workspace (omit to hide the option) */
@@ -51,7 +53,6 @@ export function SkillMenu({
   onOpenInNewWindow,
   onShowInFinder,
   onDelete,
-  canShowInFinder = true,
   canDelete = true,
   deleteLabel,
   onSendToWorkspace,
@@ -69,11 +70,13 @@ export function SkillMenu({
         <span className="flex-1">{t("sidebarMenu.openInNewWindow")}</span>
       </MenuItem>
 
-      {/* Show in file manager */}
-      <MenuItem onClick={onShowInFinder} disabled={!canShowInFinder}>
-        <FolderOpen className="h-3.5 w-3.5" />
-        <span className="flex-1">{t("sessionMenu.showInFileManager", { fileManager: getFileManagerName() })}</span>
-      </MenuItem>
+      {/* Show in file manager — hidden in web mode */}
+      {!isWebMode && onShowInFinder && (
+        <MenuItem onClick={onShowInFinder}>
+          <FolderOpen className="h-3.5 w-3.5" />
+          <span className="flex-1">{t("sessionMenu.showInFileManager", { fileManager: getFileManagerName() })}</span>
+        </MenuItem>
+      )}
 
       {/* Send to another workspace */}
       {onSendToWorkspace && (
