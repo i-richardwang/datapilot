@@ -333,10 +333,53 @@ grep -rn "Craft Agent" apps/electron/resources/docs/ apps/electron/resources/rel
 grep -rn '\.craft-agent' --include='*.ts' --include='*.tsx' --include='*.md' . \
   | grep -v node_modules | grep -v FORK_MERGE_GUIDE
 
-# 环境变量残留（排除 CRAFT_FEATURE_* 内部 flag）
-grep -rn 'CRAFT_SERVER_\|CRAFT_RPC_\|CRAFT_WEBUI_\|CRAFT_LITE_\|CRAFT_HEALTH_\|CRAFT_DEBUG\|CRAFT_VIEWER_\|CRAFT_CLI_\|CRAFT_BUN\|CRAFT_BATCH_\|CRAFT_COMMANDS_\|CRAFT_TLS_' \
-  --include="*.ts" --include="*.sh" --include="*.yaml" --include="*.json" \
-  --exclude="FORK_MERGE_GUIDE.md" --exclude-dir=node_modules --exclude-dir=.git . 2>/dev/null
+# 环境变量残留（allow-list 思路：列出 fork 保留的 CRAFT_* 命名空间，
+# 其它 CRAFT_* 出现都是疑似漏改 — 上游引入新 CRAFT_* env 也会触发）
+#
+# Fork 保留的 CRAFT_* 命名空间（不要改）：
+#
+#   1) Misc：
+#      - CRAFT_DEEPLINK_SCHEME       配合 craftagents:// scheme（fork 也保留）
+#      - CRAFT_FEATURE_*             内部 feature flag
+#
+#   2) Session/Workspace 标识符：
+#      - CRAFT_SESSION_DIR / CRAFT_SESSION_ID / CRAFT_SESSION_NAME / CRAFT_SESSION_METADATA
+#      - CRAFT_WORKSPACE_ID / CRAFT_WORKSPACE_PATH
+#
+#   3) Automation hook env vars（fork 的 automation 系统命名约定，
+#      utils.ts:256 还会把任意 payload key 动态生成 `CRAFT_<KEY>`）：
+#      - CRAFT_EVENT / CRAFT_EVENT_DATA
+#      - CRAFT_TOOL_*  (NAME, INPUT, RESPONSE)
+#      - CRAFT_AGENT_* (ID, TYPE)
+#      - CRAFT_LOCAL_* (TIME, DATE)
+#      - CRAFT_OLD_*   (MODE, STATE)
+#      - CRAFT_NEW_*   (MODE, STATE)
+#      - CRAFT_WH_*    (用户自定义 webhook secret prefix)
+#      - CRAFT_PROMPT / CRAFT_SOURCE / CRAFT_MODEL / CRAFT_ERROR
+#      - CRAFT_MESSAGE / CRAFT_TITLE / CRAFT_LABEL / CRAFT_IS_FLAGGED
+#
+# 其它 CRAFT_* 都已 rename 成 DATAPILOT_*（CONFIG_DIR, RPC_*, WEBUI_*,
+# SERVER_*, BUN, NODE, DEBUG, MESSAGING_*, DISABLE_*, VIEWER_*, ...）。
+# 重点扫新增/修改的 test 文件、scripts/、resources/。
+#
+# 备注：DATAPILOT_BRANCH_GUIDE.md 是描述 rename 历史的文档，所以排除。
+grep -rEn 'CRAFT_[A-Z_]+' \
+  --include="*.ts" --include="*.tsx" --include="*.sh" --include="*.ps1" \
+  --include="*.yaml" --include="*.yml" --include="*.json" --include="*.md" \
+  --exclude="FORK_MERGE_GUIDE.md" --exclude="SQLITE_MIGRATION_AND_CRAFT_CLI.md" \
+  --exclude="DATAPILOT_BRANCH_GUIDE.md" \
+  --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=release-notes . 2>/dev/null \
+  | grep -v -E 'CRAFT_(DEEPLINK_SCHEME(_PREFIX)?|FEATURE_[A-Z_]+|SESSION_(DIR|ID|NAME|METADATA)|WORKSPACE_(ID|PATH)|EVENT(_DATA)?|TOOL_[A-Z_]+|AGENT_[A-Z_]+|LOCAL_[A-Z_]+|OLD_[A-Z_]+|NEW_[A-Z_]+|WH_[A-Z_]*|PROMPT|SOURCE|MODEL|ERROR|MESSAGE|TITLE|LABEL|IS_FLAGGED)\b'
+
+# 小写品牌字符串残留（tempdir 前缀、fixture 路径、ID 等，cosmetic 但建议统一）
+# 注意：@craft-agent/* package 名是 fork 保留的（package.json 里），
+# craft-agents-oss 是 upstream repo URL，craftagents:// 是保留的 scheme
+grep -rEn 'craft[_-]agent[_-]|craft-agent\b' \
+  --include="*.ts" --include="*.tsx" --include="*.json" --include="*.md" \
+  --exclude="FORK_MERGE_GUIDE.md" --exclude="SQLITE_MIGRATION_AND_CRAFT_CLI.md" \
+  --exclude="DATAPILOT_BRANCH_GUIDE.md" --exclude="bun.lock" \
+  --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=release-notes . 2>/dev/null \
+  | grep -v "@craft-agent/" | grep -v "craft-agents-oss" | grep -v 'craft-agent[' | grep -v "node_modules"
 
 # CLI 二进制名
 grep -rn 'datapilot-cli\|craft-server\|craft-agent-batch' \
