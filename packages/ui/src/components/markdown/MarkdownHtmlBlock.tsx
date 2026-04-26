@@ -207,7 +207,7 @@ export function MarkdownHtmlBlock({ code, className }: MarkdownHtmlBlockProps) {
         </div>
 
         {/* Content area: hidden iframes for cached items + loading/error for uncached active */}
-        <div className="relative max-h-[400px] overflow-hidden">
+        <div className="relative max-h-[800px] overflow-hidden">
           {/* Render all cached items as hidden iframes — prevents flash on tab switch */}
           {items.map((item, i) => {
             const processed = processedCache[item.src]
@@ -220,7 +220,7 @@ export function MarkdownHtmlBlock({ code, className }: MarkdownHtmlBlockProps) {
                 title={item.label || spec.title || t('preview.htmlPreview')}
                 className="w-full border-0 bg-white"
                 style={{
-                  height: '400px',
+                  height: '800px',
                   display: i === activeIndex ? 'block' : 'none',
                 }}
               />
