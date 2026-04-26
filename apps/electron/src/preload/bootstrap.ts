@@ -17,7 +17,7 @@
  */
 
 import '@sentry/electron/preload'
-import { contextBridge, ipcRenderer, shell } from 'electron'
+import { contextBridge, ipcRenderer, shell, webUtils } from 'electron'
 import { WsRpcClient, type TransportConnectionState } from '../transport/client'
 import { RoutedClient } from '../transport/routed-client'
 import { buildClientApi } from '../transport/build-api'
@@ -431,5 +431,16 @@ client.onConnectionStateChanged((state) => {
 // Web-only: guards the Download as zip header button. Electron uses "View in Finder".
 ;(api as ElectronAPI).downloadSessionZip = () =>
   Promise.reject(new Error('downloadSessionZip is web-only; Electron should use showInFolder'))
+
+// webUtils.getPathForFile: returns the absolute OS path of a File object obtained
+// from <input type="file"> or OS drag-drop. Returns null for Files fabricated from
+// Blobs (clipboard paste, web-drag) — those are content-only, no filesystem path.
+;(api as ElectronAPI).getFilePath = (file: File) => {
+  try {
+    return webUtils.getPathForFile(file) || null
+  } catch {
+    return null
+  }
+}
 
 contextBridge.exposeInMainWorld('electronAPI', api)

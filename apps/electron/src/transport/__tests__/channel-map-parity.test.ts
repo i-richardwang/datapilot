@@ -29,6 +29,7 @@ type ApiToChannelMapKeys = Exclude<
   | 'changeLanguage' // direct IPC to main process — syncs i18n language
   | 'downloadSessionFile' // web-only; preload stub rejects, web adapter triggers <a download>
   | 'downloadSessionZip' // web-only; preload stub rejects, web adapter triggers <a download>
+  | 'getFilePath' // renderer-local — webUtils.getPathForFile, no IPC round-trip
 > | BrowserPaneKeys
 type ChannelMapKeys = keyof typeof CHANNEL_MAP & string
 
