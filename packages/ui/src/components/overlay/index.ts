@@ -21,4 +21,5 @@ export { ImagePreviewOverlay, type ImagePreviewOverlayProps } from './ImagePrevi
 export { PDFPreviewOverlay, type PDFPreviewOverlayProps } from './PDFPreviewOverlay'
 export { MermaidPreviewOverlay, type MermaidPreviewOverlayProps } from './MermaidPreviewOverlay'
 export { HTMLPreviewOverlay, type HTMLPreviewOverlayProps } from './HTMLPreviewOverlay'
+export { HtmlSharePasswordDialog, type HtmlSharePasswordDialogProps, type HtmlSharePasswordMode } from './HtmlSharePasswordDialog'
 export { ActivityCardsOverlay, type ActivityCardsOverlayProps } from './ActivityCardsOverlay'

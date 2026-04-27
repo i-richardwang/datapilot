@@ -80,6 +80,12 @@ Won't conflict unless upstream adds similarly-named features.
 | `docker-compose.yml` | One-command deployment: server + viewer |
 | `.env.docker` | Environment variable template |
 
+### HTML Share Password Dialog
+
+| Location | Purpose |
+|----------|---------|
+| `packages/ui/src/components/overlay/HtmlSharePasswordDialog.tsx` | Set / change / clear the password on a shared HTML artifact. Mirrors the session-level `SharePasswordDialog` (kept in `apps/electron/`) so the two share flows stay symmetric. Lives in `packages/ui/` because `HTMLPreviewOverlay` is cross-platform; backend interaction goes through `PlatformActions` (`onShareHtml` with optional password, `onSetHtmlSharePassword`) instead of `window.electronAPI` directly. |
+
 ---
 
 ## Modified Upstream Files (Conflict Zone)

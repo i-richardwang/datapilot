@@ -14,6 +14,8 @@ import { createContext, useContext, type ReactNode } from 'react'
 export interface HtmlShareEntry {
   sharedUrl: string
   sharedId: string
+  /** True when the artifact is gated by a password on the viewer-server. */
+  passwordSet?: boolean
 }
 
 export interface SessionContextValue {

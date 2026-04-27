@@ -1824,10 +1824,16 @@ export default function App() {
       window.electronAPI.setTrafficLightsVisible(visible)
     },
     // Share HTML artifact for a session — uploads to viewer-server, copies URL,
-    // and records the share under the session's htmlShares map.
-    onShareHtml: async (sessionId: string, html: string) => {
-      const result = await window.electronAPI.sessionCommand(sessionId, { type: 'shareHtml', html }) as
-        | { success: true; sharedUrl: string; sharedId: string; contentHash: string }
+    // and records the share under the session's htmlShares map. Pass `password`
+    // to gate the artifact at upload time (avoids a follow-up setSharePassword
+    // round-trip for the "share with password" flow).
+    onShareHtml: async (sessionId: string, html: string, password?: string | null) => {
+      const hasPassword = typeof password === 'string' && password.length > 0
+      const command = hasPassword
+        ? { type: 'shareHtml' as const, html, password: password as string }
+        : { type: 'shareHtml' as const, html }
+      const result = await window.electronAPI.sessionCommand(sessionId, command) as
+        | { success: true; sharedUrl: string; sharedId: string; contentHash: string; hasPassword?: boolean }
         | { success: false; error: string }
         | undefined
       if (!result || !result.success) {
@@ -1835,13 +1841,22 @@ export default function App() {
         toast.error(t('toast.failedToShare'), { description: error })
         throw new Error(error)
       }
-      try {
-        await navigator.clipboard.writeText(result.sharedUrl)
-      } catch (clipboardError) {
-        console.warn('Failed to copy share URL to clipboard:', clipboardError)
+      // The "share with password" flow shows its own toast (with the URL) from
+      // the dialog; only auto-toast on the public path.
+      if (!hasPassword) {
+        try {
+          await navigator.clipboard.writeText(result.sharedUrl)
+        } catch (clipboardError) {
+          console.warn('Failed to copy share URL to clipboard:', clipboardError)
+        }
+        toast.success(t('toast.linkCopied'))
       }
-      toast.success(t('toast.linkCopied'))
-      return { sharedUrl: result.sharedUrl, sharedId: result.sharedId, contentHash: result.contentHash }
+      return {
+        sharedUrl: result.sharedUrl,
+        sharedId: result.sharedId,
+        contentHash: result.contentHash,
+        hasPassword: result.hasPassword === true,
+      }
     },
     // Overwrite a previously shared HTML artifact in place.
     onUpdateHtmlShare: async (sessionId: string, sharedId: string, html: string) => {
@@ -1869,6 +1884,30 @@ export default function App() {
         throw new Error(error)
       }
       toast.success(t('htmlShare.sharingStopped'))
+    },
+    // Set / change / clear the password on a previously shared HTML artifact.
+    // Mirrors the session-level setSharePassword flow — `currentPassword` is
+    // required to authorise the change when the artifact is already gated;
+    // `newPassword: null` clears the password.
+    onSetHtmlSharePassword: async (
+      sessionId: string,
+      sharedId: string,
+      args: { currentPassword?: string; newPassword: string | null },
+    ) => {
+      const result = await window.electronAPI.sessionCommand(sessionId, {
+        type: 'setHtmlSharePassword',
+        sharedId,
+        currentPassword: args.currentPassword,
+        newPassword: args.newPassword,
+      }) as
+        | { success: true; hasPassword: boolean }
+        | { success: false; error: string }
+        | undefined
+      if (!result || !result.success) {
+        const error = result && 'error' in result ? result.error : t('toast.unknownError')
+        throw new Error(error)
+      }
+      return { hasPassword: result.hasPassword }
     },
   }), [handleOpenFile, handleOpenUrl, linkInterceptor.openFileExternal, t])
 

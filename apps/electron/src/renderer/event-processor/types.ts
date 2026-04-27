@@ -428,7 +428,7 @@ export interface SessionUnsharedEvent {
 export interface SessionHtmlSharesChangedEvent {
   type: 'session_html_shares_changed'
   sessionId: string
-  htmlShares: Record<string, { sharedUrl: string; sharedId: string }>
+  htmlShares: Record<string, { sharedUrl: string; sharedId: string; passwordSet?: boolean }>
 }
 
 /**

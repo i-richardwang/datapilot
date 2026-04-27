@@ -11,12 +11,13 @@
  */
 
 import * as React from 'react'
-import { Globe, Copy, RefreshCw, Link2Off, Info } from 'lucide-react'
+import { Globe, Copy, RefreshCw, Link2Off, Info, Lock } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { PreviewOverlay } from './PreviewOverlay'
 import { CopyButton } from './CopyButton'
 import { ItemNavigator } from './ItemNavigator'
+import { HtmlSharePasswordDialog, type HtmlSharePasswordMode } from './HtmlSharePasswordDialog'
 import { usePlatform } from '../../context/PlatformContext'
 import { useSessionContext } from '../../context/SessionContext'
 import { ShareCloudIconButton, ShareCloudMenuIcon } from '../ui/ShareCloudIconButton'
@@ -109,8 +110,12 @@ function ShareLinkButton({
 }) {
   const { t } = useTranslation()
   const session = useSessionContext()
-  const { onShareHtml, onUpdateHtmlShare, onRevokeHtmlShare, onOpenUrl } = usePlatform()
+  const { onShareHtml, onUpdateHtmlShare, onRevokeHtmlShare, onSetHtmlSharePassword, onOpenUrl } = usePlatform()
   const [anchorSharedId, setAnchorSharedId] = React.useState<string | null>(null)
+  const [passwordDialog, setPasswordDialog] = React.useState<{ open: boolean; mode: HtmlSharePasswordMode }>({
+    open: false,
+    mode: 'share',
+  })
 
   const currentHash = useContentHash(html)
   const htmlShares = session?.htmlShares
@@ -162,6 +167,31 @@ function ShareLinkButton({
     }
   }
 
+  const openPasswordDialog = (mode: HtmlSharePasswordMode) => {
+    setPasswordDialog({ open: true, mode })
+  }
+
+  const handlePasswordDialogComplete = (result: { hasPassword: boolean; sharedUrl?: string }) => {
+    // For 'share' mode the dialog drove the upload; adopt the new sharedId so
+    // the button flips to the post-share state. For 'change' mode the
+    // sharedId is unchanged, but the htmlShares map will refresh its
+    // passwordSet flag via the session_html_shares_changed event.
+    if (result.sharedUrl) {
+      // Find the new entry by URL — anchorEntry will follow once htmlShares
+      // updates from the server event. As a fallback for immediate UI flip,
+      // walk the map to pick up the matching sharedId.
+      const map = session?.htmlShares
+      if (map) {
+        for (const entry of Object.values(map)) {
+          if (entry.sharedUrl === result.sharedUrl) {
+            setAnchorSharedId(entry.sharedId)
+            break
+          }
+        }
+      }
+    }
+  }
+
   const handleCopyLink = async () => {
     if (!anchorEntry) return
     await navigator.clipboard.writeText(anchorEntry.sharedUrl)
@@ -197,74 +227,105 @@ function ShareLinkButton({
   }
 
   const tooltip = isShared ? t('htmlShare.shared') : t('htmlShare.share')
+  const passwordSet = anchorEntry?.passwordSet === true
+  // onShareHtml is always defined past the guard above; password flows
+  // additionally need onSetHtmlSharePassword to set / change / clear it.
+  const canShareWithPassword = !!onSetHtmlSharePassword
+  const canChangePassword = !!onSetHtmlSharePassword && passwordSet
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <ShareCloudIconButton
-          isShared={isShared}
-          title={tooltip}
-          aria-label={tooltip}
-          className={className}
-        />
-      </DropdownMenuTrigger>
-      <StyledDropdownMenuContent align="end" sideOffset={8} style={{ zIndex: 'var(--z-floating-menu, 400)' }}>
-        {isShared ? (
-          <>
-            {onOpenUrl && (
-              <StyledDropdownMenuItem onClick={handleOpenInBrowser}>
-                <Globe className="h-3.5 w-3.5" />
-                <span className="flex-1">{t('htmlShare.openInBrowser')}</span>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <ShareCloudIconButton
+            isShared={isShared}
+            title={tooltip}
+            aria-label={tooltip}
+            className={className}
+          />
+        </DropdownMenuTrigger>
+        <StyledDropdownMenuContent align="end" sideOffset={8} style={{ zIndex: 'var(--z-floating-menu, 400)' }}>
+          {isShared ? (
+            <>
+              {onOpenUrl && (
+                <StyledDropdownMenuItem onClick={handleOpenInBrowser}>
+                  <Globe className="h-3.5 w-3.5" />
+                  <span className="flex-1">{t('htmlShare.openInBrowser')}</span>
+                </StyledDropdownMenuItem>
+              )}
+              <StyledDropdownMenuItem onClick={handleCopyLink}>
+                <Copy className="h-3.5 w-3.5" />
+                <span className="flex-1">{t('htmlShare.copyLink')}</span>
               </StyledDropdownMenuItem>
-            )}
-            <StyledDropdownMenuItem onClick={handleCopyLink}>
-              <Copy className="h-3.5 w-3.5" />
-              <span className="flex-1">{t('htmlShare.copyLink')}</span>
-            </StyledDropdownMenuItem>
-            {onUpdateHtmlShare && (
-              <StyledDropdownMenuItem onClick={handleUpdateShare}>
-                <RefreshCw className="h-3.5 w-3.5" />
-                <span className="flex-1">{t('htmlShare.updateShare')}</span>
+              {onUpdateHtmlShare && (
+                <StyledDropdownMenuItem onClick={handleUpdateShare}>
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span className="flex-1">{t('htmlShare.updateShare')}</span>
+                </StyledDropdownMenuItem>
+              )}
+              {canChangePassword && (
+                <StyledDropdownMenuItem onClick={() => openPasswordDialog('change')}>
+                  <Lock className="h-3.5 w-3.5" />
+                  <span className="flex-1">{t('htmlShare.changeSharePassword')}</span>
+                </StyledDropdownMenuItem>
+              )}
+              {onRevokeHtmlShare && (
+                <>
+                  <StyledDropdownMenuSeparator />
+                  <StyledDropdownMenuItem onClick={handleRevokeShare} variant="destructive">
+                    <Link2Off className="h-3.5 w-3.5" />
+                    <span className="flex-1">{t('htmlShare.stopSharing')}</span>
+                  </StyledDropdownMenuItem>
+                </>
+              )}
+              {onOpenUrl && (
+                <>
+                  <StyledDropdownMenuSeparator />
+                  <StyledDropdownMenuItem onClick={handleLearnMore}>
+                    <Info className="h-3.5 w-3.5" />
+                    <span className="flex-1">{t('chat.learnMore')}</span>
+                  </StyledDropdownMenuItem>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <StyledDropdownMenuItem onClick={handleShare} disabled={!html}>
+                <ShareCloudMenuIcon />
+                <span className="flex-1">{t('chat.shareOnline')}</span>
               </StyledDropdownMenuItem>
-            )}
-            {onRevokeHtmlShare && (
-              <>
-                <StyledDropdownMenuSeparator />
-                <StyledDropdownMenuItem onClick={handleRevokeShare} variant="destructive">
-                  <Link2Off className="h-3.5 w-3.5" />
-                  <span className="flex-1">{t('htmlShare.stopSharing')}</span>
+              {canShareWithPassword && (
+                <StyledDropdownMenuItem onClick={() => openPasswordDialog('share')} disabled={!html}>
+                  <Lock className="h-3.5 w-3.5" />
+                  <span className="flex-1">{t('htmlShare.shareWithPassword')}</span>
                 </StyledDropdownMenuItem>
-              </>
-            )}
-            {onOpenUrl && (
-              <>
-                <StyledDropdownMenuSeparator />
-                <StyledDropdownMenuItem onClick={handleLearnMore}>
-                  <Info className="h-3.5 w-3.5" />
-                  <span className="flex-1">{t('chat.learnMore')}</span>
-                </StyledDropdownMenuItem>
-              </>
-            )}
-          </>
-        ) : (
-          <>
-            <StyledDropdownMenuItem onClick={handleShare} disabled={!html}>
-              <ShareCloudMenuIcon />
-              <span className="flex-1">{t('chat.shareOnline')}</span>
-            </StyledDropdownMenuItem>
-            {onOpenUrl && (
-              <>
-                <StyledDropdownMenuSeparator />
-                <StyledDropdownMenuItem onClick={handleLearnMore}>
-                  <Info className="h-3.5 w-3.5" />
-                  <span className="flex-1">{t('chat.learnMore')}</span>
-                </StyledDropdownMenuItem>
-              </>
-            )}
-          </>
-        )}
-      </StyledDropdownMenuContent>
-    </DropdownMenu>
+              )}
+              {onOpenUrl && (
+                <>
+                  <StyledDropdownMenuSeparator />
+                  <StyledDropdownMenuItem onClick={handleLearnMore}>
+                    <Info className="h-3.5 w-3.5" />
+                    <span className="flex-1">{t('chat.learnMore')}</span>
+                  </StyledDropdownMenuItem>
+                </>
+              )}
+            </>
+          )}
+        </StyledDropdownMenuContent>
+      </DropdownMenu>
+      <HtmlSharePasswordDialog
+        open={passwordDialog.open}
+        onOpenChange={(next) => setPasswordDialog((prev) => ({ ...prev, open: next }))}
+        mode={passwordDialog.mode}
+        sessionId={session.sessionId}
+        html={html}
+        sharedId={anchorEntry?.sharedId}
+        hasExistingPassword={passwordSet}
+        onShareHtml={onShareHtml ? (sid, body, password) => onShareHtml(sid, body, password) : undefined}
+        onSetHtmlSharePassword={onSetHtmlSharePassword}
+        onComplete={handlePasswordDialogComplete}
+      />
+    </>
   )
 }
 

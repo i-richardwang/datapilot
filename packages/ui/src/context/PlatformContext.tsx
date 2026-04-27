@@ -119,10 +119,14 @@ export interface PlatformActions {
    * viewer-server and persists the sharedUrl/sharedId under the session's
    * `htmlShares` map (keyed by sha256(html) content hash).
    *
+   * Pass an optional `password` to gate the artifact behind a password in
+   * the same call (avoids a second round-trip via `onSetHtmlSharePassword`
+   * for the "share with password" flow).
+   *
    * Implementations should surface their own error feedback (e.g. toast);
    * throwing lets callers reset transient UI state.
    */
-  onShareHtml?: (sessionId: string, html: string) => Promise<{ sharedUrl: string; sharedId: string; contentHash: string }>
+  onShareHtml?: (sessionId: string, html: string, password?: string | null) => Promise<{ sharedUrl: string; sharedId: string; contentHash: string; hasPassword: boolean }>
 
   /**
    * Overwrite the content of a previously shared HTML artifact. The
@@ -136,6 +140,19 @@ export interface PlatformActions {
    * the viewer-server and the session's `htmlShares` entry is cleared.
    */
   onRevokeHtmlShare?: (sessionId: string, sharedId: string) => Promise<void>
+
+  /**
+   * Set, change, or remove the password on a previously shared HTML
+   * artifact. Pass `newPassword: null` to remove the password; pass a
+   * non-empty string to set or rotate it. When the artifact already has a
+   * password, callers must supply `currentPassword` to authorise the
+   * change.
+   */
+  onSetHtmlSharePassword?: (
+    sessionId: string,
+    sharedId: string,
+    args: { currentPassword?: string; newPassword: string | null },
+  ) => Promise<{ hasPassword: boolean }>
 }
 
 const PlatformContext = createContext<PlatformActions>({})
