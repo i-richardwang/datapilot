@@ -317,20 +317,20 @@ The user will see a secure input UI with appropriate fields based on the auth mo
 
   update_user_preferences: `Update stored user preferences. Use this when you learn information about the user that would be helpful to remember for future conversations. This includes their name, timezone, location, preferred language, or any other relevant notes. Only update fields you have confirmed information about - don't guess.`,
 
-  transform_data: `Transform data files using a script and write structured output for datatable/spreadsheet blocks, or extract HTML content for html-preview blocks.
+  transform_data: `Run a script to shape large datasets (20+ rows) into JSON for datatable/spreadsheet blocks, or decode/extract content embedded in another file (e.g. base64 email body inside a JSON payload) into a standalone HTML/PDF/image file.
 
-Use this tool when you need to transform large datasets (20+ rows) into structured JSON for display, or extract/decode content for rich previews. Write a transform script that reads the input file and produces an output file, then reference it via \`"src"\` in your datatable/spreadsheet/html-preview/pdf-preview/image-preview block.
+Not needed when the file you want to preview already exists on disk — html-preview/pdf-preview/image-preview blocks accept any absolute path as \`"src"\`.
 
 **Workflow:**
 1. Call \`transform_data\` with a script that reads input files and writes output
-2. Output a datatable/spreadsheet block with \`"src": "data/output.json"\`, an html-preview block with \`"src": "data/output.html"\`, a pdf-preview block with \`"src": "data/output.pdf"\`, or an image-preview block with \`"src": "data/output.png"\`
+2. Output a datatable/spreadsheet/html-preview/pdf-preview/image-preview block with \`"src"\` pointing to the output file
 
 **Script conventions:**
 - Input file paths are passed as command-line arguments (last arg = output file path)
 - Python: \`sys.argv[1:-1]\` = input files, \`sys.argv[-1]\` = output path
 - Node/Bun: \`process.argv.slice(2, -1)\` = input files, \`process.argv.at(-1)\` = output path
 - For datatable/spreadsheet: output must be valid JSON: \`{"title": "...", "columns": [...], "rows": [...]}\`
-- For html-preview: output is an HTML file (any valid HTML)
+- Input files must be inside the session or skills directory
 
 **Security:** Runs in an isolated subprocess with no access to API keys or credentials. 30-second timeout.`,
 

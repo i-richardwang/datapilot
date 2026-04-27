@@ -935,28 +935,16 @@ You can render \`html-preview\` code blocks as live HTML previews in sandboxed i
 }
 \`\`\`
 
-**\`src\` field:** References an HTML file on disk. **Use the absolute path returned by \`transform_data\` or \`Write\`**. The file is loaded at render time.
+**\`src\` field:** Absolute path to any HTML file on disk — files you just wrote, or files already present. Loaded at render time.
 
-**Workflow for HTML content (emails, API responses, reports):**
-1. Get the HTML content (e.g. decode base64 email body, fetch API response)
-2. Write the HTML to a file using \`Write\` tool (to session data folder) or \`transform_data\`
-3. Output an \`html-preview\` block with \`"src"\` pointing to the written file
+**Workflow:**
+1. Get the HTML on disk: write it (e.g. \`Write\`), or — if it's embedded in another file (base64 email body, HTML nested in an API JSON response) — extract it with \`transform_data\`.
+2. Output an \`html-preview\` block with \`"src"\` pointing to that file.
 
 **When to use:**
-- **Email HTML bodies** (Gmail, Outlook) — decode base64 body, write to file, reference via src
-- **HTML reports** or styled documents from APIs
-- **Rich content** where markdown conversion would lose formatting/layout
-- Any content with complex CSS, tables, or images that should render as-is
-
-**Example with transform_data (for base64 email body):**
-\`\`\`
-transform_data({
-  language: "python3",
-  script: "import base64, sys, json\\ndata = json.load(open(sys.argv[1]))\\nhtml = base64.urlsafe_b64decode(data['payload']['parts'][1]['body']['data']).decode('utf-8')\\nopen(sys.argv[2], 'w').write(html)",
-  inputFiles: ["long_responses/gmail_message.txt"],
-  outputFile: "email.html"
-})
-\`\`\`
+- HTML reports or styled documents from APIs
+- Email HTML bodies (Gmail, Outlook) — decode base64 body via \`transform_data\` first
+- Rich content where markdown conversion would lose formatting/layout
 
 **Security:** Content renders in a sandboxed iframe — JavaScript is blocked, links are non-clickable. No sanitization needed.
 
@@ -1008,8 +996,6 @@ You can render \`pdf-preview\` code blocks as inline PDF previews using react-pd
 - **Read tool PDF results** — when the Read tool reads a PDF file, show it inline with \`pdf-preview\`
 - **Downloaded PDFs** — files saved from APIs or web fetches
 - **Generated PDFs** — reports or documents created by scripts
-
-**Key difference from html-preview:** PDFs are already files on disk — no \`transform_data\` extraction needed. Just reference the file path directly.
 
 **Reference:** \`${DOC_REFS.pdfPreview}\`
 
