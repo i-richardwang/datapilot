@@ -1,11 +1,20 @@
-# DataPilot — Docker Compose
+# DataPilot — example Docker Compose deployment.
 #
-# Quick start:
-#   1. cp .env.docker .env
-#   2. Edit .env — set DATAPILOT_SERVER_TOKEN
-#      (or generate one: docker compose run --rm server --generate-token)
+# This file is a portable starting point — keep it in the source repo. Real
+# deployments should copy it to a private location (outside the repo) and
+# layer on host-specific bind mounts (Work vault, skillshub, project skill
+# repos, etc.) without polluting the public source tree.
+#
+# Quick start (generic):
+#   1. cp docker-compose.example.yml docker-compose.yml
+#   2. cp .env.example .env  &&  edit .env (set DATAPILOT_SERVER_TOKEN)
 #   3. docker compose up --build
 #   4. Open http://localhost:9100
+#
+# For a richer example with project-specific mounts (skillshub overlays,
+# per-project agent workspaces with symlinked skills, talent-graph readonly
+# share-source mounts), see the host-specific deployment kept under
+# `~/Documents/docker/datapilot-deploy/` (private).
 
 services:
   server:
@@ -27,6 +36,7 @@ services:
       - DATAPILOT_RPC_HOST=0.0.0.0
       - DATAPILOT_RPC_PORT=9100
       - DATAPILOT_HEALTH_PORT=9101
+      - DATAPILOT_VIEWER_URL=${DATAPILOT_VIEWER_URL:-http://host.docker.internal:9101}
     volumes:
       - ${DATAPILOT_DATA_DIR:-~/.datapilot}:/home/datapilot/.datapilot
     healthcheck:
@@ -52,3 +62,6 @@ services:
     volumes:
       - ${VIEWER_DATA_DIR:-viewer-data}:/data
     restart: unless-stopped
+
+volumes:
+  viewer-data:

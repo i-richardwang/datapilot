@@ -29,7 +29,7 @@ Our fork adds 9 categories of changes:
 
 8. **Self-Hosted Viewer Server** (`apps/viewer-server/`) — 独立 HTTP 后端，替代 upstream `agents.craft.do` 的 session 分享服务。`Dockerfile.viewer` 独立部署在 9101 端口。`VIEWER_URL` 可通过 `DATAPILOT_VIEWER_URL` 环境变量配置。
 
-9. **Docker Compose Deployment** — `docker-compose.yml` + `.env.docker` 一键部署 server (9100) + viewer (9101)。
+9. **Docker Compose Deployment** — `docker-compose.example.yml` 提供通用 server (9100) + viewer (9101) 编排示例。host-specific 部署清单（含 Work / skillshub / agent-workspace 等本机挂载、自定义 build context）放在仓外的 `~/Documents/docker/datapilot-deploy/`，避免把个人路径 commit 进开源仓。
 
 ---
 
@@ -77,8 +77,7 @@ Won't conflict unless upstream adds similarly-named features.
 |----------|---------|
 | `apps/viewer-server/` | Bun HTTP server: routes, fs/S3 storage, serves `apps/viewer/dist` |
 | `Dockerfile.viewer` | Container for viewer-server (port 9101) |
-| `docker-compose.yml` | One-command deployment: server + viewer |
-| `.env.docker` | Environment variable template |
+| `docker-compose.example.yml` | Generic server + viewer compose example. Host-specific compose (with Work / skillshub / agent-workspace mounts) lives outside the repo at `~/Documents/docker/datapilot-deploy/`. |
 
 ### HTML Share Password Dialog
 
