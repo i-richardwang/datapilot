@@ -74,3 +74,10 @@ credentials.enc
 # act (local GitHub Actions runner)
 .secrets
 .actrc
+
+# Proprietary font binaries — see apps/electron/src/renderer/index.css
+# @font-face entries. CSS references these paths but the .ttf files are kept
+# out of the repo until they're swapped for licence-compatible alternatives.
+apps/electron/src/renderer/assets/fonts/*.ttf
+apps/electron/src/renderer/assets/fonts/*.woff
+apps/electron/src/renderer/assets/fonts/*.woff2
