@@ -379,6 +379,11 @@ export function HTMLPreviewOverlay({
   const [activeIdx, setActiveIdx] = React.useState(initialIndex)
   const iframeRef = React.useRef<HTMLIFrameElement>(null)
   const [contentSize, setContentSize] = React.useState<{ width: number; height: number } | null>(null)
+  // Tracks whether the iframe has fired `onLoad`. Decoupled from `contentSize`
+  // because cross-origin sandbox blocks `contentDocument` reads, so the
+  // measurement path may never set contentSize even when the iframe has
+  // rendered fine. Used purely for the fade-in opacity gate.
+  const [hasLoaded, setHasLoaded] = React.useState(false)
 
   // Internal content cache (merges external + locally loaded)
   const [internalCache, setInternalCache] = React.useState<Record<string, string>>({})
@@ -401,12 +406,14 @@ export function HTMLPreviewOverlay({
     if (isOpen) {
       setActiveIdx(initialIndex)
       setContentSize(null)
+      setHasLoaded(false)
     }
   }, [isOpen, initialIndex])
 
   // Reset size when active item changes
   React.useEffect(() => {
     setContentSize(null)
+    setHasLoaded(false)
     setLoadError(null)
   }, [activeIdx])
 
@@ -434,8 +441,12 @@ export function HTMLPreviewOverlay({
     [activeContent]
   )
 
-  // Read iframe content dimensions after it loads
+  // Read iframe content dimensions after it loads. Best-effort: cross-origin
+  // sandbox (no `allow-same-origin`) blocks contentDocument access, so this
+  // path may no-op silently — the viewport-relative fallback below handles
+  // that case.
   const handleLoad = React.useCallback(() => {
+    setHasLoaded(true)
     const iframe = iframeRef.current
     if (!iframe) return
     try {
@@ -457,8 +468,6 @@ export function HTMLPreviewOverlay({
   const iframeHeight = contentSize
     ? `${contentSize.height}px`
     : 'calc(100vh - 200px)'
-
-  const measured = contentSize !== null
 
   // Header actions: item navigation + share + copy button
   const headerActions = (
@@ -495,7 +504,7 @@ export function HTMLPreviewOverlay({
             style={{
               maxWidth: contentSize?.width ? `${contentSize.width + 128}px` : undefined,
               padding: '24px 64px 36px',
-              opacity: measured ? 1 : 0,
+              opacity: hasLoaded ? 1 : 0,
               transition: 'opacity 200ms ease-in',
             }}
           >
