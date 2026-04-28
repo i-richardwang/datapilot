@@ -23,9 +23,12 @@
  * Flash prevention: All cached items are rendered as hidden iframes (display:none/block).
  * Switching tabs toggles CSS visibility — no re-parse, no flash.
  *
- * Security: iframe uses `sandbox` attribute without `allow-scripts`,
- * blocking all JavaScript execution. `allow-same-origin` is included
- * so CSS and images resolve correctly.
+ * Security: iframe sandbox is `allow-scripts allow-top-navigation-by-user-activation`.
+ * Scripts run (so ECharts / D3 / Plotly / similar interactive reports work)
+ * but in a unique opaque origin — `allow-same-origin` is deliberately
+ * omitted so the iframe cannot reach into the parent app's DOM, cookies,
+ * or storage. CSS / images use inline content or absolute URLs (CDN, data:);
+ * relative same-origin resolution is sacrificed for the security boundary.
  */
 
 import * as React from 'react'
@@ -215,7 +218,7 @@ export function MarkdownHtmlBlock({ code, className }: MarkdownHtmlBlockProps) {
             return (
               <iframe
                 key={item.src}
-                sandbox="allow-same-origin allow-top-navigation-by-user-activation"
+                sandbox="allow-scripts allow-top-navigation-by-user-activation"
                 srcDoc={processed}
                 title={item.label || spec.title || t('preview.htmlPreview')}
                 className="w-full border-0 bg-white"

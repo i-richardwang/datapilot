@@ -2,12 +2,19 @@
  * HTMLPreviewOverlay - Fullscreen overlay for viewing rendered HTML content.
  *
  * Uses PreviewOverlay as the base for consistent modal/fullscreen behavior.
- * Renders HTML in a sandboxed iframe (no script execution).
- * Links open in the system browser via Electron's will-navigate handler.
+ * Renders HTML in a sandboxed iframe with `allow-scripts` so interactive
+ * reports (ECharts, D3, Plotly, etc.) work; `allow-same-origin` is
+ * deliberately omitted so the iframe cannot reach into the parent app's DOM.
+ * Links open in the system browser via Electron's will-navigate handler
+ * (`allow-top-navigation-by-user-activation`).
  *
  * Supports multiple items with arrow navigation in the header.
- * The iframe auto-sizes to its content height by reading contentDocument.scrollHeight
- * on load (possible because allow-same-origin is set).
+ *
+ * Iframe height: previously read `contentDocument.scrollHeight` to fit content.
+ * That path requires same-origin and is now blocked by the cross-origin
+ * sandbox — the read still runs in a try/catch and falls back to a
+ * viewport-relative default (`calc(100vh - 200px)`), which is fine for the
+ * fullscreen overlay's "use the whole viewport" intent.
  */
 
 import * as React from 'react'
@@ -494,7 +501,7 @@ export function HTMLPreviewOverlay({
           >
             <iframe
               ref={iframeRef}
-              sandbox="allow-same-origin allow-top-navigation-by-user-activation"
+              sandbox="allow-scripts allow-top-navigation-by-user-activation"
               srcDoc={processedHtml}
               onLoad={handleLoad}
               title={activeItem?.label || title || 'HTML Preview'}
