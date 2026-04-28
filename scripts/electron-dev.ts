@@ -305,7 +305,10 @@ async function runEsbuild(
       platform: "node",
       format: "cjs",
       outfile: join(ROOT_DIR, outfile),
-      external: ["electron"],
+      // Keep in sync with externals in scripts/electron-build-main.ts.
+      // bun:sqlite is a Bun runtime builtin (Electron runs Node, never reachable);
+      // better-sqlite3 is a native module loaded at runtime, not bundled.
+      external: ["electron", "bun:sqlite", "better-sqlite3"],
       ...(options.packagesExternal ? { packages: "external" as const } : {}),
       ...(options.alias ? { alias: options.alias } : {}),
       define: defines,
@@ -542,7 +545,8 @@ async function main(): Promise<void> {
     platform: "node",
     format: "cjs",
     outfile: join(ROOT_DIR, "apps/electron/dist/main.cjs"),
-    external: ["electron"],
+    // Keep in sync with runEsbuild() defaults and scripts/electron-build-main.ts.
+    external: ["electron", "bun:sqlite", "better-sqlite3"],
     alias: MAIN_PROCESS_ALIAS,
     define: oauthDefines,
     logLevel: "info",
