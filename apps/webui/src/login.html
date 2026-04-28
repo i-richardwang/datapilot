@@ -8,36 +8,46 @@
   <link rel="icon" type="image/x-icon" href="./favicon.ico" />
   <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
   <meta name="theme-color" content="#1F1F24" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap" rel="stylesheet">
   <style>
+    /*
+     * Login page — kept in sync with the renderer theme defined in
+     * apps/electron/src/renderer/index.css. Two values must track:
+     *   --accent    matches the brand accent (orange in light, purple in dark)
+     *   --font-*    matches the Kami serif stack used app-wide
+     * Border radius is 0 to match the rest of the UI.
+     */
     :root {
       color-scheme: light dark;
-      --page-bg: #f8f8fa;
-      --page-fg: #1a1a2e;
-      --card-bg: rgba(255, 255, 255, 0.86);
-      --card-border: rgba(228, 228, 232, 0.9);
-      --card-shadow: 0 32px 96px rgba(41, 25, 63, 0.14), 0 16px 40px rgba(41, 25, 63, 0.08);
-      --subtitle: rgba(26, 26, 46, 0.56);
-      --input-bg: rgba(255, 255, 255, 0.72);
-      --input-border: rgba(212, 212, 216, 0.95);
-      --placeholder: rgba(26, 26, 46, 0.34);
-      --accent: #6d5dfc;
-      --accent-hover: #5a4be0;
-      --ambient-strong: rgba(104, 78, 133, 0.18);
-      --ambient-soft: rgba(104, 78, 133, 0.1);
-      --grain-1: rgba(104, 78, 133, 0.055);
-      --grain-2: rgba(104, 78, 133, 0.03);
+
+      --page-bg: oklch(0.98 0.003 265);
+      --page-fg: oklch(0.185 0.01 270);
+      --card-bg: color-mix(in srgb, var(--page-bg) 90%, transparent);
+      --card-border: color-mix(in srgb, var(--page-fg) 12%, transparent);
+      --card-shadow: 0 24px 72px color-mix(in srgb, var(--page-fg) 8%, transparent),
+                     0 8px 24px color-mix(in srgb, var(--page-fg) 5%, transparent);
+      --subtitle: color-mix(in srgb, var(--page-fg) 56%, transparent);
+      --input-bg: color-mix(in srgb, var(--page-bg) 70%, transparent);
+      --input-border: color-mix(in srgb, var(--page-fg) 18%, transparent);
+      --placeholder: color-mix(in srgb, var(--page-fg) 35%, transparent);
+
+      --accent: oklch(0.6716 0.1368 48.5130);    /* light-mode brand accent (orange) */
+      --accent-hover: oklch(0.62 0.14 48.5);
+      --accent-ring: color-mix(in srgb, var(--accent) 18%, transparent);
+
+      --ambient: color-mix(in srgb, var(--accent) 14%, transparent);
+      --ambient-soft: color-mix(in srgb, var(--accent) 7%, transparent);
+
       --error-bg: #fef2f2;
       --error-border: #fecaca;
       --error-fg: #b91c1c;
+
+      --font-serif: Charter, Georgia, "TsangerJinKai02", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", Palatino, serif;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: var(--font-serif);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -50,34 +60,20 @@
       padding: 16px;
     }
 
-    body::before,
-    body::after {
+    body::before {
       content: '';
       position: absolute;
-      inset: 0;
-      pointer-events: none;
-    }
-
-    body::before {
       inset: -18%;
+      pointer-events: none;
       background:
-        radial-gradient(circle at 18% 20%, var(--ambient-strong) 0, transparent 34%),
-        radial-gradient(circle at 82% 18%, var(--ambient-soft) 0, transparent 28%),
-        radial-gradient(circle at 76% 76%, rgba(104, 78, 133, 0.16) 0, transparent 34%),
-        radial-gradient(circle at 30% 78%, rgba(104, 78, 133, 0.11) 0, transparent 30%);
-      filter: blur(44px);
-      opacity: 0.95;
+        radial-gradient(circle at 18% 20%, var(--ambient) 0, transparent 38%),
+        radial-gradient(circle at 82% 22%, var(--ambient-soft) 0, transparent 32%),
+        radial-gradient(circle at 76% 78%, var(--ambient) 0, transparent 36%),
+        radial-gradient(circle at 28% 80%, var(--ambient-soft) 0, transparent 30%);
+      filter: blur(48px);
+      opacity: 0.85;
       transform: scale(1.08);
-      animation: drift 24s ease-in-out infinite alternate;
-    }
-
-    body::after {
-      background:
-        radial-gradient(circle at center, rgba(104, 78, 133, 0.06), transparent 58%),
-        repeating-linear-gradient(135deg, var(--grain-1) 0 1px, transparent 1px 7px),
-        repeating-linear-gradient(45deg, var(--grain-2) 0 1px, transparent 1px 11px);
-      opacity: 0.45;
-      mix-blend-mode: multiply;
+      animation: drift 28s ease-in-out infinite alternate;
     }
 
     .card {
@@ -88,17 +84,18 @@
       padding: 32px;
       background: var(--card-bg);
       border: 1px solid var(--card-border);
-      border-radius: 20px;
+      border-radius: 0;
       text-align: center;
       box-shadow: var(--card-shadow);
-      backdrop-filter: blur(24px) saturate(140%);
-      -webkit-backdrop-filter: blur(24px) saturate(140%);
+      backdrop-filter: blur(20px) saturate(130%);
+      -webkit-backdrop-filter: blur(20px) saturate(130%);
     }
 
     h1 {
-      font-size: 20px;
+      font-size: 22px;
       font-weight: 600;
       margin-bottom: 4px;
+      letter-spacing: -0.005em;
     }
 
     .subtitle {
@@ -121,9 +118,9 @@
       width: 100%;
       padding: 10px 12px;
       font-size: 14px;
-      font-family: 'JetBrains Mono', monospace;
+      font-family: var(--font-serif);
       border: 1px solid var(--input-border);
-      border-radius: 8px;
+      border-radius: 0;
       outline: none;
       background: var(--input-bg);
       color: var(--page-fg);
@@ -136,7 +133,7 @@
 
     input:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(109, 93, 252, 0.1);
+      box-shadow: 0 0 0 3px var(--accent-ring);
     }
 
     button {
@@ -145,27 +142,23 @@
       padding: 10px;
       font-size: 14px;
       font-weight: 500;
-      font-family: 'Inter', sans-serif;
+      font-family: var(--font-serif);
       color: white;
-      background: linear-gradient(180deg, #7b6dff 0%, var(--accent) 100%);
-      border: none;
-      border-radius: 8px;
+      background: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 0;
       cursor: pointer;
-      transition: transform 0.15s, filter 0.15s, background 0.15s;
-      box-shadow: 0 10px 24px rgba(109, 93, 252, 0.28);
+      transition: background 0.15s, border-color 0.15s, filter 0.15s;
     }
 
     button:hover {
-      background: linear-gradient(180deg, #705fff 0%, var(--accent-hover) 100%);
-      transform: translateY(-1px);
-      filter: brightness(1.02);
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
     }
 
     button:disabled {
       opacity: 0.6;
       cursor: not-allowed;
-      transform: none;
-      filter: none;
     }
 
     .error {
@@ -175,7 +168,7 @@
       font-size: 13px;
       background: var(--error-bg);
       border: 1px solid var(--error-border);
-      border-radius: 8px;
+      border-radius: 0;
       color: var(--error-fg);
     }
 
@@ -190,32 +183,28 @@
       body::before {
         animation: none;
       }
-
-      button {
-        transition: background 0.15s;
-      }
-
-      button:hover {
-        transform: none;
-        filter: none;
-      }
     }
 
     @media (prefers-color-scheme: dark) {
       :root {
-        --page-bg: #0f0f14;
-        --page-fg: #e0e0e8;
-        --card-bg: rgba(26, 26, 34, 0.82);
-        --card-border: rgba(42, 42, 53, 0.95);
-        --card-shadow: 0 32px 96px rgba(0, 0, 0, 0.42), 0 16px 40px rgba(0, 0, 0, 0.24);
-        --subtitle: rgba(224, 224, 232, 0.64);
-        --input-bg: rgba(15, 15, 20, 0.72);
-        --input-border: rgba(42, 42, 53, 0.95);
-        --placeholder: rgba(224, 224, 232, 0.32);
-        --ambient-strong: rgba(155, 123, 184, 0.22);
-        --ambient-soft: rgba(155, 123, 184, 0.12);
-        --grain-1: rgba(155, 123, 184, 0.06);
-        --grain-2: rgba(155, 123, 184, 0.035);
+        --page-bg: oklch(0.145 0.015 270);
+        --page-fg: oklch(0.95 0.01 270);
+        --card-bg: color-mix(in srgb, var(--page-bg) 82%, transparent);
+        --card-border: color-mix(in srgb, var(--page-fg) 14%, transparent);
+        --card-shadow: 0 24px 72px rgba(0, 0, 0, 0.4),
+                       0 8px 24px rgba(0, 0, 0, 0.22);
+        --subtitle: color-mix(in srgb, var(--page-fg) 60%, transparent);
+        --input-bg: color-mix(in srgb, var(--page-bg) 70%, transparent);
+        --input-border: color-mix(in srgb, var(--page-fg) 18%, transparent);
+        --placeholder: color-mix(in srgb, var(--page-fg) 32%, transparent);
+
+        --accent: oklch(0.65 0.22 293);          /* dark-mode brand accent (purple) */
+        --accent-hover: oklch(0.7 0.22 293);
+        --accent-ring: color-mix(in srgb, var(--accent) 22%, transparent);
+
+        --ambient: color-mix(in srgb, var(--accent) 18%, transparent);
+        --ambient-soft: color-mix(in srgb, var(--accent) 9%, transparent);
+
         --error-bg: #2d1a1a;
         --error-border: #5a2020;
         --error-fg: #f5a0a0;
