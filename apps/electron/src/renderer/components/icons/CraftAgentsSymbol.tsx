@@ -3,21 +3,21 @@ interface CraftAgentsSymbolProps {
 }
 
 /**
- * DataPilot "E" symbol - the small pixel art icon
+ * DataPilot "D" symbol - the small pixel art icon
  * Uses accent color from theme (currentColor from className)
  */
 export function CraftAgentsSymbol({ className }: CraftAgentsSymbolProps) {
   return (
     <svg
-      viewBox="452 368 115 129"
+      viewBox="0 0 820 837"
       className={className}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
       <path
-        d="M474.78218,393.8 L474.78218,368 L566.666667,368 L566.666667,393.8 L474.78218,393.8 Z M521.101,419.6 L521.102306,445.4 L452,445.4 L452,393.8 L566.666667,393.8 L566.666667,419.6 L521.101,419.6 Z M474.78218,497 L474.775667,471.2 L452,471.2 L452,445.4 L566.666667,445.4 L566.666667,497 L474.78218,497 Z"
+        d="M0 0H564V78H666V154H769V257H820V633H769V718H718V786H615V837H0V666H102V206H0ZM308 206H512V257H564V334H615V530H564V597H512V666H308Z"
         fill="currentColor"
-        fillRule="nonzero"
+        fillRule="evenodd"
       />
     </svg>
   )

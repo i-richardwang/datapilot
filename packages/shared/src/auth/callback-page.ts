@@ -122,14 +122,16 @@ export function generateCallbackPage(options: {
       font-size: 14px;
       font-weight: 500;
       color: #fff;
-      background-color: #8b5fb3;
+      /* Accent: oklch(0.6716 0.1368 48.5130) */
+      background-color: #d87943;
       border-radius: 6px;
       text-decoration: none;
       transition: background-color 0.15s ease;
     }
 
     .return-link:hover {
-      background-color: #7a4fa3;
+      /* Darker accent: oklch(0.62 0.135 47) */
+      background-color: #c66937;
     }
 
     @media (prefers-color-scheme: dark) {
@@ -137,8 +139,8 @@ export function generateCallbackPage(options: {
         background-color: #1a1a1a;
       }
       .logo {
-        /* Brighter purple in dark mode: oklch(0.68 0.13 293) */
-        color: #a882c9;
+        /* Dark accent: oklch(0.7214 0.1337 49.9802) */
+        color: #e78a53;
       }
       .card {
         ${isSuccess

@@ -49,22 +49,21 @@ export interface SessionViewerProps {
 }
 
 /**
- * CraftAgentLogo - The Craft Agent "C" logo for branding
+ * CraftAgentLogo - The DataPilot "D" logo for branding
  */
 function CraftAgentLogo({ className }: { className?: string }) {
   return (
     <svg
       className={className}
-      viewBox="0 0 24 24"
+      viewBox="0 0 820 837"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <g transform="translate(3.4502, 3)" fill="currentColor">
-        <path
-          d="M3.17890888,3.6 L3.17890888,0 L16,0 L16,3.6 L3.17890888,3.6 Z M9.642,7.2 L9.64218223,10.8 L0,10.8 L0,3.6 L16,3.6 L16,7.2 L9.642,7.2 Z M3.17890888,18 L3.178,14.4 L0,14.4 L0,10.8 L16,10.8 L16,18 L3.17890888,18 Z"
-          fillRule="nonzero"
-        />
-      </g>
+      <path
+        d="M0 0H564V78H666V154H769V257H820V633H769V718H718V786H615V837H0V666H102V206H0ZM308 206H512V257H564V334H615V530H564V597H512V666H308Z"
+        fill="currentColor"
+        fillRule="evenodd"
+      />
     </svg>
   )
 }
@@ -225,7 +224,7 @@ export function SessionViewer({
 
             {/* Bottom branding */}
             <div className={CHAT_CLASSES.brandingContainer}>
-              <CraftAgentLogo className="w-8 h-8 text-[#9570BE]/40" />
+              <CraftAgentLogo className="w-8 h-8 text-accent/40" />
             </div>
             </div>
           </div>
