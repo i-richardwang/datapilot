@@ -134,6 +134,10 @@ export function registerWorkspaceCoreHandlers(server: RpcServer, deps: HandlerDe
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (workspace) {
       sessionManager.setupConfigWatcher(workspace.rootPath, workspaceId)
+      // Persist as the active workspace so consumers that fall back to
+      // getActiveWorkspace() (e.g. webui's initial WS handshake) see the
+      // workspace the user is actually using, not just the last-created one.
+      setActiveWorkspace(workspace.id)
     }
     end()
 

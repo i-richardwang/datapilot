@@ -372,16 +372,20 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
       })
     }
 
-    // Return the default workspace ID so the webui can include it in the WS handshake
+    // Return the default workspace ID + the id/slug list so the webui can
+    // resolve a `?ws=<slug>` URL parameter back to a workspace id during the
+    // initial WS handshake (the runtime URL uses slugs everywhere).
     if (path === '/api/config/workspaces' && req.method === 'GET') {
       const configSession = await validateSession(req.headers.get('cookie'), secret)
       if (!configSession) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 })
       }
-      const { getActiveWorkspace } = await import('@craft-agent/shared/config/storage')
+      const { getActiveWorkspace, getWorkspaces } = await import('@craft-agent/shared/config/storage')
       const active = getActiveWorkspace()
+      const workspaces = getWorkspaces().map(w => ({ id: w.id, slug: w.slug, name: w.name }))
       return Response.json({
         defaultWorkspaceId: active?.id ?? null,
+        workspaces,
       })
     }
 

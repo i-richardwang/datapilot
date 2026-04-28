@@ -85,18 +85,29 @@ export default function App() {
       const { wsUrl } = await configRes.json() as { wsUrl: string }
       if (!wsUrl) throw new Error('Server did not return a WebSocket URL')
 
-      // 2. Determine workspace — check URL params first
+      // 2. Determine workspace from URL — `?workspace=<id>` (legacy) or
+      // `?ws=<slug>` (what NavigationContext writes at runtime, so refreshes
+      // can restore the user's actual workspace instead of always falling
+      // back to the server default).
       const params = new URLSearchParams(window.location.search)
       let workspaceId = params.get('workspace') ?? undefined
+      const wsSlugFromUrl = !workspaceId ? params.get('ws') ?? undefined : undefined
 
-      // If no workspace in URL, fetch the default from the server
-      // so we can include it in the WebSocket handshake
+      // Fetch server's workspace list when we still need to resolve a slug or
+      // fall back to the default — combined into a single endpoint hit.
       if (!workspaceId) {
         try {
           const wsRes = await fetch('/api/config/workspaces', { credentials: 'same-origin' })
           if (wsRes.ok) {
-            const { defaultWorkspaceId } = await wsRes.json() as { defaultWorkspaceId?: string }
-            if (defaultWorkspaceId) workspaceId = defaultWorkspaceId
+            const { defaultWorkspaceId, workspaces } = await wsRes.json() as {
+              defaultWorkspaceId?: string
+              workspaces?: { id: string; slug: string; name: string }[]
+            }
+            if (wsSlugFromUrl && workspaces) {
+              const matched = workspaces.find(w => w.slug === wsSlugFromUrl)
+              if (matched) workspaceId = matched.id
+            }
+            if (!workspaceId && defaultWorkspaceId) workspaceId = defaultWorkspaceId
           }
         } catch {
           // Non-fatal — workspace will be set via switchWorkspace later
