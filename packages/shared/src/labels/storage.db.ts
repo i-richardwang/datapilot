@@ -14,29 +14,41 @@ import { migrateLabelColors } from '../colors/migrate.ts';
 
 // ─── Defaults ───────────────────────────────────────────────────────────────
 
+/**
+ * Default label set for new workspaces.
+ *
+ * Picked for DataPilot's data-analysis positioning. Three flat categorical
+ * labels mark workflow stage / output type:
+ *   Cleaning  — data prep / transformation (most analyst data work)
+ *   Analysis  — exploration / modeling / investigation
+ *   Report    — deliverables (writeups, dashboards, visualizations)
+ * Plus two valued labels carrying typed metadata per session:
+ *   Priority  — number, for ordering / triage
+ *   Project   — string, for grouping sessions under a named project
+ *
+ * Sub-categories were intentionally dropped after evaluating overlap
+ * (e.g. "exploration vs visualization" blur inside Analysis); the flat shape
+ * keeps classification fast for non-DS users while leaving room for
+ * per-workspace customization.
+ */
 export function getDefaultLabelConfig(): WorkspaceLabelConfig {
   return {
     version: 1,
     labels: [
       {
-        id: 'development',
-        name: 'Development',
-        color: { light: '#3B82F6', dark: '#60A5FA' },
-        children: [
-          { id: 'code', name: 'Code', color: { light: '#4F46E5', dark: '#818CF8' } },
-          { id: 'bug', name: 'Bug', color: { light: '#0EA5E9', dark: '#38BDF8' } },
-          { id: 'automation', name: 'Automation', color: { light: '#06B6D4', dark: '#22D3EE' } },
-        ],
+        id: 'cleaning',
+        name: 'Cleaning',
+        color: { light: '#3B82F6', dark: '#60A5FA' }, // blue — data prep
       },
       {
-        id: 'content',
-        name: 'Content',
-        color: { light: '#8B5CF6', dark: '#A78BFA' },
-        children: [
-          { id: 'writing', name: 'Writing', color: { light: '#7C3AED', dark: '#C4B5FD' } },
-          { id: 'research', name: 'Research', color: { light: '#A855F7', dark: '#C084FC' } },
-          { id: 'design', name: 'Design', color: { light: '#D946EF', dark: '#E879F9' } },
-        ],
+        id: 'analysis',
+        name: 'Analysis',
+        color: { light: '#8B5CF6', dark: '#A78BFA' }, // purple — analytical work
+      },
+      {
+        id: 'report',
+        name: 'Report',
+        color: { light: '#10B981', dark: '#34D399' }, // green — deliverable
       },
       {
         id: 'priority',

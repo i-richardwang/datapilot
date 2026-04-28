@@ -5,7 +5,9 @@
  * Labels are stored at {workspaceRootPath}/labels/config.json
  *
  * Hierarchy: Labels form a nested JSON tree. IDs are simple slugs.
- * New workspaces are seeded with default labels (Development + Content groups).
+ * New workspaces are seeded with default labels — three flat categorical
+ * labels (Cleaning / Analysis / Report) plus two valued labels (Priority,
+ * Project). See `getDefaultLabelConfig()` below for rationale.
  * Labels are visual by color only (colored circles in the UI).
  */
 
@@ -22,60 +24,39 @@ const LABEL_CONFIG_FILE = 'labels/config.json';
 
 /**
  * Get default label configuration.
- * Provides a starter set of labels organized into two complementary color families:
- * - Development (blue family): Code, Bug, Automation
- * - Content (purple family): Writing, Research, Design
- * Plus flat valued labels: Priority (number), Project (string)
  *
- * Children use hue-shifted shades of their parent color to show visual hierarchy.
+ * Picked for DataPilot's data-analysis positioning. Three flat categorical
+ * labels mark workflow stage / output type:
+ *   Cleaning  — data prep / transformation (most analyst data work)
+ *   Analysis  — exploration / modeling / investigation
+ *   Report    — deliverables (writeups, dashboards, visualizations)
+ * Plus two valued labels carrying typed metadata per session:
+ *   Priority  — number, for ordering / triage
+ *   Project   — string, for grouping sessions under a named project
+ *
+ * Sub-categories were intentionally dropped after evaluating overlap
+ * (e.g. "exploration vs visualization" blur inside Analysis); the flat shape
+ * keeps classification fast for non-DS users while leaving room for
+ * per-workspace customization.
  */
 export function getDefaultLabelConfig(): WorkspaceLabelConfig {
   return {
     version: 1,
     labels: [
       {
-        id: 'development',
-        name: 'Development',
-        color: { light: '#3B82F6', dark: '#60A5FA' },
-        children: [
-          {
-            id: 'code',
-            name: 'Code',
-            color: { light: '#4F46E5', dark: '#818CF8' }, // indigo shift
-          },
-          {
-            id: 'bug',
-            name: 'Bug',
-            color: { light: '#0EA5E9', dark: '#38BDF8' }, // sky shift
-          },
-          {
-            id: 'automation',
-            name: 'Automation',
-            color: { light: '#06B6D4', dark: '#22D3EE' }, // cyan shift
-          },
-        ],
+        id: 'cleaning',
+        name: 'Cleaning',
+        color: { light: '#3B82F6', dark: '#60A5FA' }, // blue — data prep
       },
       {
-        id: 'content',
-        name: 'Content',
-        color: { light: '#8B5CF6', dark: '#A78BFA' },
-        children: [
-          {
-            id: 'writing',
-            name: 'Writing',
-            color: { light: '#7C3AED', dark: '#C4B5FD' }, // deeper violet
-          },
-          {
-            id: 'research',
-            name: 'Research',
-            color: { light: '#A855F7', dark: '#C084FC' }, // lighter purple
-          },
-          {
-            id: 'design',
-            name: 'Design',
-            color: { light: '#D946EF', dark: '#E879F9' }, // fuchsia shift
-          },
-        ],
+        id: 'analysis',
+        name: 'Analysis',
+        color: { light: '#8B5CF6', dark: '#A78BFA' }, // purple — analytical work
+      },
+      {
+        id: 'report',
+        name: 'Report',
+        color: { light: '#10B981', dark: '#34D399' }, // green — deliverable
       },
       {
         id: 'priority',
