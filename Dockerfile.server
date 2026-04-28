@@ -152,7 +152,7 @@ EXPOSE 9100
 # Smart entrypoint: drop from root to datapilot when the container platform
 # (e.g. Zeabur) ignores the Dockerfile USER directive and runs as root.
 # Claude Agent SDK refuses --dangerously-skip-permissions under root.
-RUN printf '#!/bin/sh\nset -e\nif [ "$(id -u)" = "0" ]; then\n  chown -R datapilot:datapilot /home/datapilot 2>/dev/null || true\n  export HOME=/home/datapilot\n  exec gosu datapilot "$@"\nfi\nexec "$@"\n' > /usr/local/bin/entrypoint.sh && \
+RUN printf '#!/bin/sh\nset -e\nif [ "$(id -u)" = "0" ]; then\n  export HOME="${HOME:-/home/datapilot}"\n  mkdir -p "$HOME"\n  chown -R datapilot:datapilot "$HOME" 2>/dev/null || true\n  exec gosu datapilot "$@"\nfi\nexec "$@"\n' > /usr/local/bin/entrypoint.sh && \
     chmod +x /usr/local/bin/entrypoint.sh
 
 # Default to non-root, but entrypoint handles root->datapilot fallback
