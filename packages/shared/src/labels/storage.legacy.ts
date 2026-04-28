@@ -6,7 +6,7 @@
  *
  * Hierarchy: Labels form a nested JSON tree. IDs are simple slugs.
  * New workspaces are seeded with default labels — three flat categorical
- * labels (Cleaning / Analysis / Report) plus two valued labels (Priority,
+ * labels (Preparation / Analysis / Report) plus two valued labels (Priority,
  * Project). See `getDefaultLabelConfig()` below for rationale.
  * Labels are visual by color only (colored circles in the UI).
  */
@@ -27,9 +27,9 @@ const LABEL_CONFIG_FILE = 'labels/config.json';
  *
  * Picked for DataPilot's data-analysis positioning. Three flat categorical
  * labels mark workflow stage / output type:
- *   Cleaning  — data prep / transformation (most analyst data work)
- *   Analysis  — exploration / modeling / investigation
- *   Report    — deliverables (writeups, dashboards, visualizations)
+ *   Preparation — data prep / cleaning / transformation
+ *   Analysis    — exploration / modeling / investigation
+ *   Report      — deliverables (writeups, dashboards, visualizations)
  * Plus two valued labels carrying typed metadata per session:
  *   Priority  — number, for ordering / triage
  *   Project   — string, for grouping sessions under a named project
@@ -44,8 +44,8 @@ export function getDefaultLabelConfig(): WorkspaceLabelConfig {
     version: 1,
     labels: [
       {
-        id: 'cleaning',
-        name: 'Cleaning',
+        id: 'preparation',
+        name: 'Preparation',
         color: { light: '#3B82F6', dark: '#60A5FA' }, // blue — data prep
       },
       {

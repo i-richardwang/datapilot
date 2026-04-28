@@ -19,9 +19,9 @@ import { migrateLabelColors } from '../colors/migrate.ts';
  *
  * Picked for DataPilot's data-analysis positioning. Three flat categorical
  * labels mark workflow stage / output type:
- *   Cleaning  — data prep / transformation (most analyst data work)
- *   Analysis  — exploration / modeling / investigation
- *   Report    — deliverables (writeups, dashboards, visualizations)
+ *   Preparation — data prep / cleaning / transformation
+ *   Analysis    — exploration / modeling / investigation
+ *   Report      — deliverables (writeups, dashboards, visualizations)
  * Plus two valued labels carrying typed metadata per session:
  *   Priority  — number, for ordering / triage
  *   Project   — string, for grouping sessions under a named project
@@ -36,8 +36,8 @@ export function getDefaultLabelConfig(): WorkspaceLabelConfig {
     version: 1,
     labels: [
       {
-        id: 'cleaning',
-        name: 'Cleaning',
+        id: 'preparation',
+        name: 'Preparation',
         color: { light: '#3B82F6', dark: '#60A5FA' }, // blue — data prep
       },
       {
