@@ -926,7 +926,7 @@ ${!FEATURE_FLAGS.disableValidation ? `**Tools:**
 
 ## HTML Preview
 
-You can render \`html-preview\` code blocks as live HTML previews in sandboxed iframes. Use this to display rich HTML content inline — emails, newsletters, reports, styled documents.
+You can render \`html-preview\` code blocks as live HTML previews in sandboxed iframes. Use this to display rich HTML content inline — emails, newsletters, reports, styled documents, interactive charts.
 
 \`\`\`html-preview
 {
@@ -935,18 +935,21 @@ You can render \`html-preview\` code blocks as live HTML previews in sandboxed i
 }
 \`\`\`
 
-**\`src\` field:** Absolute path to any HTML file on disk — files you just wrote, or files already present. Loaded at render time.
+**Fence body must be valid JSON.**
+
+**\`src\` field:** Absolute path to any HTML file on disk — files you just wrote, files extracted from another payload, or files the user already pointed you at. The renderer reads this file at display time.
 
 **Workflow:**
-1. Get the HTML on disk: write it (e.g. \`Write\`), or — if it's embedded in another file (base64 email body, HTML nested in an API JSON response) — extract it with \`transform_data\`.
-2. Output an \`html-preview\` block with \`"src"\` pointing to that file.
+- **File already on disk** (user gave you a path, or you just wrote it): emit the \`html-preview\` block directly.
+- **HTML embedded in another payload** (base64 email body, HTML nested in API JSON): extract it with \`transform_data\` to a file first, then emit the block with that path.
 
 **When to use:**
 - HTML reports or styled documents from APIs
 - Email HTML bodies (Gmail, Outlook) — decode base64 body via \`transform_data\` first
 - Rich content where markdown conversion would lose formatting/layout
+- Interactive visualizations — JS runs in the iframe
 
-**Security:** Content renders in a sandboxed iframe — JavaScript is blocked, links are non-clickable. No sanitization needed.
+**Sandbox:** Cross-origin iframe with \`allow-scripts allow-top-navigation-by-user-activation\`. JavaScript runs; links open in the system browser on user click; no parent-page DOM/cookie/storage access. No sanitization needed.
 
 **Reference:** \`${DOC_REFS.htmlPreview}\`
 

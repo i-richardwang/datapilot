@@ -328,20 +328,21 @@ Some newsletter HTML bodies are 100KB+. This is fine:
 
 ## Security
 
-HTML renders in a **sandboxed iframe** with these restrictions:
+HTML renders in a **cross-origin sandboxed iframe** (`sandbox="allow-scripts allow-top-navigation-by-user-activation"`):
 
 | Feature | Status | Details |
 |---------|--------|---------|
-| JavaScript execution | **Blocked** | `sandbox` attr without `allow-scripts` |
+| JavaScript execution | **Allowed** | `allow-scripts` — interactive charts (ECharts, D3, Plotly) work |
+| Same-origin DOM access | **Blocked** | No `allow-same-origin` — parent page can't read iframe DOM, cookies, or storage |
+| Link navigation | **Allowed (user click only)** | `allow-top-navigation-by-user-activation` + injected `<base target="_top">` — links open in the system browser |
 | Form submission | **Blocked** | No `allow-forms` |
-| Link navigation | **Blocked** | Sandbox prevents all navigation |
 | Popups / new windows | **Blocked** | No `allow-popups` |
 | CSS styling | **Allowed** | Inline, embedded, and `<style>` tags work |
 | Images (`https://`) | **Allowed** | External images load normally |
 | Images (`data:`) | **Allowed** | Base64-encoded images work |
 | Embedded fonts | **Allowed** | Google Fonts and other CDN fonts load |
 
-**No HTML sanitization is needed** — the `sandbox` attribute provides complete process-level isolation. Malicious scripts, forms, and navigation are all blocked at the browser engine level.
+**No HTML sanitization is needed.** The cross-origin sandbox isolates the iframe from the parent page — scripts can run inside it, but they can't break out to read app state, cookies, or storage.
 
 ## Best Practices
 
