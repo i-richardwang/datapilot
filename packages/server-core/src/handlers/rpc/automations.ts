@@ -147,20 +147,18 @@ export function registerAutomationsHandlers(server: RpcServer, deps: HandlerDeps
       const references = parsePromptReferences(action.prompt)
 
       try {
-        const { sessionId } = await deps.sessionManager.executePromptAutomation(
-          payload.workspaceId,
-          workspace.rootPath,
-          action.prompt,
-          payload.labels,
-          payload.permissionMode,
-          references.mentions,
-          action.llmConnection,
-          action.model,
-          undefined, // isBatch (fork: batch-only param)
-          undefined, // batchContext (fork: batch-only param)
-          payload.automationName,
-          undefined, // workingDirectory (fork: batch-only param)
-        )
+        const { sessionId } = await deps.sessionManager.executePromptAutomation({
+          workspaceId: payload.workspaceId,
+          workspaceRootPath: workspace.rootPath,
+          prompt: action.prompt,
+          labels: payload.labels,
+          permissionMode: payload.permissionMode,
+          mentions: references.mentions,
+          llmConnection: action.llmConnection,
+          model: action.model,
+          thinkingLevel: action.thinkingLevel,
+          automationName: payload.automationName,
+        })
         results.push({
           type: 'prompt',
           success: true,

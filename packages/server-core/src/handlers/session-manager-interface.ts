@@ -87,6 +87,8 @@ export interface ISessionManager {
     storedAttachments?: StoredAttachment[],
     options?: SendMessageOptions,
     existingMessageId?: string,
+    _isAuthRetry?: boolean,
+    onAck?: (messageId: string) => void,
   ): Promise<void>
   cancelProcessing(sessionId: string, silent?: boolean): Promise<void>
   killShell(sessionId: string, shellId: string): Promise<{ success: boolean; error?: string }>
@@ -248,20 +250,7 @@ export interface ISessionManager {
 
   reinitializeAuth(connectionSlug?: string): Promise<void>
   completeAuthRequest(sessionId: string, result: AuthResult): Promise<void>
-  executePromptAutomation(
-    workspaceId: string,
-    workspaceRootPath: string,
-    prompt: string,
-    labels?: string[],
-    permissionMode?: PermissionMode,
-    mentions?: string[],
-    llmConnection?: string,
-    model?: string,
-    isBatch?: boolean,
-    batchContext?: { batchId: string; itemId: string; outputPath?: string; outputSchema?: Record<string, unknown> },
-    automationName?: string,
-    workingDirectory?: string,
-  ): Promise<{ sessionId: string }>
+  executePromptAutomation(input: ExecutePromptAutomationInput): Promise<{ sessionId: string }>
 
   // ---------------------------------------------------------------------------
   // Batch processing
@@ -276,4 +265,32 @@ export interface ISessionManager {
 
   notifyBatchesChanged(workspaceId: string): void
   notifyAutomationsChanged(workspaceId: string): void
+}
+
+/**
+ * Input for executePromptAutomation. Options-object form replaces the
+ * previous positional-args signature once the param list grew past
+ * readability — new optional fields (thinkingLevel, future cwd/permissions
+ * overrides) can be added without churn at every call site.
+ */
+export interface ExecutePromptAutomationInput {
+  workspaceId: string
+  workspaceRootPath: string
+  prompt: string
+  labels?: string[]
+  permissionMode?: PermissionMode
+  mentions?: string[]
+  llmConnection?: string
+  model?: string
+  /** Override the workspace default thinking level for the spawned session. */
+  thinkingLevel?: ThinkingLevel
+  automationName?: string
+  /** Fork: batch session marker (filters out interactive tools). */
+  isBatch?: boolean
+  /** Fork: batch context for `batch_output` tool routing. */
+  batchContext?: { batchId: string; itemId: string; outputPath?: string; outputSchema?: Record<string, unknown>; toolProfile?: string }
+  /** Fork: per-batch working directory override. */
+  workingDirectory?: string
+  /** Fork: invoked once the session is created so BatchProcessor can register the session→item mapping before the chat loop fires onSessionComplete. */
+  onSessionCreated?: (sessionId: string) => void
 }
