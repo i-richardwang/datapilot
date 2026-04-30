@@ -159,6 +159,7 @@ export function ThemeProvider({
   const [presetTheme, setPresetTheme] = useState<ThemeFile | null>(null)
   const [themeResolvedFrom, setThemeResolvedFrom] = useState<'none' | 'ipc' | 'fallback'>('none')
   const [themeLoadError, setThemeLoadError] = useState<string | null>(null)
+  const [electronAPIReady, setElectronAPIReady] = useState(() => !!window.electronAPI?.loadPresetTheme)
 
   // === Derived values ===
   const resolvedMode = mode === 'system' ? systemPreference : mode
@@ -167,6 +168,14 @@ export function ThemeProvider({
   const effectiveColorThemeSource: 'preview' | 'workspace' | 'app' =
     previewColorTheme !== null ? 'preview' : workspaceColorTheme !== null ? 'workspace' : 'app'
   const isDarkFromMode = resolvedMode === 'dark'
+
+  // Listen for electronAPI becoming available (WebUI sets it asynchronously)
+  useEffect(() => {
+    if (electronAPIReady) return
+    const handler = () => setElectronAPIReady(true)
+    window.addEventListener('electron-api-ready', handler)
+    return () => window.removeEventListener('electron-api-ready', handler)
+  }, [electronAPIReady])
 
   // Load workspace theme override when workspace changes
   useEffect(() => {
@@ -243,7 +252,7 @@ export function ThemeProvider({
     return () => {
       cancelled = true
     }
-  }, [effectiveColorTheme])
+  }, [effectiveColorTheme, electronAPIReady])
 
   // Resolve theme (preset → final)
   const resolvedTheme = useMemo(() => {
