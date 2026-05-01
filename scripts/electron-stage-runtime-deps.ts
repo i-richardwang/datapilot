@@ -1,4 +1,4 @@
-import { copyFileSync, cpSync, existsSync, mkdirSync, rmSync, readFileSync, chmodSync, writeFileSync } from 'node:fs'
+import { copyFileSync, cpSync, existsSync, mkdirSync, rmSync, readFileSync, readdirSync, statSync, chmodSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -15,7 +15,14 @@ const ELECTRON_NODE_MODULES = join(ELECTRON_DIR, 'node_modules')
 const BUN_VERSION = 'bun-v1.3.9'
 
 const RUNTIME_PACKAGES = [
+  // Thin SDK core (sdk.mjs + types). The ~210 MB native `claude` binary lives
+  // in a separate per-platform optional dep (`claude-agent-sdk-{platform}-{arch}`)
+  // and is staged below as the `claude-agent-sdk-binary` alias.
   '@anthropic-ai/claude-agent-sdk',
+  // ripgrep, used by packages/server-core/src/services/search.ts. The actual
+  // `bin/rg` binary is fetched by @vscode/ripgrep's postinstall; we sanity-check
+  // it exists before staging.
+  '@vscode/ripgrep',
   'better-sqlite3',
   'bindings',
   'file-uri-to-path',
@@ -48,6 +55,11 @@ const BUN_DOWNLOAD_MAP: Record<string, string> = {
   'linux-x64': 'bun-linux-x64',
   'win32-x64': 'bun-windows-x64-baseline',
 }
+
+// Target platform/arch — single source for all staging steps that need it.
+// ELECTRON_REBUILD_ARCH lets CI cross-compile (e.g. arm64 build on x64 runner).
+const TARGET_PLATFORM = process.platform
+const TARGET_ARCH = process.env.ELECTRON_REBUILD_ARCH ?? process.arch
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -138,13 +150,116 @@ function makeTempDir(): string {
   return base
 }
 
+/**
+ * Stage the target arch's SDK native binary package as a stable alias under
+ * `apps/electron/node_modules/@anthropic-ai/claude-agent-sdk-binary/`.
+ *
+ * Source resolution:
+ *   - Same-arch: copy from `node_modules/@anthropic-ai/claude-agent-sdk-{platform}-{arch}/`
+ *     (placed there by `bun install` via the SDK's optional deps).
+ *   - Cross-arch: `npm pack` the binary package, untar, copy.
+ */
+async function stageSdkBinaryAlias(): Promise<void> {
+  const sdkBinPkgName = `claude-agent-sdk-${TARGET_PLATFORM}-${TARGET_ARCH}`
+  const sdkBinPkgSource = join(ROOT_NODE_MODULES, '@anthropic-ai', sdkBinPkgName)
+  const aliasDest = join(ELECTRON_NODE_MODULES, '@anthropic-ai', 'claude-agent-sdk-binary')
+  const claudeBinaryName = TARGET_PLATFORM === 'win32' ? 'claude.exe' : 'claude'
+
+  console.log(`${isDryRun ? 'Would stage' : 'Staging'} SDK native binary as claude-agent-sdk-binary alias (${TARGET_PLATFORM}-${TARGET_ARCH})`)
+  if (isDryRun) return
+
+  let cleanupTmp: string | undefined
+  let actualSource = sdkBinPkgSource
+
+  try {
+    if (!existsSync(sdkBinPkgSource)) {
+      console.log(`  Cross-arch build: ${sdkBinPkgName} not in node_modules — fetching via npm pack...`)
+
+      const rootPkg = JSON.parse(readFileSync(join(ROOT_DIR, 'package.json'), 'utf-8'))
+      const sdkVersion: string | undefined = rootPkg?.dependencies?.['@anthropic-ai/claude-agent-sdk']
+      if (!sdkVersion) {
+        throw new Error('No @anthropic-ai/claude-agent-sdk version pinned in root package.json dependencies')
+      }
+
+      const tmp = makeTempDir()
+      cleanupTmp = tmp
+
+      const { $ } = await import('bun') as any
+      await $`cd ${tmp} && npm pack @anthropic-ai/${sdkBinPkgName}@${sdkVersion}`.quiet()
+
+      const tarball = readdirSync(tmp).find(f => f.startsWith('anthropic-ai-') && f.endsWith('.tgz'))
+      if (!tarball) {
+        throw new Error(`npm pack produced no tarball in ${tmp}. Contents: ${readdirSync(tmp).join(', ')}`)
+      }
+
+      await $`cd ${tmp} && tar -xzf ${tarball}`.quiet()
+      actualSource = join(tmp, 'package')
+      if (!existsSync(actualSource)) {
+        throw new Error(`Extracted tarball missing 'package/' dir at ${actualSource}`)
+      }
+    }
+
+    rmSync(aliasDest, { recursive: true, force: true })
+    mkdirSync(aliasDest, { recursive: true })
+    cpSync(actualSource, aliasDest, { recursive: true, dereference: true })
+
+    const binPath = join(aliasDest, claudeBinaryName)
+    if (!existsSync(binPath)) {
+      throw new Error(`Native claude binary not found at ${binPath} after staging`)
+    }
+    if (TARGET_PLATFORM !== 'win32') {
+      chmodSync(binPath, 0o755)
+    }
+
+    // Sanity check: the native binary is ~210 MB. A dramatically smaller file
+    // means a botched copy or wrong tarball — fail loud rather than ship a
+    // broken release.
+    const size = statSync(binPath).size
+    if (size < 50_000_000) {
+      throw new Error(`claude binary at ${binPath} is only ${size} bytes (expected ~210 MB) — staging failed`)
+    }
+    console.log(`  Native binary: ${Math.round(size / 1024 / 1024)} MB`)
+  } finally {
+    if (cleanupTmp) rmSync(cleanupTmp, { recursive: true, force: true })
+  }
+}
+
 // ── 1. Stage node_modules packages ──────────────────────────────────────────
+
+// Pre-check: @vscode/ripgrep's `bin/rg` is fetched by its postinstall script.
+// If the host did `bun install --ignore-scripts`, the binary won't be present
+// and we'd silently stage an unusable package. Fail early with a clear hint.
+{
+  const rgBinary = TARGET_PLATFORM === 'win32' ? 'rg.exe' : 'rg'
+  const rgSourceBin = join(ROOT_NODE_MODULES, '@vscode', 'ripgrep', 'bin', rgBinary)
+  if (!existsSync(rgSourceBin)) {
+    throw new Error(
+      `ripgrep binary missing at ${rgSourceBin}.\n` +
+      `@vscode/ripgrep's postinstall downloads bin/rg at install time. ` +
+      `Run 'bun install' from the repo root (without --ignore-scripts) and ensure ` +
+      `'@vscode/ripgrep' is in package.json's trustedDependencies.`,
+    )
+  }
+}
 
 for (const packageName of RUNTIME_PACKAGES) {
   stagePackage(packageName)
 }
 
 console.log(`${isDryRun ? 'Checked' : 'Prepared'} Electron runtime dependency staging`)
+
+// ── 1a. Stage SDK native binary alias ───────────────────────────────────────
+// Since SDK 0.2.113 the ~210 MB native `claude` binary is shipped as a
+// per-platform optional dep (`claude-agent-sdk-{platform}-{arch}`). We copy
+// the target arch's package to a stable alias path
+// `apps/electron/node_modules/@anthropic-ai/claude-agent-sdk-binary/` so:
+//   1. electron-builder.yml stays arch-agnostic (one entry, three platforms).
+//   2. runtime-resolver.ts looks here first (see resolveClaudeBinaryPath).
+//
+// Cross-arch builds (host arch ≠ target arch) won't have the binary package
+// installed by `bun install` (optional deps respect host os/cpu filters), so
+// we fall back to fetching the tarball via `npm pack` and unpacking it.
+await stageSdkBinaryAlias()
 
 // ── 2. Stage MCP servers ────────────────────────────────────────────────────
 // The build step (electron:build:main) compiles these to packages/*/dist/,
@@ -209,12 +324,10 @@ for (const file of INTERCEPTOR_FILES) {
 // Uses cross-platform Node/Bun APIs (fetch, crypto, fs) — no shell dependencies.
 
 const BUN_VENDOR_DIR = join(ELECTRON_DIR, 'vendor', 'bun')
-const bunBinaryName = process.platform === 'win32' ? 'bun.exe' : 'bun'
+const bunBinaryName = TARGET_PLATFORM === 'win32' ? 'bun.exe' : 'bun'
 const bunDest = join(BUN_VENDOR_DIR, bunBinaryName)
 
-// Use ELECTRON_REBUILD_ARCH to support cross-compilation (e.g. arm64 build on x64 CI).
-const targetArch = process.env.ELECTRON_REBUILD_ARCH ?? process.arch
-const bunPlatformKey = `${process.platform}-${targetArch}`
+const bunPlatformKey = `${TARGET_PLATFORM}-${TARGET_ARCH}`
 const bunDownloadName = BUN_DOWNLOAD_MAP[bunPlatformKey]
 
 if (existsSync(bunDest)) {
@@ -245,7 +358,7 @@ if (existsSync(bunDest)) {
     // Copy binary to vendor directory
     mkdirSync(BUN_VENDOR_DIR, { recursive: true })
     copyFileSync(join(tmpDir, bunDownloadName, bunBinaryName), bunDest)
-    if (process.platform !== 'win32') {
+    if (TARGET_PLATFORM !== 'win32') {
       chmodSync(bunDest, 0o755)
     }
     console.log(`Bun ${BUN_VERSION} staged to ${bunDest}`)
@@ -265,13 +378,12 @@ if (!isDryRun) {
     readFileSync(join(ROOT_DIR, 'node_modules', 'electron', 'package.json'), 'utf-8'),
   )
   const electronVersion: string = electronPkg.version
-  const arch = process.env.ELECTRON_REBUILD_ARCH ?? process.arch
 
-  console.log(`Rebuilding native modules for Electron ${electronVersion} (${arch})...`)
+  console.log(`Rebuilding native modules for Electron ${electronVersion} (${TARGET_ARCH})...`)
   await rebuild({
     buildPath: ELECTRON_DIR,
     electronVersion,
-    arch,
+    arch: TARGET_ARCH,
     onlyModules: ['better-sqlite3'],
     force: true,
   })
