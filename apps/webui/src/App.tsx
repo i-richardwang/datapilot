@@ -126,6 +126,10 @@ export default function App() {
       // 4. Set window.electronAPI — must happen before any Electron component mounts
       ;(window as any).electronAPI = api
 
+      // Notify ThemeContext that electronAPI is now available so preset theme
+      // loading can re-run via IPC (fixes WebUI startup race condition)
+      window.dispatchEvent(new Event('electron-api-ready'))
+
       // 5. Connect the WebSocket client
       client.connect()
 
