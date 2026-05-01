@@ -20,6 +20,7 @@ export type DocFeature =
   | 'preferences'
   | 'automations'
   | 'batches'
+  | 'messaging'
 
 export interface DocInfo {
   /** Path relative to DOC_BASE_URL */
@@ -114,6 +115,12 @@ export const DOCS: Record<DocFeature, DocInfo> = {
     title: 'Batches',
     summary:
       'Process lists of items in bulk — run prompt actions across CSV, JSON, or JSONL data with concurrency, retries, and progress tracking. Configured in batches.json.',
+  },
+  messaging: {
+    path: '/messaging/overview',
+    title: 'Messaging',
+    summary:
+      'Connect a session to a chat platform — Telegram, WhatsApp, or Lark / Feishu — and reach your agent from anywhere. Pair workspace supergroups, route automations to forum topics, and send rich replies natively.',
   },
 }
 

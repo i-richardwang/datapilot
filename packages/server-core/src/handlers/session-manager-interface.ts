@@ -265,6 +265,18 @@ export interface ISessionManager {
 
   notifyBatchesChanged(workspaceId: string): void
   notifyAutomationsChanged(workspaceId: string): void
+
+  /**
+   * Install a callback invoked from `executePromptAutomation` after a session
+   * is created when the matcher declared `telegramTopic`. Wired by the
+   * messaging-gateway bootstrap so the SessionManager doesn't need to import
+   * the messaging package (avoids a circular package-level import).
+   *
+   * The callback should be best-effort: failures must not block the session.
+   */
+  setAutomationBinder?(
+    fn: (input: { workspaceId: string; sessionId: string; topicName: string }) => Promise<void>,
+  ): void
 }
 
 /**
@@ -285,6 +297,12 @@ export interface ExecutePromptAutomationInput {
   /** Override the workspace default thinking level for the spawned session. */
   thinkingLevel?: ThinkingLevel
   automationName?: string
+  /**
+   * Optional Telegram forum-topic name. When set and the workspace has a
+   * paired supergroup, the new session is bound to a topic of this name
+   * (created on first use). Silently ignored when prerequisites aren't met.
+   */
+  telegramTopic?: string
   /** Fork: batch session marker (filters out interactive tools). */
   isBatch?: boolean
   /** Fork: batch context for `batch_output` tool routing. */

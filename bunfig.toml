@@ -4,6 +4,8 @@ preload = ["./packages/shared/src/unified-network-interceptor.ts"]
 # default isolated mode. Required because transitive deps like `i18next` are
 # imported directly from apps/electron/src/renderer/* files (which are consumed
 # by the webui build via alias). Under isolated linker, those imports can't be
-# resolved from the webui build root.
+# resolved from the webui build root. The Windows build script
+# (scripts/build/common.ts) was already using `bun install --linker=hoisted` for
+# the same reason.
 [install]
 linker = "hoisted"
