@@ -1369,14 +1369,18 @@ async function handlePrompt(msg: Extract<InboundMessage, { type: 'prompt' }>): P
 
     const session = await ensureSession();
 
-    // Update the closure variable that systemPromptOverride reads, then force
-    // a reload so Pi SDK's _rebuildSystemPrompt picks up the new value as
-    // customPrompt. buildSystemPrompt then fully replaces Pi's default
-    // preamble with DataPilot's prompt while still appending contextFiles
-    // (AGENTS.md/CLAUDE.md) and skills.
+    // Update the closure that systemPromptOverride reads, reload the
+    // resourceLoader so its cached systemPrompt picks up the new value, then
+    // call setActiveToolsByName with the current tool list. The latter is the
+    // only public AgentSession API that triggers _rebuildSystemPrompt, which
+    // re-reads resourceLoader.getSystemPrompt() and rebuilds _baseSystemPrompt.
+    // Without this nudge, agent.prompt() resets state.systemPrompt to the
+    // stale _baseSystemPrompt cached at session-creation time (when
+    // currentDataPilotSystemPrompt was still undefined).
     if (msg.systemPrompt) {
       currentDataPilotSystemPrompt = msg.systemPrompt;
       await session.resourceLoader.reload();
+      session.setActiveToolsByName(session.getActiveToolNames());
     }
 
     // Wire up event handler

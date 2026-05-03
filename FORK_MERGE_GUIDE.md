@@ -5,13 +5,16 @@
 >
 > **Last updated after:** upstream v0.9.0 merge (2026-05-01) — Claude Agent SDK 0.2.123 native-binary uplift (thin core + per-platform binary alias `claude-agent-sdk-binary` + `@vscode/ripgrep`), Lark/Feishu messaging adapter (Phase 1+2), Telegram supergroup pairing + per-automation `telegramTopic` topic routing, Group by Unread session list mode, resilient session-load with retry control, loopback custom-endpoint API key fix (#636), `bunfig.toml` linker pinned to `hoisted`
 >
+> **Fork-side updates after the v0.9.0 merge** (independent of upstream merges):
+> - 2026-05-03: Pi SDK Resource Loader integration — `systemPromptOverride` added so DataPilot's `getSystemPrompt()` reaches the LLM as Pi's `customPrompt` (commit `1de9e5cc`). Followup: per-turn `setActiveToolsByName` nudge added to actually trigger SDK's `_rebuildSystemPrompt` after `loader.reload()` (the latter alone is insufficient — the agent caches `_baseSystemPrompt` at session creation and `prompt()` resets `state.systemPrompt` from it on each turn). Documented as new category #10.
+>
 > 设计细节见专项文档：
 > - [DATAPILOT_BRANCH_GUIDE.md](DATAPILOT_BRANCH_GUIDE.md) — 品牌改造范围与决策
 > - [SQLITE_MIGRATION_AND_CRAFT_CLI.md](SQLITE_MIGRATION_AND_CRAFT_CLI.md) — 存储迁移架构与 CLI 实现
 
 ## Overview
 
-Our fork adds 9 categories of changes:
+Our fork adds 10 categories of changes:
 
 1. **DataPilot Branding** — Agent 身份从 "Craft Agent" 改为 "DataPilot"。涉及系统提示词、数据目录（`~/.craft-agent/` → `~/.datapilot/`）、环境变量（`CRAFT_*` → `DATAPILOT_*`）、CLI 二进制名（`craft-cli` → `datapilot-cli`）、UI 全面品牌文本（40+ 文件）、构建产物名（`DataPilot.app`）。详见 [DATAPILOT_BRANCH_GUIDE.md](DATAPILOT_BRANCH_GUIDE.md)。
 
@@ -30,6 +33,8 @@ Our fork adds 9 categories of changes:
 8. **Self-Hosted Viewer Server** (`apps/viewer-server/`) — 独立 HTTP 后端，替代 upstream `agents.craft.do` 的 session 分享服务。`Dockerfile.viewer` 独立部署在 9101 端口。`VIEWER_URL` 可通过 `DATAPILOT_VIEWER_URL` 环境变量配置。
 
 9. **Docker Compose Deployment** — `docker-compose.example.yml` 提供通用 server (9100) + viewer (9101) 编排示例。host-specific 部署清单（含 Work / skillshub / agent-workspace 等本机挂载、自定义 build context）放在仓外的 `~/Documents/docker/datapilot-deploy/`，避免把个人路径 commit 进开源仓。
+
+10. **Pi SDK Resource Loader Integration** — `pi-agent-server` 给 Pi session 装了 `PiDefaultResourceLoader`,用三个 override 把 DataPilot 的能力接进去:`additionalSkillPaths` 走三层 skill 发现(`~/.agents/skills` / `{workspace}/skills` / `{cwd}/.agents/skills`)、`agentsFilesOverride` 走 monorepo-aware 的 AGENTS.md/CLAUDE.md 行走(`findAllProjectContextFiles`)、`systemPromptOverride` 把 DataPilot 的 `getSystemPrompt()` 输出喂给 Pi 的 `customPrompt` slot。**`systemPromptOverride` 是关键约束**:Pi SDK 一旦装了 resourceLoader,它的 `_rebuildSystemPrompt` 会在每个 turn / tool change 时覆盖 `agent.state.systemPrompt`;不走 `customPrompt` slot 注入,DataPilot 的 prompt body 就会被 SDK 默认前言(`"You are an expert coding assistant operating inside pi..."`)取代。
 
 ---
 
@@ -148,6 +153,16 @@ Won't conflict unless upstream adds similarly-named features.
 - `isOauthDisabled` 和 `isLiteUi` 默认值改为 `true`（OAuth 默认关闭，Lite UI 默认开启）
 
 **Conflict trigger:** upstream adds new feature flags.
+
+#### `packages/pi-agent-server/src/index.ts` `[Resource Loader Integration]`
+
+- **Resource loader install block** (`ensureSession`,~712-746): 构造 `PiDefaultResourceLoader`,传入三个 override:`additionalSkillPaths`(三层 skill 发现)、`agentsFilesOverride`(monorepo-aware AGENTS.md/CLAUDE.md 走 `findAllProjectContextFiles`)、`systemPromptOverride`(读模块级闭包 `currentDataPilotSystemPrompt`)。两个 helper(`buildDataPilotSkillPaths`、`loadDataPilotAgentsFiles`)在 ~512-560。
+- **Per-turn handoff** (`handlePrompt`,~1370-1387): 三步走 —— `currentDataPilotSystemPrompt = msg.systemPrompt` 更新闭包 → `await session.resourceLoader.reload()` 让 loader 重新拉 override 值缓存到 `loader.systemPrompt` → `session.setActiveToolsByName(session.getActiveToolNames())` 强制触发 SDK 的 `_rebuildSystemPrompt`,后者重新读 `loader.getSystemPrompt()` 并把 DataPilot 的 prompt 当作 `customPrompt` 走 `buildSystemPrompt`(SDK 端 `system-prompt.js:19-41`),完全替换 Pi 默认前言,仍 append contextFiles + skills + date + cwd。**注意:`loader.reload()` 单独是不够的** —— 它只更新 loader 自己的缓存,不会触发 agent 的 `_baseSystemPrompt` 重建,后续 `agent.prompt()` 会用 session-creation 时缓存的 `_baseSystemPrompt`(那时闭包还是 undefined → 走 Pi default 分支)重置 `state.systemPrompt`。`setActiveToolsByName` 是 SDK 公开 API 里**唯一**会调 `_rebuildSystemPrompt` 的入口(传当前 tool 列表 = no-op tool change,但带来 prompt rebuild 的副作用)。
+- **Module-level closure variable** (~232): `currentDataPilotSystemPrompt: string | undefined`。Closure 模式必需,因为 `systemPromptOverride` 在 session 构造时一次性注册,而 `msg.systemPrompt` 是 per-turn。
+
+**Why this constraint matters(踩坑警告):** 上游 `pi-agent-server` **不装** resource loader,所以 `agent.state.systemPrompt = msg.systemPrompt` 直接赋值就活到 LLM。我们装了 resource loader 之后,**Pi SDK 的 `_rebuildSystemPrompt` 会在每个 turn / tool change 时把 `agent.state.systemPrompt` 覆盖回 buildSystemPrompt 的输出**。如果回退到直接赋值的形态(老代码 / 上游 merge 引入相似 pattern / 看着多余把 closure 删掉),DataPilot 的 prompt body **会静默丢失**,LLM 看到的是 Pi 默认 `"You are an expert coding assistant operating inside pi..."` 而不是 DataPilot 的 `getSystemPrompt()` 输出。bug 表征:Agent 不知道 html-preview 块怎么写、忽略 Configuration Documentation 表里的 doc 引用、自称是 pi 而不是 DataPilot。
+
+**Conflict trigger:** (a) 上游修改 `pi-agent-server` 的 `prompt` IPC handler 系统 prompt 处理路径; (b) 上游引入自家 resource loader 安装逻辑; (c) Pi SDK 升级改 `_rebuildSystemPrompt` 触发条件 / `customPrompt` 语义 / 暴露新公开 API 直接触发 rebuild(届时可以把 `setActiveToolsByName` no-op trick 替换掉); (d) 任何"看上去更简单"的重构想把 closure + reload + setActiveToolsByName 改回直接赋值。
 
 ### MEDIUM Risk — Check After Upstream Changes
 
