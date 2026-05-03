@@ -33,8 +33,9 @@ import { routeSession } from './datapilot/commands/session.ts'
 import { routeWorkspace } from './datapilot/commands/workspace.ts'
 import { routeStatus } from './datapilot/commands/status.ts'
 import { routePreference } from './datapilot/commands/preference.ts'
+import pkg from '../package.json' with { type: 'json' }
 
-const VERSION = '0.1.1'
+const VERSION = pkg.version
 
 export async function main(argv: string[] = process.argv): Promise<void> {
   const args = parseArgs(argv.slice(2))
