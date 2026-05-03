@@ -28,7 +28,6 @@ import {
   ModelRegistry as PiModelRegistry,
   SettingsManager as PiSettingsManager,
   DefaultResourceLoader as PiDefaultResourceLoader,
-  formatSkillsForPrompt,
   createReadToolDefinition,
   createBashToolDefinition,
   createEditToolDefinition,
@@ -229,6 +228,13 @@ let piSession: AgentSession | null = null;
 let piModelRegistry: PiModelRegistry | null = null;
 let moduleAuthStorage: PiAuthStorage | null = null;
 let unsubscribeEvents: (() => void) | null = null;
+
+// DataPilot's per-turn system prompt. Read by the resourceLoader's
+// systemPromptOverride callback so Pi SDK's _rebuildSystemPrompt picks
+// it up as customPrompt — this fully replaces Pi's default preamble while
+// letting the SDK keep appending contextFiles (AGENTS.md/CLAUDE.md) and
+// skills automatically. See system-prompt.js:19-41 in pi-coding-agent.
+let currentDataPilotSystemPrompt: string | undefined;
 
 // Init config (set on 'init' message)
 let initConfig: Extract<InboundMessage, { type: 'init' }> | null = null;
@@ -553,32 +559,6 @@ function loadDataPilotAgentsFiles(cwd: string): LoadedAgentsFile[] {
   return files;
 }
 
-/**
- * Build the suffix appended to DataPilot's per-turn system prompt so the
- * Pi agent sees loaded project context files and skills without having to
- * Read them manually. Mirrors the SDK's `buildSystemPrompt` layout so the
- * format is identical to what the SDK would emit.
- */
-function formatResourceLoaderSuffix(session: AgentSession): string {
-  const contextFiles = session.resourceLoader.getAgentsFiles().agentsFiles;
-  const skills = session.resourceLoader.getSkills().skills;
-  const activeTools = session.getActiveToolNames();
-  const hasRead = activeTools.length === 0 || activeTools.includes('read');
-
-  let suffix = '';
-  if (contextFiles.length > 0) {
-    suffix += '\n\n# Project Context\n\n';
-    suffix += 'Project-specific instructions and guidelines:\n\n';
-    for (const { path: filePath, content } of contextFiles) {
-      suffix += `## ${filePath}\n\n${content}\n\n`;
-    }
-  }
-  if (hasRead && skills.length > 0) {
-    suffix += formatSkillsForPrompt(skills);
-  }
-  return suffix;
-}
-
 async function ensureSession(): Promise<AgentSession> {
   if (piSession) return piSession;
   if (!initConfig) throw new Error('Cannot create session: init not received');
@@ -747,6 +727,9 @@ async function ensureSession(): Promise<AgentSession> {
         settingsManager,
         additionalSkillPaths,
         agentsFilesOverride: () => ({ agentsFiles: loadDataPilotAgentsFiles(cwd) }),
+        // Feed DataPilot's per-turn system prompt as Pi's customPrompt. The
+        // closure reads the latest value each time _rebuildSystemPrompt fires.
+        systemPromptOverride: () => currentDataPilotSystemPrompt,
       });
       await resourceLoader.reload();
       sessionOptions.resourceLoader = resourceLoader;
@@ -1386,12 +1369,14 @@ async function handlePrompt(msg: Extract<InboundMessage, { type: 'prompt' }>): P
 
     const session = await ensureSession();
 
-    // Set system prompt. DataPilot builds the prompt body itself, but the Pi
-    // SDK's resource loader holds the discovered skills + AGENTS.md/CLAUDE.md
-    // content — append it so the agent sees both without having to Read.
+    // Update the closure variable that systemPromptOverride reads, then force
+    // a reload so Pi SDK's _rebuildSystemPrompt picks up the new value as
+    // customPrompt. buildSystemPrompt then fully replaces Pi's default
+    // preamble with DataPilot's prompt while still appending contextFiles
+    // (AGENTS.md/CLAUDE.md) and skills.
     if (msg.systemPrompt) {
-      const suffix = formatResourceLoaderSuffix(session);
-      session.agent.state.systemPrompt = suffix ? msg.systemPrompt + suffix : msg.systemPrompt;
+      currentDataPilotSystemPrompt = msg.systemPrompt;
+      await session.resourceLoader.reload();
     }
 
     // Wire up event handler
