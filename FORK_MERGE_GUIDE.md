@@ -4,15 +4,12 @@
 > Purpose: 合并 upstream 时的唯一操作手册 — 冲突风险、合并策略、检查清单。
 >
 > **Last upstream merge:** v0.9.0 (2026-05-01).
->
-> 设计细节见专项文档：
-> - [DATAPILOT_BRANCH_GUIDE.md](DATAPILOT_BRANCH_GUIDE.md) — 品牌改造范围与决策
 
 ## Overview
 
 Our fork adds 10 categories of changes:
 
-1. **DataPilot Branding** — Agent 身份从 "Craft Agent" 改为 "DataPilot"。涉及系统提示词、数据目录（`~/.craft-agent/` → `~/.datapilot/`）、环境变量（`CRAFT_*` → `DATAPILOT_*`）、CLI 二进制名（`craft-cli` → `datapilot-cli`）、UI 全面品牌文本（40+ 文件）、构建产物名（`DataPilot.app`）。详见 [DATAPILOT_BRANCH_GUIDE.md](DATAPILOT_BRANCH_GUIDE.md)。
+1. **DataPilot Branding** — Agent 身份从 "Craft Agent" 改为 "DataPilot"。涉及系统提示词、数据目录（`~/.craft-agent/` → `~/.datapilot/`）、环境变量（`CRAFT_*` → `DATAPILOT_*`）、CLI 二进制名（`craft-cli` → `datapilot-cli`）、UI 全面品牌文本（40+ 文件）、构建产物名（`DataPilot.app`）。**故意不改的项**见 §5a "Intentionally Unchanged"。
 
 2. **SQLite Storage Migration + DataPilot CLI** — Labels、sources、statuses、views、sessions、automation history 从 JSON 文件迁移到 per-workspace `workspace.db`（Drizzle ORM）。配套 `datapilot` CLI（60 个子命令）成为 agent 管理配置的**唯一路径**。
 
@@ -366,12 +363,10 @@ grep -rn '\.craft-agent' --include='*.ts' --include='*.tsx' --include='*.md' . \
 # 其它 CRAFT_* 都已 rename 成 DATAPILOT_*（CONFIG_DIR, RPC_*, WEBUI_*,
 # SERVER_*, BUN, NODE, DEBUG, MESSAGING_*, DISABLE_*, VIEWER_*, ...）。
 # 重点扫新增/修改的 test 文件、scripts/、resources/。
-#
-# 备注：DATAPILOT_BRANCH_GUIDE.md 是描述 rename 历史的文档，所以排除。
 grep -rEn 'CRAFT_[A-Z_]+' \
   --include="*.ts" --include="*.tsx" --include="*.sh" --include="*.ps1" \
   --include="*.yaml" --include="*.yml" --include="*.json" --include="*.md" \
-  --exclude="FORK_MERGE_GUIDE.md" --exclude="DATAPILOT_BRANCH_GUIDE.md" \
+  --exclude="FORK_MERGE_GUIDE.md" \
   --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=release-notes . 2>/dev/null \
   | grep -v -E 'CRAFT_(DEEPLINK_SCHEME(_PREFIX)?|FEATURE_[A-Z_]+|SESSION_(DIR|ID|NAME|METADATA)|WORKSPACE_(ID|PATH)|EVENT(_DATA)?|TOOL_[A-Z_]+|AGENT_[A-Z_]+|LOCAL_[A-Z_]+|OLD_[A-Z_]+|NEW_[A-Z_]+|WH_[A-Z_]*|PROMPT|SOURCE|MODEL|ERROR|MESSAGE|TITLE|LABEL|IS_FLAGGED)\b'
 
@@ -380,7 +375,7 @@ grep -rEn 'CRAFT_[A-Z_]+' \
 # craft-agents-oss 是 upstream repo URL，craftagents:// 是保留的 scheme
 grep -rEn 'craft[_-]agent[_-]|craft-agent\b' \
   --include="*.ts" --include="*.tsx" --include="*.json" --include="*.md" \
-  --exclude="FORK_MERGE_GUIDE.md" --exclude="DATAPILOT_BRANCH_GUIDE.md" --exclude="bun.lock" \
+  --exclude="FORK_MERGE_GUIDE.md" --exclude="bun.lock" \
   --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=release-notes . 2>/dev/null \
   | grep -v "@craft-agent/" | grep -v "craft-agents-oss" | grep -v 'craft-agent[' | grep -v "node_modules"
 
@@ -406,6 +401,18 @@ grep -rn 'datapilot-cli\.md' --include="*.ts" --include="*.md" \
 | `errors.ts`, `connection-setup-logic.ts` | 新 provider/连接类型的错误信息 |
 | `scripts/build-server.ts` | 自部署功能的 echo/log 输出 |
 | `install-app.sh` / `install-app.ps1` | 安装流程用户提示 |
+
+**Intentionally Unchanged（"看到这些 Craft Agent 残留是故意的，不要改"）：**
+
+上面的 grep 脚本与高频区域表会扫出一批 `Craft Agent` 残留，下列项**故意保留**——审计时直接跳过：
+
+- **加密存储 magic bytes 与盐**：`MAGIC_BYTES`（`CRAFT01`）、密钥派生盐（`craft-agent-v2`）。改了会破坏现有用户的本地加密数据，没有 migration 路径。
+- **代码注释 & JSDoc**：源码里的 `// Craft Agent ...` 对用户不可见，全局替换会增加合并冲突面。
+- **`package.json` `description` 字段**：仍为 `"... for Craft Agents"`，npm 元数据，用户不可见。`@craft-agent/*` package 名同理保留——动它会触发跨包 import 全量重写。
+- **`scripts/build/` 下的 `Craft-Agents-` 文件名**：`linux.ts`、`darwin.ts`、`common.ts` 中的 artifact 命名与服务端下载 URL 耦合，动了断自动更新。`electron-builder.yml` 的 `artifactName` 已是 `DataPilot-${arch}.${ext}`。
+- **Playground 演示数据**：`playground/registry/` 下少量 "Craft Agents" 演示文本，不影响产品。
+- **测试 Fixture**：`storage-startup-migration.test.ts` 的 `'Craft Agents Backend (xxx)'` mock 数据匹配旧存储格式——动了反而让迁移测试失去意义。
+- **保留的 `CRAFT_*` 命名空间**：完整 allow-list 在 §5a 上方的 grep 脚本注释里（automation hook env、webhook secret 前缀、`craftagents://` deeplink、`CRAFT_FEATURE_*` 内部 flag、`CRAFT_SESSION_*` / `CRAFT_WORKSPACE_*` 标识符）。
 
 #### 5b. SQLite/CLI Verification
 
