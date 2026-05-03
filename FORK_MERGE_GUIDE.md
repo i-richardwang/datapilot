@@ -168,7 +168,7 @@ Won't conflict unless upstream adds similarly-named features.
 
 #### `packages/shared/src/agent/backend/internal/drivers/pi.ts` `[Custom Endpoint Fix]`
 
-Added `testOpenAICompatible()` (~70 lines); `validateStoredConnection()` makes actual API calls for custom endpoints.
+`validateStoredConnection()` 走真实 API 调用（fork 添加 `testOpenAICompatible()` ~70 行）。冲突时保留 fork 版本——上游的占位实现对 custom endpoint 永远 pass。
 
 #### `packages/shared/src/agent/claude-agent.ts` `[Batch]`
 
@@ -218,21 +218,9 @@ Config file guards and bash guards for CLI domains. `CliFeatureFlags` interface 
 
 9 regex patterns: `\.craft-agent` → `\.datapilot`.
 
-#### `apps/electron/src/renderer/components/apisetup/submit-helpers.ts` `[Preset Fix]`
+#### `apps/electron/src/renderer/index.css` + `packages/ui/src/styles/index.css` + `packages/ui/src/components/markdown/tiptap-editor.css` `[Border-Radius]`
 
-Simplified `resolvePresetStateForBaseUrlChange()`: removed `activePresetHasEmptyUrl` branch.
-
-#### `apps/electron/src/renderer/index.css` + `packages/ui/src/styles/index.css` `[Border-Radius]`
-
-`:root` override `--radius-xs` through `--radius-2xl` to `0px`. Converted hardcoded `border-radius` to `var(--radius-*)`.
-
-#### `packages/ui/src/components/markdown/tiptap-editor.css` `[Border-Radius]`
-
-Converted ~20 hardcoded `border-radius` values to `var(--radius-*)`.
-
-#### ~115 TSX/TS files `[Border-Radius]`
-
-Mechanical `rounded-[Npx]` → standard Tailwind class. Conflicts only if upstream also changes the same `rounded-[Npx]` string.
+`:root` override `--radius-xs` ~ `--radius-2xl` 全为 `0px`；硬编码 `border-radius` 转 `var(--radius-*)`。冲突时保留 fork 的 token 化版本——上游引入的新 `rounded-[Npx]` 一律转标准 Tailwind 类（处理流程见 Conditional Checks）。
 
 #### `packages/session-mcp-server/src/index.ts` `[Granular Flags]`
 
