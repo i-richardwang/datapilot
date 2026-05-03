@@ -121,6 +121,18 @@ datapilot session send <session-id> "What files changed today?"
 
 See `datapilot --help` for the full command reference.
 
+## Agent Skill
+
+External agents (Claude Code, Codex, Cursor, etc.) can drive a DataPilot server through the published [`dtpilot`](apps/cli) CLI. Install the companion skill via [skills.sh](https://skills.sh) so the agent knows how to use it:
+
+```bash
+npx skills add i-richardwang/datapilot                            # to current project (./.claude/skills/)
+npx skills add i-richardwang/datapilot -g                         # globally (~/.claude/skills/)
+npx skills add i-richardwang/datapilot -a claude-code -a codex    # pick specific agents
+```
+
+Skill source lives at [`skills/datapilot/`](skills/datapilot/).
+
 ## Supported LLM Providers
 
 | Provider | Auth |
