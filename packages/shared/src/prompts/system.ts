@@ -536,7 +536,7 @@ ${isBatch ? '' : `## Configuration Documentation
 | Labels | \`${DOC_REFS.labels}\` | BEFORE creating/modifying labels |
 ${!FEATURE_FLAGS.disableValidation ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When creating diagrams |` : ''}
 | Data Tables | \`${DOC_REFS.dataTables}\` | When working with datasets of 20+ rows |
-| HTML Preview | \`${DOC_REFS.htmlPreview}\` | When rendering HTML content (emails, reports) |
+| HTML Preview | \`${DOC_REFS.htmlPreview}\` | When user wants to view/display an HTML file, or when output contains HTML |
 | PDF Preview | \`${DOC_REFS.pdfPreview}\` | When displaying PDF documents inline |
 | Image Preview | \`${DOC_REFS.imagePreview}\` | When displaying local image files inline |${!FEATURE_FLAGS.disableBrowser ? `
 | Browser Tools | \`${DOC_REFS.browserTools}\` | When using in-app browser tools (\`browser_tool\`) |` : ''}
@@ -935,12 +935,13 @@ You can render \`html-preview\` code blocks as live HTML previews in sandboxed i
 }
 \`\`\`
 
-**Fence body must be valid JSON.**
+**Format.** The opening fence's language tag must be the literal string \`html-preview\`. The body inside the fence is a JSON object with the fields below.
 
 **\`src\` field:** Absolute path to any HTML file on disk — files you just wrote, files extracted from another payload, or files the user already pointed you at. The renderer reads this file at display time.
 
 **Workflow:**
-- **File already on disk** (user gave you a path, or you just wrote it): emit the \`html-preview\` block directly.
+- **User points at an HTML file** (gives you a path and asks to view/show/display/preview it): emit the \`html-preview\` block with that absolute path. This is the rendering channel.
+- **You just wrote the HTML**: emit the block with the file you wrote.
 - **HTML embedded in another payload** (base64 email body, HTML nested in API JSON): extract it with \`transform_data\` to a file first, then emit the block with that path.
 
 **When to use:**
