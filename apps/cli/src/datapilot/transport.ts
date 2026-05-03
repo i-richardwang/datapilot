@@ -83,6 +83,45 @@ export function resolveEndpoint(opts: ConnectOptions): ResolvedEndpoint {
   }
 }
 
+/**
+ * Connection metadata surfaced to entity commands so agents can introspect
+ * the resolved transport without inspecting env vars or the discovery file
+ * directly. Today only `workspace get` includes this in its response.
+ *
+ * `sameMachine` is a heuristic: loopback host → server is on this machine, so
+ * agents may pass local absolute paths to session/batch. Anything else is
+ * treated as remote (no false positives — false negatives are acceptable).
+ */
+export interface ConnectionInfo {
+  url: string
+  host: string
+  sameMachine: boolean
+  urlSource: ResolvedEndpoint['source']
+}
+
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '0.0.0.0'])
+
+function extractHost(url: string): string {
+  try {
+    const host = new URL(url).hostname
+    // IPv6 hostnames come back wrapped in `[...]` from WHATWG URL; strip so
+    // callers can compare against bare addresses like `::1`.
+    return host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host
+  } catch {
+    return ''
+  }
+}
+
+export function describeConnection(endpoint: ResolvedEndpoint): ConnectionInfo {
+  const host = extractHost(endpoint.url)
+  return {
+    url: endpoint.url,
+    host,
+    sameMachine: LOOPBACK_HOSTS.has(host),
+    urlSource: endpoint.source,
+  }
+}
+
 export class ConnectionError extends Error {
   readonly url: string
   readonly source: ResolvedEndpoint['source']

@@ -20,7 +20,7 @@
 
 import { parseArgs, UsageError } from './datapilot/args.ts'
 import { ok, fail, setOutputMode } from './datapilot/envelope.ts'
-import { connect, resolveWorkspaceId, ConnectionError } from './datapilot/transport.ts'
+import { connect, resolveEndpoint, resolveWorkspaceId, ConnectionError } from './datapilot/transport.ts'
 import { isEntity, type RouteCtx, ENTITIES } from './datapilot/router.ts'
 import type { CliRpcClient } from './client.ts'
 
@@ -136,8 +136,17 @@ function createCtx(args: ReturnType<typeof parseArgs>): RouteCtx {
     cachedClient = null
   }
 
+  const getEndpoint = () => resolveEndpoint({
+    url: args.global.url,
+    token: args.global.token,
+    workspace: args.global.workspace,
+    timeout: args.global.timeout,
+    tlsCa: args.global.tlsCa,
+  })
+
   return {
     getClient,
+    getEndpoint,
     getWorkspace,
     destroyClient,
     global: args.global,

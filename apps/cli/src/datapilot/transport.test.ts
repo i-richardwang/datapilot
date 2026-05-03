@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { resolveEndpoint, readDiscoveryFile, DEFAULT_URL, DISCOVERY_FILE } from './transport.ts'
+import { resolveEndpoint, readDiscoveryFile, describeConnection, DEFAULT_URL, DISCOVERY_FILE } from './transport.ts'
 
 const PREV_URL = process.env.DATAPILOT_SERVER_URL
 const PREV_TOKEN = process.env.DATAPILOT_SERVER_TOKEN
@@ -71,6 +71,35 @@ describe('resolveEndpoint', () => {
     const ep = resolveEndpoint({})
     expect(ep.url).toBe(DEFAULT_URL)
     expect(ep.source).toBe('default')
+  })
+})
+
+describe('describeConnection', () => {
+  it('marks loopback hosts as same-machine', () => {
+    for (const host of ['127.0.0.1', 'localhost', '::1', '0.0.0.0']) {
+      const url = host === '::1' ? `ws://[${host}]:9100` : `ws://${host}:9100`
+      const info = describeConnection({ url, token: undefined, source: 'default' })
+      expect(info.sameMachine).toBe(true)
+      expect(info.host).toBe(host)
+      expect(info.urlSource).toBe('default')
+    }
+  })
+
+  it('marks remote hosts as not same-machine', () => {
+    const info = describeConnection({
+      url: 'wss://datapilot.example.com:443',
+      token: 'x',
+      source: 'env',
+    })
+    expect(info.sameMachine).toBe(false)
+    expect(info.host).toBe('datapilot.example.com')
+    expect(info.urlSource).toBe('env')
+  })
+
+  it('handles malformed URLs without crashing', () => {
+    const info = describeConnection({ url: 'not a url', token: undefined, source: 'flag' })
+    expect(info.host).toBe('')
+    expect(info.sameMachine).toBe(false)
   })
 })
 

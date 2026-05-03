@@ -8,6 +8,7 @@
  */
 
 import type { CliRpcClient } from '../client.ts'
+import type { ResolvedEndpoint } from './transport.ts'
 
 export const ENTITIES = [
   'label',
@@ -31,6 +32,8 @@ export function isEntity(name: string | undefined): name is Entity {
 export interface RouteCtx {
   /** Lazily-connected client. Resolved on first call. */
   getClient(): Promise<CliRpcClient>
+  /** Resolved endpoint (URL + token source). Pure — no I/O. */
+  getEndpoint(): ResolvedEndpoint
   /** Workspace ID resolution (lazy). */
   getWorkspace(): Promise<string | undefined>
   /** Drop the connection — caller's responsibility for long-running cmds. */

@@ -5,6 +5,7 @@
 import { ok, fail } from '../envelope.ts'
 import { type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
+import { describeConnection } from '../transport.ts'
 
 const ACTIONS = [
   'list', 'get',
@@ -34,7 +35,8 @@ export async function routeWorkspace(
       const found = list.find((w) => w.id === target)
       if (!found) fail('NOT_FOUND', `Workspace '${target}' not found`)
       const settings = await client.invoke('workspaceSettings:get', target)
-      ok({ ...found, settings })
+      const connection = describeConnection(ctx.getEndpoint())
+      ok({ ...found, settings, connection })
     }
   }
 

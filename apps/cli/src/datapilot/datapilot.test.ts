@@ -514,12 +514,16 @@ describe('datapilot CLI', () => {
     ])
     expect(r.exitCode).toBe(0)
     expect(r.envelope?.ok).toBe(true)
-    expect(r.envelope?.data).toEqual({
-      id: 'ws-1',
-      name: 'Test Workspace',
-      settings: { theme: 'dark', language: 'zh' },
+    const data = r.envelope?.data as Record<string, unknown>
+    expect(data.id).toBe('ws-1')
+    expect(data.name).toBe('Test Workspace')
+    expect(data.settings).toEqual({ theme: 'dark', language: 'zh' })
+    expect(data.connection).toMatchObject({
+      url: server.url,
+      sameMachine: true,
+      urlSource: 'flag',
     })
-    expect(r.envelope?.data).not.toHaveProperty('permissions')
+    expect(data).not.toHaveProperty('permissions')
     expect(server.requests.find((req) => req.channel === 'workspaceSettings:get')).toBeDefined()
   })
 
