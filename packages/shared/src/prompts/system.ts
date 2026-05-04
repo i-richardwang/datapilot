@@ -218,9 +218,6 @@ export function readProjectContextFile(directory: string): { filename: string; c
  * Includes the working directory path and context about what it represents.
  * Returns empty string if no working directory is set.
  *
- * Note: Project context files (CLAUDE.md, AGENTS.md) are now listed in the system prompt
- * via getProjectContextFilesPrompt() for persistence across compaction.
- *
  * @param workingDirectory - The effective working directory path (where user wants to work)
  * @param isSessionRoot - If true, this is the session folder (not a user-specified project)
  * @param bashCwd - The actual bash shell cwd (may differ if working directory changed mid-session)
@@ -284,36 +281,6 @@ export function getDateTimeContext(): string {
 export interface DebugModeConfig {
   enabled: boolean;
   logFilePath?: string;
-}
-
-/**
- * Get the project context files prompt section for the system prompt.
- * Lists all discovered context files (AGENTS.md, CLAUDE.md) in the working directory.
- * For monorepos, this includes nested package context files.
- * Returns empty string if no working directory or no context files found.
- */
-export function getProjectContextFilesPrompt(workingDirectory?: string): string {
-  if (!workingDirectory) {
-    return '';
-  }
-
-  const contextFiles = findAllProjectContextFiles(workingDirectory);
-  if (contextFiles.length === 0) {
-    return '';
-  }
-
-  // Format file list with (root) annotation for top-level files
-  const fileList = contextFiles
-    .map((file) => {
-      const isRoot = !file.includes('/');
-      return `- ${file}${isRoot ? ' (root)' : ''}`;
-    })
-    .join('\n');
-
-  return `
-<project_context_files working_directory="${workingDirectory}">
-${fileList}
-</project_context_files>`;
 }
 
 /** Options for getSystemPrompt */
@@ -401,9 +368,6 @@ export function getSystemPrompt(
   const preferences = pinnedPreferencesPrompt ?? formatPreferencesForPrompt();
   const debugContext = debugMode?.enabled ? formatDebugModeContext(debugMode.logFilePath) : '';
 
-  // Get project context files for monorepo support (lives in system prompt for persistence across compaction)
-  const projectContextFiles = getProjectContextFilesPrompt(workingDirectory);
-
   // Fall back to the user's current preference when callers don't pin/pass a value,
   // so forgetting the argument can't silently re-enable the co-author trailer (see #576).
   const resolvedIncludeCoAuthoredBy = includeCoAuthoredBy ?? getCoAuthorPreference();
@@ -411,8 +375,12 @@ export function getSystemPrompt(
   // Note: Date/time context is now added to user messages instead of system prompt
   // to enable prompt caching. The system prompt stays static and cacheable.
   // Safe Mode context is also in user messages for the same reason.
+  // Note: Project context files (AGENTS.md / CLAUDE.md) are not listed here — Pi SDK
+  // appends their full content under "# Project Context" via agentsFilesOverride, and
+  // Claude SDK auto-loads root CLAUDE.md via settingSources. A separate listing would
+  // duplicate what's already injected and cause the agent to redundantly Read them.
   const basePrompt = getCraftAssistantPrompt(workspaceRootPath, backendName, resolvedIncludeCoAuthoredBy, batchMode);
-  const fullPrompt = `${basePrompt}${preferences}${debugContext}${projectContextFiles}`;
+  const fullPrompt = `${basePrompt}${preferences}${debugContext}`;
 
   debug('[getSystemPrompt] full prompt length:', fullPrompt.length);
 
@@ -551,12 +519,6 @@ Skills are stored at three levels (checked in order):
 - Global: \`~/.agents/skills/{slug}/SKILL.md\`
 - Workspace: \`${workspacePath}/skills/{slug}/SKILL.md\`
 - Project: \`{projectRoot}/.agents/skills/{slug}/SKILL.md\`
-
-## Project Context
-
-When \`<project_context_files>\` appears in the system prompt, it lists all discovered context files (CLAUDE.md, AGENTS.md) in the working directory and its subdirectories. This supports monorepos where each package may have its own context file.
-
-Read relevant context files using the Read tool - they contain architecture info, conventions, and project-specific guidance. For monorepos, read the root context file first, then package-specific files as needed based on what you're working on.
 
 ${isBatch ? '' : `## Configuration Documentation
 
