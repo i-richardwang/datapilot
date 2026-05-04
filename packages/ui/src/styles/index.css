@@ -131,9 +131,19 @@
   --md-bullets: var(--foreground-50);
   --md-counters: var(--foreground-50);
 
-  /* Fonts - System fonts for UI, JetBrains Mono for code */
-  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-serif: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  /* Fonts — Kami serif stack as default (Charter / TsangerJinKai02 / Songti
+     family) with Inter still available via data-font="inter". The serif
+     baseline gives a more reading-oriented feel for chat / markdown content;
+     code blocks keep JetBrains Mono via --font-mono.
+
+     TsangerJinKai02 is loaded via @font-face inside individual apps that ship
+     the TTF (e.g. apps/electron). Other consumers (viewer) fall through to
+     system serifs — the stack is intentionally fallback-friendly.
+
+     Lang-specific overrides below (html[lang="zh-CN"] / html[lang="ja"])
+     reorder fallbacks to favour the right CJK metrics for the active locale. */
+  --font-serif: Charter, Georgia, "TsangerJinKai02", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", Palatino, serif;
+  --font-sans: var(--font-serif);
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --font-default: var(--font-sans);
 
@@ -220,6 +230,20 @@ html[data-font="inter"] {
   --font-default: var(--font-sans);
   font-optical-sizing: auto;
   font-feature-settings: "cv01", "cv02", "cv03", "cv04", "case";
+}
+
+/* Locale-specific serif fallbacks — only kick in when the default Kami stack
+   is active (i.e. data-font is not set to a sans family). The Latin pieces
+   (Charter / Georgia / Palatino) stay so mixed CJK + Latin rendering keeps
+   consistent metrics. */
+html[lang="zh-CN"]:not([data-font="inter"]) {
+  --font-serif: "TsangerJinKai02", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", Georgia, serif;
+  --font-sans: var(--font-serif);
+}
+
+html[lang="ja"]:not([data-font="inter"]) {
+  --font-serif: "YuMincho", "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif CJK JP", "Source Han Serif JP", "TsangerJinKai02", Georgia, serif;
+  --font-sans: var(--font-serif);
 }
 
 /* =============================================================================
