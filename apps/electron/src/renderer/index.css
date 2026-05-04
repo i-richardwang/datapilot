@@ -102,9 +102,9 @@
 :root {
   /* === 6 BASE COLORS === */
   --background: oklch(0.98 0.003 265);
-  --background-elevated: color-mix(in srgb, var(--foreground) 1.5%, var(--background));
+  --background-elevated: color-mix(in oklch, var(--foreground) 1.5%, var(--background));
   --foreground: oklch(0.185 0.01 270);
-  --foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background)); /* unfocused panel text */
+  --foreground-dimmed: color-mix(in oklch, var(--foreground) 80%, var(--background)); /* unfocused panel text */
   --foreground-rgb: 38, 36, 42;             /* RGB for shadow borders */
   --user-message-bubble: oklch(from var(--foreground) l c h / 0.05);
   --user-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.03);
@@ -147,20 +147,20 @@
 
   /* === MIX VARIANTS (solid interpolation toward background) === */
   /* Use -2, -3, -5, -10, -20, ..., -90, -95 for solid colors (e.g., separators, Explore mode) */
-  --foreground-1\.5: color-mix(in srgb, var(--foreground) 1.5%, var(--background));
-  --foreground-2: color-mix(in srgb, var(--foreground) 2%, var(--background));
-  --foreground-3: color-mix(in srgb, var(--foreground) 3%, var(--background));
-  --foreground-5: color-mix(in srgb, var(--foreground) 5%, var(--background));
-  --foreground-10: color-mix(in srgb, var(--foreground) 10%, var(--background));
-  --foreground-20: color-mix(in srgb, var(--foreground) 20%, var(--background));
-  --foreground-30: color-mix(in srgb, var(--foreground) 30%, var(--background));
-  --foreground-40: color-mix(in srgb, var(--foreground) 40%, var(--background));
-  --foreground-50: color-mix(in srgb, var(--foreground) 50%, var(--background));
-  --foreground-60: color-mix(in srgb, var(--foreground) 60%, var(--background));
-  --foreground-70: color-mix(in srgb, var(--foreground) 70%, var(--background));
-  --foreground-80: color-mix(in srgb, var(--foreground) 80%, var(--background));
-  --foreground-90: color-mix(in srgb, var(--foreground) 90%, var(--background));
-  --foreground-95: color-mix(in srgb, var(--foreground) 95%, var(--background));
+  --foreground-1\.5: color-mix(in oklch, var(--foreground) 1.5%, var(--background));
+  --foreground-2: color-mix(in oklch, var(--foreground) 2%, var(--background));
+  --foreground-3: color-mix(in oklch, var(--foreground) 3%, var(--background));
+  --foreground-5: color-mix(in oklch, var(--foreground) 5%, var(--background));
+  --foreground-10: color-mix(in oklch, var(--foreground) 10%, var(--background));
+  --foreground-20: color-mix(in oklch, var(--foreground) 20%, var(--background));
+  --foreground-30: color-mix(in oklch, var(--foreground) 30%, var(--background));
+  --foreground-40: color-mix(in oklch, var(--foreground) 40%, var(--background));
+  --foreground-50: color-mix(in oklch, var(--foreground) 50%, var(--background));
+  --foreground-60: color-mix(in oklch, var(--foreground) 60%, var(--background));
+  --foreground-70: color-mix(in oklch, var(--foreground) 70%, var(--background));
+  --foreground-80: color-mix(in oklch, var(--foreground) 80%, var(--background));
+  --foreground-90: color-mix(in oklch, var(--foreground) 90%, var(--background));
+  --foreground-95: color-mix(in oklch, var(--foreground) 95%, var(--background));
 
   /* Success/destructive/info interpolated toward foreground (for tinted text) */
   /* Using oklab for perceptually uniform mixing without hue shifts */
@@ -267,41 +267,41 @@
 /* Dark Mode */
 .dark {
   /* === 6 BASE COLORS (must match DEFAULT_THEME.dark in theme.ts) === */
-  --background: oklch(0.145 0.015 270);
-  --background-elevated: color-mix(in srgb, var(--foreground) 1.5%, var(--background));
-  --foreground: oklch(0.95 0.01 270);
-  --foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background)); /* unfocused panel text */
-  --foreground-rgb: 237, 236, 240;           /* RGB for shadow borders */
+  --background: oklch(0.2 0.005 270);
+  --background-elevated: color-mix(in oklch, var(--foreground) 1.5%, var(--background));
+  --foreground: oklch(0.92 0.005 270);
+  --foreground-dimmed: color-mix(in oklch, var(--foreground) 80%, var(--background)); /* unfocused panel text */
+  --foreground-rgb: 227, 226, 229;           /* RGB for shadow borders */
   --user-message-bubble: oklch(from var(--foreground) l c h / 0.05);
   --user-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.03);
-  --accent: oklch(0.65 0.22 293);            /* brighter purple in dark */
-  --accent-rgb: 130, 75, 185;               /* darkened RGB for shadow-tinted (70% of accent) */
-  --info: oklch(0.78 0.14 70);               /* amber */
-  --info-rgb: 210, 155, 55;                  /* RGB for shadow-tinted */
+  --accent: oklch(0.7214 0.1337 49.9802);    /* brighter in dark */
+  --accent-rgb: 162, 97, 58;                 /* darkened RGB for shadow-tinted (70% of accent) */
+  --info: oklch(0.70 0.16 70);               /* amber */
+  --info-rgb: 200, 140, 60;                  /* RGB for shadow-tinted */
   --success: oklch(0.60 0.17 145);           /* green */
-  --success-rgb: 50, 140, 80;               /* RGB for shadow-tinted */
-  --destructive: oklch(0.65 0.22 28);        /* brighter red in dark */
-  --destructive-rgb: 200, 70, 60;            /* RGB for shadow-tinted */
+  --success-rgb: 50, 140, 80;                /* RGB for shadow-tinted */
+  --destructive: oklch(0.70 0.19 22);        /* brighter red in dark */
+  --destructive-rgb: 200, 80, 70;            /* RGB for shadow-tinted */
 
   /* === SHADOW OPACITY (stronger in dark mode for visibility) === */
   --shadow-border-opacity: 0.15;
   --shadow-blur-opacity: 0.12;
 
   /* === MIX VARIANTS === */
-  --foreground-1\.5: color-mix(in srgb, var(--foreground) 1.5%, var(--background));
-  --foreground-2: color-mix(in srgb, var(--foreground) 2%, var(--background));
-  --foreground-3: color-mix(in srgb, var(--foreground) 3%, var(--background));
-  --foreground-5: color-mix(in srgb, var(--foreground) 5%, var(--background));
-  --foreground-10: color-mix(in srgb, var(--foreground) 10%, var(--background));
-  --foreground-20: color-mix(in srgb, var(--foreground) 20%, var(--background));
-  --foreground-30: color-mix(in srgb, var(--foreground) 30%, var(--background));
-  --foreground-40: color-mix(in srgb, var(--foreground) 40%, var(--background));
-  --foreground-50: color-mix(in srgb, var(--foreground) 50%, var(--background));
-  --foreground-60: color-mix(in srgb, var(--foreground) 60%, var(--background));
-  --foreground-70: color-mix(in srgb, var(--foreground) 70%, var(--background));
-  --foreground-80: color-mix(in srgb, var(--foreground) 80%, var(--background));
-  --foreground-90: color-mix(in srgb, var(--foreground) 90%, var(--background));
-  --foreground-95: color-mix(in srgb, var(--foreground) 95%, var(--background));
+  --foreground-1\.5: color-mix(in oklch, var(--foreground) 1.5%, var(--background));
+  --foreground-2: color-mix(in oklch, var(--foreground) 2%, var(--background));
+  --foreground-3: color-mix(in oklch, var(--foreground) 3%, var(--background));
+  --foreground-5: color-mix(in oklch, var(--foreground) 5%, var(--background));
+  --foreground-10: color-mix(in oklch, var(--foreground) 10%, var(--background));
+  --foreground-20: color-mix(in oklch, var(--foreground) 20%, var(--background));
+  --foreground-30: color-mix(in oklch, var(--foreground) 30%, var(--background));
+  --foreground-40: color-mix(in oklch, var(--foreground) 40%, var(--background));
+  --foreground-50: color-mix(in oklch, var(--foreground) 50%, var(--background));
+  --foreground-60: color-mix(in oklch, var(--foreground) 60%, var(--background));
+  --foreground-70: color-mix(in oklch, var(--foreground) 70%, var(--background));
+  --foreground-80: color-mix(in oklch, var(--foreground) 80%, var(--background));
+  --foreground-90: color-mix(in oklch, var(--foreground) 90%, var(--background));
+  --foreground-95: color-mix(in oklch, var(--foreground) 95%, var(--background));
 
   /* Success/destructive/info interpolated toward foreground (for tinted text) */
   /* Using oklab for perceptually uniform mixing without hue shifts */
@@ -332,7 +332,7 @@ html[data-theme-override]::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: color-mix(in srgb, var(--background) 50%, transparent);
+  background: color-mix(in oklch, var(--background) 50%, transparent);
   z-index: -1;
   pointer-events: none;
 }
@@ -841,11 +841,11 @@ html[data-scenic] .fullscreen-overlay-background {
 }
 
 html[data-scenic]:not(.dark) .fullscreen-overlay-background {
-  background: color-mix(in srgb, var(--foreground-3) 70%, transparent);
+  background: color-mix(in oklch, var(--foreground-3) 70%, transparent);
 }
 
 html.dark[data-scenic] .fullscreen-overlay-background {
-  background: color-mix(in srgb, var(--foreground-3) 60%, transparent);
+  background: color-mix(in oklch, var(--foreground-3) 60%, transparent);
 }
 
 /* =============================================================================
@@ -1242,7 +1242,7 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 
 [data-sonner-toast][data-type="error"] [data-title],
 [data-sonner-toast][data-type="error"] [data-description] {
-  color: color-mix(in srgb, rgb(var(--foreground-rgb)) 70%, rgb(var(--destructive-rgb))) !important;
+  color: color-mix(in oklch, rgb(var(--foreground-rgb)) 70%, rgb(var(--destructive-rgb))) !important;
 }
 
 [data-sonner-toast][data-type="warning"] {
@@ -1252,7 +1252,7 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 
 [data-sonner-toast][data-type="warning"] [data-title],
 [data-sonner-toast][data-type="warning"] [data-description] {
-  color: color-mix(in srgb, rgb(var(--foreground-rgb)) 70%, rgb(var(--info-rgb))) !important;
+  color: color-mix(in oklch, rgb(var(--foreground-rgb)) 70%, rgb(var(--info-rgb))) !important;
 }
 
 [data-sonner-toast][data-type="success"] {
@@ -1262,7 +1262,7 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 
 [data-sonner-toast][data-type="success"] [data-title],
 [data-sonner-toast][data-type="success"] [data-description] {
-  color: color-mix(in srgb, rgb(var(--foreground-rgb)) 70%, rgb(var(--success-rgb))) !important;
+  color: color-mix(in oklch, rgb(var(--foreground-rgb)) 70%, rgb(var(--success-rgb))) !important;
 }
 
 /* Dark mode: stronger tints since dark backgrounds absorb color more */
