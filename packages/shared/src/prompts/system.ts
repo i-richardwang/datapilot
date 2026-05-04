@@ -1,6 +1,6 @@
 import { formatPreferencesForPrompt, getCoAuthorPreference } from '../config/preferences.ts';
 import { debug } from '../utils/debug.ts';
-import { existsSync, readFileSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, realpathSync } from 'fs';
 import { join, relative, basename } from 'path';
 import { DOC_REFS, APP_ROOT } from '../docs/index.ts';
 import { PERMISSION_MODE_CONFIG } from '../agent/mode-types.ts';
@@ -111,7 +111,12 @@ export function findAllProjectContextFiles(directory: string): string[] {
     // Build glob ignore patterns from excluded directories
     const ignorePatterns = EXCLUDED_DIRECTORIES.map((dir) => `**/${dir}/**`);
 
-    // Search for all context files (case-insensitive via nocase option)
+    // Discover every directory under cwd that contains an AGENTS.md or CLAUDE.md.
+    // We delegate the "which file to take per directory" decision to
+    // findProjectContextFile, which mirrors Pi SDK's native loadContextFileFromDir
+    // (resource-loader.js:30) — same CONTEXT_FILE_PATTERNS order (AGENTS first),
+    // same one-file-per-directory rule. The glob walk is the monorepo extension
+    // over native (which only walks ancestors).
     const pattern = '**/{agents,claude}.md';
     const matches = globSync(pattern, {
       cwd: directory,
@@ -125,9 +130,39 @@ export function findAllProjectContextFiles(directory: string): string[] {
       return [];
     }
 
-    // Sort by depth (fewer slashes = shallower = higher priority), then alphabetically
-    // Root files come first, then nested packages
-    const sorted = matches.sort((a, b) => {
+    // Distinct relative directories holding at least one context file.
+    // Empty string == root.
+    const dirSet = new Set<string>();
+    for (const rel of matches) {
+      const slash = rel.lastIndexOf('/');
+      dirSet.add(slash === -1 ? '' : rel.slice(0, slash));
+    }
+
+    // Per-directory mutual exclusion via findProjectContextFile + cross-directory
+    // realpath dedup so symlinks/hardlinks pointing at the same inode (e.g.
+    // AGENTS.md → CLAUDE.md) don't get counted twice.
+    const seenRealPaths = new Set<string>();
+    const picked: string[] = [];
+    for (const relDir of dirSet) {
+      const absDir = relDir ? join(directory, relDir) : directory;
+      const filename = findProjectContextFile(absDir);
+      if (!filename) continue;
+
+      const absFile = join(absDir, filename);
+      let realKey: string;
+      try {
+        realKey = realpathSync(absFile);
+      } catch {
+        realKey = absFile;
+      }
+      if (seenRealPaths.has(realKey)) continue;
+      seenRealPaths.add(realKey);
+
+      picked.push(relDir ? `${relDir}/${filename}` : filename);
+    }
+
+    // Sort by depth (root first), then alphabetically.
+    picked.sort((a, b) => {
       const depthA = (a.match(/\//g) || []).length;
       const depthB = (b.match(/\//g) || []).length;
       if (depthA !== depthB) return depthA - depthB;
@@ -135,9 +170,9 @@ export function findAllProjectContextFiles(directory: string): string[] {
     });
 
     // Cap at max files to avoid overwhelming the prompt
-    const capped = sorted.slice(0, MAX_CONTEXT_FILES);
+    const capped = picked.slice(0, MAX_CONTEXT_FILES);
 
-    debug(`[findAllProjectContextFiles] Found ${matches.length} files, returning ${capped.length}`);
+    debug(`[findAllProjectContextFiles] ${matches.length} matches across ${dirSet.size} dirs → ${picked.length} picked, returning ${capped.length}`);
     contextFileCache.set(directory, { files: capped, ts: now });
     return capped;
   } catch (error) {
