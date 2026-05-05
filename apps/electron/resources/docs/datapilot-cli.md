@@ -420,15 +420,15 @@ The `workspace get` command returns the workspace record enriched with settings:
 <!-- cli:status:start -->
 ## Status
 
-Workspace session statuses (Todo, In Progress, Done, ...). Stored per-workspace; the `category` field (`open` or `closed`) determines whether sessions in that status appear in the inbox vs. archive.
+Workspace session statuses (Todo, In Progress, Done, ...).
 
 ### Commands
 - `dtpilot status list`
 - `dtpilot status get <id>`
-- `dtpilot status create --name "<label>" --category open|closed [--input '<json>']`
+- `dtpilot status create --name "<label>" --category open|closed [--input '<json>']` — `color`, `icon` go in `--input`
 - `dtpilot status update <id> --input '<json>'`
 - `dtpilot status delete <id>`
-- `dtpilot status reorder --ids <id1,id2,...>`
+- `dtpilot status reorder --ids <id1,id2,...>` — replaces the full order
 
 ### Examples
 
@@ -437,13 +437,11 @@ dtpilot status list
 dtpilot status create --name "Needs Review" --category open --input '{"color":"#f59e0b","icon":"eye"}'
 dtpilot status update needs-review --input '{"color":"#fbbf24"}'
 dtpilot status reorder --ids todo,in-progress,needs-review,done
-dtpilot status delete needs-review
 ```
 
 ### Notes
-- `--name` maps to the status's `label` field; the id is a stable slug derived from it.
-- `--category` is required on create and must be `open` or `closed`.
-- `reorder` takes a comma-separated `--ids` list and sets that as the new full order.
+- IDs are stable slugs generated from the `--name` (label) on create.
+- `category` controls whether sessions in this status show in the inbox (`open`) or archive (`closed`).
 <!-- cli:status:end -->
 
 ---
@@ -451,7 +449,7 @@ dtpilot status delete needs-review
 <!-- cli:preference:start -->
 ## Preference
 
-User-level preferences (name, timezone, location, notes, language, `includeCoAuthoredBy`). A single object — not per-workspace, not a list — so only `get` and `update` exist.
+User-level preferences (name, timezone, location, notes, language, `includeCoAuthoredBy`).
 
 ### Commands
 - `dtpilot preference get`
@@ -462,19 +460,14 @@ User-level preferences (name, timezone, location, notes, language, `includeCoAut
 ```bash
 dtpilot preference get
 
-# Set or replace fields
 dtpilot preference update --input '{"name":"Alex","timezone":"Asia/Shanghai"}'
 
-# Clear a field — pass null (omitting the key keeps the existing value)
+# Clear a key by passing null; omitting the key keeps the existing value
 dtpilot preference update --input '{"timezone":null}'
-
-# Nested objects (`location`) shallow-merge with the stored value
-dtpilot preference update --input '{"location":{"city":"Shanghai","country":"CN"}}'
 ```
 
 ### Notes
-- All data fields go through `--input` JSON — there are no flat data flags.
-- Top-level `null` clears that key from the stored preferences. Empty string `""` is stored as-is and is *not* the same as cleared.
-- Schema validation runs server-side via `UserPreferencesSchema`; bad input returns a `VALIDATION_ERROR` envelope.
+- Top-level `null` clears that key; empty string `""` is stored as-is and is *not* the same as cleared.
+- Nested objects (`location`) shallow-merge with the stored value.
 <!-- cli:preference:end -->
 
