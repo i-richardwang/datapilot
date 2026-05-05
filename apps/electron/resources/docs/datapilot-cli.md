@@ -56,41 +56,9 @@ flat flags win on conflict.
 > --description`, `session create --mode`, `session create --source`) now
 > fail fast. Move the value to `--input '{"<jsonKey>":"..."}'`.
 
-### Input modes
-
-- **Flat flags** for identity (`--name`) and schema-branch selectors
-  (`--event`, `--provider`, `--type`).
-- **`--input '<json>'`** for every data field.
-- **`--stdin`** to read a JSON object from piped stdin (same semantics as
-  `--input`).
-
 ## Output contract
 
-All commands print a single JSON envelope on stdout (or human-readable text
-when stdout is a TTY and `--json` is not forced).
-
-### Success
-```json
-{ "ok": true, "data": {}, "warnings": [] }
-```
-
-### Error
-```json
-{
-  "ok": false,
-  "error": {
-    "code": "USAGE_ERROR",
-    "message": "...",
-    "suggestion": "..."
-  },
-  "warnings": []
-}
-```
-
-Exit codes:
-- `0` success
-- `1` execution / internal failure (incl. transport failures)
-- `2` usage / validation / input failure
+JSON envelope on stdout (`{ok, data?, error?, warnings}`); switches to human-readable text on a TTY unless `--json` forces JSON. Error envelopes carry `error.code` (`USAGE_ERROR`, `VALIDATION_ERROR`, `NOT_FOUND`, `CONNECTION_ERROR`, `INTERNAL_ERROR`) and an optional `error.suggestion`. Exit codes: `0` success, `1` execution / internal failure, `2` usage / validation / input failure.
 
 ---
 
@@ -147,43 +115,14 @@ Manage workspace sources stored under `sources/{slug}/`.
 - `dtpilot source update <slug> --input '<json>'`
 - `dtpilot source delete <slug>`
 
-### Required fields for `source create`
-
-| Flat flag | Why flat | Description |
-|-------|----------|-------------|
-| `--name` | identity | Source display name |
-| `--provider` | schema-branch | Provider identifier (e.g., `linear`, `github`, `generic`) |
-| `--type` | schema-branch | `mcp`, `api`, or `local` — picks which nested config is valid |
-
-Type-specific fields (e.g. MCP `transport` / `url` / `authType`, API `baseUrl`,
-local `path`) live under nested keys passed via `--input`.
+Type-specific config (MCP `transport`/`url`/`authType`, API `baseUrl`, local `path`) goes nested under `--input`.
 
 ### Examples
 
 ```bash
 dtpilot source list
 dtpilot source get linear
-```
 
-`source get <slug>` returns the source record merged with permissions and MCP tools:
-
-```json
-{
-  "slug": "linear",
-  "name": "Linear",
-  "provider": "linear",
-  "type": "mcp",
-  "permissions": {
-    "allowedTools": ["linear_search"],
-    "defaultPolicy": "allow"
-  },
-  "mcpTools": [
-    { "name": "linear_search", "permissionStatus": "allowed" }
-  ]
-}
-```
-
-```bash
 # MCP source — nested config via --input
 dtpilot source create --name "Linear" --provider "linear" --type mcp \
   --input '{"mcp":{"transport":"http","url":"https://mcp.linear.app/sse","authType":"oauth"}}'
@@ -231,8 +170,7 @@ dtpilot skill delete commit-helper
 
 ### Notes
 - `create` / `update` write `SKILL.md` frontmatter and content body.
-- The server derives `slug` from `name` when not provided (see
-  `packages/server-core/src/handlers/rpc/skills.ts:145`).
+- The server derives `slug` from `name` when not provided.
 <!-- cli:skill:end -->
 
 ---
@@ -272,9 +210,6 @@ dtpilot automation history abc123 --limit 10
 dtpilot automation test abc123
 dtpilot automation delete abc123
 ```
-
-### Notes
-- `--name` is required for `create` (or pass it inside `--input`); use `--input` with `actions` for multi-action automations.
 <!-- cli:automation:end -->
 
 ---
@@ -324,9 +259,7 @@ dtpilot batch delete abc123
 ```
 
 ### Notes
-- `items` returns the per-item breakdown, supporting `--offset` (default 0) and `--limit` (default 100) for pagination. Use `batch get` for progress information.
-- `test` runs a dry-run against a batch with optional sample size and returns the result directly.
-- `delete` removes the batch from `batches.json` and cleans up its `batch-state-{id}.json`.
+- `items` only returns per-item state; for overall progress call `batch get`.
 <!-- cli:batch:end -->
 
 ---
@@ -347,30 +280,18 @@ Manage sessions inside a workspace. This entity is request/response.
 - `dtpilot session share <id>`
 - `dtpilot session share <id> --html <file>`
 
-### Permission mode default
-
-`session create` defaults `permissionMode` to `allow-all` when neither the
-flat `--name` nor `--input '{"permissionMode":"..."}'` supplies one. The CLI
-is invoked by agents running without a human to confirm `ask` prompts, so
-`allow-all` is the only mode that does not stall the session. Override via
-`--input '{"permissionMode":"safe"}'` (or `"ask"`). Electron UI sessions keep
-their own `ask` default — this fallback lives only in the CLI layer.
-
 ### Examples
 
 ```bash
 dtpilot session list
 
-# permissionMode omitted → session starts in allow-all
 dtpilot session create --name "Daily standup" \
   --input '{"enabledSourceSlugs":["linear","github"]}'
-
-# explicit override
 dtpilot session create --name "Audit" --input '{"permissionMode":"safe"}'
 
 dtpilot session send sess-abc "Summarize today's open PRs"
 
-# load specific skills for this turn
+# Load specific skills for this turn
 dtpilot session send sess-abc "Run the audit" \
   --input '{"skillSlugs":["security-audit"]}'
 
@@ -378,6 +299,9 @@ dtpilot session cancel sess-abc
 dtpilot session share sess-abc
 dtpilot session share sess-abc --html ./report.html
 ```
+
+### Notes
+- `session create` defaults `permissionMode` to `allow-all` when not set — `ask` would stall a non-interactive CLI. Override with `--input '{"permissionMode":"safe"}'` (or `"ask"`).
 <!-- cli:session:end -->
 
 ---
@@ -390,28 +314,13 @@ sessions, etc.).
 
 ### Commands
 - `dtpilot workspace list`
-- `dtpilot workspace get [<id|slug|name>]`
+- `dtpilot workspace get [<id|slug|name>]` — returns the workspace record merged with `settings` and `connection` info
 
 ### Examples
 
 ```bash
 dtpilot workspace list
 dtpilot workspace get my-workspace
-```
-
-### Response
-
-The `workspace get` command returns the workspace record enriched with settings:
-
-```json
-{
-  "id": "ws-abc123",
-  "name": "My Workspace",
-  "settings": {
-    "theme": "dark",
-    "language": "zh"
-  }
-}
 ```
 <!-- cli:workspace:end -->
 
