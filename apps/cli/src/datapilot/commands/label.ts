@@ -94,7 +94,11 @@ export async function routeLabel(
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing label id')
       const index = intFlag(flags, 'index')
-      if (index === undefined) fail('USAGE_ERROR', 'Missing --index <n>')
+      if (index === undefined) {
+        fail('USAGE_ERROR', 'Missing --index <n>', {
+          suggestion: `Run 'dtpilot label get ${id}' to list autoRules with their array positions, then pass --index <n>.`,
+        })
+      }
       ok(await client.invoke('labels:autoRuleRemove', ws, id, index))
     }
 

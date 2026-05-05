@@ -27,15 +27,21 @@ Automations are configured in `automations.json` at the root of your workspace:
 ```bash
 dtpilot automation list
 dtpilot automation get <id>
-dtpilot automation create --event UserPromptSubmit --prompt "..."
-dtpilot automation update <id> --json '{...}'
+dtpilot automation history <id> --limit 20
+
+dtpilot automation create --event UserPromptSubmit --name "Summarize" \
+  --input '{"actions":[{"type":"prompt","prompt":"Summarize this prompt"}]}'
+
+dtpilot automation create --event SchedulerTick --name "Daily Summary" \
+  --input '{"cron":"0 9 * * 1-5","actions":[{"type":"prompt","prompt":"Daily summary"}]}'
+
+dtpilot automation update <id> --input '{"enabled":false}'
+
 dtpilot automation enable <id>
 dtpilot automation disable <id>
-dtpilot automation duplicate <id>
-dtpilot automation history [<id>] --limit 20
-dtpilot automation last-executed <id>
-dtpilot automation test <id> --match "..."
-dtpilot automation validate
+dtpilot automation delete <id>
+
+dtpilot automation test <id>
 ```
 
 ## Basic Structure

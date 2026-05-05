@@ -113,12 +113,16 @@ const LocationSchema = z.object({
   country: z.string().optional(),
 });
 
+// `null` on a top-level field is the explicit "clear this preference" signal
+// for the partial-update RPC path (`preferences:update`). `undefined` / key
+// absence keeps the existing value. Stored preferences never contain `null` —
+// the storage layer translates `null` into key deletion before persisting.
 export const UserPreferencesSchema = z.object({
-  name: z.string().optional(),
-  timezone: z.string().optional(),  // TODO: Could validate against IANA timezone list
-  location: LocationSchema.optional(),
-  language: z.string().optional(),
-  notes: z.string().optional(),
+  name: z.string().nullable().optional(),
+  timezone: z.string().nullable().optional(),  // TODO: Could validate against IANA timezone list
+  location: LocationSchema.nullable().optional(),
+  language: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
   updatedAt: z.number().int().min(0).optional(),
 });
 
@@ -390,20 +394,31 @@ const McpSourceConfigSchema = z.object({
   headers: z.record(z.string(), z.string()).optional(),
   // Header names for credential-store auth (values stored in credential store as JSON)
   headerNames: z.array(z.string()).optional(),
-}).refine(
-  (data) => {
-    if (data.transport === 'stdio') {
-      // Stdio transport requires command
-      return !!data.command;
-    } else {
-      // HTTP/SSE transport (default) requires url and authType
-      return !!data.url && !!data.authType;
+}).superRefine((data, ctx) => {
+  if (data.transport === 'stdio') {
+    if (!data.command) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'stdio MCP transport requires "command".',
+      });
     }
-  },
-  {
-    message: 'MCP config requires either (url + authType) for HTTP/SSE or (command) for stdio transport',
+    return;
   }
-);
+  // Common mistake: command supplied without transport.
+  if (data.command && !data.transport) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Got "command" but no "transport". Add "transport":"stdio" for local subprocess MCP servers.',
+    });
+    return;
+  }
+  if (!data.url || !data.authType) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'MCP config requires "url" + "authType" (HTTP/SSE) or "transport":"stdio" + "command" (stdio).',
+    });
+  }
+});
 
 const ApiOAuthConfigSchema = z.object({
   authorizationUrl: z.string().url(),

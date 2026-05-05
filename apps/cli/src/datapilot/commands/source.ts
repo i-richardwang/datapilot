@@ -38,14 +38,14 @@ export async function routeSource(
       rejectUnknownFlags(flags, [])
       const slug = positionals[0]
       if (!slug) fail('USAGE_ERROR', 'Missing source slug')
-      const sources = (await client.invoke('sources:get', ws)) as Array<{ slug: string }>
-      const found = sources.find((s) => s.slug === slug)
+      const sources = (await client.invoke('sources:get', ws)) as Array<{ config: { slug: string } }>
+      const found = sources.find((s) => s.config?.slug === slug)
       if (!found) fail('NOT_FOUND', `Source '${slug}' not found`)
       const [permissions, mcpTools] = await Promise.all([
         client.invoke('sources:getPermissions', ws, slug),
         client.invoke('sources:getMcpTools', ws, slug),
       ])
-      ok({ ...found, permissions, mcpTools })
+      ok({ ...found.config, permissions, mcpTools })
     }
 
     case 'create': {

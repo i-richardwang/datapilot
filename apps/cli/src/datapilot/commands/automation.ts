@@ -142,9 +142,26 @@ export async function routeAutomation(
 
     case 'test': {
       rejectUnknownFlags(flags, [])
-      const input = (await parseInput(flags)) ?? {}
-      const payload = { workspaceId: ws, ...input }
-      ok(await client.invoke('automations:test', payload))
+      const id = positionals[0]
+      if (!id) fail('USAGE_ERROR', 'Missing automation id')
+      const resolved = await resolveAutomationId(client, ws, id)
+      if (!resolved) fail('NOT_FOUND', `Automation '${id}' not found`)
+      const m = resolved.matcher as {
+        name?: string
+        actions?: unknown
+        permissionMode?: string
+        labels?: string[]
+        telegramTopic?: string
+      }
+      ok(await client.invoke('automations:test', {
+        workspaceId: ws,
+        automationId: id,
+        automationName: m.name,
+        actions: m.actions,
+        permissionMode: m.permissionMode,
+        labels: m.labels,
+        telegramTopic: m.telegramTopic,
+      }))
     }
   }
 

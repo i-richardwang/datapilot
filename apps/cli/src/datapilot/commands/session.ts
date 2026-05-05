@@ -3,6 +3,8 @@
  *
  * Flag rule: `create` keeps only `--name` (identity). `permissionMode` and
  * `enabledSourceSlugs` — previously `--mode` / `--source` flat flags — flow
+ * through `--input '<json>'`. `send` accepts the message as a positional for
+ * the common case; `skillSlugs` (and an alternate `message` field) flow
  * through `--input '<json>'`. `share` keeps `--html <file>` as a query-param
  * flat flag (it's a file path, not entity data) to switch upload mode.
  *
@@ -84,9 +86,13 @@ export async function routeSession(
       rejectUnknownFlags(flags, [])
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing session id')
-      const message = positionals.slice(1).join(' ')
-      if (!message) fail('USAGE_ERROR', 'Missing message text')
-      ok(await client.invoke('sessions:sendMessage', id, message))
+      const positionalMessage = positionals.slice(1).join(' ')
+      const input = (await parseInput(flags)) ?? {}
+      const message = (input.message as string | undefined) ?? positionalMessage
+      if (!message) fail('USAGE_ERROR', 'Missing message text — pass as positional or --input \'{"message":"..."}\'')
+      const skillSlugs = input.skillSlugs as string[] | undefined
+      const options = skillSlugs ? { skillSlugs } : undefined
+      ok(await client.invoke('sessions:sendMessage', id, message, undefined, undefined, options))
     }
 
     case 'cancel': {

@@ -631,14 +631,16 @@ export function getActiveWorkspace(): Workspace | null {
 }
 
 /**
- * Find a workspace by name (case-insensitive) or ID.
- * Useful for CLI -w flag to specify workspace.
+ * Find a workspace by ID, slug, or name (case-insensitive).
+ * Slug is the URL-safe folder name and the canonical public identifier
+ * (UI uses it for `?ws=` and skill qualification).
  */
-export function getWorkspaceByNameOrId(nameOrId: string): Workspace | null {
+export function getWorkspaceByNameOrId(idSlugOrName: string): Workspace | null {
   const workspaces = getWorkspaces();
   return workspaces.find(w =>
-    w.id === nameOrId ||
-    w.name.toLowerCase() === nameOrId.toLowerCase()
+    w.id === idSlugOrName ||
+    w.slug === idSlugOrName ||
+    w.name.toLowerCase() === idSlugOrName.toLowerCase()
   ) || null;
 }
 

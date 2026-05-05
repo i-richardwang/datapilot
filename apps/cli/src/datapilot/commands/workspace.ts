@@ -30,11 +30,15 @@ export async function routeWorkspace(
 
     case 'get': {
       const id = positionals[0]
-      const list = (await client.invoke('workspaces:get')) as Array<{ id: string }>
+      const list = (await client.invoke('workspaces:get')) as Array<{ id: string; slug: string; name: string }>
       const target = id ?? (await ctx.getWorkspace())
-      const found = list.find((w) => w.id === target)
+      const found = list.find((w) =>
+        w.id === target ||
+        w.slug === target ||
+        w.name?.toLowerCase() === target?.toLowerCase()
+      )
       if (!found) fail('NOT_FOUND', `Workspace '${target}' not found`)
-      const settings = await client.invoke('workspaceSettings:get', target)
+      const settings = await client.invoke('workspaceSettings:get', found.id)
       const connection = describeConnection(ctx.getEndpoint())
       ok({ ...found, settings, connection })
     }

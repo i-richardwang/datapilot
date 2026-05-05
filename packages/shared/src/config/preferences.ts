@@ -57,22 +57,32 @@ export function savePreferences(prefs: UserPreferences): void {
   writeFileSync(PREFERENCES_FILE, JSON.stringify(prefs, null, 2), 'utf-8');
 }
 
-export function updatePreferences(updates: Partial<UserPreferences>): UserPreferences {
+/**
+ * Partial-merge update. Top-level `null` on a key clears that preference
+ * (the key is removed from the stored JSON). Omitting a key keeps the
+ * existing value. Nested objects (`location`, `diffViewer`) shallow-merge
+ * when an object is supplied.
+ */
+export function updatePreferences(
+  updates: Record<string, unknown>,
+): UserPreferences {
   const current = loadPreferences();
-  const updated = {
-    ...current,
-    ...updates,
-    // Merge location if provided
-    location: updates.location
-      ? { ...current.location, ...updates.location }
-      : current.location,
-    // Merge diffViewer if provided
-    diffViewer: updates.diffViewer
-      ? { ...current.diffViewer, ...updates.diffViewer }
-      : current.diffViewer,
-  };
-  savePreferences(updated);
-  return updated;
+  const next: Record<string, unknown> = { ...current };
+
+  for (const [key, value] of Object.entries(updates)) {
+    if (value === null) {
+      delete next[key];
+    } else if (key === 'location' && value && typeof value === 'object') {
+      next.location = { ...current.location, ...(value as UserLocation) };
+    } else if (key === 'diffViewer' && value && typeof value === 'object') {
+      next.diffViewer = { ...current.diffViewer, ...(value as DiffViewerPreferences) };
+    } else {
+      next[key] = value;
+    }
+  }
+
+  savePreferences(next as UserPreferences);
+  return next as UserPreferences;
 }
 
 export function getPreferencesPath(): string {

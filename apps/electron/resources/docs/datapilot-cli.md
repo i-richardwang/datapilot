@@ -21,7 +21,7 @@ entities/actions.
 |------|-------------|
 | `--url <ws-url>` | Server URL (default: `ws://127.0.0.1:9100`, env: `DATAPILOT_SERVER_URL`) |
 | `--token <secret>` | Bearer token (env: `DATAPILOT_SERVER_TOKEN`, or discovery file) |
-| `--workspace <id>` | Workspace ID (auto-detected from the server if omitted) |
+| `--workspace <id\|slug\|name>` | Workspace identifier (auto-detected from the server if omitted) |
 | `--timeout <ms>` | Per-request timeout (default: `30000`) |
 | `--tls-ca <path>` | Custom CA cert for self-signed `wss://` (env: `DATAPILOT_TLS_CA`) |
 | `--json` | Force JSON envelope output (default for non-TTY stdout) |
@@ -251,7 +251,7 @@ Manage workspace automations stored in `automations.json`.
 - `dtpilot automation enable <id>`
 - `dtpilot automation disable <id>`
 - `dtpilot automation history <id> [--limit <n>]`
-- `dtpilot automation test [--input '<json>']`
+- `dtpilot automation test <id>`
 
 ### Examples
 
@@ -269,7 +269,7 @@ dtpilot automation create --event SchedulerTick --name "Daily Summary" \
 dtpilot automation update abc123 --input '{"enabled":false}'
 dtpilot automation enable abc123
 dtpilot automation history abc123 --limit 10
-dtpilot automation test --input '{"automationId":"abc123","actions":[{"type":"prompt","prompt":"Test"}]}'
+dtpilot automation test abc123
 dtpilot automation delete abc123
 ```
 
@@ -342,7 +342,7 @@ Manage sessions inside a workspace. This entity is request/response.
 - `dtpilot session create [--name "..."] [--input '<json>']` — `permissionMode` and `enabledSourceSlugs` go in `--input`
 - `dtpilot session delete <id>`
 - `dtpilot session messages <id>`
-- `dtpilot session send <id> <message-text...>`
+- `dtpilot session send <id> [<message-text...>] [--input '<json>']` — message via positional or `--input.message`; `--input.skillSlugs` loads skills for that turn
 - `dtpilot session cancel <id>`
 - `dtpilot session share <id>`
 - `dtpilot session share <id> --html <file>`
@@ -369,6 +369,11 @@ dtpilot session create --name "Daily standup" \
 dtpilot session create --name "Audit" --input '{"permissionMode":"safe"}'
 
 dtpilot session send sess-abc "Summarize today's open PRs"
+
+# load specific skills for this turn
+dtpilot session send sess-abc "Run the audit" \
+  --input '{"skillSlugs":["security-audit"]}'
+
 dtpilot session cancel sess-abc
 dtpilot session share sess-abc
 dtpilot session share sess-abc --html ./report.html
@@ -385,13 +390,13 @@ sessions, etc.).
 
 ### Commands
 - `dtpilot workspace list`
-- `dtpilot workspace get [<id>]`
+- `dtpilot workspace get [<id|slug|name>]`
 
 ### Examples
 
 ```bash
 dtpilot workspace list
-dtpilot workspace get ws-abc123
+dtpilot workspace get my-workspace
 ```
 
 ### Response

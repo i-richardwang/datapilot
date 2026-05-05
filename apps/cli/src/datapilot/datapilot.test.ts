@@ -540,7 +540,7 @@ describe('datapilot CLI', () => {
       handlers: {
         'workspaces:get': () => [{ id: 'ws-1' }],
         'window:switchWorkspace': () => undefined,
-        'sources:get': () => [{ slug: 'linear', name: 'Linear', provider: 'linear', type: 'mcp' }],
+        'sources:get': () => [{ config: { slug: 'linear', name: 'Linear', provider: 'linear', type: 'mcp' } }],
         'sources:getPermissions': () => ({ allowedTools: ['linear_search'], defaultPolicy: 'allow' }),
         'sources:getMcpTools': () => [{ name: 'linear_search', permissionStatus: 'allowed' }],
       },

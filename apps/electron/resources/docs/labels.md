@@ -139,18 +139,15 @@ The optional `valueType` in config is a hint only — the parser always infers f
 
 ## Adding Labels
 
-Prefer `dtpilot` commands:
-
 ```bash
-dtpilot label create --name "Bug" --color "destructive"
-dtpilot label create --name "Priority" --color "accent" --value-type number
-dtpilot label create --name "Due Date" --color "info" --value-type date
-dtpilot label create --name "Project" --color "foreground/60"
-dtpilot label create --name "Alpha" --color "info" --parent-id project
-dtpilot label create --name "Beta" --color "success" --parent-id project
+dtpilot label create --name "Bug" --input '{"color":"destructive"}'
+dtpilot label create --name "Priority" --input '{"color":"accent","valueType":"number"}'
+dtpilot label create --name "Alpha" --input '{"color":"info","parentId":"project"}'
+
+dtpilot label update bug --input '{"color":"destructive","name":"Bug Report"}'
 ```
 
-Use direct JSON edits only for bulk/manual operations where CLI is not sufficient.
+Nested labels: set `parentId` to the parent label's slug.
 
 ## Color Conventions
 
