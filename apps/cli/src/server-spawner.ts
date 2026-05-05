@@ -1,5 +1,5 @@
 /**
- * Server spawner — start a headless Craft Agent server as a child process.
+ * Server spawner — start a headless DataPilot server as a child process.
  *
  * Spawns `bun run <serverEntry>`, reads stdout for the `DATAPILOT_SERVER_URL=`
  * and `DATAPILOT_SERVER_TOKEN=` lines, and returns a handle to stop the server.

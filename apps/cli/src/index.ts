@@ -2,7 +2,7 @@
 /**
  * Internal terminal helper for the DataPilot server (run via `bun run`).
  *
- * Connects over WebSocket (ws:// or wss://) to a running Craft Agent server
+ * Connects over WebSocket (ws:// or wss://) to a running DataPilot server
  * and provides commands for listing resources, managing sessions, sending
  * messages with real-time streaming, and validating server health.
  */

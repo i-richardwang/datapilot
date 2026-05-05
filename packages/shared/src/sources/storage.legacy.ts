@@ -534,7 +534,7 @@ export async function createSource(
   }
 
   // Create guide.md with skeleton template
-  // (bundled guides removed - agent should search craft-agents-docs MCP for service-specific guidance)
+  // (bundled guides removed - agent should use WebSearch for service-specific setup guidance)
   const guideContent = `# ${input.name}
 
 ## Guidelines

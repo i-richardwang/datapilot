@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * @craft-agent/server — standalone headless Craft Agent server.
+ * @craft-agent/server — standalone headless DataPilot server.
  *
  * Usage:
  *   DATAPILOT_SERVER_TOKEN=<secret> bun run packages/server/src/index.ts

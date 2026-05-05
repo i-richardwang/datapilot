@@ -221,7 +221,7 @@ ${colors.bold}Dynamic User Message Components (per message):${colors.reset}
 
 ${colors.bold}Key Files:${colors.reset}
   packages/shared/src/prompts/system.ts          ${colors.dim}// Main prompt assembly${colors.reset}
-  packages/shared/src/agent/craft-agent.ts       ${colors.dim}// User message building${colors.reset}
+  packages/shared/src/agent/claude-agent.ts       ${colors.dim}// User message building${colors.reset}
   packages/shared/src/agent/mode-manager.ts      ${colors.dim}// Permission modes${colors.reset}
   packages/shared/src/config/preferences.ts      ${colors.dim}// User preferences${colors.reset}
 `);

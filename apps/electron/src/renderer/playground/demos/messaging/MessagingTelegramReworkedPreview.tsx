@@ -149,7 +149,7 @@ function BotHeader({ connected }: { connected: boolean }) {
       <div className="min-w-0 flex-1">
         <div className="text-sm font-medium">Telegram</div>
         <div className="mt-0.5 truncate text-xs text-foreground/50">
-          Bot API · {connected ? 'Valid bot: @CraftAgentsBot' : 'Not connected'}
+          Bot API · {connected ? 'Valid bot: @DataPilotBot' : 'Not connected'}
         </div>
       </div>
       {connected ? (
@@ -285,7 +285,7 @@ function PairedSupergroupSection({ topics }: { topics: TopicBinding[] }) {
         <SubRowIcon icon={Users} />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
-            <div className="truncate text-sm font-medium">Craft Agents</div>
+            <div className="truncate text-sm font-medium">DataPilot</div>
             <div className="truncate text-xs text-foreground/50">(-1003783993623)</div>
           </div>
           <div className="mt-0.5 truncate text-xs text-foreground/50">

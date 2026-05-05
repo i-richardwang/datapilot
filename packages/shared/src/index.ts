@@ -1,7 +1,7 @@
 /**
  * @craft-agent/shared
  *
- * Shared business logic for Craft Agent.
+ * Shared business logic for DataPilot.
  * Used by the Electron app.
  *
  * Import specific modules via subpath exports:
@@ -16,7 +16,7 @@
  * Available modules:
  *   - agent: CraftAgent SDK wrapper, plan tools
  *   - auth: OAuth, token management, auth state
- *   - clients: Craft API client
+ *   - clients: DataPilot API client
  *   - config: Storage, models, preferences
  *   - credentials: Encrypted credential storage
  *   - mcp: MCP client, connection validation

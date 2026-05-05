@@ -183,7 +183,7 @@ What data/functionality this provides. Include:
 ## Examples
 
 Concrete examples tailored to the user's workflow:
-- "To find issues in the Craft iOS project: ..."
+- "To find issues in the Acme iOS project: ..."
 - "To search for recent commits by the mobile team: ..."
 ```
 
@@ -207,23 +207,23 @@ Agent: A few questions to set up Linear:
 2. Are there specific teams or projects you want to focus on?
 3. Should I set it up for read-only exploration or full access?
 
-User: Issue tracking for my iOS team, project called "Craft iOS"
+User: Issue tracking for my iOS team, project called "Acme iOS"
 
 Agent: [Uses WebSearch to verify current Linear MCP URL]
 Agent: [Creates config.json with:
         - icon: (searches web for app icon or uses favicon)
-        - tagline: "Issue tracking for the Craft iOS team"
+        - tagline: "Issue tracking for the Acme iOS team"
         - OAuth authentication]
-Agent: [Writes guide.md mentioning "Craft iOS" project and iOS team context]
+Agent: [Writes guide.md mentioning "Acme iOS" project and iOS team context]
 Agent: [Sets up permissions.json for read-only listing in Explore mode]
 Agent: [MANDATORY: Runs source_test to validate]
        mcp__session__source_test({ sourceSlug: "linear" })
 Agent: [Triggers source_oauth_trigger for authentication]
        mcp__session__source_oauth_trigger({ sourceSlug: "linear" })
 
-Agent: Linear is now set up! I've configured it to focus on the "Craft iOS" project.
+Agent: Linear is now set up! I've configured it to focus on the "Acme iOS" project.
 You can use it to:
-- Search and view issues in Craft iOS
+- Search and view issues in Acme iOS
 - Track sprint progress for the iOS team
 - Create and update issues
 
@@ -523,11 +523,11 @@ For API sources that use OAuth 2.0 but aren't Google, Slack, or Microsoft. Two m
 
 ```json
 {
-  "name": "Craft Connect",
+  "name": "Acme API",
   "type": "api",
-  "provider": "craft",
+  "provider": "acme",
   "api": {
-    "baseUrl": "https://connect.craft.do/my/api/v1/",
+    "baseUrl": "https://api.example.com/v1/",
     "authType": "oauth"
   }
 }
