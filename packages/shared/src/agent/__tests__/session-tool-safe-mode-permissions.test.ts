@@ -24,7 +24,7 @@ describe('session tool safe-mode classification', () => {
       'mcp__session__source_oauth_trigger',
       'mcp__session__source_credential_prompt',
       'mcp__session__spawn_session',
-      'mcp__session__update_user_preferences',
+      'mcp__session__set_session_labels',
     ] as const;
 
     for (const toolName of blockedTools) {

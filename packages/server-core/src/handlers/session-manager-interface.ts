@@ -13,6 +13,9 @@ import type { ThinkingLevel } from '@craft-agent/shared/agent/thinking-levels'
 import type { AuthResult } from '@craft-agent/shared/agent'
 import type {
   Session,
+  SessionInfo,
+  SessionListOptions,
+  SessionListResult,
   SessionStatus,
   CreateSessionOptions,
   FileAttachment,
@@ -45,6 +48,18 @@ export interface ISessionManager {
 
   getSessions(workspaceId?: string): Session[]
   getSession(sessionId: string): Promise<Session | null>
+
+  /**
+   * Curated agent-facing snapshot of one session — 10 fields, no UI/SDK noise.
+   * Returns null when the session id is unknown.
+   */
+  getSessionInfo(sessionId: string): SessionInfo | null
+
+  /**
+   * Filtered/sorted/paginated session list for agent-facing CLI/RPC.
+   * Returns `{ total, returned, sessions: SessionListItem[] }` (5 fields per row).
+   */
+  getSessionList(workspaceId: string, options?: SessionListOptions): SessionListResult
   createSession(workspaceId: string, options?: CreateSessionOptions): Promise<Session>
   deleteSession(sessionId: string): Promise<void>
 

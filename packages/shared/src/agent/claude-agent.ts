@@ -858,7 +858,7 @@ export class ClaudeAgent extends BaseAgent {
 
       // Build full MCP servers set first, then filter for mini agents
       const fullMcpServers: Options['mcpServers'] = {
-        // Session-scoped tools (SubmitPlan, source_test, update_user_preferences, transform_data, etc.)
+        // Session-scoped tools (SubmitPlan, source_test, transform_data, etc.)
         session: getSessionScopedTools(sessionId, this.workspaceRootPath),
         // DISABLED: Upstream Craft Agents docs MCP — provides only generic schema/overview pages,
         // no per-service setup recipes. Costs ~1000 tokens/session in tool definitions on Claude

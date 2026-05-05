@@ -28,7 +28,6 @@ import {
   handleMicrosoftOAuthTrigger,
 } from './handlers/source-oauth.ts';
 import { handleCredentialPrompt } from './handlers/credential-prompt.ts';
-import { handleUpdatePreferences } from './handlers/update-preferences.ts';
 import { handleTransformData } from './handlers/transform-data.ts';
 import { handleScriptSandbox } from './handlers/script-sandbox.ts';
 import { handleRenderTemplate } from './handlers/render-template.ts';
@@ -36,8 +35,6 @@ import { handleSendDeveloperFeedback } from './handlers/send-developer-feedback.
 import { handleBatchOutput } from './handlers/batch-output.ts';
 import { handleSetSessionLabels } from './handlers/set-session-labels.ts';
 import { handleSetSessionStatus } from './handlers/set-session-status.ts';
-import { handleGetSessionInfo } from './handlers/get-session-info.ts';
-import { handleListSessions } from './handlers/list-sessions.ts';
 import { handleSendAgentMessage } from './handlers/send-agent-message.ts';
 import { handleListMessagingChannels, handleUnbindMessagingChannel } from './handlers/messaging.ts';
 
@@ -111,17 +108,6 @@ export const CallLlmSchema = z.object({
   }).optional().describe('Custom JSON Schema for structured output'),
 });
 
-export const UpdatePreferencesSchema = z.object({
-  name: z.string().optional().describe("The user's preferred name or how they'd like to be addressed"),
-  timezone: z.string().optional().describe("The user's timezone in IANA format (e.g., 'America/New_York', 'Europe/London')"),
-  city: z.string().optional().describe("The user's city"),
-  region: z.string().optional().describe("The user's state/region/province"),
-  country: z.string().optional().describe("The user's country"),
-  language: z.string().optional().describe("The user's preferred language for responses"),
-  notes: z.string().optional().describe('Additional notes about the user that would be helpful to remember (preferences, context, etc.). Replaces any existing notes.'),
-  includeCoAuthoredBy: z.boolean().optional().describe("Whether to include 'Co-Authored-By: DataPilot' trailer on git commits. Defaults to true."),
-});
-
 export const TransformDataSchema = z.object({
   language: z.enum(['python3', 'node', 'bun']).describe('Script runtime to use'),
   script: z.string().describe('Transform script source code. Receives input file paths as command-line args (sys.argv[1:] or process.argv.slice(2)), last arg is the output file path.'),
@@ -189,19 +175,6 @@ export const SetSessionLabelsSchema = z.object({
 export const SetSessionStatusSchema = z.object({
   sessionId: z.string().optional().describe('Session ID to update. Omit to update the current session.'),
   status: z.string().describe('Status to set (e.g., "todo", "in_progress", "done")'),
-});
-
-export const GetSessionInfoSchema = z.object({
-  sessionId: z.string().optional().describe('Session ID to query. Omit to get info about the current session.'),
-});
-
-export const ListSessionsSchema = z.object({
-  status: z.string().optional().describe('Filter by status'),
-  label: z.string().optional().describe('Filter by label'),
-  search: z.string().optional().describe('Substring match on session name'),
-  sortBy: z.enum(['recent', 'name', 'status']).optional().describe('Sort order (default: recent)'),
-  limit: z.number().optional().describe('Max sessions to return (default 20, max 100)'),
-  offset: z.number().optional().describe('Skip first N results (for pagination)'),
 });
 
 // Inter-session messaging
@@ -315,9 +288,7 @@ The user will see a secure input UI with appropriate fields based on the auth mo
 
 **IMPORTANT:** After calling this tool, execution will be paused for user input.`,
 
-  update_user_preferences: `Update stored user preferences. Use this when you learn information about the user that would be helpful to remember for future conversations. This includes their name, timezone, location, preferred language, or any other relevant notes. Only update fields you have confirmed information about - don't guess.`,
-
-  transform_data: `Run a script to shape large datasets (20+ rows) into JSON for datatable/spreadsheet blocks, or decode/extract content embedded in another file (e.g. base64 email body inside a JSON payload) into a standalone HTML/PDF/image file.
+  transform_data:`Run a script to shape large datasets (20+ rows) into JSON for datatable/spreadsheet blocks, or decode/extract content embedded in another file (e.g. base64 email body inside a JSON payload) into a standalone HTML/PDF/image file.
 
 Not needed when the file you want to preview already exists on disk — html-preview/pdf-preview/image-preview blocks accept any absolute path as \`"src"\`.
 
@@ -462,20 +433,10 @@ Pass an empty array to clear all labels. Omit sessionId to target the current se
 Use this to signal completion or trigger status-based automations (SessionStatusChange events).
 Omit sessionId to target the current session.`,
 
-  get_session_info: `Get metadata about the current session or a specific session by ID.
-
-Returns labels, status, name, permission mode, and other details.
-Call with no arguments to introspect your own session state.`,
-
-  list_sessions: `List sessions in the workspace. Returns total count + paginated results.
-
-Use filters (status, label, search) to narrow results instead of fetching everything. Default limit is 20 sessions.
-Use get_session_info for full details on a specific session (list-then-detail pattern).`,
-
   send_agent_message: `Send a message to another session. The message is delivered with your session ID so the target can reply back.
 
 Use this to coordinate with spawned sessions, send follow-up instructions, or relay information between sessions.
-Use list_sessions to find session IDs, or use the sessionId returned by spawn_session.
+Use \`dtpilot session list\` to find session IDs, or use the sessionId returned by spawn_session.
 
 The target session receives your message with a sender envelope containing your session ID, so it can use send_agent_message to reply.`,
 
@@ -538,8 +499,7 @@ export const SESSION_TOOL_DEFS: SessionToolDef[] = [
   { name: 'source_slack_oauth_trigger', description: TOOL_DESCRIPTIONS.source_slack_oauth_trigger, inputSchema: SourceOAuthTriggerSchema, executionMode: 'registry', safeMode: 'block', handler: handleSlackOAuthTrigger },
   { name: 'source_microsoft_oauth_trigger', description: TOOL_DESCRIPTIONS.source_microsoft_oauth_trigger, inputSchema: SourceOAuthTriggerSchema, executionMode: 'registry', safeMode: 'block', handler: handleMicrosoftOAuthTrigger },
   { name: 'source_credential_prompt', description: TOOL_DESCRIPTIONS.source_credential_prompt, inputSchema: CredentialPromptSchema, executionMode: 'registry', safeMode: 'block', handler: handleCredentialPrompt },
-  { name: 'update_user_preferences', description: TOOL_DESCRIPTIONS.update_user_preferences, inputSchema: UpdatePreferencesSchema, executionMode: 'registry', safeMode: 'block', handler: handleUpdatePreferences },
-  { name: 'transform_data', description: TOOL_DESCRIPTIONS.transform_data, inputSchema: TransformDataSchema, executionMode: 'registry', safeMode: 'allow', handler: handleTransformData },
+  { name: 'transform_data',description: TOOL_DESCRIPTIONS.transform_data, inputSchema: TransformDataSchema, executionMode: 'registry', safeMode: 'allow', handler: handleTransformData },
   { name: 'script_sandbox', description: TOOL_DESCRIPTIONS.script_sandbox, inputSchema: ScriptSandboxSchema, executionMode: 'registry', safeMode: 'allow', handler: handleScriptSandbox },
   { name: 'render_template', description: TOOL_DESCRIPTIONS.render_template, inputSchema: RenderTemplateSchema, executionMode: 'registry', safeMode: 'allow', handler: handleRenderTemplate },
   { name: 'send_developer_feedback', description: TOOL_DESCRIPTIONS.send_developer_feedback, inputSchema: SendDeveloperFeedbackSchema, executionMode: 'registry', safeMode: 'allow', handler: handleSendDeveloperFeedback },
@@ -552,8 +512,6 @@ export const SESSION_TOOL_DEFS: SessionToolDef[] = [
   // Session self-management tools (registry — use context callbacks to reach SessionManager)
   { name: 'set_session_labels', description: TOOL_DESCRIPTIONS.set_session_labels, inputSchema: SetSessionLabelsSchema, executionMode: 'registry', safeMode: 'block', handler: handleSetSessionLabels },
   { name: 'set_session_status', description: TOOL_DESCRIPTIONS.set_session_status, inputSchema: SetSessionStatusSchema, executionMode: 'registry', safeMode: 'block', handler: handleSetSessionStatus },
-  { name: 'get_session_info', description: TOOL_DESCRIPTIONS.get_session_info, inputSchema: GetSessionInfoSchema, executionMode: 'registry', safeMode: 'allow', readOnly: true, handler: handleGetSessionInfo },
-  { name: 'list_sessions', description: TOOL_DESCRIPTIONS.list_sessions, inputSchema: ListSessionsSchema, executionMode: 'registry', safeMode: 'allow', readOnly: true, handler: handleListSessions },
   // Inter-session messaging
   { name: 'send_agent_message', description: TOOL_DESCRIPTIONS.send_agent_message, inputSchema: SendAgentMessageSchema, executionMode: 'registry', safeMode: 'block', handler: handleSendAgentMessage },
   // Messaging gateway tools
@@ -601,7 +559,6 @@ export const BATCH_EXCLUDED_TOOLS = new Set([
   'source_slack_oauth_trigger',
   'source_microsoft_oauth_trigger',
   'source_credential_prompt',
-  'update_user_preferences',
   'render_template',
   'transform_data',
   'send_developer_feedback',

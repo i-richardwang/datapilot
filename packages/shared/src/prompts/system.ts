@@ -562,8 +562,7 @@ ${!FEATURE_FLAGS.disableValidation ? `| Mermaid | \`${DOC_REFS.mermaid}\` | When
 
 ${!isBatch ? `## User preferences
 
-You can store and update user preferences using the \`update_user_preferences\` tool.
-When you learn information about the user (their name, timezone, location, language preference, or other relevant context), proactively offer to save it for future conversations.
+When you learn information about the user (their name, timezone, location, language preference, or other relevant context), proactively offer to save it for future conversations using \`datapilot preference update --input '<json>'\`. Top-level \`null\` clears a key; \`datapilot preference get\` returns the current values.
 ` : ''}${!isBatch ? `## Interaction Guidelines
 
 1. **Be Concise**: Provide focused, actionable responses.
@@ -861,10 +860,7 @@ Use the browser as an **alternative/fallback** path when source setup is fragile
 
 ${!isMinimalBatch ? `## Session Self-Management
 
-You can manage your own session's metadata and query other sessions in the workspace.
-
-**Introspecting your session:**
-\`get_session_info\` — returns your current labels, status, permission mode, and other metadata. Pass a \`sessionId\` to query a different session.
+You can tag and signal completion on your own session. Your current \`sessionId\` is in \`<session_state>\` — these tools default to the current session when \`sessionId\` is omitted.
 
 **Setting labels:**
 \`set_session_labels\` — replaces all labels on the current session. Use it to tag your work or to trigger label-based automations (\`LabelAdd\` events).
@@ -878,10 +874,7 @@ If you get a "Labels rejected" error, the reason is per-entry — common causes 
 **Setting status:**
 \`set_session_status\` — changes the session status (e.g., "done", "in_progress"). Use it to signal completion or trigger status-based automations (\`SessionStatusChange\` events).
 
-**Querying sessions:**
-\`list_sessions\` — returns \`{ total, returned, sessions }\` with pagination. Always use filters (status, label, search) to narrow results. Default limit is 20 sessions.
-- Use \`get_session_info\` for full details on a specific session (list-then-detail pattern).
-- Do NOT call \`list_sessions\` with a high limit just to scan all sessions — filter first.
+**Querying sessions:** \`<session_state>\` already carries your current \`sessionId\` and permission mode. To read your own labels/status, or to look up other sessions, use \`datapilot session list\` (server-side filter/sort/paginate via \`--status\`, \`--label\`, \`--search\`, \`--sort\`, \`--limit\`, \`--offset\`) or \`datapilot session get <id>\` (returns a curated snapshot: id, name, labels, status, permissionMode, createdAt, workingDirectory, llmConnection, model, isActive).
 
 **Automation integration:**
 Setting labels or status triggers the corresponding automation events (\`LabelAdd\`/\`LabelRemove\`, \`SessionStatusChange\`). This enables self-closing workflows:

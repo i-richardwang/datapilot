@@ -16,7 +16,7 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { ok, fail } from '../envelope.ts'
-import { strFlag, parseInput, rejectUnknownFlags, type Flags } from '../args.ts'
+import { strFlag, intFlag, listFlag, parseInput, rejectUnknownFlags, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 
 const ACTIONS = [
@@ -40,9 +40,22 @@ export async function routeSession(
 
   switch (action) {
     case 'list': {
-      rejectUnknownFlags(flags, [])
-      await requireWorkspace(ctx)
-      ok(await client.invoke('sessions:get'))
+      rejectUnknownFlags(flags, ['status', 'label', 'search', 'sort', 'limit', 'offset'])
+      const ws = await requireWorkspace(ctx)
+      const sortBy = strFlag(flags, 'sort')
+      if (sortBy && sortBy !== 'recent' && sortBy !== 'name' && sortBy !== 'status') {
+        fail('USAGE_ERROR', `Invalid --sort '${sortBy}' (expected: recent | name | status)`)
+      }
+      const options: Record<string, unknown> = {}
+      const status = strFlag(flags, 'status'); if (status) options.status = status
+      // `label` is REPEATABLE (args.ts) so the parser always returns string[];
+      // server-side filter accepts a single label, so we take the first.
+      const labels = listFlag(flags, 'label'); if (labels?.length) options.label = labels[0]
+      const search = strFlag(flags, 'search'); if (search) options.search = search
+      if (sortBy) options.sortBy = sortBy
+      const limit = intFlag(flags, 'limit'); if (limit !== undefined) options.limit = limit
+      const offset = intFlag(flags, 'offset'); if (offset !== undefined) options.offset = offset
+      ok(await client.invoke('sessions:list', ws, options))
     }
 
     case 'get': {
@@ -50,10 +63,9 @@ export async function routeSession(
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing session id')
       const ws = await requireWorkspace(ctx)
-      const list = (await client.invoke('sessions:get', ws)) as Array<{ id: string }>
-      const found = list.find((s) => s.id === id)
-      if (!found) fail('NOT_FOUND', `Session '${id}' not found`)
-      ok(found)
+      const info = await client.invoke('sessions:getInfo', ws, id)
+      if (!info) fail('NOT_FOUND', `Session '${id}' not found`)
+      ok(info)
     }
 
     case 'create': {

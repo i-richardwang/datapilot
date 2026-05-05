@@ -69,8 +69,6 @@ import {
 import { isGoogleOAuthConfigured as isGoogleOAuthConfiguredImpl } from '../auth/google-oauth.ts';
 import { debug } from '../utils/debug.ts';
 import { getSessionPlansPath, getSessionPath, getSessionDataPath } from '../sessions/storage.db.ts';
-import { updatePreferences as updatePreferencesImpl } from '../config/preferences.ts';
-
 // Re-export types that may be needed by consumers
 export type { SessionToolContext, SessionToolCallbacks } from '@craft-agent/session-tools-core';
 
@@ -89,7 +87,6 @@ export interface ClaudeContextOptions {
   setSessionLabels?: (sessionId: string | undefined, labels: string[]) => void | Promise<void>;
   setSessionStatus?: (sessionId: string | undefined, status: string) => void | Promise<void>;
   getSessionInfo?: (sessionId?: string) => import('@craft-agent/session-tools-core').SessionInfo | null;
-  listSessions?: (options?: import('@craft-agent/session-tools-core').ListSessionsOptions) => import('@craft-agent/session-tools-core').ListSessionsResult;
   resolveLabels?: (labels: string[]) => import('@craft-agent/session-tools-core').ResolvedLabelsResult;
   resolveStatus?: (status: string) => import('@craft-agent/session-tools-core').ResolvedStatusResult;
 }
@@ -263,9 +260,6 @@ export function createClaudeContext(options: ClaudeContextOptions): SessionToolC
     fs,
     validators,
     credentialManager,
-    updatePreferences: (updates: Record<string, unknown>) => {
-      updatePreferencesImpl(updates as any);
-    },
     submitFeedback: (feedback: DeveloperFeedback) => {
       const feedbackDir = join(CONFIG_DIR, 'feedback');
       mkdirSync(feedbackDir, { recursive: true });

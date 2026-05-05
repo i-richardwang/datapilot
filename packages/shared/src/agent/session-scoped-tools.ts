@@ -285,10 +285,6 @@ export function getSessionScopedTools(
         const callbacks = getSessionScopedToolCallbacks(sessionId);
         return callbacks?.getSessionInfoFn?.(sid ?? sessionId) ?? null;
       },
-      listSessions: (options) => {
-        const callbacks = getSessionScopedToolCallbacks(sessionId);
-        return callbacks?.listSessionsFn?.(options) ?? { total: 0, returned: 0, sessions: [] };
-      },
       resolveLabels: (labels) => {
         const callbacks = getSessionScopedToolCallbacks(sessionId);
         return callbacks?.resolveLabelsFn?.(labels) ?? { resolved: labels, unknown: [], available: [] };

@@ -39,10 +39,6 @@ export type {
 export { handleCredentialPrompt } from './credential-prompt.ts';
 export type { CredentialPromptArgs } from './credential-prompt.ts';
 
-// Update Preferences
-export { handleUpdatePreferences } from './update-preferences.ts';
-export type { UpdatePreferencesArgs } from './update-preferences.ts';
-
 // Transform Data
 export { handleTransformData } from './transform-data.ts';
 export type { TransformDataArgs } from './transform-data.ts';
@@ -68,7 +64,3 @@ export { handleSetSessionLabels } from './set-session-labels.ts';
 export type { SetSessionLabelsArgs } from './set-session-labels.ts';
 export { handleSetSessionStatus } from './set-session-status.ts';
 export type { SetSessionStatusArgs } from './set-session-status.ts';
-export { handleGetSessionInfo } from './get-session-info.ts';
-export type { GetSessionInfoArgs } from './get-session-info.ts';
-export { handleListSessions } from './list-sessions.ts';
-export type { ListSessionsArgs } from './list-sessions.ts';

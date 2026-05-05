@@ -86,7 +86,7 @@ import { isParentTaskTool } from '@craft-agent/shared/utils/toolNames'
 import { restoreFiles } from '@craft-agent/shared/utils/bundle-files'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
 import { CraftMcpClient, McpClientPool, McpPoolServer } from '@craft-agent/shared/mcp'
-import { type Session, type SessionEvent, type FileAttachment, type SendMessageOptions, type UnreadSummary, type RemoteSessionTransferPayload, type ImportRemoteSessionTransferResult, RPC_CHANNELS, generateMessageId } from '@craft-agent/shared/protocol'
+import { type Session, type SessionEvent, type SessionInfo, type SessionListOptions, type SessionListResult, type FileAttachment, type SendMessageOptions, type UnreadSummary, type RemoteSessionTransferPayload, type ImportRemoteSessionTransferResult, RPC_CHANNELS, generateMessageId } from '@craft-agent/shared/protocol'
 import { messageToStored, storedToMessage, type Message, type StoredAttachment, type ToolDisplayMeta } from '@craft-agent/core/types'
 import { formatPathsToRelative, formatToolInputPaths, perf, encodeIconToDataUrlAsync, getEmojiIcon, resetSummarizationClient, resolveToolIcon, readFileAttachment, selectSpreadMessages, normalizePath } from '@craft-agent/shared/utils'
 import { loadAllSkills, loadSkillBySlug, invalidateSkillsCache, type LoadedSkill } from '@craft-agent/shared/skills'
@@ -566,7 +566,6 @@ async function resolveToolDisplayMeta(
           'source_credential_prompt': 'Enter Credentials',
           'transform_data': 'Transform Data',
           'render_template': 'Render Template',
-          'update_user_preferences': 'Update Preferences',
           'send_developer_feedback': 'Send Feedback',
           'browser_tool': 'Browser',
         },
@@ -2134,6 +2133,77 @@ export class SessionManager implements ISessionManager {
   }
 
   /**
+   * Curated single-session snapshot for agent-facing CLI/RPC. Mirrors the
+   * MCP `get_session_info` shape (10 fields) — strips UI/SDK noise from the
+   * persistent record.
+   */
+  getSessionInfo(sessionId: string): SessionInfo | null {
+    const session = this.sessions.get(sessionId)
+    if (!session) return null
+    return {
+      id: session.id,
+      name: session.name ?? session.id,
+      labels: session.labels ?? [],
+      status: session.sessionStatus ?? 'todo',
+      permissionMode: session.permissionMode ?? 'ask',
+      createdAt: session.createdAt ?? 0,
+      workingDirectory: session.workingDirectory,
+      llmConnection: session.llmConnection,
+      model: session.model,
+      isActive: session.agent != null,
+    }
+  }
+
+  /**
+   * Server-side filter/sort/paginate for agent-facing session listing.
+   * Mirrors the MCP `list_sessions` shape — `{ total, returned, sessions[] }`
+   * with 5 fields per row. Defaults: `limit=20`, `MAX_LIMIT=100`, `sortBy=recent`.
+   */
+  getSessionList(workspaceId: string, options?: SessionListOptions): SessionListResult {
+    const DEFAULT_LIMIT = 20
+    const MAX_LIMIT = 100
+    const limit = Math.min(options?.limit ?? DEFAULT_LIMIT, MAX_LIMIT)
+    const offset = options?.offset ?? 0
+
+    let sessions = this.getSessions(workspaceId)
+
+    if (options?.status) {
+      sessions = sessions.filter(s => s.sessionStatus === options.status)
+    }
+    if (options?.label) {
+      sessions = sessions.filter(s => s.labels?.includes(options.label!))
+    }
+    if (options?.search) {
+      const needle = options.search.toLowerCase()
+      sessions = sessions.filter(s => s.name?.toLowerCase().includes(needle))
+    }
+
+    const sortBy = options?.sortBy ?? 'recent'
+    if (sortBy === 'recent') {
+      sessions.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+    } else if (sortBy === 'name') {
+      sessions.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
+    } else if (sortBy === 'status') {
+      sessions.sort((a, b) => (a.sessionStatus ?? '').localeCompare(b.sessionStatus ?? ''))
+    }
+
+    const total = sessions.length
+    const page = sessions.slice(offset, offset + limit)
+
+    return {
+      total,
+      returned: page.length,
+      sessions: page.map(s => ({
+        id: s.id,
+        name: s.name ?? s.id,
+        labels: s.labels ?? [],
+        status: s.sessionStatus ?? 'todo',
+        createdAt: s.createdAt ?? 0,
+      })),
+    }
+  }
+
+  /**
    * Aggregate unread state across all workspaces.
    * Excludes hidden and archived sessions from counts/indicators.
    */
@@ -3644,53 +3714,6 @@ export class SessionManager implements ISessionManager {
             llmConnection: session.llmConnection,
             model: session.model,
             isActive: session.agent != null,
-          }
-        },
-        listSessionsFn: (options) => {
-          const DEFAULT_LIMIT = 20
-          const MAX_LIMIT = 100
-          const limit = Math.min(options?.limit ?? DEFAULT_LIMIT, MAX_LIMIT)
-          const offset = options?.offset ?? 0
-
-          let sessions = this.getSessions(managed.workspace.id)
-
-          // Filter
-          if (options?.status) {
-            sessions = sessions.filter(s => s.sessionStatus === options.status)
-          }
-          if (options?.label) {
-            sessions = sessions.filter(s => s.labels?.includes(options.label!))
-          }
-          if (options?.search) {
-            const needle = options.search.toLowerCase()
-            sessions = sessions.filter(s => s.name?.toLowerCase().includes(needle))
-          }
-
-          // Sort
-          const sortBy = options?.sortBy ?? 'recent'
-          if (sortBy === 'recent') {
-            sessions.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
-          } else if (sortBy === 'name') {
-            sessions.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
-          } else if (sortBy === 'status') {
-            sessions.sort((a, b) => (a.sessionStatus ?? '').localeCompare(b.sessionStatus ?? ''))
-          }
-
-          const total = sessions.length
-
-          // Paginate
-          const page = sessions.slice(offset, offset + limit)
-
-          return {
-            total,
-            returned: page.length,
-            sessions: page.map(s => ({
-              id: s.id,
-              name: s.name ?? s.id,
-              labels: s.labels ?? [],
-              status: s.sessionStatus ?? 'todo',
-              createdAt: s.createdAt ?? 0,
-            })),
           }
         },
         resolveLabelsFn: (labels: string[]) => {

@@ -1237,24 +1237,6 @@ export function getValidateSteps(): ValidateStep[] {
         return `${result} — labels verified: ${JSON.stringify(labels)}`
       },
     },
-    {
-      name: 'session-tools:get_session_info',
-      fn: async (client, ctx) => {
-        if (!ctx.createdSessionId) return 'skipped (no session)'
-        return await waitForSendEvents(client, ctx.createdSessionId,
-          'Use the get_session_info tool to get info about the current session. Do NOT use any other tool.',
-          90_000, true, undefined, ctx.onEvent, 'get_session_info')
-      },
-    },
-    {
-      name: 'session-tools:list_sessions',
-      fn: async (client, ctx) => {
-        if (!ctx.createdSessionId) return 'skipped (no session)'
-        return await waitForSendEvents(client, ctx.createdSessionId,
-          'Use the list_sessions tool to list all sessions. Do NOT use any other tool.',
-          90_000, true, undefined, ctx.onEvent, 'list_sessions')
-      },
-    },
     // ----- Session branching -----
     {
       name: 'sessions:branch',

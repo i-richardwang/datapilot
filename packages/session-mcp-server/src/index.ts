@@ -215,32 +215,6 @@ function createCodexContext(config: SessionConfig): SessionToolContext {
     // Credential manager reads from cache files written by main process
     credentialManager,
 
-    // Preferences: write directly to preferences.json
-    updatePreferences: (updates: Record<string, unknown>) => {
-      // Resolve preferences path from config dir (parent of workspaces dir)
-      // workspaceRootPath = ~/.datapilot/workspaces/{id}
-      // preferencesPath = ~/.datapilot/preferences.json
-      const configDir = join(workspaceRootPath, '..', '..');
-      const prefsPath = join(configDir, 'preferences.json');
-      try {
-        let current: Record<string, unknown> = {};
-        if (existsSync(prefsPath)) {
-          current = JSON.parse(readFileSync(prefsPath, 'utf-8'));
-        }
-        const merged = {
-          ...current,
-          ...updates,
-          location: updates.location
-            ? { ...(current.location as Record<string, unknown> || {}), ...(updates.location as Record<string, unknown>) }
-            : current.location,
-          updatedAt: Date.now(),
-        };
-        writeFileSync(prefsPath, JSON.stringify(merged, null, 2), 'utf-8');
-      } catch (err) {
-        console.error('Failed to update preferences:', err);
-      }
-    },
-
     // Developer feedback: write one JSON file per entry to {configDir}/feedback/
     submitFeedback: (feedback) => {
       const configDir = process.env.DATAPILOT_CONFIG_DIR || join(workspaceRootPath, '..', '..');

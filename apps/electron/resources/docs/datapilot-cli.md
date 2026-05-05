@@ -270,8 +270,8 @@ dtpilot batch delete abc123
 Manage sessions inside a workspace. This entity is request/response.
 
 ### Commands
-- `dtpilot session list`
-- `dtpilot session get <id>`
+- `dtpilot session list [--status <id>] [--label <name>] [--search <text>] [--sort recent|name|status] [--limit <n>] [--offset <n>]` — server-side filter/sort/paginate; default `--limit 20`, max 100
+- `dtpilot session get <id>` — returns the curated 10-field shape (id, name, labels, status, permissionMode, createdAt, workingDirectory, llmConnection, model, isActive)
 - `dtpilot session create [--name "..."] [--input '<json>']` — `permissionMode` and `enabledSourceSlugs` go in `--input`
 - `dtpilot session delete <id>`
 - `dtpilot session messages <id>`
@@ -284,6 +284,12 @@ Manage sessions inside a workspace. This entity is request/response.
 
 ```bash
 dtpilot session list
+dtpilot session list --status todo --sort name --limit 50
+dtpilot session list --label urgent --search "weekly report"
+
+dtpilot session get sess-abc
+# → { id, name, labels[], status, permissionMode, createdAt,
+#     workingDirectory?, llmConnection?, model?, isActive }
 
 dtpilot session create --name "Daily standup" \
   --input '{"enabledSourceSlugs":["linear","github"]}'
@@ -301,6 +307,8 @@ dtpilot session share sess-abc --html ./report.html
 ```
 
 ### Notes
+- `session list` returns `{ total, returned, sessions: [{id, name, labels, status, createdAt}] }`. Pagination is server-side — don't fetch everything and slice client-side on large workspaces.
+- `session list --label` accepts a single label (only the first is honored if repeated).
 - `session create` defaults `permissionMode` to `allow-all` when not set — `ask` would stall a non-interactive CLI. Override with `--input '{"permissionMode":"safe"}'` (or `"ask"`).
 <!-- cli:session:end -->
 

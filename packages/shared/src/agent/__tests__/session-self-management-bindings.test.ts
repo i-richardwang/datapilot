@@ -54,7 +54,6 @@ describe('Pi session self-management regression (#511)', () => {
     expect(ctx.setSessionLabels).toBeUndefined();
     expect(ctx.setSessionStatus).toBeUndefined();
     expect(ctx.getSessionInfo).toBeUndefined();
-    expect(ctx.listSessions).toBeUndefined();
     expect(ctx.resolveLabels).toBeUndefined();
     expect(ctx.resolveStatus).toBeUndefined();
   });
@@ -71,16 +70,14 @@ describe('Pi session self-management regression (#511)', () => {
       setSessionLabelsFn: (sid, labels) => { setLabelsCalled.push([sid, labels]); },
       setSessionStatusFn: (sid, status) => { setStatusCalled.push([sid, status]); },
       getSessionInfoFn: (sid) => makeSessionInfo({ id: sid ?? sessionId }),
-      listSessionsFn: () => ({ total: 1, returned: 1, sessions: [] }),
       resolveLabelsFn: (labels) => ({ resolved: labels, unknown: [], available: labels }),
       resolveStatusFn: (status) => ({ resolved: status, available: ['active', 'done'] }),
     });
 
-    // All 6 properties should now be defined
+    // All 5 properties should now be defined
     expect(ctx.setSessionLabels).toBeDefined();
     expect(ctx.setSessionStatus).toBeDefined();
     expect(ctx.getSessionInfo).toBeDefined();
-    expect(ctx.listSessions).toBeDefined();
     expect(ctx.resolveLabels).toBeDefined();
     expect(ctx.resolveStatus).toBeDefined();
 
@@ -94,9 +91,6 @@ describe('Pi session self-management regression (#511)', () => {
     const info = ctx.getSessionInfo!();
     expect(info).toBeTruthy();
     expect(info!.id).toBe(sessionId);
-
-    const list = ctx.listSessions!();
-    expect(list.total).toBe(1);
 
     const resolved = ctx.resolveLabels!(['bug']);
     expect(resolved.resolved).toEqual(['bug']);
@@ -117,7 +111,7 @@ describe('attachSessionSelfManagementBindings', () => {
     unregisterSessionScopedToolCallbacks(sessionId);
   });
 
-  it('absent callback → property is undefined for all 6 fields', () => {
+  it('absent callback → property is undefined for all 5 fields', () => {
     const ctx = createBaseContext(sessionId);
     attachSessionSelfManagementBindings(ctx, sessionId);
 
@@ -125,7 +119,6 @@ describe('attachSessionSelfManagementBindings', () => {
     expect(ctx.setSessionLabels).toBeUndefined();
     expect(ctx.setSessionStatus).toBeUndefined();
     expect(ctx.getSessionInfo).toBeUndefined();
-    expect(ctx.listSessions).toBeUndefined();
     expect(ctx.resolveLabels).toBeUndefined();
     expect(ctx.resolveStatus).toBeUndefined();
   });
@@ -228,12 +221,11 @@ describe('Claude/Pi session self-management parity', () => {
     unregisterSessionScopedToolCallbacks(sessionId);
   });
 
-  it('both paths expose the same 6 bound properties when callbacks are registered', () => {
+  it('both paths expose the same 5 bound properties when callbacks are registered', () => {
     const SELF_MGMT_PROPERTIES = [
       'setSessionLabels',
       'setSessionStatus',
       'getSessionInfo',
-      'listSessions',
       'resolveLabels',
       'resolveStatus',
     ] as const;
@@ -242,7 +234,6 @@ describe('Claude/Pi session self-management parity', () => {
       setSessionLabelsFn: () => {},
       setSessionStatusFn: () => {},
       getSessionInfoFn: () => makeSessionInfo({ id: sessionId }),
-      listSessionsFn: () => ({ total: 0, returned: 0, sessions: [] }),
       resolveLabelsFn: (l) => ({ resolved: l, unknown: [], available: l }),
       resolveStatusFn: (s) => ({ resolved: s, available: [] }),
     });
@@ -278,15 +269,5 @@ describe('Claude/Pi session self-management parity', () => {
     const statusResult = await statusHandler(ctx, { status: 'done' });
     expect(statusResult.isError).toBe(true);
     expect(statusResult.content[0]!.text).toContain('not available in this context');
-
-    const infoHandler = SESSION_TOOL_REGISTRY.get('get_session_info')!.handler!;
-    const infoResult = await infoHandler(ctx, {});
-    expect(infoResult.isError).toBe(true);
-    expect(infoResult.content[0]!.text).toContain('not available in this context');
-
-    const listHandler = SESSION_TOOL_REGISTRY.get('list_sessions')!.handler!;
-    const listResult = await listHandler(ctx, {});
-    expect(listResult.isError).toBe(true);
-    expect(listResult.content[0]!.text).toContain('not available in this context');
   });
 });

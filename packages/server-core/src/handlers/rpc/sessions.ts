@@ -103,6 +103,8 @@ async function scanSessionDirectory(dirPath: string): Promise<import('@craft-age
 
 export const HANDLED_CHANNELS = [
   RPC_CHANNELS.sessions.GET,
+  RPC_CHANNELS.sessions.LIST,
+  RPC_CHANNELS.sessions.GET_INFO,
   RPC_CHANNELS.sessions.GET_UNREAD_SUMMARY,
   RPC_CHANNELS.sessions.MARK_ALL_READ,
   RPC_CHANNELS.sessions.CREATE,
@@ -162,6 +164,32 @@ export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): 
     })
 
     return sessions
+  })
+
+  // Curated, paginated session list for agent-facing CLI/RPC (MCP shape).
+  // Server-side filter/sort/limit so large workspaces don't ship the full list.
+  server.handle(RPC_CHANNELS.sessions.LIST, async (
+    _ctx,
+    workspaceId: string,
+    options?: import('@craft-agent/shared/protocol').SessionListOptions,
+  ) => {
+    try {
+      await sessionManager.waitForInit()
+    } catch (error) {
+      log.error('LIST_SESSIONS continuing after initialization failure:', error)
+    }
+    return sessionManager.getSessionList(workspaceId, options)
+  })
+
+  // Curated single-session snapshot (10 fields) for agent-facing CLI/RPC.
+  // Returns null when session is unknown — caller should surface NOT_FOUND.
+  server.handle(RPC_CHANNELS.sessions.GET_INFO, async (_ctx, _workspaceId: string, sessionId: string) => {
+    try {
+      await sessionManager.waitForInit()
+    } catch (error) {
+      log.error('GET_SESSION_INFO continuing after initialization failure:', error)
+    }
+    return sessionManager.getSessionInfo(sessionId)
   })
 
   // Get unread summary across all workspaces

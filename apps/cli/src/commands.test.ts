@@ -342,8 +342,6 @@ describe('getValidateSteps', () => {
   it('includes session tool validation steps', () => {
     const names = getValidateSteps().map((s) => s.name)
     expect(names).toContain('session-tools:set_session_labels')
-    expect(names).toContain('session-tools:get_session_info')
-    expect(names).toContain('session-tools:list_sessions')
   })
 
   it('session tool steps come after tool use and before branching', () => {

@@ -120,6 +120,56 @@ export interface Session {
   supportsBranching?: boolean
 }
 
+/**
+ * Curated session shape returned by `sessions:getInfo`.
+ *
+ * Distinct from `Session` (the full UI/persistence DTO): this is the 10-field
+ * agent-facing snapshot — identity + config + runtime location, no UI noise
+ * (sharing/archive/branch/SDK internals). Used by `dtpilot session get` and the
+ * session self-management tooling.
+ */
+export interface SessionInfo {
+  id: string
+  name: string
+  labels: string[]
+  status: string
+  permissionMode: string
+  createdAt: number
+  workingDirectory?: string
+  llmConnection?: string
+  model?: string
+  /** True when an agent instance is attached (session is "live"). */
+  isActive: boolean
+}
+
+/** Query options for `sessions:list` — all optional, all server-side. */
+export interface SessionListOptions {
+  status?: string
+  label?: string
+  search?: string
+  sortBy?: 'recent' | 'name' | 'status'
+  limit?: number
+  offset?: number
+}
+
+/** One row in a `sessions:list` result. */
+export interface SessionListItem {
+  id: string
+  name: string
+  labels: string[]
+  status: string
+  createdAt: number
+}
+
+/** Paginated result from `sessions:list`. */
+export interface SessionListResult {
+  /** Total sessions matching filters before pagination. */
+  total: number
+  /** Number of sessions in this page. */
+  returned: number
+  sessions: SessionListItem[]
+}
+
 export interface CreateSessionOptions {
   name?: string
   permissionMode?: PermissionMode
