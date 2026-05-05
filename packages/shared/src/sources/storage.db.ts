@@ -412,12 +412,14 @@ export function isSourceUsable(source: LoadedSource): boolean {
 
 /**
  * Get sources by slugs for a workspace.
- * Includes both user-configured sources from DB and builtin sources.
+ * Includes user-configured sources from DB. Built-in source branch is dead
+ * code (isBuiltinSource always returns false) but kept for API stability.
  */
 export function getSourcesBySlugs(workspaceRootPath: string, slugs: string[]): LoadedSource[] {
   const workspaceId = basename(workspaceRootPath);
   const sources: LoadedSource[] = [];
   for (const slug of slugs) {
+    // Dead branch: isBuiltinSource always returns false (no built-in sources remain).
     if (isBuiltinSource(slug)) {
       if (slug === 'craft-agents-docs') {
         sources.push(getDocsSource(workspaceId, workspaceRootPath));

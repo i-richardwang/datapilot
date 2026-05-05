@@ -362,7 +362,6 @@ const EDIT_CONFIGS: Record<EditContextKey, (location: string) => EditConfig> = {
       filePath: `${location}/sources/`,
       context:
         'The user wants to add a local folder source. ' +
-        'First, look up the guide: mcp__craft-agents-docs__SearchCraftAgents({ query: "filesystem" }). ' +
         'Local folders are bookmarks - use type: "local" with a local.path field. ' +
         'They use existing Read, Write, Glob, Grep tools - no MCP server needed. ' +
         'If unclear, ask about the folder path they want to connect. ' +

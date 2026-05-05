@@ -46,7 +46,7 @@ export interface PrerequisiteManagerConfig {
 // ============================================================
 
 /** Slugs that are exempt from prerequisite checks (internal sources) */
-const EXEMPT_SLUGS = new Set(['session', 'craft-agents-docs']);
+const EXEMPT_SLUGS = new Set(['session' /* , 'craft-agents-docs' — DISABLED, MCP no longer registered */]);
 
 /** Global browser tools docs path required before browser tool usage. */
 const BROWSER_TOOLS_DOC_PATH = resolve(join(homedir(), '.datapilot', 'docs', 'browser-tools.md'));

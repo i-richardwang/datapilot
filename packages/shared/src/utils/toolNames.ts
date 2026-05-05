@@ -23,7 +23,8 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'NotebookEdit': 'Editing Notebook',
 
   // Documentation tools
-  'SearchCraftAgents': 'Search Documentation',
+  // DISABLED: craft-agents-docs MCP no longer registered.
+  // 'SearchCraftAgents': 'Search Documentation',
 };
 
 /**

@@ -444,7 +444,7 @@ function getCraftAgentEnvironmentMarker(): string {
   const arch = process.arch; // 'arm64', 'x64'
   const osVersion = os.release(); // OS kernel version
 
-  return `<craft_agent_environment version="${APP_VERSION}" platform="${platform}" arch="${arch}" os_version="${osVersion}" />`;
+  return `<datapilot_environment version="${APP_VERSION}" platform="${platform}" arch="${arch}" os_version="${osVersion}" />`;
 }
 
 /**
@@ -481,7 +481,7 @@ function getCraftAssistantPrompt(workspaceRootPath?: string, backendName: string
 You are DataPilot - an AI assistant specialized in data analysis, helping users connect and work across their data sources through a desktop interface.
 
 **Core capabilities:**
-- **Connect external sources** - MCP servers, REST APIs, local filesystems. Users can integrate Linear, GitHub, Craft, custom APIs, and more.
+- **Connect external sources** - MCP servers, REST APIs, local filesystems. Users can integrate Linear, GitHub, Notion, custom APIs, and more.
 - **Automate workflows** - Combine data from multiple sources to create unique, powerful workflows.
 - **Code** - You are powered by ${backendName}, so you can write and execute code (Python, Bash) to manipulate data, call APIs, and automate tasks.
 
@@ -638,7 +638,7 @@ MCP tools from connected sources follow the naming pattern \`mcp__sources__{slug
 - **\`slug\`** is the source's **slug** from the \`<sources>\` block above (e.g., \`linear\`, \`github\`)
 - Do **NOT** use source IDs, provider names, or config.json \`id\` fields
 - Example: Linear source (slug: \`linear\`) → \`mcp__sources__linear__list_issues\`, \`mcp__sources__linear__create_issue\`
-- Example: Craft source (slug: \`craft\`) → \`mcp__sources__craft__search_spaces\`, \`mcp__sources__craft__get_block\`
+- Example: Notion source (slug: \`notion\`) → \`mcp__sources__notion__search\`, \`mcp__sources__notion__get_page\`
 - The \`session\` MCP server provides workspace tools: \`mcp__session__SubmitPlan\`, \`mcp__session__source_test\`, etc.
 
 **Tool discovery:** Call \`mcp__sources__{slug}__list_tools\` or try calling a specific tool directly — the error response will list available tools.
@@ -662,7 +662,7 @@ The \`session\` MCP server provides tools for managing external sources:
 
 **Source creation workflow:**
 1. Read \`${DOC_REFS.sources}\` for the full setup guide
-2. Search \`datapilot-docs\` for service-specific guides
+2. Use WebSearch to find the service's current MCP/API endpoint and any setup gotchas
 3. Create \`config.json\` in \`sources/{slug}/\`
 4. Create \`permissions.json\` for Explore mode
 5. Write \`guide.md\` with usage instructions

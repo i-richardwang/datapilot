@@ -2,9 +2,10 @@
  * Source Guides System
  *
  * Provides parsing utilities for source guides.
- * Guides are now served exclusively via the craft-agents-docs MCP server.
  *
- * The agent should search the MCP docs for setup guidance when creating sources.
+ * Bundled guides have been removed. The previous craft-agents-docs MCP server
+ * has also been disabled. The agent now uses WebSearch to find service-specific
+ * setup info when creating sources.
  */
 
 // ============================================================
@@ -188,10 +189,8 @@ export function extractDomainFromSource(source: {
 // ============================================================
 
 /**
- * @deprecated Bundled guides have been removed.
- * Use the craft-agents-docs MCP server to search for setup guides.
- *
- * Example: mcp__craft-agents-docs__SearchCraftAgents({ query: "github source setup guide" })
+ * @deprecated Bundled guides have been removed; the upstream craft-agents-docs
+ * MCP server has also been disabled. Agent should use WebSearch instead.
  */
 export function getSourceGuideForDomain(_domain: string): ParsedSourceGuide | null {
   // Bundled guides removed - guides now come from MCP docs server
@@ -199,8 +198,8 @@ export function getSourceGuideForDomain(_domain: string): ParsedSourceGuide | nu
 }
 
 /**
- * @deprecated Bundled guides have been removed.
- * Use the craft-agents-docs MCP server to search for setup guides.
+ * @deprecated Bundled guides have been removed; the upstream craft-agents-docs
+ * MCP server has also been disabled. Agent should use WebSearch instead.
  */
 export function getSourceGuide(_source: {
   type?: string;
@@ -213,8 +212,8 @@ export function getSourceGuide(_source: {
 }
 
 /**
- * @deprecated Bundled guides have been removed.
- * Use the craft-agents-docs MCP server to search for setup guides.
+ * @deprecated Bundled guides have been removed; the upstream craft-agents-docs
+ * MCP server has also been disabled. Agent should use WebSearch instead.
  */
 export function getSourceKnowledge(_source: {
   type?: string;

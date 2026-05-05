@@ -3,12 +3,12 @@ const CRAFT_INTENT_KEY = '_intent';
 
 const CRAFT_DISPLAY_NAME_SCHEMA = {
   type: 'string',
-  description: 'Craft UI metadata: human-friendly action name for display only.',
+  description: 'DataPilot UI metadata: human-friendly action name for display only.',
 };
 
 const CRAFT_INTENT_SCHEMA = {
   type: 'string',
-  description: 'Craft UI metadata: concise tool-call intent for display only.',
+  description: 'DataPilot UI metadata: concise tool-call intent for display only.',
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {

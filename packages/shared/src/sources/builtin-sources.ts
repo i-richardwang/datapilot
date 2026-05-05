@@ -1,13 +1,10 @@
 /**
  * Built-in Sources
  *
- * System-level sources that are always available in every workspace.
- * These sources are not shown in the sources list UI but are available
- * for the agent to use.
- *
- * NOTE: craft-agents-docs is now an always-available MCP server configured
- * directly in craft-agent.ts, not a source. This file is kept for backwards
- * compatibility but returns empty results.
+ * Previously hosted the craft-agents-docs built-in source, then it became an
+ * always-available MCP server in claude-agent.ts. That MCP has now also been
+ * disabled. This file is kept as a no-op for backwards compatibility — all
+ * functions return empty/false. Safe to delete once all callers are removed.
  */
 
 import type { LoadedSource, FolderSourceConfig } from './types.ts';
@@ -15,8 +12,7 @@ import type { LoadedSource, FolderSourceConfig } from './types.ts';
 /**
  * Get all built-in sources for a workspace.
  *
- * Currently returns empty array - craft-agents-docs has been moved to
- * an always-available MCP server in craft-agent.ts.
+ * Returns empty array - no built-in sources exist anymore.
  *
  * @param _workspaceId - The workspace ID (unused)
  * @param _workspaceRootPath - Absolute path to workspace root folder (unused)
@@ -27,11 +23,11 @@ export function getBuiltinSources(_workspaceId: string, _workspaceRootPath: stri
 }
 
 /**
- * Get the built-in Craft Agents docs source.
+ * Get the built-in DataPilot docs source.
  *
- * @deprecated craft-agents-docs is now an always-available MCP server
- * configured directly in craft-agent.ts. This function is kept for
- * backwards compatibility but returns a placeholder.
+ * @deprecated craft-agents-docs MCP has been disabled. This function is kept
+ * for backwards compatibility but returns an unreachable placeholder
+ * (isBuiltinSource returns false, so this is never called).
  */
 export function getDocsSource(workspaceId: string, workspaceRootPath: string): LoadedSource {
   // Return a placeholder - this shouldn't be called anymore
@@ -66,8 +62,7 @@ export function getDocsSource(workspaceId: string, workspaceRootPath: string): L
 /**
  * Check if a source slug is a built-in source.
  *
- * Returns false - craft-agents-docs is now an always-available MCP server,
- * not a source in the sources system.
+ * Returns false unconditionally — there are no built-in sources anymore.
  *
  * @param _slug - Source slug to check (unused)
  * @returns false (no built-in sources)

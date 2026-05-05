@@ -570,9 +570,10 @@ async function resolveToolDisplayMeta(
           'send_developer_feedback': 'Send Feedback',
           'browser_tool': 'Browser',
         },
-        'craft-agents-docs': {
-          'SearchCraftAgents': 'Search Docs',
-        },
+        // DISABLED: craft-agents-docs MCP no longer registered (see claude-agent.ts).
+        // 'craft-agents-docs': {
+        //   'SearchCraftAgents': 'Search Docs',
+        // },
       }
 
       const internalServer = internalMcpServers[serverSlug]
@@ -1608,7 +1609,7 @@ export class SessionManager implements ISessionManager {
     const workspaceRootPath = managed.workspace.rootPath
     sessionLog.info(`Reloading sources for session ${managed.id}`)
 
-    // Reload all sources from disk (craft-agents-docs is always available as MCP server)
+    // Reload all sources from disk
     const allSources = loadAllSources(workspaceRootPath)
     managed.agent.setAllSources(allSources)
 

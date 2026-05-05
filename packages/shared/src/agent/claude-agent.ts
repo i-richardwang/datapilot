@@ -860,12 +860,14 @@ export class ClaudeAgent extends BaseAgent {
       const fullMcpServers: Options['mcpServers'] = {
         // Session-scoped tools (SubmitPlan, source_test, update_user_preferences, transform_data, etc.)
         session: getSessionScopedTools(sessionId, this.workspaceRootPath),
-        // Craft Agents documentation - always available for searching setup guides
-        // This is a public Mintlify MCP server, no auth needed
-        'craft-agents-docs': {
-          type: 'http',
-          url: 'https://agents.craft.do/docs/mcp',
-        },
+        // DISABLED: Upstream Craft Agents docs MCP — provides only generic schema/overview pages,
+        // no per-service setup recipes. Costs ~1000 tokens/session in tool definitions on Claude
+        // backend. Local apps/electron/resources/docs/sources.md covers the schema; agent falls
+        // back to WebSearch for service-specific URLs/auth. Re-enable by uncommenting.
+        // 'craft-agents-docs': {
+        //   type: 'http',
+        //   url: 'https://agents.craft.do/docs/mcp',
+        // },
         // Per-source proxy servers from centralized MCP pool (MCP + API sources)
         // Each source gets its own SDK server keyed by slug (e.g., 'linear', 'github', 'gmail')
         // so the SDK produces correct tool names: mcp__{slug}__{toolName}

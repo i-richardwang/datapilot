@@ -83,7 +83,9 @@ describe('PrerequisiteManager', () => {
       expect(result.allowed).toBe(true);
     });
 
-    it('exempts craft-agents-docs MCP tools', () => {
+    // DISABLED: craft-agents-docs MCP no longer registered (see claude-agent.ts).
+    // Slug removed from EXEMPT_SLUGS, so this exemption no longer applies.
+    it.skip('exempts craft-agents-docs MCP tools', () => {
       mockExistsPaths.add(guidePath('craft-agents-docs'));
       const result = manager.checkPrerequisites('mcp__craft-agents-docs__search');
       expect(result.allowed).toBe(true);

@@ -375,16 +375,15 @@ export function isSourceUsable(source: LoadedSource): boolean {
 
 /**
  * Get sources by slugs for a workspace.
- * Includes both user-configured sources from disk and builtin sources
- * (like craft-agents-docs) that don't have filesystem folders.
+ * Includes user-configured sources from disk. Built-in source branch is dead
+ * code (isBuiltinSource always returns false) but kept for API stability.
  */
 export function getSourcesBySlugs(workspaceRootPath: string, slugs: string[]): LoadedSource[] {
   const workspaceId = basename(workspaceRootPath);
   const sources: LoadedSource[] = [];
   for (const slug of slugs) {
-    // Check builtin sources first (they don't exist on disk)
+    // Dead branch: isBuiltinSource always returns false (no built-in sources remain).
     if (isBuiltinSource(slug)) {
-      // Currently only craft-agents-docs is a builtin source
       if (slug === 'craft-agents-docs') {
         sources.push(getDocsSource(workspaceId, workspaceRootPath));
       }
@@ -401,11 +400,8 @@ export function getSourcesBySlugs(workspaceRootPath: string, slugs: string[]): L
 
 /**
  * Load all sources for a workspace INCLUDING built-in sources.
- * Built-in sources (like craft-agents-docs) are always available and merged
- * with user-configured sources from the workspace.
- *
- * Use this when the agent needs visibility into all available sources,
- * including system-provided ones that don't live on disk.
+ * Built-in sources are currently empty (none registered), so this returns the
+ * same as loadWorkspaceSources(). Kept for API stability.
  */
 export function loadAllSources(workspaceRootPath: string): LoadedSource[] {
   const workspaceId = basename(workspaceRootPath);

@@ -23,8 +23,9 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+// DISABLED: Upstream docs MCP proxy — see DataPilot Docs Upstream Proxy section below.
+// import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+// import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -274,72 +275,73 @@ function createSessionTools(includeDeveloperFeedback: boolean): Tool[] {
 }
 
 // ============================================================
-// DataPilot Docs Upstream Proxy
+// DataPilot Docs Upstream Proxy — DISABLED
 // ============================================================
-
-const DOCS_MCP_URL = 'https://agents.craft.do/docs/mcp';
-
-/** Cached upstream client + tool list */
-let docsClient: Client | null = null;
-let docsTools: Tool[] = [];
-
-/**
- * Connect to the craft-agents-docs MCP server and fetch its tool definitions.
- * Falls back gracefully if the server is unreachable (tools will just be empty).
- */
-async function connectDocsUpstream(): Promise<void> {
-  try {
-    const client = new Client(
-      { name: 'craft-agent-session-proxy', version: '1.0.0' },
-      { capabilities: {} }
-    );
-
-    const transport = new StreamableHTTPClientTransport(new URL(DOCS_MCP_URL));
-    await client.connect(transport);
-
-    const result = await client.listTools();
-    docsTools = (result.tools || []) as Tool[];
-    docsClient = client;
-
-    console.error(`DataPilot Docs proxy connected: ${docsTools.length} tools`);
-  } catch (err) {
-    console.error(`DataPilot Docs proxy connection failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
-    docsClient = null;
-    docsTools = [];
-  }
-}
-
-/**
- * Route a tool call to the upstream docs client.
- */
-async function callDocsUpstream(
-  name: string,
-  args: Record<string, unknown>
-): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
-  if (!docsClient) {
-    return errorResponse(`DataPilot Docs server is not connected. Tool '${name}' unavailable.`);
-  }
-
-  try {
-    const result = await docsClient.callTool({ name, arguments: args });
-    // Convert MCP result to our format
-    const textContent = (result.content as Array<{ type: string; text?: string }> || [])
-      .filter(c => c.type === 'text' && c.text)
-      .map(c => ({ type: 'text' as const, text: c.text! }));
-
-    return {
-      content: textContent.length > 0 ? textContent : [{ type: 'text', text: '(No response from docs server)' }],
-      isError: result.isError as boolean | undefined,
-    };
-  } catch (err) {
-    return errorResponse(`Docs tool '${name}' failed: ${err instanceof Error ? err.message : String(err)}`);
-  }
-}
-
-/** Check if a tool name belongs to the docs upstream */
-function isDocsUpstreamTool(name: string): boolean {
-  return docsTools.some(t => t.name === name);
-}
+// Previously connected to https://agents.craft.do/docs/mcp and proxied its 2
+// tools (search_craft_agents, query_docs_filesystem_craft_agents) into the
+// session tool list. Removed because:
+//   - upstream docs only contain generic schema/overview pages, no per-service
+//     setup recipes (so the proxy added little value for source creation)
+//   - costs ~1000 tokens/session on backends that load this server (Codex)
+//   - upstream is owned by Craft (agents.craft.do); we want to drop the dep
+// To re-enable: restore the imports above, this block, the `await
+// connectDocsUpstream()` call, the spread in the ListTools handler, and the
+// docs-routing branch in CallTool.
+//
+// const DOCS_MCP_URL = 'https://agents.craft.do/docs/mcp';
+//
+// /** Cached upstream client + tool list */
+// let docsClient: Client | null = null;
+// let docsTools: Tool[] = [];
+//
+// async function connectDocsUpstream(): Promise<void> {
+//   try {
+//     const client = new Client(
+//       { name: 'craft-agent-session-proxy', version: '1.0.0' },
+//       { capabilities: {} }
+//     );
+//
+//     const transport = new StreamableHTTPClientTransport(new URL(DOCS_MCP_URL));
+//     await client.connect(transport);
+//
+//     const result = await client.listTools();
+//     docsTools = (result.tools || []) as Tool[];
+//     docsClient = client;
+//
+//     console.error(`DataPilot Docs proxy connected: ${docsTools.length} tools`);
+//   } catch (err) {
+//     console.error(`DataPilot Docs proxy connection failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+//     docsClient = null;
+//     docsTools = [];
+//   }
+// }
+//
+// async function callDocsUpstream(
+//   name: string,
+//   args: Record<string, unknown>
+// ): Promise<{ content: Array<{ type: 'text'; text: string }>; isError?: boolean }> {
+//   if (!docsClient) {
+//     return errorResponse(`DataPilot Docs server is not connected. Tool '${name}' unavailable.`);
+//   }
+//
+//   try {
+//     const result = await docsClient.callTool({ name, arguments: args });
+//     const textContent = (result.content as Array<{ type: string; text?: string }> || [])
+//       .filter(c => c.type === 'text' && c.text)
+//       .map(c => ({ type: 'text' as const, text: c.text! }));
+//
+//     return {
+//       content: textContent.length > 0 ? textContent : [{ type: 'text', text: '(No response from docs server)' }],
+//       isError: result.isError as boolean | undefined,
+//     };
+//   } catch (err) {
+//     return errorResponse(`Docs tool '${name}' failed: ${err instanceof Error ? err.message : String(err)}`);
+//   }
+// }
+//
+// function isDocsUpstreamTool(name: string): boolean {
+//   return docsTools.some(t => t.name === name);
+// }
 
 // ============================================================
 // call_llm Handler (backend-specific)
@@ -533,12 +535,12 @@ async function main() {
     }
   );
 
-  // Connect to upstream docs server (non-blocking, best-effort)
-  await connectDocsUpstream();
+  // DISABLED: upstream docs proxy — see DataPilot Docs Upstream Proxy section.
+  // await connectDocsUpstream();
 
-  // Handle tool listing — session tools + docs upstream tools
+  // Handle tool listing — session tools only (docs upstream proxy disabled)
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: [...createSessionTools(includeDeveloperFeedback), ...docsTools],
+    tools: createSessionTools(includeDeveloperFeedback),
   }));
 
   // Handle tool calls — route via canonical registry, call_llm, or docs upstream
@@ -562,10 +564,10 @@ async function main() {
         return await def.handler(ctx, toolArgs);
       }
 
-      // Route to docs upstream if it's a docs tool
-      if (isDocsUpstreamTool(name)) {
-        return await callDocsUpstream(name, toolArgs as Record<string, unknown>);
-      }
+      // DISABLED: docs upstream routing — see DataPilot Docs Upstream Proxy section.
+      // if (isDocsUpstreamTool(name)) {
+      //   return await callDocsUpstream(name, toolArgs as Record<string, unknown>);
+      // }
 
       return errorResponse(`Unknown tool: ${name}`);
     } catch (error) {

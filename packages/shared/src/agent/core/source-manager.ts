@@ -19,7 +19,7 @@ import type { SourceManagerConfig } from './types.ts';
 import { FEATURE_FLAGS } from '../../feature-flags.ts';
 
 /** Slugs exempt from guide.md prerequisite (internal sources) */
-const GUIDE_EXEMPT_SLUGS = new Set(['session', 'craft-agents-docs']);
+const GUIDE_EXEMPT_SLUGS = new Set(['session' /* , 'craft-agents-docs' — DISABLED, MCP no longer registered */]);
 
 /**
  * SourceManager provides centralized source state tracking for agent backends.

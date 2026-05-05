@@ -298,7 +298,9 @@ describe('runPreToolUseChecks', () => {
       expect(result.type).toBe('call_llm_intercept');
     });
 
-    it('skips source check for built-in MCP servers (craft-agents-docs)', () => {
+    // DISABLED: craft-agents-docs MCP no longer registered (see claude-agent.ts).
+    // Slug removed from BUILT_IN_MCP_SERVERS, so source check is no longer skipped.
+    it.skip('skips source check for built-in MCP servers (craft-agents-docs)', () => {
       const result = runPreToolUseChecks(createInput({
         toolName: 'mcp__craft-agents-docs__search',
         input: {},
