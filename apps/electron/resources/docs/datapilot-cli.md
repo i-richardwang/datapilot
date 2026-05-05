@@ -303,9 +303,9 @@ Manage batch processing jobs stored in `batches.json`.
 dtpilot batch list
 dtpilot batch get abc123
 
-# Create — most fields live under --input
+# Create — `source` and `action` are nested objects (see batches.md for full schema)
 dtpilot batch create --name "User Analysis" \
-  --input '{"source":"data/users.csv","idField":"user_id","promptFile":"prompt.txt"}'
+  --input '{"source":{"type":"csv","path":"data/users.csv","idField":"user_id"},"action":{"type":"prompt","prompt":"Summarize $BATCH_ITEM_NAME"}}'
 
 dtpilot batch update abc123 \
   --input '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
