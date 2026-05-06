@@ -250,6 +250,7 @@ const SETTINGS_ICONS: Record<SettingsSubpage, string> = {
  */
 export const SETTINGS_ITEMS: SettingsMenuItem[] = SETTINGS_PAGES
   .filter(page => page.id !== 'server' || FEATURE_FLAGS.embeddedServer)
+  .filter(page => page.id !== 'messaging' || !FEATURE_FLAGS.disableMessaging)
   .map(page => ({
     id: page.id,
     labelKey: page.labelKey,

@@ -548,6 +548,12 @@ export const SANDBOX_TOOLS = new Set([
   'script_sandbox',
 ]);
 
+/** Messaging gateway tools. Disabled via DATAPILOT_DISABLE_MESSAGING. */
+export const MESSAGING_TOOLS = new Set([
+  'list_messaging_channels',
+  'unbind_messaging_channel',
+]);
+
 /** Tools excluded in batch mode (no human interaction, no UI rendering, no session management) */
 export const BATCH_EXCLUDED_TOOLS = new Set([
   'SubmitPlan',
@@ -588,6 +594,8 @@ export interface SessionToolFilterOptions {
   /** Exclude sandbox execution tool (script_sandbox). Defaults to false.
    *  script_sandbox is also excluded when disableTemplates is true (OR logic). */
   disableSandbox?: boolean;
+  /** Exclude messaging gateway tools (list_messaging_channels, unbind_messaging_channel). Defaults to false. */
+  disableMessaging?: boolean;
   /** Exclude UI/interaction tools for batch-spawned sessions. Defaults to false. */
   batchMode?: boolean;
   /** Minimal batch profile: only include tools in MINIMAL_BATCH_SESSION_TOOLS. Defaults to false. */
@@ -608,6 +616,7 @@ export function getSessionToolDefs(options?: SessionToolFilterOptions): SessionT
   const disableValidation = options?.disableValidation ?? false;
   const disableTemplates = options?.disableTemplates ?? false;
   const disableSandbox = options?.disableSandbox ?? false;
+  const disableMessaging = options?.disableMessaging ?? false;
   const batchMode = options?.batchMode ?? false;
   const minimalBatchMode = options?.minimalBatchMode ?? false;
 
@@ -631,6 +640,9 @@ export function getSessionToolDefs(options?: SessionToolFilterOptions): SessionT
       return false;
     }
     if ((disableSandbox || disableTemplates) && SANDBOX_TOOLS.has(def.name)) {
+      return false;
+    }
+    if (disableMessaging && MESSAGING_TOOLS.has(def.name)) {
       return false;
     }
     if (minimalBatchMode) {
@@ -757,6 +769,7 @@ export function getToolDefsAsJsonSchema(opts?: {
   disableValidation?: boolean;
   disableTemplates?: boolean;
   disableSandbox?: boolean;
+  disableMessaging?: boolean;
   batchMode?: boolean;
 }): JsonSchemaToolDef[] {
   const prefix = opts?.prefix || '';
@@ -768,6 +781,7 @@ export function getToolDefsAsJsonSchema(opts?: {
     disableValidation: opts?.disableValidation,
     disableTemplates: opts?.disableTemplates,
     disableSandbox: opts?.disableSandbox,
+    disableMessaging: opts?.disableMessaging,
     batchMode: opts?.batchMode,
   });
 

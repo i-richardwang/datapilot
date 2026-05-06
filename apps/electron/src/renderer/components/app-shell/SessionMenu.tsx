@@ -52,6 +52,7 @@ import { getFileManagerName } from '@/lib/platform'
 import type { SessionMeta } from '@/atoms/sessions'
 import { getSessionStatus, hasUnreadMeta, hasMessagesMeta } from '@/utils/session'
 import { MessagingSessionMenuItem } from '@/components/messaging/MessagingSessionMenuItem'
+import { FEATURE_FLAGS } from '@craft-agent/shared/feature-flags'
 
 /** True when running in web UI (browser) rather than Electron. */
 const isWebMode = window.electronAPI.getRuntimeEnvironment() === 'web'
@@ -246,8 +247,9 @@ export function SessionMenu({
         </MenuItem>
       )}
 
-      {/* Connect to Messaging — pairing code flow */}
-      <MessagingSessionMenuItem sessionId={sessionId} />
+      {/* Connect to Messaging — pairing code flow.
+          Hidden when DATAPILOT_DISABLE_MESSAGING is set. */}
+      {!FEATURE_FLAGS.disableMessaging && <MessagingSessionMenuItem sessionId={sessionId} />}
 
       <Separator />
 

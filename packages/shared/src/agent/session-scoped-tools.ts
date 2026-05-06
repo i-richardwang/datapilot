@@ -332,6 +332,7 @@ export function getSessionScopedTools(
       disableValidation: FEATURE_FLAGS.disableValidation,
       disableTemplates: FEATURE_FLAGS.disableTemplates,
       disableSandbox: FEATURE_FLAGS.disableSandbox,
+      disableMessaging: FEATURE_FLAGS.disableMessaging,
     })
       .filter(def => def.handler !== null) // Skip backend-specific tools (call_llm)
       .map(def => registryTool(def.name, def.inputSchema.shape));

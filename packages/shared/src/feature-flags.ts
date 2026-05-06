@@ -113,6 +113,22 @@ export function isSandboxDisabled(): boolean {
 }
 
 /**
+ * Build-time check: disable messaging gateway (Telegram, WhatsApp).
+ *
+ * When set, hides the two messaging session tools, skips the messaging
+ * bootstrap (no WhatsApp worker subprocess, no binding store I/O), skips
+ * messaging RPC handler registration, and hides the Messaging settings
+ * page + session menu entry.
+ *
+ * Set DATAPILOT_DISABLE_MESSAGING=1 at build time to disable.
+ */
+export function isMessagingDisabled(): boolean {
+  const override = parseBooleanEnv(process.env.DATAPILOT_DISABLE_MESSAGING);
+  if (override !== undefined) return override;
+  return false;
+}
+
+/**
  * Build-time check: enable streamlined UI.
  *
  * Hides non-essential UI elements (What's New, Help menu) and
@@ -156,6 +172,10 @@ export const FEATURE_FLAGS = {
   /** Disable sandbox tool (script_sandbox) independently of templates. */
   get disableSandbox(): boolean {
     return isSandboxDisabled();
+  },
+  /** Disable messaging gateway (Telegram, WhatsApp): tools, bootstrap, RPC handlers, settings page. */
+  get disableMessaging(): boolean {
+    return isMessagingDisabled();
   },
   /** Streamlined UI — hides non-essential elements and extra statuses. */
   get liteUi(): boolean {

@@ -3665,8 +3665,9 @@ function AppShellContent({
       />
 
       {/* Messaging dialogs (pairing-code + WA connect) — driven by messagingDialogAtom.
-          Mounted here so they survive context-menu / dropdown close. */}
-      <MessagingDialogHost />
+          Mounted here so they survive context-menu / dropdown close.
+          Hidden when DATAPILOT_DISABLE_MESSAGING is set. */}
+      {!FEATURE_FLAGS.disableMessaging && <MessagingDialogHost />}
 
     </AppShellProvider>
   )

@@ -78,6 +78,7 @@ import { createElectronPlatform } from './platform'
 import type { HandlerDeps } from './handlers/handler-deps'
 import { bootstrapServer, releaseServerLock } from '@craft-agent/server-core/bootstrap'
 import { createMessagingBootstrap, type MessagingBootstrapHandle } from '@craft-agent/messaging-gateway'
+import { FEATURE_FLAGS } from '@craft-agent/shared/feature-flags'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
 import { initModelRefreshService, getModelRefreshService, setFetcherPlatform } from '@craft-agent/server-core/model-fetchers'
 import { setSearchPlatform, setImageProcessor } from '@craft-agent/server-core/services'
@@ -636,37 +637,42 @@ app.whenReady().then(async () => {
           // The messaging handle is built here because it needs sessionManager.
           // The WS publisher is attached after bootstrapServer resolves (via
           // handle.setPublisher) because wsServer isn't available yet.
-          messagingHandle = createMessagingBootstrap({
-            sessionManager: sm,
-            credentialManager: getCredentialManager(),
-            getMessagingDir: (wsId: string) =>
-              join(homedir(), '.datapilot', 'workspaces', wsId, 'messaging'),
-            getLegacyMessagingDir: (wsId: string) => {
-              const ws = getWorkspaces().find((w) => w.id === wsId)
-              return ws ? join(ws.rootPath, 'messaging') : undefined
-            },
-            // Route messaging diagnostics through the dedicated messaging log
-            // at ~/.datapilot/logs/messaging-gateway.log.
-            logger: messagingGatewayLog,
-            // WhatsApp worker runs under Electron's embedded Node via
-            // ELECTRON_RUN_AS_NODE (WhatsAppAdapter defaults nodeBin to
-            // process.execPath). In dev we resolve worker.cjs from the
-            // monorepo; in packaged builds it's shipped via extraResources
-            // (see apps/electron/electron-builder.yml).
-            whatsapp: {
-              workerEntry: app.isPackaged
-                ? join(process.resourcesPath, 'messaging-whatsapp-worker', 'worker.cjs')
-                : join(process.cwd(), 'packages', 'messaging-whatsapp-worker', 'dist', 'worker.cjs'),
-              pairingMode: 'qr',
-            },
-          })
+          // Gated by DATAPILOT_DISABLE_MESSAGING — when set, the WhatsApp
+          // worker subprocess is not spawned and binding store I/O is skipped.
+          if (!FEATURE_FLAGS.disableMessaging) {
+            messagingHandle = createMessagingBootstrap({
+              sessionManager: sm,
+              credentialManager: getCredentialManager(),
+              getMessagingDir: (wsId: string) =>
+                join(homedir(), '.datapilot', 'workspaces', wsId, 'messaging'),
+              getLegacyMessagingDir: (wsId: string) => {
+                const ws = getWorkspaces().find((w) => w.id === wsId)
+                return ws ? join(ws.rootPath, 'messaging') : undefined
+              },
+              // Route messaging diagnostics through the dedicated messaging log
+              // at ~/.datapilot/logs/messaging-gateway.log.
+              logger: messagingGatewayLog,
+              // WhatsApp worker runs under Electron's embedded Node via
+              // ELECTRON_RUN_AS_NODE (WhatsAppAdapter defaults nodeBin to
+              // process.execPath). In dev we resolve worker.cjs from the
+              // monorepo; in packaged builds it's shipped via extraResources
+              // (see apps/electron/electron-builder.yml).
+              whatsapp: {
+                workerEntry: app.isPackaged
+                  ? join(process.resourcesPath, 'messaging-whatsapp-worker', 'worker.cjs')
+                  : join(process.cwd(), 'packages', 'messaging-whatsapp-worker', 'dist', 'worker.cjs'),
+                pairingMode: 'qr',
+              },
+            })
+          }
           return {
             sessionManager: sm,
             platform: p,
             windowManager: windowManager ?? undefined,
             browserPaneManager: browserPaneManager ?? undefined,
             oauthFlowStore: ofs,
-            messagingRegistry: messagingHandle.registry,
+            // null registry → registerMessagingHandlers early-returns, RPC channel stays unregistered.
+            messagingRegistry: messagingHandle?.registry,
           }
         },
         // Headless: register only server-core handlers (no GUI).
@@ -713,30 +719,33 @@ app.whenReady().then(async () => {
       // Messaging Gateway — attach the WS publisher, init local workspaces,
       // install the fan-out event sink. The handle was created inside
       // createHandlerDeps so the registry could be wired into HandlerDeps.
+      // Skipped entirely when DATAPILOT_DISABLE_MESSAGING is set.
       // -----------------------------------------------------------------------
-      try {
-        if (!messagingHandle) {
-          throw new Error('Messaging handle was not constructed in createHandlerDeps')
+      if (!FEATURE_FLAGS.disableMessaging) {
+        try {
+          if (!messagingHandle) {
+            throw new Error('Messaging handle was not constructed in createHandlerDeps')
+          }
+
+          messagingHandle.setPublisher(instance.wsServer.push.bind(instance.wsServer))
+
+          // Skip remote-owned workspaces — messaging runs on the remote server.
+          const localWorkspaceIds = getWorkspaces()
+            .filter((ws) => !ws.remoteServer)
+            .map((ws) => ws.id)
+          await messagingHandle.initializeWorkspaces(localWorkspaceIds)
+
+          // Compose fan-out event sink: RPC push + messaging gateway dispatch.
+          // Always install — this lets workspaces enable messaging at runtime
+          // without a process restart.
+          const baseSink = instance.wsServer.push.bind(instance.wsServer)
+          instance.sessionManager.setEventSink(messagingHandle.wrapSink(baseSink))
+          if (messagingHandle.registry.size > 0) {
+            mainLog.info(`[messaging] Fan-out sink active for ${messagingHandle.registry.size} workspace(s)`)
+          }
+        } catch (err) {
+          mainLog.error('[messaging] Gateway initialization failed:', err)
         }
-
-        messagingHandle.setPublisher(instance.wsServer.push.bind(instance.wsServer))
-
-        // Skip remote-owned workspaces — messaging runs on the remote server.
-        const localWorkspaceIds = getWorkspaces()
-          .filter((ws) => !ws.remoteServer)
-          .map((ws) => ws.id)
-        await messagingHandle.initializeWorkspaces(localWorkspaceIds)
-
-        // Compose fan-out event sink: RPC push + messaging gateway dispatch.
-        // Always install — this lets workspaces enable messaging at runtime
-        // without a process restart.
-        const baseSink = instance.wsServer.push.bind(instance.wsServer)
-        instance.sessionManager.setEventSink(messagingHandle.wrapSink(baseSink))
-        if (messagingHandle.registry.size > 0) {
-          mainLog.info(`[messaging] Fan-out sink active for ${messagingHandle.registry.size} workspace(s)`)
-        }
-      } catch (err) {
-        mainLog.error('[messaging] Gateway initialization failed:', err)
       }
 
       // IPC handlers — preload uses sendSync to get WS connection details

@@ -12,6 +12,7 @@ import {
   VALIDATION_TOOLS,
   TEMPLATE_TOOLS,
   SANDBOX_TOOLS,
+  MESSAGING_TOOLS,
 } from './tool-defs.ts';
 
 describe('session tool filtering helpers', () => {
@@ -151,6 +152,16 @@ describe('session tool filtering helpers', () => {
       expect(removed).toEqual(SANDBOX_TOOLS);
     });
 
+    it('disableMessaging excludes exactly the MESSAGING_TOOLS set', () => {
+      const base = getSessionToolDefs();
+      const filtered = getSessionToolDefs({ disableMessaging: true });
+
+      const removed = new Set(
+        base.filter(d => !filtered.some(f => f.name === d.name)).map(d => d.name)
+      );
+      expect(removed).toEqual(MESSAGING_TOOLS);
+    });
+
     it('disableSandbox does not affect render_template', () => {
       const filtered = getSessionToolDefs({ disableSandbox: true });
 
@@ -192,10 +203,11 @@ describe('session tool filtering helpers', () => {
         disableValidation: true,
         disableTemplates: true,
         disableSandbox: true,
+        disableMessaging: true,
       });
       const names = new Set(filtered.map(d => d.name));
 
-      const allDisabled = new Set([...OAUTH_TOOLS, ...BROWSER_TOOLS, ...VALIDATION_TOOLS, ...TEMPLATE_TOOLS, ...SANDBOX_TOOLS]);
+      const allDisabled = new Set([...OAUTH_TOOLS, ...BROWSER_TOOLS, ...VALIDATION_TOOLS, ...TEMPLATE_TOOLS, ...SANDBOX_TOOLS, ...MESSAGING_TOOLS]);
       for (const tool of allDisabled) {
         expect(names.has(tool)).toBe(false);
       }
@@ -205,11 +217,13 @@ describe('session tool filtering helpers', () => {
     });
 
     it('json schema conversion respects granular flags', () => {
-      const defs = getToolDefsAsJsonSchema({ disableOauth: true, disableBrowser: true });
+      const defs = getToolDefsAsJsonSchema({ disableOauth: true, disableBrowser: true, disableMessaging: true });
       const names = new Set(defs.map(d => d.name));
 
       expect(names.has('source_oauth_trigger')).toBe(false);
       expect(names.has('browser_tool')).toBe(false);
+      expect(names.has('list_messaging_channels')).toBe(false);
+      expect(names.has('unbind_messaging_channel')).toBe(false);
       expect(names.has('mermaid_validate')).toBe(true);
     });
   });

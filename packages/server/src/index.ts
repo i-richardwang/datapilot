@@ -36,6 +36,7 @@ import type { WebuiHandler } from '@craft-agent/server-core/webui'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
 import { getWorkspaces } from '@craft-agent/shared/config'
 import { createMessagingBootstrap, type MessagingBootstrapHandle } from '@craft-agent/messaging-gateway'
+import { FEATURE_FLAGS } from '@craft-agent/shared/feature-flags'
 
 // --generate-token: print a crypto-random token and exit
 if (process.argv.includes('--generate-token')) {
@@ -217,23 +218,28 @@ const instance = await (async () => {
       }),
       createSessionManager: () => new SessionManager(),
       createHandlerDeps: ({ sessionManager, platform, oauthFlowStore }) => {
-        messagingHandle = createMessagingBootstrap({
-          sessionManager,
-          credentialManager: getCredentialManager(),
-          getMessagingDir: (wsId: string) =>
-            join(homedir(), '.datapilot', 'workspaces', wsId, 'messaging'),
-          // Headless has no legacy messaging dir — workspaces start clean.
-          whatsapp: {
-            workerEntry: waWorkerEntry,
-            nodeBin: waNodeBin,
-            pairingMode: 'qr',
-          },
-        })
+        // Gated by DATAPILOT_DISABLE_MESSAGING. When set, the WhatsApp worker
+        // is not spawned and the messaging RPC handlers self-skip
+        // (registerMessagingHandlers early-returns when registry is undefined).
+        if (!FEATURE_FLAGS.disableMessaging) {
+          messagingHandle = createMessagingBootstrap({
+            sessionManager,
+            credentialManager: getCredentialManager(),
+            getMessagingDir: (wsId: string) =>
+              join(homedir(), '.datapilot', 'workspaces', wsId, 'messaging'),
+            // Headless has no legacy messaging dir — workspaces start clean.
+            whatsapp: {
+              workerEntry: waWorkerEntry,
+              nodeBin: waNodeBin,
+              pairingMode: 'qr',
+            },
+          })
+        }
         return {
           sessionManager,
           platform,
           oauthFlowStore,
-          messagingRegistry: messagingHandle.registry,
+          messagingRegistry: messagingHandle?.registry,
         }
       },
       registerAllRpcHandlers: (server, deps, serverCtx) => {

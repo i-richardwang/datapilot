@@ -27,5 +27,6 @@ export function getSessionToolProxyDefs(opts?: { includeBatchOutput?: boolean; b
     disableValidation: FEATURE_FLAGS.disableValidation,
     disableTemplates: FEATURE_FLAGS.disableTemplates,
     disableSandbox: FEATURE_FLAGS.disableSandbox,
+    disableMessaging: FEATURE_FLAGS.disableMessaging,
   });
 }
