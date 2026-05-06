@@ -15,7 +15,7 @@ Our fork adds 10 categories of changes:
 
 3. **Batch Processing System** — 对大量条目（CSV/JSON/JSONL）执行 prompt action 的批处理系统。架构镜像 Automations；上游重构 automations 时 batch 代码大概率需要同步。
 
-4. **Granular Feature Flags** — 5 个独立构建时开关替代旧的 `LITE_VERSION`：`DATAPILOT_DISABLE_OAUTH`、`DATAPILOT_DISABLE_BROWSER`、`DATAPILOT_DISABLE_VALIDATION`、`DATAPILOT_DISABLE_TEMPLATES`、`DATAPILOT_LITE_UI`。每个 flag 独立控制工具集和系统提示词段落。
+4. **Granular Feature Flags** — 7 个独立构建时开关替代旧的 `LITE_VERSION`：`DATAPILOT_DISABLE_OAUTH`、`DATAPILOT_DISABLE_BROWSER`、`DATAPILOT_DISABLE_VALIDATION`、`DATAPILOT_DISABLE_TEMPLATES`、`DATAPILOT_DISABLE_SANDBOX`、`DATAPILOT_DISABLE_MESSAGING`、`DATAPILOT_LITE_UI`。每 flag 独立控制工具集 / 系统提示词段落 / 子系统 bootstrap（messaging 还会跳过 WhatsApp worker 和 messaging RPC handler 注册）。
 
 5. **Custom Endpoint Runtime Fixes** — 4 个修复：(a) `queryLlm()` 豁免 custom-endpoint 的 provider 兼容性检查；(b) `validateStoredConnection()` 改为实际 API 调用验证；(c) `resolveModelForProvider()` 跳过 cross-provider guard；(d) tier-hint 短名解析（`'haiku'` → `getMiniModel()`）。
 
@@ -95,6 +95,7 @@ Won't conflict unless upstream adds similarly-named features.
 - **SQLite/CLI:** CLI section 从 "Prefer CLI" 改为 mandatory "You MUST use"；mini agent prompt 改为引用 CLI
 - **Batch:** Doc reference table 新增 Batches 行；batch CLI guidance 由 `FEATURE_FLAGS.craftAgentsCli` 控制
 - **Granular flags:** `disableBrowser` 条件包裹 Browser Tools 段落 + doc table 行；`disableValidation` 包裹 mermaid 工具；`disableTemplates` 包裹 Source Templates
+- **Project context:** 已删除 fork 自带的 `<project_context_files>` 块（与 Pi resourceLoader 的 `agentsFilesOverride` 重复）；AGENTS.md/CLAUDE.md 走 realpath dedup 防止 symlink 重复 — 上游若引入相似 block 不要回采
 
 **Conflict trigger:** 上游频繁修改系统提示词。任何段落重写/重排都可能破坏我们的条件包裹。
 
@@ -119,8 +120,8 @@ Won't conflict unless upstream adds similarly-named features.
 
 - `batch_output` tool def, `BatchOutputSchema`, `'batches'` target in `ConfigValidateSchema`
 - `BATCH_EXCLUDED_TOOLS` set (18 tools stripped from batch sessions)
-- Per-category tool sets: `OAUTH_TOOLS`, `BROWSER_TOOLS`, `VALIDATION_TOOLS`, `TEMPLATE_TOOLS`
-- `SessionToolFilterOptions` extended with `includeBatchOutput`, `batchMode`, `disableOauth/Browser/Validation/Templates`
+- Per-category tool sets: `OAUTH_TOOLS`, `BROWSER_TOOLS`, `VALIDATION_TOOLS`, `TEMPLATE_TOOLS`, `SANDBOX_TOOLS`, `MESSAGING_TOOLS`
+- `SessionToolFilterOptions` extended with `includeBatchOutput`, `batchMode`, `disableOauth/Browser/Validation/Templates/Sandbox/Messaging`
 
 **Conflict trigger:** upstream adds/removes/renames session tools.
 
@@ -142,8 +143,8 @@ Won't conflict unless upstream adds similarly-named features.
 #### `packages/shared/src/feature-flags.ts` `[Granular Flags + CLI]`
 
 - `craftAgentsCli` default changed from `false` to `true`
-- 5 granular flag functions (`isOauthDisabled`, `isBrowserDisabled`, `isValidationDisabled`, `isTemplatesDisabled`, `isLiteUi`)
-- `isOauthDisabled` 和 `isLiteUi` 默认值改为 `true`（OAuth 默认关闭，Lite UI 默认开启）
+- 7 granular flag functions (`isOauthDisabled`, `isBrowserDisabled`, `isValidationDisabled`, `isTemplatesDisabled`, `isSandboxDisabled`, `isMessagingDisabled`, `isLiteUi`)
+- `isOauthDisabled` 和 `isLiteUi` 默认值改为 `true`（OAuth 默认关闭，Lite UI 默认开启）；其余默认 `false`
 
 **Conflict trigger:** upstream adds new feature flags.
 
@@ -158,6 +159,12 @@ Won't conflict unless upstream adds similarly-named features.
 **Conflict trigger:** (a) 上游修改 `pi-agent-server` 的 `prompt` IPC handler 系统 prompt 处理路径; (b) 上游引入自家 resource loader 安装逻辑; (c) Pi SDK 升级改 `_rebuildSystemPrompt` 触发条件 / `customPrompt` 语义 / 暴露新公开 API 直接触发 rebuild(届时可以把 `setActiveToolsByName` no-op trick 替换掉); (d) 任何"看上去更简单"的重构想把 closure + reload + setActiveToolsByName 改回直接赋值。
 
 ### MEDIUM Risk — Check After Upstream Changes
+
+#### `packages/session-tools-core/src/handlers/` + `session-mcp-server` `[MCP → CLI Collapse]`
+
+Fork 删除了三个 session 自管理 MCP tool 及其 handler:`list_sessions`、`get_session_info`、`update_user_preferences`。能力收敛到 `dtpilot session list/info` + `dtpilot preference set`(CLI 是产品内 agent 的唯一入口);新增 RPC handlers 在 `server-core/src/handlers/rpc/sessions.ts`,补齐 SessionManager 接口。`prompts/system.ts` 同步删去对这三个 tool 的引用。
+
+**Conflict trigger:** 上游对这三个 handler 做扩展(新字段、新 dispatch 路径)→ 不要回采,把变化吸收进对应 CLI 命令或 RPC handler。
 
 #### `packages/shared/src/agent/backend/factory.ts` `[Custom Endpoint Fix]`
 
@@ -263,7 +270,8 @@ Re-exports now point to `storage.db.ts`.
 | `apps/electron/src/renderer/contexts/NavigationContext.tsx` | Batch | `isBatch` exclusion, batch filter |
 | `apps/electron/src/renderer/components/app-shell/TopBar.tsx` | Lite UI | Help menu wrapped with `!FEATURE_FLAGS.liteUi` |
 | `apps/electron/src/renderer/components/onboarding/ProviderSelectStep.tsx` | Disable OAuth | `OAUTH_HIDDEN_PROVIDERS` filter |
-| `apps/electron/vite.config.ts` | Flags | `define` for 5 `DATAPILOT_DISABLE_*` env vars |
+| `apps/electron/vite.config.ts` | Flags | `define` for 6 `DATAPILOT_DISABLE_*` + `DATAPILOT_LITE_UI` env vars |
+| `apps/webui/vite.config.ts` | Flags | Same `define` set as electron — webui is browser-only so the literal substitution is mandatory (no runtime `process.env`). 漏哪个 flag → renderer 静默读 undefined → UI 不响应该 flag |
 | `apps/electron/resources/permissions/default.json` | CLI | `datapilot` + `datapilot batch` bash patterns |
 | `packages/shared/src/__tests__/feature-flags.test.ts` | CLI | `craftAgentsCli` defaults to `true` |
 | `packages/shared/src/auth/oauth.ts` | Branding | `CLIENT_NAME = 'DataPilot'` |
