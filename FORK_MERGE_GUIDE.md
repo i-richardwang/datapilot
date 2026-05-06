@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: 合并 upstream 时的唯一操作手册 — 冲突风险、合并策略、检查清单。
 >
-> **Last upstream merge:** v0.9.0 (2026-05-01).
+> **Last upstream merge:** v0.9.1 (2026-05-06).
 
 ## Overview
 
@@ -481,3 +481,4 @@ bun run tsc --noEmit
 | v0.8.12 | 2026-04-26 | 11 | Pi SDK 0.70.2 — `codingTools` removed (factory functions instead); attachment hybrid persistence; deep-link allowlist switch; Claude Agent SDK pinned `0.2.111`. |
 | v0.8.13 | 2026-04-29 | 8 | `executePromptAutomation` → options object (`ExecutePromptAutomationInput`); fork-only keys (`isBatch`/`batchContext`/`workingDirectory`/`onSessionCreated`) live on the input type now. |
 | v0.9.0 | 2026-05-01 | 19 | Claude Agent SDK 0.2.123 native-binary distribution + `@vscode/ripgrep`; Lark/Feishu messaging adapter; Telegram supergroup + per-automation `telegramTopic` (added to `ExecutePromptAutomationInput`); `bunfig.toml` linker pinned to `hoisted`. |
+| v0.9.1 | 2026-05-06 | 17 | Pi SDK 0.72.1 + `@sentry/core` resolution drift forced an `overrides` entry pinning `10.50.0` (electron 7.13.0 / react 10.51.0 otherwise pull mismatched cores); `TOKEN_LIMIT` → `tokenLimitFor(contextWindow)` in `pi-agent-server`; `large-response.ts` keeps `TOKEN_LIMIT` re-export so legacy imports survive. Telegram access-control adds `packages/messaging-gateway/src/access-control.ts` + `pending-senders.ts`; `runtime-config.ts` (new in `server-core/sessions/`) extracts in-place vs restart-required signature builders — fork's `BatchProcessor` import sits next to the new `buildBackendRuntimeSignature` import. Old `pages/PreferencesPage.tsx` was already dead (re-exported from `./settings`); accepted upstream's deletion. **Pre-existing parity gap (not merge-introduced):** 17 `htmlShare.*` keys missing in de/es/hu/ja/pl. |
