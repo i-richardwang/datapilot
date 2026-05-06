@@ -253,12 +253,12 @@ export const DEFAULT_THEME: ThemeOverrides = {
   success: 'oklch(0.55 0.17 145)',
   destructive: 'oklch(0.58 0.24 28)',
   dark: {
-    background: 'oklch(0.2 0.005 270)',
-    foreground: 'oklch(0.92 0.005 270)',
+    background: 'oklch(0.145 0.015 270)',
+    foreground: 'oklch(0.95 0.01 270)',
     accent: 'oklch(0.7214 0.1337 49.9802)',
-    info: 'oklch(0.70 0.16 70)',
+    info: 'oklch(0.78 0.14 70)',
     success: 'oklch(0.60 0.17 145)',
-    destructive: 'oklch(0.70 0.19 22)',
+    destructive: 'oklch(0.65 0.22 28)',
   },
 };
 
