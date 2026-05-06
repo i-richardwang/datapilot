@@ -38,6 +38,7 @@ export default defineConfig({
     'process.env.DATAPILOT_DISABLE_BROWSER': JSON.stringify(process.env.DATAPILOT_DISABLE_BROWSER || ''),
     'process.env.DATAPILOT_DISABLE_VALIDATION': JSON.stringify(process.env.DATAPILOT_DISABLE_VALIDATION || ''),
     'process.env.DATAPILOT_DISABLE_TEMPLATES': JSON.stringify(process.env.DATAPILOT_DISABLE_TEMPLATES || ''),
+    'process.env.DATAPILOT_DISABLE_MESSAGING': JSON.stringify(process.env.DATAPILOT_DISABLE_MESSAGING || ''),
     'process.env.DATAPILOT_LITE_UI': JSON.stringify(process.env.DATAPILOT_LITE_UI || ''),
   },
   root: resolve(__dirname, 'src/renderer'),
