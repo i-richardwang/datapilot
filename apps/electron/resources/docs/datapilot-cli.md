@@ -129,7 +129,7 @@ dtpilot source create --name "Linear" --provider "linear" --type mcp \
 
 # API source
 dtpilot source create --name "Exa" --provider "exa" --type api \
-  --input '{"api":{"baseUrl":"https://api.exa.ai/","authType":"header"}}'
+  --input '{"api":{"baseUrl":"https://api.exa.ai/","authType":"header","headerName":"x-api-key"}}'
 
 # Local source
 dtpilot source create --name "Docs Folder" --provider "filesystem" --type local \
