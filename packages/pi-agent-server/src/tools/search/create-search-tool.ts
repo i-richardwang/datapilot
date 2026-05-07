@@ -172,5 +172,3 @@ export function createSearchTool(
 //   };
 // }
 
-// [fork] DDG re-export kept for callers that need a default fallback in the array.
-export { DDGSearchProvider };
