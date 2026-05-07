@@ -51,7 +51,7 @@ function assertValidToolDefinition(tool: ToolDefinition<any, any>): void {
 
 describe('Pi subprocess tool shape contract', () => {
   it('createSearchTool returns a valid ToolDefinition with promptSnippet', () => {
-    const tool = createSearchTool(stubSearchProvider);
+    const tool = createSearchTool([stubSearchProvider]);
     assertValidToolDefinition(tool);
     expect(tool.name).toBe('web_search');
     expect(typeof tool.promptSnippet).toBe('string');
@@ -101,7 +101,7 @@ describe('Pi SDK 0.70.0 CreateAgentSessionOptions contract', () => {
   });
 
   it('`customTools` field accepts ToolDefinition[] (the tool object channel)', () => {
-    const searchTool = createSearchTool(stubSearchProvider);
+    const searchTool = createSearchTool([stubSearchProvider]);
     const webFetchTool = createWebFetchTool(() => null);
     const options: CreateAgentSessionOptions = {
       customTools: [searchTool, webFetchTool],
@@ -112,7 +112,7 @@ describe('Pi SDK 0.70.0 CreateAgentSessionOptions contract', () => {
   it('customTools names ⊆ tools allowlist invariant', () => {
     // This is the invariant the subprocess must maintain when building sessionOptions.
     // If any customTool name is missing from `tools`, that tool gets filtered out.
-    const searchTool = createSearchTool(stubSearchProvider);
+    const searchTool = createSearchTool([stubSearchProvider]);
     const webFetchTool = createWebFetchTool(() => null);
     const customTools = [
       createReadToolDefinition('/tmp'),

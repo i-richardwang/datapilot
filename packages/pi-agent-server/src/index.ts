@@ -82,7 +82,8 @@ import {
 import { getWorkspaceSkillsPath } from '../../shared/src/workspaces/storage.ts';
 import { findAllProjectContextFiles } from '../../shared/src/prompts/system.ts';
 import { createWebFetchTool } from './tools/web-fetch.ts';
-import { resolveSearchProvider } from './tools/search/resolve-provider.ts';
+// [fork] resolveSearchProvider replaced by resolveSearchProviders (env-driven cascade).
+import { resolveSearchProviders } from './tools/search/resolve-provider.ts';
 import { createSearchTool } from './tools/search/create-search-tool.ts';
 import { allowCraftMetadataProperties, stripCraftMetadata } from './craft-metadata-schema.ts';
 
@@ -589,31 +590,31 @@ async function ensureSession(): Promise<AgentSession> {
   // Store at module scope for set_model handler
   piModelRegistry = modelRegistry;
 
-  // Build tools: coding tools + web tools wrapped with permission hooks + proxy tools.
-  // Search provider is selected based on the user's LLM connection:
-  //   - OpenAI/OpenRouter → Responses API built-in web_search
-  //   - ChatGPT Plus (openai-codex) → ChatGPT backend responses endpoint
-  //   - Google → Gemini API with googleSearch grounding
-  //   - Others → DuckDuckGo fallback
+  // [fork] Build tools: coding tools + web tools wrapped with permission hooks.
+  // Search cascade is env-driven (TINYFISH_API_KEY → EXA_API_KEY → DDG fallback)
+  // and independent of the LLM connection. The cascade is resolved once per
+  // session: env vars are static, so there's no token-refresh dynamic-resolve
+  // requirement that drove the upstream proxy below.
   //
-  // IMPORTANT: resolve dynamically on each search call so token_update refreshes
-  // are used without recreating the session.
-  // [fork] Pass baseUrl alongside piAuth so the resolver can detect custom OpenAI-compat
-  // endpoints (where piAuthProvider='openai' but the key is NOT for api.openai.com)
-  // and skip native search → DDG. See resolve-provider.ts hasCustomEndpoint guard.
-  const buildSearchAuth = () =>
-    initConfig?.piAuth
-      ? { ...initConfig.piAuth, baseUrl: initConfig.baseUrl }
-      : undefined;
-  const searchProvider = {
-    get name() {
-      return resolveSearchProvider(buildSearchAuth()).name;
-    },
-    async search(query: string, count: number) {
-      return resolveSearchProvider(buildSearchAuth()).search(query, count);
-    },
-  };
-  const searchTool = createSearchTool(searchProvider);
+  // Upstream parity (commented out): the original block resolved the search
+  // provider per-call against `piAuth` so OAuth token refreshes (ChatGPT codex)
+  // would be picked up without restarting the session. See resolve-provider.ts
+  // for the rationale behind retiring the LLM-native path entirely in this fork.
+  //
+  // const buildSearchAuth = () =>
+  //   initConfig?.piAuth
+  //     ? { ...initConfig.piAuth, baseUrl: initConfig.baseUrl }
+  //     : undefined;
+  // const searchProvider = {
+  //   get name() {
+  //     return resolveSearchProvider(buildSearchAuth()).name;
+  //   },
+  //   async search(query: string, count: number) {
+  //     return resolveSearchProvider(buildSearchAuth()).search(query, count);
+  //   },
+  // };
+  // const searchTool = createSearchTool(searchProvider);
+  const searchTool = createSearchTool(resolveSearchProviders());
   const webFetchTool = createWebFetchTool(() =>
     initConfig ? getSessionPath(initConfig.workspaceRootPath, initConfig.sessionId) : null
   );
