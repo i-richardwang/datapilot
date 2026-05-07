@@ -22,6 +22,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import { Lock, LockOpen, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '../../lib/utils'
+import { usePlatform } from '../../context/PlatformContext'
 
 export type HtmlSharePasswordMode = 'share' | 'change'
 
@@ -65,6 +66,7 @@ export function HtmlSharePasswordDialog({
   onComplete,
 }: HtmlSharePasswordDialogProps) {
   const { t } = useTranslation()
+  const { onOpenUrl } = usePlatform()
   const [currentPassword, setCurrentPassword] = React.useState('')
   const [newPassword, setNewPassword] = React.useState('')
   const [isBusy, setIsBusy] = React.useState(false)
@@ -102,6 +104,12 @@ export function HtmlSharePasswordDialog({
           await navigator.clipboard.writeText(result.sharedUrl).catch(() => undefined)
           toast.success(t('toast.linkCopied'), {
             description: result.sharedUrl,
+            ...(onOpenUrl && {
+              action: {
+                label: t('sendToWorkspace.open'),
+                onClick: () => onOpenUrl(result.sharedUrl),
+              },
+            }),
           })
           onComplete?.({ hasPassword: result.hasPassword, sharedUrl: result.sharedUrl })
           onOpenChange(false)

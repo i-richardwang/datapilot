@@ -1935,7 +1935,13 @@ export default function App() {
         } catch (clipboardError) {
           console.warn('Failed to copy share URL to clipboard:', clipboardError)
         }
-        toast.success(t('toast.linkCopied'))
+        toast.success(t('toast.linkCopied'), {
+          description: result.sharedUrl,
+          action: {
+            label: t('sendToWorkspace.open'),
+            onClick: () => window.electronAPI.openUrl(result.sharedUrl),
+          },
+        })
       }
       return {
         sharedUrl: result.sharedUrl,
