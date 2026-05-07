@@ -28,7 +28,8 @@ import {
 } from './share-assets'
 import { isValidWorkingDirectory } from '../utils/path-validation'
 import { InitGate } from '@craft-agent/server-core/domain'
-import { i18n, LOCALE_REGISTRY, type LanguageCode } from '@craft-agent/shared/i18n'
+// [fork] Title generation no longer relies on server-side i18n (see generateTitle/refreshTitle).
+// import { i18n, LOCALE_REGISTRY, type LanguageCode } from '@craft-agent/shared/i18n'
 import {
   getWorkspaces,
   getWorkspaceByNameOrId,
@@ -5260,10 +5261,12 @@ export class SessionManager implements ISessionManager {
 
     const assistantResponse = lastAssistantMsg?.content ?? ''
 
-    // Derive language from app's i18n setting for language-aware title generation
-    const titleLangCode = (i18n.resolvedLanguage ?? 'en') as LanguageCode
-    const titleLangEntry = LOCALE_REGISTRY[titleLangCode]
-    const titleOptions = { language: titleLangEntry?.nativeName }
+    // [fork] Disabled: server-side i18n.resolvedLanguage is unreliable (see generateTitle for full reasoning).
+    // Pass no language so title-generator auto-detects from user messages.
+    // const titleLangCode = (i18n.resolvedLanguage ?? 'en') as LanguageCode
+    // const titleLangEntry = LOCALE_REGISTRY[titleLangCode]
+    // const titleOptions = { language: titleLangEntry?.nativeName }
+    const titleOptions: { language?: string } = {}
 
     // Use existing agent or create temporary one
     let agent: AgentInstance | null = managed.agent
@@ -7207,9 +7210,16 @@ export class SessionManager implements ISessionManager {
     }
 
     try {
-      const genLangCode = (i18n.resolvedLanguage ?? 'en') as LanguageCode
-      const genLangEntry = LOCALE_REGISTRY[genLangCode]
-      const title = await agent.generateTitle(userMessage, { language: genLangEntry?.nativeName })
+      // [fork] Disabled: server-side i18n.resolvedLanguage is unreliable
+      //   - Electron main: setupI18n() has no LanguageDetector → fallback 'en' until user manually changes Settings
+      //   - Standalone server: setupI18n() never called → resolvedLanguage is undefined → 'en' fallback
+      // Result was always `Reply in English.` regardless of user UI language.
+      // Pass no language so title-generator falls back to "Reply in the same language as the user's messages."
+      // which lets the LLM auto-detect from message content (more accurate than UI language anyway).
+      // const genLangCode = (i18n.resolvedLanguage ?? 'en') as LanguageCode
+      // const genLangEntry = LOCALE_REGISTRY[genLangCode]
+      // const title = await agent.generateTitle(userMessage, { language: genLangEntry?.nativeName })
+      const title = await agent.generateTitle(userMessage)
       if (title) {
         managed.name = title
         this.persistSession(managed)

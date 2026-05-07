@@ -2,6 +2,11 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'path'
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { getPreferencesPath, getSessionDraft, setSessionDraft, deleteSessionDraft, getAllSessionDrafts, getWorkspaceByNameOrId, getDefaultThinkingLevel, setDefaultThinkingLevel, loadPreferences, updatePreferences, UserPreferencesSchema } from '@craft-agent/shared/config'
+// [fork] Used to keep the server process's in-memory i18n instance in sync with
+// preferences.language. Without this, WebUI changing language would persist to
+// preferences.json but the running server would still use the stale i18n value
+// for any code path that reads i18n.resolvedLanguage at request time.
+import { i18n } from '@craft-agent/shared/i18n'
 import { isValidThinkingLevel, normalizeThinkingLevel, THINKING_LEVEL_IDS } from '@craft-agent/shared/agent/thinking-levels'
 
 const VALID_THINKING_LEVELS_LIST = THINKING_LEVEL_IDS.map(id => `'${id}'`).join(', ')
@@ -213,7 +218,14 @@ export function registerSettingsHandlers(server: RpcServer, deps: HandlerDeps): 
       ;(err as { code?: string }).code = 'VALIDATION_ERROR'
       throw err
     }
-    return updatePreferences(parsed.data)
+    const result = updatePreferences(parsed.data)
+    // [fork] Sync server-side i18n when language changes so subsequent reads of
+    // i18n.resolvedLanguage (e.g. preferences.ts:formatPreferencesForPrompt as a
+    // fallback) reflect the new value within the same process.
+    if (typeof parsed.data.language === 'string' && parsed.data.language) {
+      i18n.changeLanguage(parsed.data.language)
+    }
+    return result
   })
 
   // ============================================================

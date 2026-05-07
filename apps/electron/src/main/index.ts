@@ -60,7 +60,18 @@ Sentry.init({
 
 // Initialize i18n for main process (menus, dialogs, etc.)
 import { setupI18n, i18n } from '@craft-agent/shared/i18n'
+import { loadPreferences as loadUserPreferences } from '@craft-agent/shared/config'
 setupI18n()
+// [fork] Apply persisted language so server-side i18n (used by system-prompt user
+// preferences) reflects the user's actual choice from process start, instead of
+// the 'en' fallback. Renderer also pushes its detected language via IPC right
+// after setupI18n, but reading here covers the gap before the renderer connects.
+{
+  const persistedLang = loadUserPreferences().language
+  if (persistedLang) {
+    i18n.changeLanguage(persistedLang)
+  }
+}
 
 // Set anonymous machine ID for Sentry user tracking (no PII — just a hash).
 // Uses hostname + homedir to produce a stable per-machine identifier.
@@ -880,6 +891,15 @@ app.whenReady().then(async () => {
       // Language change: sync from renderer to main process and rebuild native menu
       ipcMain.handle('i18n:changeLanguage', async (_event, lang: string) => {
         i18n.changeLanguage(lang)
+        // [fork] Persist so subsequent main-process startups (and the standalone
+        // server, which reads the same preferences.json) start with the right
+        // language instead of falling back to 'en'.
+        try {
+          const { updatePreferences } = await import('@craft-agent/shared/config')
+          updatePreferences({ language: lang })
+        } catch (err) {
+          console.warn('[i18n] Failed to persist language preference:', err)
+        }
         const { rebuildMenu } = await import('./menu')
         await rebuildMenu()
       })

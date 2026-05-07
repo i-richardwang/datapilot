@@ -10,6 +10,7 @@
 
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
+import i18n from 'i18next'
 import { createWebApi } from './adapter/web-api'
 import type { WsRpcClient } from '../../electron/src/transport/client'
 
@@ -132,6 +133,18 @@ export default function App() {
 
       // 5. Connect the WebSocket client
       client.connect()
+
+      // [fork] Push the browser's detected/persisted language to the server on
+      // every connection so server-side preferences.language is current. The
+      // main session's system prompt reads this field to inject "Preferred
+      // language: X". Fire-and-forget — invoke() will queue until the client
+      // is connected, and a transient failure isn't fatal to the UI flow.
+      const detectedLang = i18n.resolvedLanguage
+      if (detectedLang) {
+        api.changeLanguage(detectedLang).catch((err: unknown) => {
+          console.warn('[i18n] Failed to sync language to server:', err)
+        })
+      }
 
       setPhase('ready')
     } catch (err) {

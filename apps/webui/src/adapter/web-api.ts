@@ -168,6 +168,19 @@ export function createWebApi(options: WebApiOptions): {
       }
     },
 
+    // [fork] WebUI language change must persist to server-side preferences so the
+    // main session's system prompt picks up the correct "Preferred language" hint.
+    // The Electron path persists via an IPC handler in main/index.ts; here we
+    // reuse the existing preferences:update RPC, which writes the same
+    // preferences.json field and (server-side) syncs the in-process i18n instance.
+    changeLanguage: async (lang: string) => {
+      try {
+        await client.invoke('preferences:update', { language: lang })
+      } catch (err) {
+        console.warn('[i18n] Failed to persist language preference to server:', err)
+      }
+    },
+
     // Workspace operations — web UI works with a single connection
     getWindowWorkspace: () => Promise.resolve(workspaceId ?? null),
     getWindowMode: () => Promise.resolve('main'),

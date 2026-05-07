@@ -34,9 +34,23 @@ import { bootstrapServer, startHealthHttpServer, generateServerToken } from '@cr
 import { validateSession, createWebuiHandler, nodeHttpAdapter } from '@craft-agent/server-core/webui'
 import type { WebuiHandler } from '@craft-agent/server-core/webui'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
-import { getWorkspaces } from '@craft-agent/shared/config'
+import { getWorkspaces, loadPreferences as loadUserPreferences } from '@craft-agent/shared/config'
+import { setupI18n, i18n } from '@craft-agent/shared/i18n'
 import { createMessagingBootstrap, type MessagingBootstrapHandle } from '@craft-agent/messaging-gateway'
 import { FEATURE_FLAGS } from '@craft-agent/shared/feature-flags'
+
+// [fork] Initialize i18n so any server-side code that consults i18n.resolvedLanguage
+// (e.g. system-prompt user preferences in @craft-agent/shared/config/preferences)
+// reflects the user's persisted choice. Upstream never called setupI18n() in
+// the standalone server, leaving resolvedLanguage as undefined → 'en' fallback,
+// which caused incorrect "Preferred language: English" injection.
+setupI18n()
+{
+  const persistedLang = loadUserPreferences().language
+  if (persistedLang) {
+    i18n.changeLanguage(persistedLang)
+  }
+}
 
 // --generate-token: print a crypto-random token and exit
 if (process.argv.includes('--generate-token')) {

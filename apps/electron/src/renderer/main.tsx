@@ -8,13 +8,26 @@ import App from './App'
 import { ThemeProvider } from './context/ThemeContext'
 import { windowWorkspaceIdAtom } from './atoms/sessions'
 import { Toaster } from '@/components/ui/sonner'
-import { setupI18n } from '@craft-agent/shared/i18n'
+import { setupI18n, i18n } from '@craft-agent/shared/i18n'
 import { initReactI18next } from 'react-i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
 import './index.css'
 
 // Initialize i18n before any React rendering
 setupI18n([LanguageDetector, initReactI18next])
+
+// [fork] Push the renderer's detected language to the main process at startup so
+// server-side i18n (used by system-prompt preferences and any future main-process
+// LLM call) reflects the user's actual UI language. Without this, main process
+// stays on 'en' fallback until the user manually changes Settings → Appearance →
+// Language. The IPC handler also persists this to preferences.json so the
+// standalone server picks it up on next start.
+const detectedLang = i18n.resolvedLanguage
+if (detectedLang) {
+  void window.electronAPI?.changeLanguage?.(detectedLang).catch?.((err: unknown) => {
+    console.warn('[i18n] Failed to sync language to main process:', err)
+  })
+}
 
 // Known-harmless console messages that should NOT be sent to Sentry.
 // These are dev-mode noise or expected warnings that aren't actionable.

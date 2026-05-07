@@ -95,14 +95,24 @@ export function getPreferencesPath(): string {
 export function formatPreferencesForPrompt(): string {
   const prefs = loadPreferences();
 
-  // Derive language from the app's i18n setting (Appearance > Language).
-  // This replaces the old prefs.language field which is now ignored.
-  const langCode = (i18n.resolvedLanguage ?? 'en') as LanguageCode;
-  const langEntry = LOCALE_REGISTRY[langCode];
-  const langName = langEntry?.nativeName ?? 'English';
+  // [fork] Resolve the preferred language for prompt injection.
+  // Original behavior: always derived from i18n.resolvedLanguage and ignored prefs.language.
+  // Problem: server-side i18n is unreliable (Electron main fallbacks to 'en' at startup;
+  //   standalone server never inits i18n). This caused `Preferred language: English` to be
+  //   injected for every user regardless of UI language.
+  // New priority: prefs.language (persisted, authoritative) → i18n.resolvedLanguage (fallback).
+  // If neither is set we omit the "Preferred language" hint entirely so the LLM detects from messages
+  // instead of being misled into English.
+  // Original (replaced):
+  //   const langCode = (i18n.resolvedLanguage ?? 'en') as LanguageCode;
+  //   const langEntry = LOCALE_REGISTRY[langCode];
+  //   const langName = langEntry?.nativeName ?? 'English';
+  const resolvedCode = (prefs.language ?? i18n.resolvedLanguage) as LanguageCode | undefined;
+  const langEntry = resolvedCode ? LOCALE_REGISTRY[resolvedCode] : undefined;
+  const langName = langEntry?.nativeName;
 
   if (Object.keys(prefs).length === 0 ||
-      (!prefs.name && !prefs.timezone && !prefs.location && !prefs.notes && langCode === 'en')) {
+      (!prefs.name && !prefs.timezone && !prefs.location && !prefs.notes && !langName)) {
     return '';
   }
 
@@ -124,9 +134,14 @@ export function formatPreferencesForPrompt(): string {
     }
   }
 
-  // Always include language so the AI knows which language to respond in.
-  // Derived from the Appearance language setting, not the old prefs.language field.
-  lines.push(`- Preferred language: ${langName}`);
+  // [fork] Only include the language hint when we have an authoritative source
+  // (persisted prefs.language or initialized i18n). Avoids injecting a wrong
+  // "Preferred language: English" when server-side i18n is uninitialized.
+  // Original (replaced):
+  //   lines.push(`- Preferred language: ${langName}`);
+  if (langName) {
+    lines.push(`- Preferred language: ${langName}`);
+  }
 
   if (prefs.notes) {
     lines.push('', '### Notes about this user', prefs.notes);
