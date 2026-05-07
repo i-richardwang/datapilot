@@ -25,7 +25,9 @@ function formatResults(
   query: string,
   providerName: string,
   results: WebSearchResult[],
-  note?: string,
+  // [fork] note dropped — `(via ${providerName})` already conveys fallback;
+  // primary-error body was leaking partial API key into LLM context.
+  // _note?: string,
 ) {
   const formatted = results
     .map(
@@ -34,24 +36,26 @@ function formatResults(
     )
     .join('\n\n');
 
-  const noteText = note ? `${note}\n\n` : '';
+  // [fork] suppressed — see note above.
+  // const noteText = note ? `${note}\n\n` : '';
 
   return {
     content: [
       {
         type: 'text' as const,
-        text: `${noteText}Search results for "${query}" (via ${providerName}):\n\n${formatted}`,
+        text: `Search results for "${query}" (via ${providerName}):\n\n${formatted}`,
       },
     ],
     details: {},
   };
 }
 
-function formatErrorSnippet(message: string, max = 180): string {
-  const compact = message.replace(/\s+/g, ' ').trim();
-  if (!compact) return 'unknown error';
-  return compact.length > max ? `${compact.slice(0, max - 1)}…` : compact;
-}
+// [fork] kept for upstream parity — re-enable if note is restored.
+// function formatErrorSnippet(message: string, max = 180): string {
+//   const compact = message.replace(/\s+/g, ' ').trim();
+//   if (!compact) return 'unknown error';
+//   return compact.length > max ? `${compact.slice(0, max - 1)}…` : compact;
+// }
 
 export function createSearchTool(
   provider: WebSearchProvider,
@@ -79,12 +83,15 @@ export function createSearchTool(
         if (canFallback) {
           try {
             const fallbackResults = await fallbackProvider.search(query, count);
-            return formatResults(
-              query,
-              fallbackProvider.name,
-              fallbackResults,
-              `Primary search provider (${provider.name}) failed (${formatErrorSnippet(primaryMsg)}), automatically fell back to ${fallbackProvider.name}.`,
-            );
+            // [fork] dropped fallback note arg — `(via ${fallbackProvider.name})`
+            // is enough; the primary error body was leaking key fragments into LLM context.
+            // return formatResults(
+            //   query,
+            //   fallbackProvider.name,
+            //   fallbackResults,
+            //   `Primary search provider (${provider.name}) failed (${formatErrorSnippet(primaryMsg)}), automatically fell back to ${fallbackProvider.name}.`,
+            // );
+            return formatResults(query, fallbackProvider.name, fallbackResults);
           } catch (fallbackErr) {
             const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
             return {

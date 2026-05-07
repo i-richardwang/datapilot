@@ -163,4 +163,38 @@ describe('resolveSearchProvider', () => {
 
     expect(provider).toBeInstanceOf(DDGSearchProvider);
   });
+
+  // --- Custom OpenAI/Anthropic-compat endpoints ---
+  // piAuthProvider='openai' marks the wire protocol; the API key belongs to the
+  // custom gateway, not api.openai.com. Routing native search would 401 and leak.
+
+  it('falls back to DDG when openai provider has a custom baseUrl', () => {
+    const provider = resolveSearchProvider({
+      provider: 'openai',
+      credential: { type: 'api_key', key: 'gateway-key-not-for-openai' },
+      baseUrl: 'https://my-gateway.example.com/v1',
+    });
+
+    expect(provider).toBeInstanceOf(DDGSearchProvider);
+  });
+
+  it('falls back to DDG when openrouter provider has a custom baseUrl', () => {
+    const provider = resolveSearchProvider({
+      provider: 'openrouter',
+      credential: { type: 'api_key', key: 'gateway-key' },
+      baseUrl: 'https://my-gateway.example.com/v1',
+    });
+
+    expect(provider).toBeInstanceOf(DDGSearchProvider);
+  });
+
+  it('still selects native OpenAI when baseUrl is empty/whitespace', () => {
+    const provider = resolveSearchProvider({
+      provider: 'openai',
+      credential: { type: 'api_key', key: 'sk-test' },
+      baseUrl: '   ',
+    });
+
+    expect(provider).toBeInstanceOf(ResponsesApiSearchProvider);
+  });
 });

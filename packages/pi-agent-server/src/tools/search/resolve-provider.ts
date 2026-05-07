@@ -24,6 +24,14 @@ export type SearchProviderCredential =
 export interface SearchProviderAuthConfig {
   provider?: string;
   credential?: SearchProviderCredential;
+  /**
+   * [fork] Custom endpoint base URL, when the user has wired up an OpenAI/Anthropic-compatible
+   * gateway. When set, we MUST NOT route web_search to the official OpenAI/OpenRouter/Google
+   * URLs even though `provider` is one of those names — `piAuthProvider` only marks the
+   * wire protocol, the API key is for the custom endpoint, not the upstream vendor.
+   * Sending it to the upstream leaks key fragments via 401 responses.
+   */
+  baseUrl?: string;
 }
 
 function getApiKey(piAuth?: SearchProviderAuthConfig): string | undefined {
@@ -53,6 +61,15 @@ export function resolveSearchProvider(piAuth?: SearchProviderAuthConfig): WebSea
   const provider = piAuth?.provider;
   const apiKey = getApiKey(piAuth);
   const openAiCodexAccess = getOpenAiCodexAccessToken(piAuth);
+  // [fork] Custom OpenAI/Anthropic-compatible endpoints set `piAuthProvider` to 'openai' /
+  // 'anthropic' for wire-protocol routing, but the API key belongs to the custom gateway —
+  // not to OpenAI/OpenRouter/Google. Routing search to the upstream vendor would 401 and
+  // also leak key fragments back into the LLM context. Skip native search → DDG fallback.
+  const hasCustomEndpoint =
+    typeof piAuth?.baseUrl === 'string' && piAuth.baseUrl.trim().length > 0;
+  if (hasCustomEndpoint) {
+    return new DDGSearchProvider();
+  }
 
   // OpenAI with API key → standard Responses API
   if (provider === 'openai' && apiKey) {

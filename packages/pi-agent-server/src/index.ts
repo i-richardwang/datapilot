@@ -598,12 +598,19 @@ async function ensureSession(): Promise<AgentSession> {
   //
   // IMPORTANT: resolve dynamically on each search call so token_update refreshes
   // are used without recreating the session.
+  // [fork] Pass baseUrl alongside piAuth so the resolver can detect custom OpenAI-compat
+  // endpoints (where piAuthProvider='openai' but the key is NOT for api.openai.com)
+  // and skip native search → DDG. See resolve-provider.ts hasCustomEndpoint guard.
+  const buildSearchAuth = () =>
+    initConfig?.piAuth
+      ? { ...initConfig.piAuth, baseUrl: initConfig.baseUrl }
+      : undefined;
   const searchProvider = {
     get name() {
-      return resolveSearchProvider(initConfig?.piAuth).name;
+      return resolveSearchProvider(buildSearchAuth()).name;
     },
     async search(query: string, count: number) {
-      return resolveSearchProvider(initConfig?.piAuth).search(query, count);
+      return resolveSearchProvider(buildSearchAuth()).search(query, count);
     },
   };
   const searchTool = createSearchTool(searchProvider);

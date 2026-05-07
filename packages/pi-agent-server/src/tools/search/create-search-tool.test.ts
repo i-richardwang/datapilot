@@ -37,11 +37,15 @@ describe('createSearchTool', () => {
     expect((result.content[0] as any).text).toContain('(via MockProvider)');
   });
 
-  it('automatically falls back when primary provider fails', async () => {
+  it('falls back silently to fallback provider when primary fails', async () => {
+    // [fork] We intentionally drop the "Primary provider failed (…)" note —
+    // `(via DuckDuckGo)` is enough signal, and the primary's error body was leaking
+    // key fragments into the LLM context.
+    const SECRET_MARKER = 'PRIMARY_ERROR_BODY_DO_NOT_LEAK';
     const provider: WebSearchProvider = {
       name: 'OpenAI',
       async search() {
-        throw new Error('401 missing scope');
+        throw new Error(`HTTP 401: ${SECRET_MARKER}`);
       },
     };
 
@@ -56,9 +60,12 @@ describe('createSearchTool', () => {
     const result = await tool.execute('tool-2', { query: 'craft', count: 5 });
 
     expect(result.details?.isError).toBeUndefined();
-    expect((result.content[0] as any).text).toContain('automatically fell back to DuckDuckGo');
-    expect((result.content[0] as any).text).toContain('401 missing scope');
-    expect((result.content[0] as any).text).toContain('https://fallback.example');
+    const text = (result.content[0] as any).text as string;
+    expect(text).toContain('(via DuckDuckGo)');
+    expect(text).toContain('https://fallback.example');
+    // Primary error body must NOT leak into model context.
+    expect(text).not.toContain('automatically fell back');
+    expect(text).not.toContain(SECRET_MARKER);
   });
 
   it('marks failures as errors when primary and fallback both fail', async () => {
