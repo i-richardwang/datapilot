@@ -147,11 +147,15 @@ The `source_test` tool:
 5. **Auto-enables the source** (default): on a clean run it flips `enabled: true` in config if needed and activates the source in the current session so its tools become available without a restart. Pass `autoEnable: false` to keep pure validation behavior.
 
 After validation passes, trigger the appropriate auth flow:
+<!-- @if-oauth -->
 - OAuth sources: `source_oauth_trigger({ sourceSlug: "{slug}" })`
+<!-- /if-oauth -->
 - Bearer/API key: `source_credential_prompt({ sourceSlug: "{slug}", mode: "bearer" })`
+<!-- @if-oauth -->
 - Google services: `source_google_oauth_trigger({ sourceSlug: "{slug}" })`
 - Microsoft services: `source_microsoft_oauth_trigger({ sourceSlug: "{slug}" })`
 - Slack: `source_slack_oauth_trigger({ sourceSlug: "{slug}" })`
+<!-- /if-oauth -->
 
 **Do NOT skip validation** - it catches config errors before they cause runtime failures.
 
@@ -195,6 +199,7 @@ Concrete examples tailored to the user's workflow:
 4. **Note scope boundaries**: What the source can and cannot do
 5. **Keep it actionable**: Focus on what Claude needs to know to help effectively
 
+<!-- @if-oauth -->
 ## Example Conversational Flow
 
 ```
@@ -229,6 +234,7 @@ You can use it to:
 
 Would you like me to show you what issues are currently open?
 ```
+<!-- /if-oauth -->
 
 ## Overview
 
@@ -298,6 +304,7 @@ Each source folder contains:
 
 Model Context Protocol servers provide tools via HTTP/SSE.
 
+<!-- @if-oauth -->
 **OAuth authentication (recommended):**
 ```json
 {
@@ -313,6 +320,7 @@ Model Context Protocol servers provide tools via HTTP/SSE.
 
 After creating, use `source_oauth_trigger` to authenticate.
 
+<!-- /if-oauth -->
 **Bearer token authentication:**
 ```json
 {
@@ -515,6 +523,7 @@ Common multi-header use cases:
 - **APIs with identity + signing keys**: Separate API key and secret
 - **Services with app + user credentials**: Application key plus user token
 
+<!-- @if-oauth -->
 **Generic OAuth (authType: 'oauth'):**
 
 For API sources that use OAuth 2.0 but aren't Google, Slack, or Microsoft. Two modes:
@@ -570,6 +579,7 @@ source_oauth_trigger({ sourceSlug: "github" })
 
 Tokens are sent as `Authorization: Bearer {token}` on every request. Token refresh is automatic when a refresh token is available.
 
+<!-- /if-oauth -->
 **Basic auth with optional password:**
 
 Some APIs use HTTP Basic Auth but only require the username field (API key), leaving the password empty. For these APIs, use `passwordRequired: false` when prompting for credentials:
@@ -674,7 +684,9 @@ The optional `renewEndpoint` enables automatic token renewal for non-OAuth beare
 
 **When `body` is omitted**, the current token is sent via the standard Authorization header (using the source's `authScheme`).
 
+<!-- @if-oauth -->
 **Note:** This is for APIs with their own token renewal mechanism, not OAuth. For OAuth-based APIs, use `authType: "oauth"` instead.
+<!-- /if-oauth -->
 
 ### Local Sources
 
@@ -820,6 +832,7 @@ For favicon resolution, a cache maps provider names to their canonical domains a
 
 ## Common Providers
 
+<!-- @if-oauth -->
 ### Gmail (and other Google services)
 Provider: `google`, Type: `api`
 Requires user-provided OAuth credentials in the source config:
@@ -833,6 +846,7 @@ Uses OAuth via `source_google_oauth_trigger`.
 Provider: `linear`, Type: `mcp`
 URL: `https://mcp.linear.app`, OAuth auth.
 
+<!-- /if-oauth -->
 ### GitHub
 Provider: `github`, Type: `mcp`
 URL: `https://api.githubcopilot.com/mcp/`, **bearer auth** (PAT required - OAuth will fail).
@@ -877,10 +891,12 @@ Technical steps:
 5. Run `source_test` to validate configuration and test connection
 
 6. If auth is required, trigger the appropriate flow:
+<!-- @if-oauth -->
    - `source_oauth_trigger` for MCP OAuth
    - `source_google_oauth_trigger` for Google services (Gmail, Calendar, Drive, Docs, Sheets, YouTube, Search Console)
    - `source_microsoft_oauth_trigger` for Microsoft services
    - `source_slack_oauth_trigger` for Slack
+<!-- /if-oauth -->
    - `source_credential_prompt` for API keys/tokens
    - For basic auth with optional password: `source_credential_prompt({ mode: "basic", passwordRequired: false })`
 

@@ -674,7 +674,7 @@ The \`session\` MCP server provides tools for managing external sources:
 - **Do NOT** grep the workspace, search session files, or do web searches to find source config patterns. Read the source's \`config.json\` and \`guide.md\` directly.
 - **If an existing source is already configured**, read its \`config.json\` + \`guide.md\`, then use it. Do not recreate or search for how to set it up.
 ${FEATURE_FLAGS.disableOauth ? `
-**OAuth tools are disabled in this build.** \`source_*oauth_trigger\` tools do not exist — ignore references to them in docs. For OAuth sources, tell the user authentication is unavailable.` : `
+**OAuth-based authentication is unavailable in this build.** Sources that would normally use OAuth cannot be authenticated here — tell the user, and offer an API key / PAT setup if the service supports one.` : `
 **If MCP connection fails after OAuth with "Auth required":** The source needs to be re-enabled in the session for the new credentials to take effect. Do NOT keep retrying the same failing call or investigating log files — ask the user to re-enable the source or restart the session.`}
 ` : ''}
 **Full reference on what commands are enablled:** \`${DOC_REFS.permissions}\` (bash command lists, blocked constructs, planning workflow, customization). Read if unsure, or user has questions about permissions.

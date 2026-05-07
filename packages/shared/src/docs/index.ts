@@ -13,6 +13,7 @@ import { homedir } from 'os';
 import { existsSync, mkdirSync, writeFileSync, readdirSync, readFileSync } from 'fs';
 import { getBundledAssetsDir } from '../utils/paths.ts';
 import { debug } from '../utils/debug.ts';
+import { FEATURE_FLAGS } from '../feature-flags.ts';
 
 const CONFIG_DIR = join(homedir(), '.datapilot');
 const DOCS_DIR = join(CONFIG_DIR, 'docs');
@@ -27,6 +28,30 @@ function getAssetsDir(): string {
   return getBundledAssetsDir('docs')
     // Fallback: development path (will fail gracefully if files don't exist)
     ?? join(process.cwd(), 'resources', 'docs');
+}
+
+/**
+ * Strip feature-gated blocks from doc content before it reaches the agent.
+ *
+ * Block markers (each on its own line):
+ *   <!-- @if-oauth -->
+ *   ...content visible only when OAuth is enabled...
+ *   <!-- /if-oauth -->
+ *
+ * When the feature is disabled the whole block (markers + content) is removed,
+ * so the agent never sees OAuth instructions / tool names that don't exist in
+ * this build. When enabled, only the marker lines are stripped so the comments
+ * don't leak into the agent's view.
+ */
+// Exported for testing only.
+export function processDocContent(content: string): string {
+  if (FEATURE_FLAGS.disableOauth) {
+    return content.replace(
+      /^[ \t]*<!--\s*@if-oauth\s*-->[ \t]*\n[\s\S]*?^[ \t]*<!--\s*\/if-oauth\s*-->[ \t]*\n/gm,
+      ''
+    );
+  }
+  return content.replace(/^[ \t]*<!--\s*[@/]if-oauth\s*-->[ \t]*\n/gm, '');
 }
 
 /**
@@ -51,7 +76,7 @@ function loadBundledDocs(): Record<string, string> {
   for (const filename of files) {
     const filePath = join(assetsDir, filename);
     try {
-      docs[filename] = readFileSync(filePath, 'utf-8');
+      docs[filename] = processDocContent(readFileSync(filePath, 'utf-8'));
     } catch (error) {
       console.error(`[docs] Failed to load ${filename}:`, error);
     }
