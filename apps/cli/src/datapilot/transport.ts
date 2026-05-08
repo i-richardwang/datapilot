@@ -167,8 +167,10 @@ export async function connect(opts: ConnectOptions): Promise<{ client: CliRpcCli
 /**
  * Resolve a workspace ID for entity commands that require one.
  *
- * Order: explicit --workspace flag → first workspace returned by the server.
- * Returns undefined if no workspaces exist (caller decides whether to fail).
+ * Order: explicit --workspace flag → $DATAPILOT_WORKSPACE env var → first
+ * workspace returned by the server. Accepts an id, slug, or name; non-id
+ * values are resolved against the server's workspace list. Returns undefined
+ * if no workspaces exist (caller decides whether to fail).
  *
  * Side effect: binds the client to the resolved workspace via
  * window:switchWorkspace so push events are routed to us.
@@ -177,19 +179,29 @@ export async function resolveWorkspaceId(
   client: CliRpcClient,
   explicit?: string,
 ): Promise<string | undefined> {
-  if (explicit) {
-    await client.invoke('window:switchWorkspace', explicit).catch(() => {})
-    return explicit
-  }
+  const fromEnv = process.env.DATAPILOT_WORKSPACE
+  const requested = explicit ?? (fromEnv && fromEnv.length > 0 ? fromEnv : undefined)
+
+  let workspaces: Array<{ id: string; slug?: string; name?: string }> | undefined
   try {
-    const workspaces = (await client.invoke('workspaces:get')) as Array<{ id: string }>
-    if (workspaces?.length > 0) {
-      const id = workspaces[0]!.id
-      await client.invoke('window:switchWorkspace', id).catch(() => {})
-      return id
-    }
+    workspaces = (await client.invoke('workspaces:get')) as typeof workspaces
   } catch {
     /* Fall through */
+  }
+
+  if (requested) {
+    const match = workspaces?.find(
+      w => w.id === requested || w.slug === requested || w.name === requested,
+    )
+    const resolved = match?.id ?? requested
+    await client.invoke('window:switchWorkspace', resolved).catch(() => {})
+    return resolved
+  }
+
+  if (workspaces && workspaces.length > 0) {
+    const id = workspaces[0]!.id
+    await client.invoke('window:switchWorkspace', id).catch(() => {})
+    return id
   }
   return undefined
 }

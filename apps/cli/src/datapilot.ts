@@ -163,7 +163,7 @@ Usage:
 Global flags:
   --url <ws-url>         Server URL (default: ws://127.0.0.1:9100, env: DATAPILOT_SERVER_URL)
   --token <secret>       Auth token (env: DATAPILOT_SERVER_TOKEN, or discovery file)
-  --workspace <id|slug|name>  Workspace identifier (auto-detected if omitted)
+  --workspace <id|slug|name>  Workspace identifier (env: DATAPILOT_WORKSPACE; auto-detected if omitted)
   --timeout <ms>         Per-request timeout (default: 30000)
   --tls-ca <path>        Custom CA cert for self-signed TLS (env: DATAPILOT_TLS_CA)
   --json                 Force JSON envelope output (default for non-TTY stdout)
