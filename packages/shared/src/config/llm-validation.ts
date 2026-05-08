@@ -8,8 +8,9 @@
  * credential injection, no tools, minimal system prompt.
  */
 
-import { query } from '@anthropic-ai/claude-agent-sdk';
+import { query, type SDKResultError } from '@anthropic-ai/claude-agent-sdk';
 import { getDefaultOptions } from '../agent/options.ts';
+import { summarizeSdkError } from '../agent/claude-llm-query.ts';
 import { debug } from '../utils/debug.ts';
 
 export interface LlmValidationConfig {
@@ -21,6 +22,8 @@ export interface LlmValidationConfig {
   oauthToken?: string;
   /** Custom base URL for Anthropic-compatible endpoints */
   baseUrl?: string;
+  /** Abort the SDK query if it doesn't complete within this many ms. */
+  timeoutMs?: number;
 }
 
 export interface LlmValidationResult {
@@ -61,6 +64,10 @@ export async function validateAnthropicConnection(
   }
 
   const abortController = new AbortController();
+  let timedOut = false;
+  const timer = config.timeoutMs
+    ? setTimeout(() => { timedOut = true; abortController.abort(); }, config.timeoutMs)
+    : undefined;
 
   try {
     const options = {
@@ -75,26 +82,49 @@ export async function validateAnthropicConnection(
 
     const q = query({ prompt: 'hi', options });
 
-    // Consume the query — we just need it to succeed or fail
+    // Consume the query and track three independent failure signals:
+    // (1) assistant.error — SDK reported an inline error on the assistant turn
+    // (2) result.subtype !== 'success' — SDK terminated with an error result
+    //     (e.g. error_during_execution from a 4xx upstream). The previous
+    //     implementation broke on the first assistant message and ignored
+    //     `result` entirely, which silently passed when the SDK never produced
+    //     an assistant message at all (the "No response from provider" bug).
+    // (3) iterator drained without an assistant — endpoint reachable but
+    //     produced nothing usable; surface as failure rather than silent pass.
+    let sawAssistant = false;
+    let resultErrorMessage: string | undefined;
+
     for await (const msg of q) {
       if (msg.type === 'assistant') {
-        // Check if the SDK reported an error on the assistant message
         if (msg.error) {
           abortController.abort();
           return { success: false, error: parseValidationError(msg.error) };
         }
-        // Got a successful response — connection works, abort early
+        sawAssistant = true;
         abortController.abort();
         break;
       }
+
+      if (msg.type === 'result' && msg.subtype !== 'success') {
+        resultErrorMessage = summarizeSdkError(msg as SDKResultError);
+      }
     }
 
-    return { success: true };
+    if (sawAssistant) return { success: true };
+    if (resultErrorMessage) {
+      return { success: false, error: parseValidationError(resultErrorMessage) };
+    }
+    return { success: false, error: 'No response from provider (SDK produced no output — endpoint may be incompatible).' };
   } catch (error) {
     abortController.abort();
+    if (timedOut) {
+      return { success: false, error: `Connection test timed out after ${config.timeoutMs}ms` };
+    }
     const msg = error instanceof Error ? error.message : String(error);
     debug('[llm-validation] Validation failed:', msg);
     return { success: false, error: parseValidationError(msg) };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

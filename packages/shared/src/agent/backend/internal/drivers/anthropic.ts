@@ -133,6 +133,7 @@ export const anthropicDriver: ProviderDriver = {
       apiKey: apiKey || undefined,
       oauthToken: oauthToken || undefined,
       baseUrl: connection.baseUrl || undefined,
+      timeoutMs: 15_000,
     });
 
     if (!validationResult.success) {
@@ -140,5 +141,19 @@ export const anthropicDriver: ProviderDriver = {
     }
 
     return { success: true };
+  },
+  testConnection: async (args) => {
+    // Both default Anthropic and anthropic_compat (Claude Agent SDK custom
+    // endpoint) go through the SDK subprocess — that's the path the user
+    // expects when they pick "Claude Agent SDK". Delegating to
+    // validateAnthropicConnection keeps the test on the SDK path while
+    // surfacing SDK `result` / `assistant.error` failures that the generic
+    // runMiniCompletion fallback in factory.ts silently swallowed.
+    return validateAnthropicConnection({
+      model: args.model,
+      apiKey: args.apiKey || undefined,
+      baseUrl: args.baseUrl,
+      timeoutMs: args.timeoutMs,
+    });
   },
 };
