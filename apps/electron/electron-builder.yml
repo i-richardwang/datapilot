@@ -32,8 +32,8 @@ files:
   - resources/scripts/**/*
   # Include DataPilot CLI (compiled bundle + wrapper scripts for agent Bash sessions)
   - resources/cli/**/*
-  - resources/bin/datapilot
-  - resources/bin/datapilot.cmd
+  - resources/bin/dtpilot
+  - resources/bin/dtpilot.cmd
   # Include CLI tool shell wrappers (platform-independent, both Unix and Windows)
   - resources/bin/markitdown
   - resources/bin/markitdown.cmd

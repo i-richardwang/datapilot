@@ -1,5 +1,5 @@
 @echo off
-rem datapilot — agent-facing CLI wrapper (Windows).
+rem dtpilot — agent-facing CLI wrapper (Windows).
 rem
 rem Dispatches to the unified CLI entry at %DATAPILOT_CLI_ENTRY%.
 set "DATAPILOT_BUN_BIN=%DATAPILOT_BUN%"
