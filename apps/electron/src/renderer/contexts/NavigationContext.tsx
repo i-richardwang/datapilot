@@ -548,6 +548,8 @@ export function NavigationProvider({
             return session.isArchived === true
           case 'batch':
             return session.isBatch === true
+          case 'batchInstance':
+            return session.batchId === filter.batchId
           case 'state':
             return session.sessionStatus === filter.stateId && session.isArchived !== true && session.isBatch !== true
           case 'label': {
@@ -1214,6 +1216,9 @@ export function NavigationProvider({
         break
       case 'batch':
         navigate(routes.view.batchSessions(sessionId))
+        break
+      case 'batchInstance':
+        navigate(routes.view.batchInstance(filter.batchId, sessionId))
         break
       case 'state':
         navigate(routes.view.state(filter.stateId, sessionId))

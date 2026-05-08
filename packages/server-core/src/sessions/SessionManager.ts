@@ -860,6 +860,8 @@ interface ManagedSession {
   hidden?: boolean
   // Whether this session was created by the batch processor
   isBatch?: boolean
+  // Owning batch ID (set for batch sub-sessions)
+  batchId?: string
   branchFromMessageId?: string
   // Branch context strategy:
   // - sdk-fork: provider-level fork from parent SDK session
@@ -2729,6 +2731,7 @@ export class SessionManager implements ISessionManager {
       workingDirectory: resolvedWorkingDir,
       hidden: options?.hidden,
       isBatch: options?.isBatch,
+      batchId: options?.batchId,
       sessionStatus: options?.sessionStatus,
       labels: options?.labels,
       isFlagged: options?.isFlagged,
@@ -7996,6 +7999,7 @@ export class SessionManager implements ISessionManager {
       model,
       thinkingLevel,
       isBatch,
+      batchId: batchContext?.batchId,
       workingDirectory,
     })
 

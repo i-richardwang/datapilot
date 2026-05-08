@@ -64,7 +64,7 @@ export interface ParsedCompoundRoute {
  * Known prefixes that indicate a compound route
  */
 const COMPOUND_ROUTE_PREFIXES = [
-  'allSessions', 'flagged', 'archived', 'batchSessions', 'state', 'label', 'view', 'sources', 'skills', 'automations', 'batches', 'settings'
+  'allSessions', 'flagged', 'archived', 'batchSessions', 'batch', 'state', 'label', 'view', 'sources', 'skills', 'automations', 'batches', 'settings'
 ]
 
 /**
@@ -253,6 +253,11 @@ export function parseCompoundRoute(route: string): ParsedCompoundRoute | null {
       sessionFilter = { kind: 'batch' }
       detailsStartIndex = 1
       break
+    case 'batch':
+      if (!segments[1]) return null
+      sessionFilter = { kind: 'batchInstance', batchId: decodeURIComponent(segments[1]) }
+      detailsStartIndex = 2
+      break
     case 'state':
       if (!segments[1]) return null
       // Cast is safe because we're constructing from URL
@@ -355,6 +360,9 @@ export function buildCompoundRoute(parsed: ParsedCompoundRoute): string {
       break
     case 'batch':
       base = 'batchSessions'
+      break
+    case 'batchInstance':
+      base = `batch/${encodeURIComponent(filter.batchId)}`
       break
     case 'state':
       base = `state/${filter.stateId}`
@@ -485,13 +493,18 @@ function convertCompoundToViewRoute(compound: ParsedCompoundRoute): ParsedRoute 
           ...(filter.kind === 'state' ? { stateId: filter.stateId } : {}),
           ...(filter.kind === 'label' ? { labelId: filter.labelId } : {}),
           ...(filter.kind === 'view' ? { viewId: filter.viewId } : {}),
+          ...(filter.kind === 'batchInstance' ? { batchId: filter.batchId } : {}),
         },
       }
     }
     return {
       type: 'view',
       name: filter.kind,
-      id: filter.kind === 'state' ? filter.stateId : (filter.kind === 'label' ? filter.labelId : (filter.kind === 'view' ? filter.viewId : undefined)),
+      id: filter.kind === 'state' ? filter.stateId
+        : filter.kind === 'label' ? filter.labelId
+        : filter.kind === 'view' ? filter.viewId
+        : filter.kind === 'batchInstance' ? filter.batchId
+        : undefined,
       params: {},
     }
   }
@@ -722,6 +735,8 @@ function convertParsedRouteToNavigationState(parsed: ParsedRoute): NavigationSta
           filter = { kind: 'label', labelId: parsed.params.labelId }
         } else if (filterKind === 'view' && parsed.params.viewId) {
           filter = { kind: 'view', viewId: parsed.params.viewId }
+        } else if (filterKind === 'batchInstance' && parsed.params.batchId) {
+          filter = { kind: 'batchInstance', batchId: parsed.params.batchId }
         } else {
           filter = { kind: filterKind as 'allSessions' | 'flagged' | 'archived' }
         }

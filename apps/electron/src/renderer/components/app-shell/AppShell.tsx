@@ -654,6 +654,8 @@ function AppShellContent({
       case 'allSessions': return 'allSessions'
       case 'flagged': return 'flagged'
       case 'archived': return 'archived'
+      case 'batch': return 'batch'
+      case 'batchInstance': return `batch:${sessionFilter.batchId}`
       case 'state': return `state:${sessionFilter.stateId}`
       case 'label': return `label:${sessionFilter.labelId}`
       case 'view': return `view:${sessionFilter.viewId}`
@@ -1366,6 +1368,14 @@ function AppShellContent({
     return workspaceSessionMetas.filter(s => !s.isArchived && !s.isBatch)
   }, [workspaceSessionMetas])
 
+  // Like activeSessionMetas but keeps batch sub-sessions. Used for explicit
+  // user-tag filters (label, view) where the user opted into the bucket by
+  // tagging — including batch sessions matches the user's intent. Aggregate
+  // views (allSessions, flagged, state) keep using activeSessionMetas.
+  const taggableSessionMetas = useMemo(() => {
+    return workspaceSessionMetas.filter(s => !s.isArchived)
+  }, [workspaceSessionMetas])
+
   const refreshWorkspaceUnreadMap = useCallback(async () => {
     try {
       const summary = await window.electronAPI.getUnreadSummary()
@@ -1414,29 +1424,28 @@ function AppShellContent({
 
   // Compute session counts per label (cumulative: parent includes descendants).
   // Flatten the tree for iteration, use the tree for descendant lookups.
-  // Uses activeSessionMetas to exclude archived sessions from counts.
+  // Uses taggableSessionMetas so batch sub-sessions tagged with a user label
+  // are reflected in the count (matches what the label filter view shows).
   const labelCounts = useMemo(() => {
     const allLabels = flattenLabels(labelConfigs)
     const counts: Record<string, number> = {}
     for (const label of allLabels) {
-      // Direct count: sessions explicitly tagged with this label (handles valued entries like "priority::3")
-      const directCount = activeSessionMetas.filter(
+      const directCount = taggableSessionMetas.filter(
         s => s.labels?.some(l => extractLabelId(l) === label.id)
       ).length
       counts[label.id] = directCount
     }
-    // Add descendant counts to parents (cumulative)
     for (const label of allLabels) {
       const descendants = getDescendantIds(labelConfigs, label.id)
       if (descendants.length > 0) {
-        const descendantCount = activeSessionMetas.filter(
+        const descendantCount = taggableSessionMetas.filter(
           s => s.labels?.some(l => descendants.includes(extractLabelId(l)))
         ).length
         counts[label.id] = (counts[label.id] || 0) + descendantCount
       }
     }
     return counts
-  }, [activeSessionMetas, labelConfigs])
+  }, [taggableSessionMetas, labelConfigs])
 
   // Count sessions by individual todo state (dynamic based on effectiveSessionStatuses)
   // Uses activeSessionMetas to exclude archived sessions from counts.
@@ -1503,19 +1512,25 @@ function AppShellContent({
         // Batch view shows only batch-created sessions
         result = workspaceSessionMetas.filter(s => s.isBatch)
         break
+      case 'batchInstance':
+        // Per-batch view: only sub-sessions belonging to this batch
+        result = workspaceSessionMetas.filter(s => s.batchId === sessionFilter.batchId)
+        break
       case 'state':
         // Filter by specific todo state (excludes archived)
         result = activeSessionMetas.filter(s => (s.sessionStatus || 'todo') === sessionFilter.stateId)
         break
       case 'label': {
         if (sessionFilter.labelId === '__all__') {
-          // "Labels" header: show all active sessions that have at least one label
-          result = activeSessionMetas.filter(s => s.labels && s.labels.length > 0)
+          // "Labels" header: show every tagged session (including batch sub-sessions)
+          result = taggableSessionMetas.filter(s => s.labels && s.labels.length > 0)
         } else {
-          // Specific label: includes sessions tagged with this label or any descendant
+          // Specific label: includes sessions tagged with this label or any descendant.
+          // Uses taggableSessionMetas so batch sub-sessions tagged with the label
+          // surface here — explicit tagging is treated as user intent.
           const descendants = getDescendantIds(labelConfigs, sessionFilter.labelId)
           const matchIds = new Set([sessionFilter.labelId, ...descendants])
-          result = activeSessionMetas.filter(
+          result = taggableSessionMetas.filter(
             s => s.labels?.some(l => matchIds.has(extractLabelId(l)))
           )
         }
@@ -1523,8 +1538,10 @@ function AppShellContent({
       }
       case 'view': {
         // Filter by view: __all__ shows any session matched by any view,
-        // otherwise filter to the specific view (excludes archived)
-        result = activeSessionMetas.filter(s => {
+        // otherwise filter to the specific view (excludes archived).
+        // Includes batch sub-sessions for the same reason as 'label' — views
+        // are user-defined, so the user's filter expression is authoritative.
+        result = taggableSessionMetas.filter(s => {
           const matched = evaluateViews(s)
           if (sessionFilter.viewId === '__all__') {
             return matched.length > 0
@@ -1581,7 +1598,7 @@ function AppShellContent({
     }
 
     return result
-  }, [workspaceSessionMetas, activeSessionMetas, sessionFilter, listFilter, labelFilter, labelConfigs])
+  }, [workspaceSessionMetas, activeSessionMetas, taggableSessionMetas, sessionFilter, listFilter, labelFilter, labelConfigs, evaluateViews])
 
   // Derive "pinned" (non-removable) filters from the current sessionFilter path.
   // These represent filters that are implicit in the current deeplink/route and
@@ -2179,6 +2196,10 @@ function AppShellContent({
     switch (sessionFilter.kind) {
       case 'flagged':
         return t("sidebar.flagged")
+      case 'batchInstance': {
+        const batch = batches.find(b => b.id === sessionFilter.batchId)
+        return batch?.name || sessionFilter.batchId
+      }
       case 'state': {
         const state = effectiveSessionStatuses.find(s => s.id === sessionFilter.stateId)
         return state ? t(`status.${state.id}`, state.label) : t("sidebar.allSessions")
@@ -2190,7 +2211,7 @@ function AppShellContent({
       default:
         return t("sidebar.allSessions")
     }
-  }, [navState, t, sessionFilter, effectiveSessionStatuses, labelConfigs, viewConfigs, automationFilter, batchFilter])
+  }, [navState, t, sessionFilter, effectiveSessionStatuses, labelConfigs, viewConfigs, automationFilter, batchFilter, batches])
 
   // Build recursive sidebar items from the shared display-sorted label tree.
   // Each node renders with condensed height (compact: true) since many labels expected.

@@ -78,6 +78,8 @@ export interface SessionMeta {
   hidden?: boolean
   /** Whether this session was created by the batch processor */
   isBatch?: boolean
+  /** Owning batch ID — set for batch sub-sessions, undefined otherwise. */
+  batchId?: string
   /** Whether this session is archived */
   isArchived?: boolean
   /** Timestamp when session was archived (for retention policy) */

@@ -187,6 +187,7 @@ function sessionToRow(session: StoredSession, workspaceRootPath: string): typeof
     labels: session.labels ?? null,
     hidden: session.hidden ?? false,
     isBatch: session.isBatch ?? false,
+    batchId: session.batchId ?? null,
     lastReadMessageId: session.lastReadMessageId ?? null,
     hasUnread: session.hasUnread ?? false,
     enabledSourceSlugs: session.enabledSourceSlugs ?? null,
@@ -240,6 +241,7 @@ function rowToSessionConfig(row: SessionRow, workspaceRootPath: string): Session
     labels: (row.labels as string[] | null) ?? undefined,
     hidden: row.hidden ?? undefined,
     isBatch: row.isBatch ?? undefined,
+    batchId: row.batchId ?? undefined,
     lastReadMessageId: row.lastReadMessageId ?? undefined,
     hasUnread: row.hasUnread ?? undefined,
     enabledSourceSlugs: (row.enabledSourceSlugs as string[] | null) ?? undefined,
@@ -310,6 +312,7 @@ function rowToMetadata(row: SessionRow, workspaceRootPath: string): SessionMetad
     tokenUsage: row.tokenUsage as SessionTokenUsage | undefined,
     hidden: row.hidden ?? undefined,
     isBatch: row.isBatch ?? undefined,
+    batchId: row.batchId ?? undefined,
     isArchived: row.isArchived ?? undefined,
     archivedAt: row.archivedAt ?? undefined,
     branchFromMessageId: row.branchFromMessageId ?? undefined,
@@ -375,6 +378,7 @@ export async function createSession(
     llmConnection?: string;
     hidden?: boolean;
     isBatch?: boolean;
+    batchId?: string;
     sessionStatus?: SessionConfig['sessionStatus'];
     labels?: string[];
     isFlagged?: boolean;
@@ -403,6 +407,7 @@ export async function createSession(
     llmConnection: options?.llmConnection,
     hidden: options?.hidden,
     isBatch: options?.isBatch,
+    batchId: options?.batchId,
     sessionStatus: options?.sessionStatus,
     labels: options?.labels,
     isFlagged: options?.isFlagged,

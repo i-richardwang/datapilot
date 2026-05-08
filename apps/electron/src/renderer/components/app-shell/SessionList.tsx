@@ -663,7 +663,7 @@ export function SessionList({
       )
     }
 
-    if (currentFilter?.kind === 'batch') {
+    if (currentFilter?.kind === 'batch' || currentFilter?.kind === 'batchInstance') {
       return (
         <EntityListEmptyScreen
           icon={<Layers />}

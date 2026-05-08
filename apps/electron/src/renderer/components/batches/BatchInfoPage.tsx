@@ -390,7 +390,7 @@ export function BatchInfoPage({
           title={t('batches.sectionItems')}
           description={itemCount > 0 ? t('batches.itemsInBatch', { count: itemCount }) : undefined}
         >
-          <BatchItemTimeline items={pageItemsRecord} onRetryItem={onRetryItem} />
+          <BatchItemTimeline items={pageItemsRecord} batchId={batch.id} onRetryItem={onRetryItem} />
           {itemsPage && itemsPage.total > PAGE_SIZE && (
             <div className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground border-t border-border/30">
               <span>

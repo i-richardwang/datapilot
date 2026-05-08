@@ -115,6 +115,8 @@ export interface Session {
   hidden?: boolean
   /** Whether this session was created by the batch processor */
   isBatch?: boolean
+  /** Owning batch ID — set for sessions created by a BatchProcessor; undefined otherwise. */
+  batchId?: string
   isArchived?: boolean
   archivedAt?: number
   supportsBranching?: boolean
@@ -192,6 +194,8 @@ export interface CreateSessionOptions {
   systemPromptPreset?: 'default' | 'mini' | string
   hidden?: boolean
   isBatch?: boolean
+  /** Owning batch ID — set by BatchProcessor when creating a batch sub-session. */
+  batchId?: string
   sessionStatus?: SessionStatus
   labels?: string[]
   isFlagged?: boolean

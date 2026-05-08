@@ -29,7 +29,7 @@ export const SESSION_PERSISTENT_FIELDS = [
   // Timestamps
   'createdAt', 'lastUsedAt', 'lastMessageAt',
   // Display
-  'name', 'isFlagged', 'sessionStatus', 'labels', 'hidden', 'isBatch',
+  'name', 'isFlagged', 'sessionStatus', 'labels', 'hidden', 'isBatch', 'batchId',
   // Read tracking
   'lastReadMessageId', 'hasUnread',
   // Config
@@ -211,6 +211,8 @@ export interface SessionConfig {
   hidden?: boolean;
   /** Whether this session was created by the batch processor */
   isBatch?: boolean;
+  /** Owning batch ID (set when session is created by a BatchProcessor) */
+  batchId?: string;
   /** Whether this session is archived */
   isArchived?: boolean;
   /** Timestamp when session was archived (for retention policy) */
@@ -347,6 +349,8 @@ export interface SessionHeader {
   hidden?: boolean;
   /** Whether this session was created by the batch processor */
   isBatch?: boolean;
+  /** Owning batch ID (set when session is created by a BatchProcessor) */
+  batchId?: string;
   /** Whether this session is archived */
   isArchived?: boolean;
   /** Timestamp when session was archived (for retention policy) */
@@ -447,6 +451,8 @@ export interface SessionMetadata {
   hidden?: boolean;
   /** Whether this session was created by the batch processor */
   isBatch?: boolean;
+  /** Owning batch ID (set when session is created by a BatchProcessor) */
+  batchId?: string;
   /** Whether this session is archived */
   isArchived?: boolean;
   /** Timestamp when session was archived (for retention policy) */

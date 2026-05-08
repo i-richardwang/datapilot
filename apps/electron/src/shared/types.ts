@@ -803,6 +803,7 @@ export type SessionFilter =
   | { kind: 'view'; viewId: string }
   | { kind: 'archived' }
   | { kind: 'batch' }
+  | { kind: 'batchInstance'; batchId: string }
 
 /**
  * Settings subpage options - re-exported from settings-registry (single source of truth)

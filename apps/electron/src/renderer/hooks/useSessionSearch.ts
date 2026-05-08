@@ -274,6 +274,9 @@ export function sessionMatchesCurrentFilter(
     case 'batch':
       return session.isBatch === true
 
+    case 'batchInstance':
+      return session.batchId === currentFilter.batchId
+
     default:
       const _exhaustive: never = currentFilter
       return true
@@ -386,10 +389,15 @@ export function useSessionSearch({
   // --- Data pipeline ---
 
   // Filter out hidden sessions before any processing.
-  // Batch sessions are only included when the current filter is 'batch'.
+  // Batch sessions show up in: explicit batch views ('batch', 'batchInstance')
+  // and explicit user-tag filters ('label', 'view') where the user opted in
+  // by tagging. Aggregate views (allSessions, flagged, state) keep them out.
   const visibleItems = useMemo(() => items.filter(item => {
     if (item.hidden) return false
-    if (item.isBatch) return currentFilter?.kind === 'batch'
+    if (item.isBatch) {
+      const kind = currentFilter?.kind
+      return kind === 'batch' || kind === 'batchInstance' || kind === 'label' || kind === 'view'
+    }
     return true
   }), [items, currentFilter])
 

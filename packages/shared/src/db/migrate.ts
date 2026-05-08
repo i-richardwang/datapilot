@@ -219,6 +219,16 @@ const WORKSPACE_MIGRATIONS: Migration[] = [
       ALTER TABLE sessions ADD COLUMN shared_password_set INTEGER;
     `,
   },
+  {
+    name: '0005_session_batch_id',
+    sql: `
+      -- Stable reference from a batch sub-session back to its owning batch.
+      -- NULL for non-batch sessions. Lets sidebar filter sessions by batchId
+      -- without parsing triggered_by.automationName.
+      ALTER TABLE sessions ADD COLUMN batch_id TEXT;
+      CREATE INDEX IF NOT EXISTS idx_sessions_batch ON sessions(batch_id);
+    `,
+  },
 ];
 
 /**

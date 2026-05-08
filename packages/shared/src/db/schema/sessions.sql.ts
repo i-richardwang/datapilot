@@ -31,6 +31,8 @@ export const sessions = sqliteTable('sessions', {
   labels: text('labels', { mode: 'json' }),
   hidden: integer('hidden', { mode: 'boolean' }).default(false),
   isBatch: integer('is_batch', { mode: 'boolean' }).default(false),
+  /** Owning batch ID — set for sessions created by a BatchProcessor; NULL otherwise */
+  batchId: text('batch_id'),
 
   // Read tracking
   lastReadMessageId: text('last_read_message_id'),
@@ -99,6 +101,7 @@ export const sessions = sqliteTable('sessions', {
   index('idx_sessions_archived').on(table.isArchived),
   index('idx_sessions_flagged').on(table.isFlagged),
   index('idx_sessions_hidden').on(table.hidden),
+  index('idx_sessions_batch').on(table.batchId),
 ]);
 
 /** Session messages — one row per message, ordered by position */

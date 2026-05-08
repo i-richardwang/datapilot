@@ -13,6 +13,7 @@ import { CheckCircle2, XCircle, Loader2, Clock, MinusCircle, RotateCw } from 'lu
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { useNavigation } from '@/contexts/NavigationContext'
+import { routes } from '../../../shared/routes'
 import type { BatchItemState, BatchItemStatus } from '@craft-agent/shared/batches'
 
 // ============================================================================
@@ -33,13 +34,20 @@ const statusConfig: Record<BatchItemStatus, { icon: React.ElementType; classes: 
 
 export interface BatchItemTimelineProps {
   items: Record<string, BatchItemState>
+  /**
+   * Owning batch ID. When set, "Open Session" navigates into the per-batch
+   * sidebar view (filter.kind='batchInstance') so the user keeps context for
+   * peer items. Omit for test-run timelines where session navigation isn't
+   * meaningful.
+   */
+  batchId?: string
   onRetryItem?: (itemId: string) => void
   className?: string
 }
 
-export function BatchItemTimeline({ items, onRetryItem, className }: BatchItemTimelineProps) {
+export function BatchItemTimeline({ items, batchId, onRetryItem, className }: BatchItemTimelineProps) {
   const { t } = useTranslation()
-  const { navigateToSession } = useNavigation()
+  const { navigate, navigateToSession } = useNavigation()
   const entries = Object.entries(items)
 
   if (entries.length === 0) {
@@ -82,11 +90,16 @@ export function BatchItemTimeline({ items, onRetryItem, className }: BatchItemTi
               </button>
             )}
 
-            {/* Session deep link */}
+            {/* Session deep link — when we know the batchId, route into the
+                per-batch sidebar view so the user lands with sibling items
+                for context instead of an empty allSessions sidebar. */}
             {item.sessionId && (
               <button
                 className="shrink-0 text-[11px] text-accent hover:underline cursor-pointer"
-                onClick={() => navigateToSession(item.sessionId!)}
+                onClick={() => batchId
+                  ? navigate(routes.view.batchInstance(batchId, item.sessionId!))
+                  : navigateToSession(item.sessionId!)
+                }
               >
                 {t('batches.openSession')}
               </button>
