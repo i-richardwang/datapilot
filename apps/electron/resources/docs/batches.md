@@ -16,11 +16,11 @@ Per-batch runtime state lives alongside as `batch-state-{id}.json`.
 
 ## Configuration
 
-A batch config is a single JSON object. Pass it via `--input` on `create`, or as a partial patch on `update`:
+A batch config is a single JSON object. Build it as a file and submit via `--stdin`:
 
 ```json
+// config.json
 {
-  "name": "User Onboarding Summaries",
   "source": { "type": "csv", "path": "data/users.csv", "idField": "user_id" },
   "action": {
     "type": "prompt",
@@ -42,9 +42,27 @@ A batch config is a single JSON object. Pass it via `--input` on `create`, or as
 ```
 
 ```bash
-dtpilot batch create --name "User Onboarding Summaries" --input "$(cat config.json)"
-# Or pipe via stdin:
-cat config.json | dtpilot batch create --name "User Onboarding Summaries" --stdin
+cat config.json | dtpilot batch create --name "Onboarding" --stdin
+```
+
+For configs with multi-line prompts or non-ASCII text, build the JSON with a JSON-aware tool — `python3 -c json.dumps` or `jq -n`:
+
+```bash
+python3 -c '
+import json
+print(json.dumps({
+  "source": {"type":"csv","path":"data/users.csv","idField":"user_id"},
+  "action": {"type":"prompt","prompt":"Multi-line content with \"quotes\" and 中文..."},
+  "output": {"path":"output/results.jsonl","schema":{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}},
+}, ensure_ascii=False))
+' | dtpilot batch create --name "Onboarding" --stdin
+
+# Or keep prompt in a separate file and inject with jq
+jq -n --arg p "$(cat prompt.md)" \
+  --argjson src '{"type":"csv","path":"data/users.csv","idField":"user_id"}' \
+  --argjson schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}' \
+  '{source:$src, action:{type:"prompt",prompt:$p}, output:{path:"output/results.jsonl",schema:$schema}}' \
+  | dtpilot batch create --name "Onboarding" --stdin
 ```
 
 ## Data Sources
@@ -75,15 +93,6 @@ Field names must be ASCII (letters / numbers / underscores) — non-ASCII keys w
 
 ```
 Create a welcome email for $BATCH_ITEM_NAME at $BATCH_ITEM_EMAIL (account $BATCH_ITEM_USER_ID)
-```
-
-The CLI does not read prompt files. To inline a file's contents, build the JSON in shell:
-
-```bash
-dtpilot batch create --name "Onboarding" --input "$(jq -n \
-  --arg p "$(cat prompt.txt)" \
-  --argjson src '{"type":"csv","path":"users.csv","idField":"user_id"}' \
-  '{source:$src, action:{type:"prompt", prompt:$p}}')"
 ```
 
 Optional `action` fields: `mentions` (string[], @-resolves sources/skills), `labels` (string[], applied to spawned sessions).
