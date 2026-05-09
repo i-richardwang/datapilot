@@ -259,6 +259,17 @@ export abstract class BaseAgent implements AgentBackend {
 
   constructor(config: BackendConfig, defaultModel: string, contextWindow?: number) {
     this.config = config;
+    // Auto-inject DATAPILOT_WORKSPACE so the agent's child shells (Bash tool,
+    // any subprocess that calls `dtpilot`) target this session's workspace
+    // instead of `workspaces:get`'s first entry. Caller-provided envOverrides
+    // win, so a session can still target a different workspace explicitly.
+    const wsHandle = config.workspace?.slug || config.workspace?.id;
+    if (wsHandle) {
+      this.config.envOverrides = {
+        DATAPILOT_WORKSPACE: wsHandle,
+        ...(config.envOverrides ?? {}),
+      };
+    }
     // Use session's workingDirectory if set (user-changeable), fallback to workspace root
     this.workingDirectory = config.session?.workingDirectory ?? config.workspace.rootPath ?? process.cwd();
     this._sessionId = config.session?.id || `agent-${Date.now()}`;
