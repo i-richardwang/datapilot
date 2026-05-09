@@ -204,6 +204,13 @@ export interface BatchSystemOptions {
   onBatchComplete?: (batchId: string, status: BatchStatus) => void
   /** Error callback */
   onError?: (batchId: string, error: Error) => void
+  /**
+   * Hard cap on concurrent active sessions across all batches in this
+   * workspace. Per-batch `maxConcurrency` still applies; the effective slot
+   * count is `min(globalMaxConcurrentSessions, batch.maxConcurrency)`.
+   * Defaults to `DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS`.
+   */
+  globalMaxConcurrentSessions?: number
 }
 
 // ============================================================================

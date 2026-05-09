@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { randomBytes, createHash } from 'node:crypto'
 import { createLogger } from '../utils/debug.ts'
-import { BATCHES_CONFIG_FILE, DEFAULT_MAX_CONCURRENCY, DEFAULT_MAX_RETRIES, BATCH_ITEM_ENV_PREFIX, DEFAULT_TEST_SAMPLE_SIZE, TEST_BATCH_SUFFIX } from './constants.ts'
+import { BATCHES_CONFIG_FILE, DEFAULT_MAX_CONCURRENCY, DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS, DEFAULT_MAX_RETRIES, BATCH_ITEM_ENV_PREFIX, DEFAULT_TEST_SAMPLE_SIZE, TEST_BATCH_SUFFIX } from './constants.ts'
 import { BatchesFileConfigSchema } from './schemas.ts'
 import { loadBatchItems } from './data-source.ts'
 import {
@@ -396,13 +396,12 @@ export class BatchProcessor {
     // Check completion
     if (isBatchDone(state)) {
       this.completeBatch(batchId)
-    } else if (state.status === 'running') {
-      // Dispatch next items to fill concurrency slots
-      this.dispatchNext(batchId).catch((error) => {
-        log.error(`[BatchProcessor] Failed to dispatch next items for batch "${batchId}":`, error)
-        this.options.onError?.(batchId, error instanceof Error ? error : new Error(String(error)))
-      })
     }
+
+    // Wake every running batch — the slot that just freed may be claimed by a
+    // different batch than the one whose session ended. Without this, batches
+    // queued behind the global cap would stay stuck even after slots open.
+    this.dispatchAllRunning()
 
     // Notify progress
     const progress = computeProgress(state)
@@ -476,6 +475,38 @@ export class BatchProcessor {
   // ============================================================================
 
   /**
+   * Count items currently running across every active batch in this workspace.
+   * Used to enforce the global concurrency cap so that N batches each with
+   * `maxConcurrency: 1` cannot collectively spawn N sessions and saturate the
+   * server event loop.
+   */
+  private countGlobalRunning(): number {
+    let count = 0
+    for (const s of this.activeStates.values()) {
+      for (const item of Object.values(s.items)) {
+        if (item.status === 'running') count++
+      }
+    }
+    return count
+  }
+
+  /**
+   * Wake every active running batch so any with pending items can claim slots
+   * that just freed up. Called when a session completes — the freed slot may
+   * belong to a different batch than the one whose session ended.
+   */
+  private dispatchAllRunning(): void {
+    for (const otherBatchId of this.activeStates.keys()) {
+      const otherState = this.activeStates.get(otherBatchId)
+      if (otherState?.status !== 'running') continue
+      this.dispatchNext(otherBatchId).catch((error) => {
+        log.error(`[BatchProcessor] Failed to dispatch items for batch "${otherBatchId}":`, error)
+        this.options.onError?.(otherBatchId, error instanceof Error ? error : new Error(String(error)))
+      })
+    }
+  }
+
+  /**
    * Fill concurrency slots by dispatching pending items.
    */
   private async dispatchNext(batchId: string): Promise<void> {
@@ -486,8 +517,9 @@ export class BatchProcessor {
     if (!config) return
 
     const maxConcurrency = config.execution?.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY
+    const globalMax = this.options.globalMaxConcurrentSessions ?? DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS
 
-    // Count currently running items
+    // Count currently running items in this batch
     let runningCount = 0
     for (const item of Object.values(state.items)) {
       if (item.status === 'running') runningCount++
@@ -501,11 +533,16 @@ export class BatchProcessor {
       }
     }
 
-    const slotsAvailable = maxConcurrency - runningCount
+    const globalRunning = this.countGlobalRunning()
+    const batchSlots = maxConcurrency - runningCount
+    const globalSlots = globalMax - globalRunning
+    const slotsAvailable = Math.max(0, Math.min(batchSlots, globalSlots))
     const toDispatch = pendingIds.slice(0, slotsAvailable)
 
     if (toDispatch.length > 0) {
-      log.debug(`[BatchProcessor] Dispatching ${toDispatch.length} items for batch "${batchId}" (running: ${runningCount}, pending: ${pendingIds.length})`)
+      log.debug(`[BatchProcessor] Dispatching ${toDispatch.length} items for batch "${batchId}" (batch ${runningCount}/${maxConcurrency}, global ${globalRunning}/${globalMax}, pending ${pendingIds.length})`)
+    } else if (pendingIds.length > 0 && globalSlots <= 0) {
+      log.debug(`[BatchProcessor] Batch "${batchId}" has ${pendingIds.length} pending but global cap reached (${globalRunning}/${globalMax})`)
     }
 
     await Promise.allSettled(

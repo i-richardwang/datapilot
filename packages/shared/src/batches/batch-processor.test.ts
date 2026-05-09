@@ -54,6 +54,10 @@ function createTestSetup() {
   const executePrompt = mock(async (params: BatchExecutePromptParams) => {
     const sessionId = `session-${++sessionCounter}`
     createdSessions.push({ sessionId, params })
+    // Real handler invokes this so BatchProcessor can register the
+    // session→item mapping; tests asserting onSessionComplete behavior
+    // depend on this side effect.
+    params.onSessionCreated?.(sessionId)
     return { sessionId }
   })
 
@@ -553,6 +557,101 @@ describe('BatchProcessor', () => {
       const progress = setup.processor.getProgress('test-batch')
       expect(progress).not.toBeNull()
       expect(progress!.totalItems).toBe(3)
+    })
+  })
+
+  // =========================================================================
+  // Global Concurrency Cap (cross-batch)
+  // =========================================================================
+
+  describe('globalMaxConcurrentSessions', () => {
+    it('caps concurrent sessions across batches and releases as items complete', async () => {
+      const tempDir = mkdtempSync(join(tmpdir(), 'batch-global-cap-'))
+      writeFileSync(join(tempDir, 'companies.json'), JSON.stringify([
+        { id: 'acme', name: 'Acme' },
+      ]))
+      // Three independent batches, each with maxConcurrency: 1.
+      // Without a global cap, all 3 would spawn sessions immediately.
+      writeFileSync(join(tempDir, 'batches.json'), JSON.stringify({
+        version: 1,
+        batches: [
+          { id: 'b1', name: 'b1', source: { type: 'json', path: 'companies.json', idField: 'id' }, execution: { maxConcurrency: 1 }, action: { type: 'prompt', prompt: 'p $BATCH_ITEM_NAME' } },
+          { id: 'b2', name: 'b2', source: { type: 'json', path: 'companies.json', idField: 'id' }, execution: { maxConcurrency: 1 }, action: { type: 'prompt', prompt: 'p $BATCH_ITEM_NAME' } },
+          { id: 'b3', name: 'b3', source: { type: 'json', path: 'companies.json', idField: 'id' }, execution: { maxConcurrency: 1 }, action: { type: 'prompt', prompt: 'p $BATCH_ITEM_NAME' } },
+        ],
+      }))
+
+      let counter = 0
+      const sessions: { sessionId: string; batchId?: string }[] = []
+      const executePrompt = mock(async (params: BatchExecutePromptParams) => {
+        const sessionId = `s-${++counter}`
+        sessions.push({ sessionId, batchId: params.batchContext?.batchId })
+        // Real handler invokes this before sendMessage so the batch processor
+        // can register the session→item mapping. The mock must do the same.
+        params.onSessionCreated?.(sessionId)
+        return { sessionId }
+      })
+
+      const processor = new BatchProcessor({
+        workspaceRootPath: tempDir,
+        workspaceId: 'test-workspace',
+        onExecutePrompt: executePrompt,
+        globalMaxConcurrentSessions: 2,
+      })
+
+      processor.start('b1')
+      processor.start('b2')
+      processor.start('b3')
+      await tick()
+
+      // Only 2 sessions should have spawned despite 3 batches each with their own slot
+      expect(sessions).toHaveLength(2)
+      expect(processor.getState('b3')!.items['acme']!.status).toBe('pending')
+
+      // Complete one session; the queued batch's item should now dispatch
+      processor.onSessionComplete(sessions[0]!.sessionId, 'complete')
+      await tick()
+
+      expect(sessions).toHaveLength(3)
+      expect(processor.getState('b3')!.items['acme']!.status).toBe('running')
+
+      processor.dispose()
+      rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    it('per-batch maxConcurrency still applies under global cap', async () => {
+      const tempDir = mkdtempSync(join(tmpdir(), 'batch-per-cap-'))
+      writeFileSync(join(tempDir, 'companies.json'), JSON.stringify([
+        { id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'c', name: 'C' },
+      ]))
+      writeFileSync(join(tempDir, 'batches.json'), JSON.stringify({
+        version: 1,
+        batches: [
+          { id: 'b1', name: 'b1', source: { type: 'json', path: 'companies.json', idField: 'id' }, execution: { maxConcurrency: 1 }, action: { type: 'prompt', prompt: 'p' } },
+        ],
+      }))
+
+      const sessions: string[] = []
+      let counter = 0
+      const processor = new BatchProcessor({
+        workspaceRootPath: tempDir,
+        workspaceId: 'test-workspace',
+        onExecutePrompt: async () => {
+          const id = `s-${++counter}`
+          sessions.push(id)
+          return { sessionId: id }
+        },
+        globalMaxConcurrentSessions: 10,  // global cap is permissive
+      })
+
+      processor.start('b1')
+      await tick()
+
+      // Only 1 session despite 3 items and globalMax=10 — per-batch cap wins
+      expect(sessions).toHaveLength(1)
+
+      processor.dispose()
+      rmSync(tempDir, { recursive: true, force: true })
     })
   })
 })
