@@ -4,7 +4,7 @@ import { validateFilePath, getWorkspaceAllowedDirs } from '@craft-agent/server-c
 import { createScopedLogger, CONSOLE_LOGGER, type PlatformServices, type Logger } from '@craft-agent/server-core/runtime'
 import { basename, dirname, join } from 'path'
 import { existsSync } from 'fs'
-import { readFile, writeFile, mkdir } from 'fs/promises'
+import { readFile, writeFile, mkdir, cp } from 'fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
 import { type AgentEvent, setPermissionMode, hydratePreviousPermissionMode, getPermissionModeDiagnostics, type PermissionMode, unregisterSessionScopedToolCallbacks, cleanupSessionScopedTools, mergeSessionScopedToolCallbacks, registerSessionBatchContext, AbortReason, type AuthRequest, type AuthResult, type CredentialAuthRequest, type BrowserPaneFns, generateConversationSummary } from '@craft-agent/shared/agent'
 import {
@@ -2775,6 +2775,31 @@ export class SessionManager implements ISessionManager {
         delete branchedStored.branchFromSdkTurnId
       }
       await saveStoredSession(branchedStored)
+
+      // Physically copy session asset directories from source to branch.
+      // Path-rewriting alone makes inherited messages point at <branch>/data/foo.html,
+      // but without the file copy those paths ENOENT on the next preview/read.
+      // Each subdir is best-effort with its own try/catch: a copy failure on one
+      // dir (e.g. permissions, disk full) shouldn't prevent the branch from being
+      // created — the chat history stays intact; only the affected preview breaks.
+      const sourceSessionDir = getSessionStoragePath(workspaceRootPath, validatedBranch.sourceSessionId)
+      const branchSessionDir = getSessionStoragePath(workspaceRootPath, storedSession.id)
+      const ASSET_SUBDIRS = ['data', 'attachments', 'downloads', 'long_responses', 'plans'] as const
+      for (const sub of ASSET_SUBDIRS) {
+        const src = join(sourceSessionDir, sub)
+        const dst = join(branchSessionDir, sub)
+        if (!existsSync(src)) continue
+        try {
+          await cp(src, dst, { recursive: true, errorOnExist: false, force: false })
+        } catch (error) {
+          sessionLog.warn(`Failed to copy ${sub}/ from source to branch session`, {
+            workspaceId,
+            sourceSessionId: validatedBranch.sourceSessionId,
+            branchSessionId: storedSession.id,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
     }
 
     // Resolve connection/provider/auth/model using the provider-agnostic backend resolver.
