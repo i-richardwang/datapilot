@@ -260,9 +260,16 @@ export interface ToolMetadata {
  *
  * IMPORTANT: Multiple sessions can run concurrently in the main process (parallel chats,
  * title generation, etc.). The singleton _sessionDir gets clobbered by whichever session
- * calls setSessionDir() last. To handle this, get() accepts an explicit sessionDir
- * parameter, and setSessionDir() merges (not replaces) the in-memory map so entries
- * from all sessions coexist safely (tool_use_ids are globally unique UUIDs).
+ * calls setSessionDir() last. To keep concurrent sessions isolated:
+ *  - get() accepts an explicit sessionDir parameter and uses it (not _sessionDir) to
+ *    look up the in-memory entry.
+ *  - The in-memory map is keyed by `${sessionDir}::${toolUseId}`, NOT by toolUseId alone.
+ *    Earlier code keyed by toolUseId on the assumption that tool_use_ids are globally
+ *    unique UUIDs; that assumption breaks for branch-fork ids (`base|x`), session
+ *    resume/replay, and rare upstream collisions, causing one session's intent to
+ *    surface in another session's render. The composite key removes that coupling.
+ *  - The on-disk file format is unchanged: each session has its own tool-metadata.json
+ *    keyed by toolUseId. Cross-session sharing only happens in the in-memory cache.
  */
 
 function getMetadataFilePath(): string | null {
@@ -281,8 +288,14 @@ function readMetadataFileFromDir(dir: string): Record<string, ToolMetadata> {
   }
 }
 
-// In-memory Map for same-process lookups (accumulates entries across all sessions)
+// In-memory Map for same-process lookups (accumulates entries across all sessions).
+// Keyed by `${sessionDir}::${toolUseId}` so concurrent sessions in the main process
+// stay isolated even if a tool_use_id appears in more than one session.
 const _metadataMap = new Map<string, ToolMetadata>();
+
+function memKey(sessionDir: string | null | undefined, toolUseId: string): string {
+  return `${sessionDir ?? ''}::${toolUseId}`;
+}
 
 /** Read the entire metadata file from disk (uses current _sessionDir) */
 function readMetadataFile(): Record<string, ToolMetadata> {
@@ -329,22 +342,21 @@ export const toolMetadataStore = {
   /**
    * Set session directory and pre-populate in-memory map from file.
    * Called by main process so subsequent get() calls are O(1) memory lookups.
-   * Does NOT clear the map — entries from other sessions are preserved since
-   * tool_use_ids are globally unique UUIDs and won't conflict.
+   * Does NOT clear the map — concurrent sessions share this singleton, so
+   * clearing would discard metadata from other active sessions. Entries are
+   * keyed by (dir, toolUseId), so per-session views stay isolated.
    */
   setSessionDir(dir: string): void {
     _sessionDir = dir;
-    // Merge, don't clear — concurrent sessions share this singleton and
-    // clearing would discard metadata from other active sessions.
-    const all = readMetadataFile();
+    const all = readMetadataFileFromDir(dir);
     for (const [id, meta] of Object.entries(all)) {
-      _metadataMap.set(id, meta);
+      _metadataMap.set(memKey(dir, id), meta);
     }
   },
 
   /** Store metadata — writes to in-memory Map + cached file */
   set(toolUseId: string, metadata: ToolMetadata): void {
-    _metadataMap.set(toolUseId, metadata);
+    _metadataMap.set(memKey(_sessionDir, toolUseId), metadata);
     mergeAndWriteMetadata((all) => {
       all[toolUseId] = metadata;
     });
@@ -354,26 +366,27 @@ export const toolMetadataStore = {
    * Read metadata — checks in-memory first, then session file.
    * Accepts an explicit sessionDir to read from the correct file even when
    * _sessionDir has been clobbered by a concurrent session's setSessionDir().
+   * The in-memory key includes sessionDir, so a different session's entry
+   * with the same tool_use_id cannot leak through.
    */
   get(toolUseId: string, sessionDir?: string): ToolMetadata | undefined {
-    const inMemory = _metadataMap.get(toolUseId);
+    const dir = sessionDir || _sessionDir;
+    const inMemory = _metadataMap.get(memKey(dir, toolUseId));
     if (inMemory) return inMemory;
 
-    // Read from explicit sessionDir if provided, otherwise fall back to _sessionDir
-    const dir = sessionDir || _sessionDir;
     if (!dir) return undefined;
 
     const all = readMetadataFileFromDir(dir);
     const entry = all[toolUseId];
     if (entry) {
-      // Cache in memory for O(1) subsequent lookups
-      _metadataMap.set(toolUseId, entry);
+      // Cache in memory for O(1) subsequent lookups, scoped to this dir
+      _metadataMap.set(memKey(dir, toolUseId), entry);
     }
     return entry;
   },
 
   delete(toolUseId: string): void {
-    _metadataMap.delete(toolUseId);
+    _metadataMap.delete(memKey(_sessionDir, toolUseId));
     mergeAndWriteMetadata((all) => {
       delete all[toolUseId];
     });
