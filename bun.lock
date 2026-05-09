@@ -120,7 +120,7 @@
     },
     "apps/cli": {
       "name": "dtpilot",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "bin": {
         "dtpilot": "dist/datapilot.js",
       },
@@ -160,6 +160,7 @@
         "jotai-family": "^1.0.1",
         "motion": "^12.23.26",
         "next-themes": "^0.4.6",
+        "pdfjs-dist": "5.4.296",
         "qrcode.react": "^4.2.0",
         "react": "^18.3.1",
         "react-day-picker": "^9.13.0",
@@ -289,7 +290,7 @@
         "@sinclair/typebox": "^0.34.0",
         "duck-duck-scrape": "^2.2.7",
         "node-html-parser": "^6.1.0",
-        "pdfjs-dist": "^5.4.0",
+        "pdfjs-dist": "5.4.296",
         "turndown": "^7.2.0",
       },
       "devDependencies": {
@@ -421,6 +422,7 @@
         "katex": ">=0.16.0",
         "lucide-react": ">=0.400.0",
         "motion": ">=11.0.0",
+        "pdfjs-dist": "5.4.296",
         "react": ">=18.0.0",
         "react-dom": ">=18.0.0",
         "react-i18next": ">=17.0.0",
@@ -2963,7 +2965,7 @@
 
     "pdf-parse-tt-message-gone": ["pdf-parse-tt-message-gone@1.1.2", "", { "dependencies": { "debug": "^3.1.0", "node-ensure": "^0.0.0" } }, "sha512-RUD1/trR3/FnxaLhjPuDiF7goFGP1tlw8SEeR7In8aQUoY9kGp1isfCA3oXyMLu3dbgKgshMWNGb1Sx50a5HIg=="],
 
-    "pdfjs-dist": ["pdfjs-dist@5.7.284", "", { "optionalDependencies": { "@napi-rs/canvas": "^0.1.100" } }, "sha512-h4EdYQczmGhbOlqc3PPZwxevn7ApdWPbovAuWXOB/DjIyigSnwfy2oze7c6mRcSr9XgLp3eN3EeL4DyySTPMFw=="],
+    "pdfjs-dist": ["pdfjs-dist@5.4.296", "", { "optionalDependencies": { "@napi-rs/canvas": "^0.1.80" } }, "sha512-DlOzet0HO7OEnmUmB6wWGJrrdvbyJKftI1bhMitK7O2N8W2gc757yyYBbINy9IDafXAV9wmKr9t7xsTaNKRG5Q=="],
 
     "pe-library": ["pe-library@1.0.1", "", {}, "sha512-nh39Mo1eGWmZS7y+mK/dQIqg7S1lp38DpRxkyoHf0ZcUs/HDc+yyTjuOtTvSMZHmfSLuSQaX945u05Y2Q6UWZg=="],
 
@@ -3962,8 +3964,6 @@
     "rc/strip-json-comments": ["strip-json-comments@2.0.1", "", {}, "sha512-4gB8na07fecVVkOI6Rs4e7T6NOTki5EmL7TUduTs6bu3EdnSycntVJ4re8kgZA+wx9IueI2Y11bfbgwtzuE0KQ=="],
 
     "react-devtools-core/ws": ["ws@7.5.10", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": "^5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-+dbF1tHwZpXcbOJdVOkzLDxZP1ailvSxM6ZweXTegylPny803bFhA+vqBYw4s31NSAk4S2Qz+AKXK9a4wkdjcQ=="],
-
-    "react-pdf/pdfjs-dist": ["pdfjs-dist@5.4.296", "", { "optionalDependencies": { "@napi-rs/canvas": "^0.1.80" } }, "sha512-DlOzet0HO7OEnmUmB6wWGJrrdvbyJKftI1bhMitK7O2N8W2gc757yyYBbINy9IDafXAV9wmKr9t7xsTaNKRG5Q=="],
 
     "readable-stream/isarray": ["isarray@1.0.0", "", {}, "sha512-VLghIWNM6ELQzo7zwmcg0NmTVyWKYjvIeM83yjp0wRDTmUnrM678fQbcKBo6n2CJEF0szoG//ytg+TKla89ALQ=="],
 
