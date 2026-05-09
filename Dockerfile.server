@@ -43,14 +43,16 @@ RUN ln -s /usr/local/bin/bun /usr/local/bin/bunx
 # fd-find: Debian package installs the binary as `fdfind`; symlink to `fd` so
 # the agent's Find tool can locate it on PATH (otherwise it tries to download
 # from GitHub at runtime and fails in restricted networks).
-# libpango / libpangoft2 + fonts-noto-cjk: WeasyPrint runtime — pango pulls in
-# glib/gobject/cairo transitively; fonts-noto-cjk gives the OS a CJK fallback
-# so report-weaver slides with `lang="zh-CN"` render Chinese glyphs in PDF
-# instead of tofu boxes.
+# libpango / libpangoft2: WeasyPrint runtime — pango pulls in
+# glib/gobject/cairo transitively. fonts-noto-cjk + fonts-noto-core: cover the
+# report-weaver Charter→Georgia→serif chain on a slim base image (Charter is
+# macOS-only) and give CJK fallback for `lang="zh-CN"` slides — without these
+# Latin renders sans and CJK becomes tofu in the PDF.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       ca-certificates git gosu ripgrep fd-find curl gnupg \
-      libpango-1.0-0 libpangoft2-1.0-0 fonts-noto-cjk && \
+      libpango-1.0-0 libpangoft2-1.0-0 \
+      fonts-noto-core fonts-noto-cjk && \
     ln -s /usr/bin/fdfind /usr/local/bin/fd && \
     rm -rf /var/lib/apt/lists/*
 
@@ -136,7 +138,8 @@ RUN find /app -not -perm -o=r -exec chmod o+r {} + && \
 # - PATH addition: makes python3/pip available in Bash for exploratory analysis
 RUN uv venv /opt/datapilot-py --python python3 && \
     uv pip install --python /opt/datapilot-py/bin/python \
-      pandas numpy pyarrow polars openpyxl xlsxwriter weasyprint && \
+      pandas numpy pyarrow polars openpyxl xlsxwriter \
+      weasyprint pypdf pymupdf && \
     chmod -R a+rX /opt/datapilot-py
 
 ENV DATAPILOT_RPC_HOST=0.0.0.0
