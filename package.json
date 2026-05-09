@@ -1,6 +1,6 @@
 {
   "name": "datapilot",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "license": "Apache-2.0",
   "description": "Claude Code-like agent for data analysis",
   "type": "module",
