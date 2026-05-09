@@ -23,7 +23,6 @@ import { EditPopover, EditButton, getEditConfig } from '@/components/ui/EditPopo
 import { useActiveWorkspace } from '@/context/AppShellContext'
 import { BatchAvatar } from './BatchAvatar'
 import { BatchMenu } from './BatchMenu'
-import { BatchActionRow } from './BatchActionRow'
 import { BatchItemTimeline } from './BatchItemTimeline'
 import { BATCH_STATUS_DISPLAY_KEY, BATCH_STATUS_BADGE_COLOR, getPermissionModeKey } from './types'
 import { TEST_BATCH_SUFFIX } from '@craft-agent/shared/batches/constants'
@@ -224,7 +223,9 @@ export function BatchInfoPage({
 
         {/* Section: Action */}
         <Info_Section title={t('batches.sectionAction')} description={t('batches.sectionActionDesc')} actions={editActions}>
-          <BatchActionRow prompt={batch.action.prompt} />
+          <Info_Markdown maxHeight={540} fullscreen>
+            {batch.action.prompt || t('automations.emptyPrompt')}
+          </Info_Markdown>
         </Info_Section>
 
         {/* Section: Execution */}

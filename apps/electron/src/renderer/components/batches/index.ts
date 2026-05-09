@@ -8,9 +8,6 @@ export type { BatchAvatarProps } from './BatchAvatar'
 export { BatchMenu } from './BatchMenu'
 export type { BatchMenuProps } from './BatchMenu'
 
-export { BatchActionRow } from './BatchActionRow'
-export type { BatchActionRowProps } from './BatchActionRow'
-
 export { BatchItemTimeline } from './BatchItemTimeline'
 export type { BatchItemTimelineProps } from './BatchItemTimeline'
 
