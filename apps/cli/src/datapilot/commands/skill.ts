@@ -9,12 +9,55 @@
  */
 
 import { ok, fail } from '../envelope.ts'
-import { strFlag, parseInput, rejectUnknownFlags, type Flags } from '../args.ts'
+import { strFlag, parseInput, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
+import { rejectActionFlags, type ActionSpec, type EntitySpec } from '../help.ts'
 
-const ACTIONS = [
-  'list', 'get', 'create', 'update', 'delete',
-] as const
+export const SKILL_SPEC: EntitySpec = {
+  name: 'skill',
+  description: 'Workspace skills (reusable prompt + context bundles)',
+  actions: [
+    {
+      name: 'list',
+      description: 'List all skills in the workspace',
+      flags: [],
+      example: 'dtpilot skill list',
+    },
+    {
+      name: 'get',
+      description: 'Show one skill',
+      positionals: [{ name: 'slug', description: 'Skill slug' }],
+      flags: [],
+      example: 'dtpilot skill get my-skill',
+    },
+    {
+      name: 'create',
+      description: 'Create a new skill (description, body, globs, requiredSources go in --input)',
+      flags: [{ name: 'name', type: 'string', required: true, description: 'Skill display name (slug auto-generated)' }],
+      takesInput: true,
+      example: 'dtpilot skill create --name "Triage" --input \'{"description":"Sort incoming items"}\'',
+    },
+    {
+      name: 'update',
+      description: 'Update skill fields',
+      positionals: [{ name: 'slug', description: 'Skill slug' }],
+      flags: [],
+      takesInput: true,
+      example: 'dtpilot skill update my-skill --input \'{"body":"..."}\'',
+    },
+    {
+      name: 'delete',
+      description: 'Delete a skill',
+      positionals: [{ name: 'slug', description: 'Skill slug' }],
+      flags: [],
+      example: 'dtpilot skill delete my-skill',
+    },
+  ],
+}
+
+function specOf(action: string): ActionSpec {
+  return SKILL_SPEC.actions.find((a) => a.name === action)!
+}
 
 export async function routeSkill(
   ctx: RouteCtx,
@@ -22,9 +65,11 @@ export async function routeSkill(
   positionals: string[],
   flags: Flags,
 ): Promise<never> {
-  if (!action) ok({ entity: 'skill', actions: ACTIONS })
-  if (!ACTIONS.includes(action as typeof ACTIONS[number])) {
-    fail('USAGE_ERROR', `Unknown skill action: ${action}`)
+  if (!action) ok({ entity: 'skill', actions: SKILL_SPEC.actions.map((a) => a.name) })
+  if (!SKILL_SPEC.actions.some((a) => a.name === action)) {
+    fail('USAGE_ERROR', `Unknown skill action: ${action}`, {
+      suggestion: `Valid actions: ${SKILL_SPEC.actions.map((a) => a.name).join(', ')}`,
+    })
   }
 
   const ws = await requireWorkspace(ctx)
@@ -32,11 +77,11 @@ export async function routeSkill(
 
   switch (action) {
     case 'list':
-      rejectUnknownFlags(flags, [])
+      rejectActionFlags(flags, specOf('list'))
       ok(await client.invoke('skills:get', ws))
 
     case 'get': {
-      rejectUnknownFlags(flags, [])
+      rejectActionFlags(flags, specOf('get'))
       const slug = positionals[0]
       if (!slug) fail('USAGE_ERROR', 'Missing skill slug')
       const list = (await client.invoke('skills:get', ws)) as Array<{ slug: string }>
@@ -46,19 +91,15 @@ export async function routeSkill(
     }
 
     case 'create': {
-      rejectUnknownFlags(flags, ['name'])
+      rejectActionFlags(flags, specOf('create'))
       const input = (await parseInput(flags)) ?? {}
       const name = strFlag(flags, 'name') ?? (input.name as string | undefined)
-      if (!name) {
-        fail('USAGE_ERROR', 'Missing --name', {
-          suggestion: `dtpilot skill create --name "<name>" --input '{"description":"..."}'`,
-        })
-      }
+      if (!name) fail('USAGE_ERROR', 'Missing --name')
       ok(await client.invoke('skills:create', ws, { ...input, name }))
     }
 
     case 'update': {
-      rejectUnknownFlags(flags, [])
+      rejectActionFlags(flags, specOf('update'))
       const slug = positionals[0]
       if (!slug) fail('USAGE_ERROR', 'Missing skill slug')
       const input = (await parseInput(flags)) ?? {}
@@ -66,7 +107,7 @@ export async function routeSkill(
     }
 
     case 'delete': {
-      rejectUnknownFlags(flags, [])
+      rejectActionFlags(flags, specOf('delete'))
       const slug = positionals[0]
       if (!slug) fail('USAGE_ERROR', 'Missing skill slug')
       await client.invoke('skills:delete', ws, slug)

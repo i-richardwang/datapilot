@@ -11,13 +11,70 @@
  */
 
 import { ok, fail } from '../envelope.ts'
-import { strFlag, intFlag, parseInput, rejectUnknownFlags, type Flags } from '../args.ts'
+import { strFlag, intFlag, parseInput, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
+import { rejectActionFlags, type ActionSpec, type EntitySpec } from '../help.ts'
 
-const ACTIONS = [
-  'list', 'get', 'create', 'update', 'delete',
-  'auto-rule-add', 'auto-rule-remove',
-] as const
+export const LABEL_SPEC: EntitySpec = {
+  name: 'label',
+  description: 'Workspace labels and auto-rules (regex-based label assignment)',
+  actions: [
+    {
+      name: 'list',
+      description: 'List all labels (tree-ordered)',
+      flags: [],
+      example: 'dtpilot label list',
+    },
+    {
+      name: 'get',
+      description: 'Show one label including its auto-rules',
+      positionals: [{ name: 'id', description: 'Label id' }],
+      flags: [],
+      example: 'dtpilot label get bug',
+    },
+    {
+      name: 'create',
+      description: 'Create a new label (color, parentId, valueType go in --input)',
+      flags: [{ name: 'name', type: 'string', required: true, description: 'Label display name (id is generated as a slug)' }],
+      takesInput: true,
+      example: 'dtpilot label create --name "Bug" --input \'{"color":"accent"}\'',
+    },
+    {
+      name: 'update',
+      description: 'Update label fields',
+      positionals: [{ name: 'id', description: 'Label id' }],
+      flags: [],
+      takesInput: true,
+      example: 'dtpilot label update bug --input \'{"name":"Bug Report","color":"destructive"}\'',
+    },
+    {
+      name: 'delete',
+      description: 'Delete a label',
+      positionals: [{ name: 'id', description: 'Label id' }],
+      flags: [],
+      example: 'dtpilot label delete bug',
+    },
+    {
+      name: 'auto-rule-add',
+      description: 'Add a regex auto-rule to a label',
+      positionals: [{ name: 'id', description: 'Label id' }],
+      flags: [],
+      takesInput: true,
+      example: 'dtpilot label auto-rule-add linear-issue --input \'{"pattern":"\\\\b([A-Z]{2,5}-\\\\d+)\\\\b","valueTemplate":"$1"}\'',
+    },
+    {
+      name: 'auto-rule-remove',
+      description: 'Remove an auto-rule by its array position',
+      positionals: [{ name: 'id', description: 'Label id' }],
+      flags: [{ name: 'index', type: 'int', required: true, description: 'Zero-based position in the autoRules array' }],
+      example: 'dtpilot label auto-rule-remove linear-issue --index 0',
+    },
+  ],
+}
+
+function specOf(action: string): ActionSpec {
+  return LABEL_SPEC.actions.find((a) => a.name === action)!
+}
 
 export async function routeLabel(
   ctx: RouteCtx,
@@ -25,9 +82,11 @@ export async function routeLabel(
   positionals: string[],
   flags: Flags,
 ): Promise<never> {
-  if (!action) ok({ entity: 'label', actions: ACTIONS })
-  if (!ACTIONS.includes(action as typeof ACTIONS[number])) {
-    fail('USAGE_ERROR', `Unknown label action: ${action}`)
+  if (!action) ok({ entity: 'label', actions: LABEL_SPEC.actions.map((a) => a.name) })
+  if (!LABEL_SPEC.actions.some((a) => a.name === action)) {
+    fail('USAGE_ERROR', `Unknown label action: ${action}`, {
+      suggestion: `Valid actions: ${LABEL_SPEC.actions.map((a) => a.name).join(', ')}`,
+    })
   }
 
   const ws = await requireWorkspace(ctx)
@@ -35,13 +94,13 @@ export async function routeLabel(
 
   switch (action) {
     case 'list':
-      rejectUnknownFlags(flags, [])
+      rejectActionFlags(flags, specOf('list'))
       ok(await client.invoke('labels:list', ws))
 
     case 'get': {
-      rejectUnknownFlags(flags, [])
+      rejectActionFlags(flags, specOf('get'))
       const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing label id', { suggestion: 'dtpilot label get <id>' })
+      if (!id) fail('USAGE_ERROR', 'Missing label id')
       const [labels, autoRules] = await Promise.all([
         client.invoke('labels:list', ws),
         client.invoke('labels:autoRuleList', ws, id),
@@ -52,15 +111,15 @@ export async function routeLabel(
     }
 
     case 'create': {
-      rejectUnknownFlags(flags, ['name'])
+      rejectActionFlags(flags, specOf('create'))
       const input = (await parseInput(flags)) ?? {}
       const name = strFlag(flags, 'name') ?? (input.name as string | undefined)
-      if (!name) fail('USAGE_ERROR', 'Missing --name', { suggestion: 'dtpilot label create --name "<name>"' })
+      if (!name) fail('USAGE_ERROR', 'Missing --name')
       ok(await client.invoke('labels:create', ws, { ...input, name }))
     }
 
     case 'update': {
-      rejectUnknownFlags(flags, [])
+      rejectActionFlags(flags, specOf('update'))
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing label id')
       const input = (await parseInput(flags)) ?? {}
@@ -70,35 +129,27 @@ export async function routeLabel(
     }
 
     case 'delete': {
-      rejectUnknownFlags(flags, [])
+      rejectActionFlags(flags, specOf('delete'))
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing label id')
       ok(await client.invoke('labels:delete', ws, id))
     }
 
     case 'auto-rule-add': {
-      rejectUnknownFlags(flags, [])
+      rejectActionFlags(flags, specOf('auto-rule-add'))
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing label id')
       const input = (await parseInput(flags)) ?? {}
-      if (!input.pattern) {
-        fail('USAGE_ERROR', 'Missing pattern', {
-          suggestion: `dtpilot label auto-rule-add ${id} --input '{"pattern":"<regex>"}'`,
-        })
-      }
+      if (!input.pattern) fail('USAGE_ERROR', 'Missing pattern in --input')
       ok(await client.invoke('labels:autoRuleAdd', ws, id, input))
     }
 
     case 'auto-rule-remove': {
-      rejectUnknownFlags(flags, ['index'])
+      rejectActionFlags(flags, specOf('auto-rule-remove'))
       const id = positionals[0]
       if (!id) fail('USAGE_ERROR', 'Missing label id')
       const index = intFlag(flags, 'index')
-      if (index === undefined) {
-        fail('USAGE_ERROR', 'Missing --index <n>', {
-          suggestion: `Run 'dtpilot label get ${id}' to list autoRules with their array positions, then pass --index <n>.`,
-        })
-      }
+      if (index === undefined) fail('USAGE_ERROR', 'Missing --index <n>')
       ok(await client.invoke('labels:autoRuleRemove', ws, id, index))
     }
 

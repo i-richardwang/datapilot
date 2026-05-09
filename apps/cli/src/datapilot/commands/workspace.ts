@@ -6,10 +6,31 @@ import { ok, fail } from '../envelope.ts'
 import { type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 import { describeConnection } from '../transport.ts'
+import { rejectActionFlags, type ActionSpec, type EntitySpec } from '../help.ts'
 
-const ACTIONS = [
-  'list', 'get',
-] as const
+export const WORKSPACE_SPEC: EntitySpec = {
+  name: 'workspace',
+  description: 'Workspaces themselves (read-only from CLI)',
+  actions: [
+    {
+      name: 'list',
+      description: 'List all workspaces visible to this server',
+      flags: [],
+      example: 'dtpilot workspace list',
+    },
+    {
+      name: 'get',
+      description: 'Show one workspace including settings and connection info',
+      positionals: [{ name: 'id', required: false, description: 'Workspace id|slug|name (defaults to current)' }],
+      flags: [],
+      example: 'dtpilot workspace get my-workspace',
+    },
+  ],
+}
+
+function specOf(action: string): ActionSpec {
+  return WORKSPACE_SPEC.actions.find((a) => a.name === action)!
+}
 
 export async function routeWorkspace(
   ctx: RouteCtx,
@@ -17,18 +38,22 @@ export async function routeWorkspace(
   positionals: string[],
   flags: Flags,
 ): Promise<never> {
-  if (!action) ok({ entity: 'workspace', actions: ACTIONS })
-  if (!ACTIONS.includes(action as typeof ACTIONS[number])) {
-    fail('USAGE_ERROR', `Unknown workspace action: ${action}`)
+  if (!action) ok({ entity: 'workspace', actions: WORKSPACE_SPEC.actions.map((a) => a.name) })
+  if (!WORKSPACE_SPEC.actions.some((a) => a.name === action)) {
+    fail('USAGE_ERROR', `Unknown workspace action: ${action}`, {
+      suggestion: `Valid actions: ${WORKSPACE_SPEC.actions.map((a) => a.name).join(', ')}`,
+    })
   }
 
   const client = await ctx.getClient()
 
   switch (action) {
     case 'list':
+      rejectActionFlags(flags, specOf('list'))
       ok(await client.invoke('workspaces:get'))
 
     case 'get': {
+      rejectActionFlags(flags, specOf('get'))
       const id = positionals[0]
       const list = (await client.invoke('workspaces:get')) as Array<{ id: string; slug: string; name: string }>
       const target = id ?? (await ctx.getWorkspace())

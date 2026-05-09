@@ -22,6 +22,7 @@ import { parseArgs, UsageError } from './datapilot/args.ts'
 import { ok, fail, setOutputMode } from './datapilot/envelope.ts'
 import { connect, resolveEndpoint, resolveWorkspaceId, ConnectionError } from './datapilot/transport.ts'
 import { isEntity, type RouteCtx, ENTITIES } from './datapilot/router.ts'
+import { printTopHelp, printEntityHelp, printActionHelp } from './datapilot/help.ts'
 import type { CliRpcClient } from './client.ts'
 
 import { routeLabel } from './datapilot/commands/label.ts'
@@ -43,21 +44,12 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   if (args.global.json) setOutputMode('json')
   else if (args.global.human) setOutputMode('human')
 
-  if (args.global.help && !args.entity) {
-    printHelp()
-    process.exit(0)
-  }
+  // Top-level help: `dtpilot --help` or just `dtpilot`
+  if (args.global.help && !args.entity) printTopHelp()
   if (args.global.version && !args.entity) {
     ok(VERSION, { human: () => VERSION })
   }
-
-  if (!args.entity) {
-    if (args.global.json) {
-      ok({ usage: 'dtpilot <entity> <action> [args]', entities: ENTITIES })
-    }
-    printHelp()
-    process.exit(0)
-  }
+  if (!args.entity) printTopHelp()
 
   if (!isEntity(args.entity)) {
     fail('USAGE_ERROR', `Unknown entity: ${args.entity}`, {
@@ -65,13 +57,10 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     })
   }
 
-  // Per-action help: `dtpilot <entity> --help`
-  if (args.global.help) {
-    ok({
-      entity: args.entity,
-      hint: `Run 'dtpilot ${args.entity}' (no action) to list available actions`,
-    })
-  }
+  // Action-level help: `dtpilot <entity> <action> --help`
+  if (args.global.help && args.action) printActionHelp(args.entity, args.action)
+  // Entity-level help: `dtpilot <entity> --help`
+  if (args.global.help) printEntityHelp(args.entity)
 
   const ctx = createCtx(args)
   try {
@@ -152,43 +141,6 @@ function createCtx(args: ReturnType<typeof parseArgs>): RouteCtx {
     destroyClient,
     global: args.global,
   }
-}
-
-function printHelp(): void {
-  process.stdout.write(`dtpilot — unified CLI for the DataPilot server
-
-Usage:
-  dtpilot [global-flags] <entity> <action> [positionals...] [flags...]
-
-Global flags:
-  --url <ws-url>         Server URL (default: ws://127.0.0.1:9100, env: DATAPILOT_SERVER_URL)
-  --token <secret>       Auth token (env: DATAPILOT_SERVER_TOKEN, or discovery file)
-  --workspace <id|slug|name>  Workspace identifier (env: DATAPILOT_WORKSPACE; auto-detected if omitted)
-  --timeout <ms>         Per-request timeout (default: 30000)
-  --tls-ca <path>        Custom CA cert for self-signed TLS (env: DATAPILOT_TLS_CA)
-  --json                 Force JSON envelope output (default for non-TTY stdout)
-  --human                Force human-readable output (default for TTY stdout)
-  --help, -h             Show this help
-  --version, -v          Show version
-
-Entities:
-  label                  Workspace labels and auto-rules
-  source                 Workspace sources (MCP / API / local)
-  automation             Workspace automations
-  skill                  Workspace skills
-  batch                  Batch processing jobs
-  session                Sessions inside a workspace
-  workspace              Workspaces themselves
-  status                 Workspace session statuses
-  preference             User preferences (name, timezone, language, notes)
-
-Run 'dtpilot <entity>' with no action to list that entity's actions.
-
-Examples:
-  dtpilot label list
-  dtpilot label create --name TODO --input '{"color":"info"}'
-  dtpilot --url wss://remote source list
-`)
 }
 
 // This file is an executable entry point — never imported. Running it (via

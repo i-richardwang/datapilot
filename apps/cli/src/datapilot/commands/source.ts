@@ -8,12 +8,59 @@
  */
 
 import { ok, fail } from '../envelope.ts'
-import { strFlag, parseInput, rejectUnknownFlags, type Flags } from '../args.ts'
+import { strFlag, parseInput, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
+import { rejectActionFlags, type ActionSpec, type EntitySpec } from '../help.ts'
 
-const ACTIONS = [
-  'list', 'get', 'create', 'update', 'delete',
-] as const
+export const SOURCE_SPEC: EntitySpec = {
+  name: 'source',
+  description: 'Workspace sources (MCP servers, HTTP APIs, local filesystem)',
+  actions: [
+    {
+      name: 'list',
+      description: 'List all sources in the workspace',
+      flags: [],
+      example: 'dtpilot source list',
+    },
+    {
+      name: 'get',
+      description: 'Show one source with its permissions and MCP tools',
+      positionals: [{ name: 'slug', description: 'Source slug' }],
+      flags: [],
+      example: 'dtpilot source get my-api',
+    },
+    {
+      name: 'create',
+      description: 'Create a new source (provider/type select the config schema branch)',
+      flags: [
+        { name: 'name', type: 'string', required: true, description: 'Source display name' },
+        { name: 'provider', type: 'string', required: true, description: 'Provider id (e.g. generic, github, linear)' },
+        { name: 'type', type: 'string', required: true, description: 'Source type: mcp | api | local' },
+      ],
+      takesInput: true,
+      example: 'dtpilot source create --name MyAPI --provider generic --type api --input \'{"baseUrl":"https://..."}\'',
+    },
+    {
+      name: 'update',
+      description: 'Update source fields',
+      positionals: [{ name: 'slug', description: 'Source slug' }],
+      flags: [],
+      takesInput: true,
+      example: 'dtpilot source update my-api --input \'{"name":"My API v2"}\'',
+    },
+    {
+      name: 'delete',
+      description: 'Delete a source',
+      positionals: [{ name: 'slug', description: 'Source slug' }],
+      flags: [],
+      example: 'dtpilot source delete my-api',
+    },
+  ],
+}
+
+function specOf(action: string): ActionSpec {
+  return SOURCE_SPEC.actions.find((a) => a.name === action)!
+}
 
 export async function routeSource(
   ctx: RouteCtx,
@@ -21,9 +68,11 @@ export async function routeSource(
   positionals: string[],
   flags: Flags,
 ): Promise<never> {
-  if (!action) ok({ entity: 'source', actions: ACTIONS })
-  if (!ACTIONS.includes(action as typeof ACTIONS[number])) {
-    fail('USAGE_ERROR', `Unknown source action: ${action}`)
+  if (!action) ok({ entity: 'source', actions: SOURCE_SPEC.actions.map((a) => a.name) })
+  if (!SOURCE_SPEC.actions.some((a) => a.name === action)) {
+    fail('USAGE_ERROR', `Unknown source action: ${action}`, {
+      suggestion: `Valid actions: ${SOURCE_SPEC.actions.map((a) => a.name).join(', ')}`,
+    })
   }
 
   const ws = await requireWorkspace(ctx)
@@ -31,11 +80,11 @@ export async function routeSource(
 
   switch (action) {
     case 'list':
-      rejectUnknownFlags(flags, [])
+      rejectActionFlags(flags, specOf('list'))
       ok(await client.invoke('sources:get', ws))
 
     case 'get': {
-      rejectUnknownFlags(flags, [])
+      rejectActionFlags(flags, specOf('get'))
       const slug = positionals[0]
       if (!slug) fail('USAGE_ERROR', 'Missing source slug')
       const sources = (await client.invoke('sources:get', ws)) as Array<{ config: { slug: string } }>
@@ -49,7 +98,7 @@ export async function routeSource(
     }
 
     case 'create': {
-      rejectUnknownFlags(flags, ['name', 'provider', 'type'])
+      rejectActionFlags(flags, specOf('create'))
       const input = (await parseInput(flags)) ?? {}
       const name = strFlag(flags, 'name') ?? (input.name as string | undefined)
       const provider = strFlag(flags, 'provider') ?? (input.provider as string | undefined)
@@ -62,7 +111,7 @@ export async function routeSource(
     }
 
     case 'update': {
-      rejectUnknownFlags(flags, [])
+      rejectActionFlags(flags, specOf('update'))
       const slug = positionals[0]
       if (!slug) fail('USAGE_ERROR', 'Missing source slug')
       const input = (await parseInput(flags)) ?? {}
@@ -70,7 +119,7 @@ export async function routeSource(
     }
 
     case 'delete': {
-      rejectUnknownFlags(flags, [])
+      rejectActionFlags(flags, specOf('delete'))
       const slug = positionals[0]
       if (!slug) fail('USAGE_ERROR', 'Missing source slug')
       await client.invoke('sources:delete', ws, slug)
