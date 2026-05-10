@@ -14,7 +14,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import type { AgentEvent } from '@craft-agent/core/types';
 import type { FileAttachment } from '../utils/files.ts';
@@ -993,9 +993,9 @@ ${formattedMessages}
   protected formatSkillDirective(skillPaths: Map<string, string>): string {
     if (skillPaths.size === 0) return '';
     const pathList = [...skillPaths.entries()]
-      .map(([slug, path]) => `- ${path} (skill: ${slug})`)
+      .map(([slug, path]) => `- ${path} (skill: ${slug}, dir: ${dirname(path)})`)
       .join('\n');
-    return `Before proceeding with the user's request, you MUST read the following skill instruction files using the Read tool or \`cat\` via Bash:\n${pathList}\n\nDo not take any other action until you have read these files.`;
+    return `Before proceeding with the user's request, you MUST read the following skill instruction files using the Read tool or \`cat\` via Bash:\n${pathList}\n\nRelative paths inside SKILL.md resolve against the skill's \`dir\` shown above.\n\nDo not take any other action until you have read these files.`;
   }
 
   // ============================================================
