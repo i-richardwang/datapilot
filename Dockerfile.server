@@ -63,6 +63,12 @@ RUN groupadd -r datapilot && \
 
 WORKDIR /app
 
+# Optional package-registry mirrors for environments where the public
+# registries (npmjs.org / pypi.org) are slow or block TLS. Empty default
+# preserves upstream behavior so this Dockerfile merges cleanly.
+ARG NPM_REGISTRY=""
+ARG PIP_INDEX_URL=""
+
 # Copy dependency manifests first for layer caching.
 # bunfig.toml must be present *before* `bun install` runs so the hoisted
 # linker setting is honored; otherwise bun falls back to configVersion=1's
@@ -85,6 +91,8 @@ COPY apps/viewer-server/package.json apps/viewer-server/
 COPY apps/webui/package.json apps/webui/
 
 # Skip better-sqlite3 native build — Docker runs on Bun which uses built-in bun:sqlite
+# When NPM_REGISTRY is set, write it to .npmrc so bun install routes through the mirror.
+RUN if [ -n "$NPM_REGISTRY" ]; then echo "registry=$NPM_REGISTRY" > /root/.npmrc; fi
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile --ignore-scripts || \
     (rm -rf /root/.bun/install/cache/* && bun install --frozen-lockfile --ignore-scripts)
@@ -138,6 +146,7 @@ RUN find /app -not -perm -o=r -exec chmod o+r {} + && \
 # - PATH addition: makes python3/pip available in Bash for exploratory analysis
 RUN uv venv /opt/datapilot-py --python python3 && \
     uv pip install --python /opt/datapilot-py/bin/python \
+      ${PIP_INDEX_URL:+--index-url "$PIP_INDEX_URL"} \
       pandas numpy pyarrow polars openpyxl xlsxwriter \
       weasyprint pypdf pymupdf && \
     chmod -R a+rX /opt/datapilot-py
