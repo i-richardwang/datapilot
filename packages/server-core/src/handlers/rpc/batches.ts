@@ -3,8 +3,30 @@ import { join } from 'path'
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { getWorkspaceByNameOrId } from '@craft-agent/shared/config'
 import { BATCHES_CONFIG_FILE, BATCH_STATE_FILE_PREFIX, BATCH_TEST_RESULT_FILE_PREFIX, TEST_BATCH_SUFFIX } from '@craft-agent/shared/batches'
+import { loadLabelConfig } from '@craft-agent/shared/labels/storage'
+import { resolveSessionLabels } from '@craft-agent/shared/labels'
 import type { RpcServer } from '@craft-agent/server-core/transport'
 import type { HandlerDeps } from '../handler-deps'
+
+/**
+ * Validate batch entity labels against the workspace label tree.
+ * Mirrors the session label flow (`resolveSessionLabels`) so agent-supplied
+ * inputs go through the same display-name → id canonicalization and unknown-id
+ * rejection path. Throws on any unknown entry; returns canonical IDs on success.
+ */
+function resolveBatchEntityLabels(workspaceRootPath: string, inputs: string[]): string[] {
+  const labelConfig = loadLabelConfig(workspaceRootPath)
+  const { resolved, unknown, available, reasons } = resolveSessionLabels(inputs, labelConfig.labels)
+  if (unknown.length > 0) {
+    const lines = unknown.map((entry) => `  - "${entry}" — ${reasons[entry] ?? 'unknown label'}`)
+    throw new Error(
+      `Batch labels rejected:\n${lines.join('\n')}\n\n` +
+      `Available label IDs: ${available.join(', ') || '(none configured)'}.\n` +
+      `Use "id::value" only for labels configured with a valueType.`
+    )
+  }
+  return resolved
+}
 
 // Per-workspace config mutex: serializes read-modify-write cycles on batches.json
 const configMutexes = new Map<string, Promise<void>>()
@@ -150,6 +172,9 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
       const newBatch = { ...batch }
       if (!newBatch.id) newBatch.id = randomBytes(3).toString('hex')
       if (typeof newBatch.createdAt !== 'number') newBatch.createdAt = Date.now()
+      if (Array.isArray(newBatch.labels)) {
+        newBatch.labels = resolveBatchEntityLabels(workspace.rootPath, newBatch.labels as string[])
+      }
       config.batches.push(newBatch)
 
       const validation = BatchesFileConfigSchema.safeParse(config)
@@ -168,10 +193,20 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
   server.handle(RPC_CHANNELS.batches.UPDATE, async (_ctx, workspaceId: string, batchId: string, patch: Record<string, unknown>) => {
     const { BatchesFileConfigSchema } = await import('@craft-agent/shared/batches')
 
+    // Validate labels up-front against the workspace label tree before entering
+    // the mutex. Without this check, agent-supplied unknown IDs would silently
+    // persist and the renderer would then drop them at display time.
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error('Workspace not found')
+    const sanitizedPatch = { ...patch }
+    if (Array.isArray(sanitizedPatch.labels)) {
+      sanitizedPatch.labels = resolveBatchEntityLabels(workspace.rootPath, sanitizedPatch.labels as string[])
+    }
+
     let updated!: Record<string, unknown>
     await withBatchMutation(workspaceId, batchId, (batches, idx, config) => {
       const current = batches[idx]!
-      const merged = { ...current, ...patch }
+      const merged = { ...current, ...sanitizedPatch }
       merged.id = current.id ?? merged.id
       batches[idx] = merged
 
