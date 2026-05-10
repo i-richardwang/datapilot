@@ -123,7 +123,8 @@ import { AutomationsListPanel } from "../automations/AutomationsListPanel"
 import { APP_EVENTS, AGENT_EVENTS, type AutomationFilterKind, AUTOMATION_TYPE_TO_FILTER_KIND } from "../automations/types"
 import { useAutomations } from "@/hooks/useAutomations"
 import { BatchesListPanel } from "../batches/BatchesListPanel"
-import { BATCH_STATUS_TO_FILTER_KIND } from "../batches/types"
+import { BATCH_STATUS_TO_FILTER_KIND, BATCH_STATUS_ORDER, BATCH_STATUS_DISPLAY_KEY, BATCH_STATUS_COLOR, type BatchGroupingMode } from "../batches/types"
+import type { BatchStatus } from "@craft-agent/shared/batches"
 import { useBatches } from "@/hooks/useBatches"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { PanelHeader } from "./PanelHeader"
@@ -641,6 +642,13 @@ function AppShellContent({
   // Derive batch filter from navigation state (only when in batches navigator)
   const batchFilter: BatchFilter | null = isBatchesNavigation(navState) ? navState.filter ?? null : null
 
+  // Per-view batch filter storage. Mirrors viewFiltersMap shape but lives in a
+  // separate localStorage key so the BatchStatus enum doesn't collide with SessionStatusId.
+  // Only one batch view today (`all`); the keyed shape is forward-compat.
+  type BatchFilterEntry = Partial<Record<BatchStatus, FilterMode>>
+  type BatchViewFiltersMap = Record<string, { statuses: BatchFilterEntry, groupingMode?: BatchGroupingMode }>
+  const BATCH_FILTER_KEY = 'all'
+
   // Per-view filter storage: each session list view (allSessions, flagged, state:X, label:X, view:X)
   // has its own independent set of status and label filters.
   // Each filter entry stores a mode ('include' or 'exclude') for tri-state filtering.
@@ -733,6 +741,40 @@ function AppShellContent({
       }
     })
   }, [sessionFilterKey])
+
+  // ── Batch list filters (mirrors session filter pattern) ──────────────────
+  const [batchViewFiltersMap, setBatchViewFiltersMap] = React.useState<BatchViewFiltersMap>(() =>
+    storage.get<BatchViewFiltersMap>(storage.KEYS.batchViewFilters, {})
+  )
+
+  const batchListFilter = useMemo<Map<BatchStatus, FilterMode>>(() => {
+    const entry = batchViewFiltersMap[BATCH_FILTER_KEY]?.statuses ?? {}
+    return new Map(Object.entries(entry) as [BatchStatus, FilterMode][])
+  }, [batchViewFiltersMap])
+
+  const setBatchListFilter = useCallback((updater: Map<BatchStatus, FilterMode> | ((prev: Map<BatchStatus, FilterMode>) => Map<BatchStatus, FilterMode>)) => {
+    setBatchViewFiltersMap(prev => {
+      const current = new Map<BatchStatus, FilterMode>(Object.entries(prev[BATCH_FILTER_KEY]?.statuses ?? {}) as [BatchStatus, FilterMode][])
+      const next = typeof updater === 'function' ? updater(current) : updater
+      const existing = prev[BATCH_FILTER_KEY] ?? { statuses: {} }
+      return {
+        ...prev,
+        [BATCH_FILTER_KEY]: { ...existing, statuses: Object.fromEntries(next) as BatchFilterEntry }
+      }
+    })
+  }, [])
+
+  const batchGroupingMode: BatchGroupingMode = batchViewFiltersMap[BATCH_FILTER_KEY]?.groupingMode ?? 'date'
+
+  const setBatchGroupingMode = useCallback((mode: BatchGroupingMode) => {
+    setBatchViewFiltersMap(prev => {
+      const existing = prev[BATCH_FILTER_KEY] ?? { statuses: {} }
+      return {
+        ...prev,
+        [BATCH_FILTER_KEY]: { ...existing, groupingMode: mode }
+      }
+    })
+  }, [])
   // Search state for session list
   const [searchActive, setSearchActive] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState('')
@@ -929,6 +971,9 @@ function AppShellContent({
     if (previousWorkspaceId !== activeWorkspaceId) {
       const newViewFilters = storage.get<ViewFiltersMap>(storage.KEYS.viewFilters, {}, activeWorkspaceId)
       setViewFiltersMap(newViewFilters)
+
+      const newBatchViewFilters = storage.get<BatchViewFiltersMap>(storage.KEYS.batchViewFilters, {}, activeWorkspaceId)
+      setBatchViewFiltersMap(newBatchViewFilters)
 
       const newExpandedFolders = storage.get<string[]>(storage.KEYS.expandedFolders, [], activeWorkspaceId)
       setExpandedFolders(new Set(newExpandedFolders))
@@ -1711,6 +1756,12 @@ function AppShellContent({
     if (!activeWorkspaceId) return
     storage.set(storage.KEYS.viewFilters, viewFiltersMap, activeWorkspaceId)
   }, [viewFiltersMap, activeWorkspaceId])
+
+  // Persist batch list filters (workspace-scoped). Independent key from session viewFilters.
+  React.useEffect(() => {
+    if (!activeWorkspaceId) return
+    storage.set(storage.KEYS.batchViewFilters, batchViewFiltersMap, activeWorkspaceId)
+  }, [batchViewFiltersMap, activeWorkspaceId])
 
   // Persist sidebar section collapsed states (workspace-scoped)
   React.useEffect(() => {
@@ -3239,17 +3290,177 @@ function AppShellContent({
                       {...getEditConfig('automation-config', activeWorkspace.rootPath)}
                     />
                   )}
-                  {/* Add Batch button */}
-                  {isBatchesNavigation(navState) && activeWorkspace && (
-                    <EditPopover
-                      trigger={
+                  {/* Batch list filter dropdown — replaces the legacy + button.
+                      Batch creation now happens via the main session agent (mini-agent
+                      can't carry the full batch authoring context). Empty-state still
+                      offers an EditPopover entry inside BatchesListPanel. */}
+                  {isBatchesNavigation(navState) && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
                         <HeaderIconButton
-                          icon={<Plus className="h-4 w-4" />}
-                          tooltip={t('batches.addBatch')}
+                          icon={<ListFilter className="h-4 w-4" />}
+                          tooltip={t('batches.filterTooltip')}
+                          className={batchListFilter.size > 0 ? "bg-accent/5 text-accent rounded-lg shadow-tinted" : "rounded-lg"}
+                          style={batchListFilter.size > 0 ? { '--shadow-color': 'var(--accent-rgb)' } as React.CSSProperties : undefined}
                         />
-                      }
-                      {...getEditConfig('batch-config', activeWorkspace.rootPath)}
-                    />
+                      </DropdownMenuTrigger>
+                      <StyledDropdownMenuContent align="end" light minWidth="min-w-[200px]">
+                        {/* Header with title and clear */}
+                        <div className="flex items-center justify-between px-2 py-1.5">
+                          <span className="text-xs font-medium text-muted-foreground">{t('batches.filterTitle')}</span>
+                          {batchListFilter.size > 0 && (
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault()
+                                setBatchListFilter(new Map())
+                              }}
+                              className="text-xs text-muted-foreground hover:text-foreground"
+                            >
+                              {t('common.clear')}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Active status chips (mode pill, click to remove) */}
+                        {batchListFilter.size > 0 && (
+                          <>
+                            <StyledDropdownMenuSeparator />
+                            {BATCH_STATUS_ORDER.filter(s => batchListFilter.has(s)).map(status => {
+                              const mode = batchListFilter.get(status)!
+                              const colors = BATCH_STATUS_COLOR[status]
+                              return (
+                                <DropdownMenuSub key={`sel-batch-status-${status}`}>
+                                  <StyledDropdownMenuSubTrigger
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      setBatchListFilter(prev => {
+                                        const next = new Map(prev)
+                                        next.delete(status)
+                                        return next
+                                      })
+                                    }}
+                                  >
+                                    <FilterMenuRow
+                                      icon={<span className={cn("h-2 w-2 rounded-full", colors.bg)} />}
+                                      label={t(BATCH_STATUS_DISPLAY_KEY[status])}
+                                      accessory={<FilterModeBadge mode={mode} />}
+                                    />
+                                  </StyledDropdownMenuSubTrigger>
+                                  <StyledDropdownMenuSubContent minWidth="min-w-[140px]">
+                                    <FilterModeSubMenuItems
+                                      mode={mode}
+                                      onChangeMode={(newMode) => setBatchListFilter(prev => {
+                                        const next = new Map(prev)
+                                        next.set(status, newMode)
+                                        return next
+                                      })}
+                                      onRemove={() => setBatchListFilter(prev => {
+                                        const next = new Map(prev)
+                                        next.delete(status)
+                                        return next
+                                      })}
+                                    />
+                                  </StyledDropdownMenuSubContent>
+                                </DropdownMenuSub>
+                              )
+                            })}
+                          </>
+                        )}
+
+                        <StyledDropdownMenuSeparator />
+
+                        {/* Statuses submenu */}
+                        <DropdownMenuSub>
+                          <StyledDropdownMenuSubTrigger>
+                            <Inbox className="h-3.5 w-3.5" />
+                            <span className="flex-1">{t('batches.filterStatuses')}</span>
+                          </StyledDropdownMenuSubTrigger>
+                          <StyledDropdownMenuSubContent minWidth="min-w-[180px]">
+                            {BATCH_STATUS_ORDER.map(status => {
+                              const colors = BATCH_STATUS_COLOR[status]
+                              const currentMode = batchListFilter.get(status)
+                              const isActive = !!currentMode
+                              if (isActive) {
+                                return (
+                                  <DropdownMenuSub key={status}>
+                                    <StyledDropdownMenuSubTrigger
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        setBatchListFilter(prev => {
+                                          const next = new Map(prev)
+                                          next.delete(status)
+                                          return next
+                                        })
+                                      }}
+                                    >
+                                      <FilterMenuRow
+                                        icon={<span className={cn("h-2 w-2 rounded-full", colors.bg)} />}
+                                        label={t(BATCH_STATUS_DISPLAY_KEY[status])}
+                                        accessory={<FilterModeBadge mode={currentMode} />}
+                                      />
+                                    </StyledDropdownMenuSubTrigger>
+                                    <StyledDropdownMenuSubContent minWidth="min-w-[140px]">
+                                      <FilterModeSubMenuItems
+                                        mode={currentMode}
+                                        onChangeMode={(newMode) => setBatchListFilter(prev => {
+                                          const next = new Map(prev)
+                                          next.set(status, newMode)
+                                          return next
+                                        })}
+                                        onRemove={() => setBatchListFilter(prev => {
+                                          const next = new Map(prev)
+                                          next.delete(status)
+                                          return next
+                                        })}
+                                      />
+                                    </StyledDropdownMenuSubContent>
+                                  </DropdownMenuSub>
+                                )
+                              }
+                              return (
+                                <StyledDropdownMenuItem
+                                  key={status}
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    setBatchListFilter(prev => {
+                                      const next = new Map(prev)
+                                      next.set(status, e.altKey ? 'exclude' : 'include')
+                                      return next
+                                    })
+                                  }}
+                                >
+                                  <FilterMenuRow
+                                    icon={<span className={cn("h-2 w-2 rounded-full", colors.bg)} />}
+                                    label={t(BATCH_STATUS_DISPLAY_KEY[status])}
+                                  />
+                                </StyledDropdownMenuItem>
+                              )
+                            })}
+                          </StyledDropdownMenuSubContent>
+                        </DropdownMenuSub>
+
+                        {/* Group by submenu (mirrors session 'group by') */}
+                        <StyledDropdownMenuSeparator />
+                        <DropdownMenuSub>
+                          <StyledDropdownMenuSubTrigger>
+                            <Layers className="h-3.5 w-3.5" />
+                            <span className="flex-1">{t('sidebar.group')}</span>
+                          </StyledDropdownMenuSubTrigger>
+                          <StyledDropdownMenuSubContent minWidth="min-w-[140px]">
+                            <StyledDropdownMenuItem onClick={() => setBatchGroupingMode('date')}>
+                              <Calendar className="h-3.5 w-3.5" />
+                              <span className="flex-1">{t('sidebar.groupByDate')}</span>
+                              {batchGroupingMode === 'date' && <Check className="h-3 w-3 text-muted-foreground" />}
+                            </StyledDropdownMenuItem>
+                            <StyledDropdownMenuItem onClick={() => setBatchGroupingMode('status')}>
+                              <Inbox className="h-3.5 w-3.5" />
+                              <span className="flex-1">{t('sidebar.groupByStatus')}</span>
+                              {batchGroupingMode === 'status' && <Check className="h-3 w-3 text-muted-foreground" />}
+                            </StyledDropdownMenuItem>
+                          </StyledDropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      </StyledDropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </>
               }
@@ -3297,6 +3508,8 @@ function AppShellContent({
               <BatchesListPanel
                 batches={batches}
                 batchFilter={batchFilter ? { kind: BATCH_STATUS_TO_FILTER_KIND[batchFilter.batchStatus] ?? 'all' } : undefined}
+                statusFilter={batchListFilter}
+                groupingMode={batchGroupingMode}
                 onBatchClick={handleBatchSelect}
                 onStartBatch={handleStartBatch}
                 onPauseBatch={handlePauseBatch}

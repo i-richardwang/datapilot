@@ -23,6 +23,9 @@ export const KEYS = {
   chatGroupingMode: 'chat-grouping-mode', // How to group chats: 'date' | 'status'
   collapsedSessionGroups: 'collapsed-session-groups', // Collapsed group keys in session list
 
+  // Batch list view filters (workspace-scoped). Mirrors viewFilters shape.
+  batchViewFilters: 'batch-view-filters',
+
   // Focus mode
   focusModeEnabled: 'focus-mode-enabled',
 

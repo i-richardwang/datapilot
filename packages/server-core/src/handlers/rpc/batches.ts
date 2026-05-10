@@ -149,6 +149,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
 
       const newBatch = { ...batch }
       if (!newBatch.id) newBatch.id = randomBytes(3).toString('hex')
+      if (typeof newBatch.createdAt !== 'number') newBatch.createdAt = Date.now()
       config.batches.push(newBatch)
 
       const validation = BatchesFileConfigSchema.safeParse(config)
@@ -208,6 +209,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
       const clone = JSON.parse(JSON.stringify(batches[idx]))
       clone.id = genId()
       clone.name = clone.name ? `${clone.name} Copy` : 'Untitled Copy'
+      clone.createdAt = Date.now()
       batches.splice(idx + 1, 0, clone)
     })
     deps.sessionManager.notifyBatchesChanged(workspaceId)

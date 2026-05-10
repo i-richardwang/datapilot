@@ -34,6 +34,12 @@ export const BATCH_STATUS_TO_FILTER_KIND: Record<string, BatchFilterKind> = {
   failed: 'failed',
 }
 
+/** All batch status IDs, in canonical order (used by status grouping + dropdown). */
+export const BATCH_STATUS_ORDER: BatchStatus[] = ['running', 'pending', 'paused', 'failed', 'completed']
+
+/** Grouping mode for batch list (mirrors session list grouping shape, minus 'unread'). */
+export type BatchGroupingMode = 'date' | 'status'
+
 // ============================================================================
 // Display Keys & Colors
 // ============================================================================

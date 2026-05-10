@@ -90,6 +90,8 @@ export interface BatchConfig {
   id?: string
   /** Display name */
   name: string
+  /** Creation timestamp (unix ms). Missing on hand-authored entries — UI sorts those last. */
+  createdAt?: number
   /** Working directory for sessions created by this batch (absolute path). Omit to use workspace default. */
   workingDirectory?: string
   /** Data source configuration */
