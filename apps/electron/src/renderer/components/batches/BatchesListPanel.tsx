@@ -15,8 +15,10 @@ import { EntityList, type EntityListGroup } from '@/components/ui/entity-list'
 import { EntityListEmptyScreen } from '@/components/ui/entity-list-empty'
 import { EntityRow } from '@/components/ui/entity-row'
 import { EditPopover, getEditConfig } from '@/components/ui/EditPopover'
+import { EntityListLabelBadge } from '@/components/ui/entity-list-label-badge'
 import { SessionSearchHeader } from '@/components/app-shell/SessionSearchHeader'
 import { getDateLocale } from '@craft-agent/shared/i18n'
+import { parseLabelEntry, flattenLabels, type LabelConfig } from '@craft-agent/shared/labels'
 import { BatchAvatar } from './BatchAvatar'
 import { BatchMenu } from './BatchMenu'
 import { cn } from '@/lib/utils'
@@ -49,6 +51,10 @@ interface BatchItemProps {
   isSelected: boolean
   isFirst: boolean
   isTesting?: boolean
+  /** Flattened workspace labels for badge resolution. */
+  flatLabels: LabelConfig[]
+  /** Full hierarchical label tree for the right-click submenu. Empty array hides the submenu. */
+  labelTree: LabelConfig[]
   onClick: () => void
   onStart?: () => void
   onPause?: () => void
@@ -56,6 +62,7 @@ interface BatchItemProps {
   onTest?: () => void
   onDuplicate?: () => void
   onDelete?: () => void
+  onLabelsChange?: (batchId: string, labels: string[]) => void
 }
 
 function BatchItem({
@@ -63,6 +70,8 @@ function BatchItem({
   isSelected,
   isFirst,
   isTesting,
+  flatLabels,
+  labelTree,
   onClick,
   onStart,
   onPause,
@@ -70,12 +79,33 @@ function BatchItem({
   onTest,
   onDuplicate,
   onDelete,
+  onLabelsChange,
 }: BatchItemProps) {
   const { t } = useTranslation()
   const status: BatchStatus = batch.progress?.status ?? 'pending'
   const statusColors = BATCH_STATUS_COLOR[status]
   const progressText = batch.progress
     ? `${batch.progress.completedItems + batch.progress.failedItems}/${batch.progress.totalItems}`
+    : undefined
+
+  // Resolve applied labels against the workspace tree. Stale references
+  // (label deleted from workspace) are silently dropped — same semantics as
+  // SessionBadges so a deleted label doesn't crash the row.
+  const resolvedLabels = useMemo(() => {
+    const applied = batch.labels
+    if (!applied || applied.length === 0 || flatLabels.length === 0) return []
+    return applied
+      .map(entry => {
+        const parsed = parseLabelEntry(entry)
+        const config = flatLabels.find(l => l.id === parsed.id)
+        if (!config) return null
+        return { config, rawValue: parsed.rawValue }
+      })
+      .filter((l): l is { config: LabelConfig; rawValue: string | undefined } => l != null)
+  }, [batch.labels, flatLabels])
+
+  const handleLabelsChange = onLabelsChange && batch.id
+    ? (updated: string[]) => onLabelsChange(batch.id!, updated)
     : undefined
 
   return (
@@ -97,6 +127,15 @@ function BatchItem({
               {t('batches.badgeTesting')}
             </MicroBadge>
           )}
+          {resolvedLabels.map(({ config, rawValue }, idx) => (
+            <EntityListLabelBadge
+              key={`${config.id}-${idx}`}
+              label={config}
+              rawValue={rawValue}
+              sessionLabels={batch.labels ?? []}
+              onLabelsChange={handleLabelsChange}
+            />
+          ))}
         </>
       }
       trailing={
@@ -110,6 +149,9 @@ function BatchItem({
         <BatchMenu
           batchId={batch.id ?? ''}
           status={status}
+          labels={labelTree}
+          batchLabels={batch.labels}
+          onLabelsChange={handleLabelsChange}
           onStart={onStart}
           onPause={onPause}
           onResume={onResume}
@@ -143,6 +185,28 @@ function batchMatchesStatusFilter(
     if (mode === 'include') {
       hasInclude = true
       if (statusId === status) included = true
+    }
+  }
+  return hasInclude ? included : true
+}
+
+/**
+ * Apply tri-state label filter. A batch with no labels is excluded only when
+ * an `include` rule is present (consistent with session list semantics).
+ */
+function batchMatchesLabelFilter(
+  batchLabels: string[] | undefined,
+  filter: Map<string, FilterMode>,
+): boolean {
+  if (filter.size === 0) return true
+  const appliedIds = new Set((batchLabels ?? []).map(entry => parseLabelEntry(entry).id))
+  let hasInclude = false
+  let included = false
+  for (const [labelId, mode] of filter) {
+    if (mode === 'exclude' && appliedIds.has(labelId)) return false
+    if (mode === 'include') {
+      hasInclude = true
+      if (appliedIds.has(labelId)) included = true
     }
   }
   return hasInclude ? included : true
@@ -220,6 +284,10 @@ export interface BatchesListPanelProps {
   batchFilter?: { kind: BatchFilterKind } | null
   /** Tri-state status filter (Map<status, FilterMode>). Owned by AppShell, mirrors session pattern. */
   statusFilter?: Map<BatchStatus, FilterMode>
+  /** Tri-state label filter (Map<labelId, FilterMode>). Owned by AppShell, mirrors session pattern. */
+  labelFilter?: Map<string, FilterMode>
+  /** Workspace label tree (display-sorted) — passed to row badges + right-click submenu. */
+  labels?: LabelConfig[]
   /** Grouping mode for the list. Default: 'date'. */
   groupingMode?: BatchGroupingMode
   onBatchClick: (batchId: string) => void
@@ -229,6 +297,8 @@ export interface BatchesListPanelProps {
   onTestBatch?: (batchId: string) => void
   onDuplicateBatch?: (batchId: string) => void
   onDeleteBatch?: (batchId: string) => void
+  /** Apply / remove labels on a batch (calls updateBatch RPC). */
+  onLabelsChange?: (batchId: string, labels: string[]) => void
   selectedBatchId?: string | null
   workspaceRootPath?: string
   testProgress?: Record<string, BatchProgress>
@@ -239,6 +309,8 @@ export function BatchesListPanel({
   batches,
   batchFilter,
   statusFilter,
+  labelFilter,
+  labels,
   groupingMode = 'date',
   onBatchClick,
   onStartBatch,
@@ -247,6 +319,7 @@ export function BatchesListPanel({
   onTestBatch,
   onDuplicateBatch,
   onDeleteBatch,
+  onLabelsChange,
   selectedBatchId,
   workspaceRootPath,
   testProgress,
@@ -267,17 +340,24 @@ export function BatchesListPanel({
     return new Map<BatchStatus, FilterMode>([[seedKind as BatchStatus, 'include']])
   }, [statusFilter, batchFilter?.kind])
 
+  const effectiveLabelFilter = labelFilter ?? new Map<string, FilterMode>()
+
+  // Flatten the workspace label tree once per labels change for badge/menu lookups.
+  const flatLabels = useMemo(() => flattenLabels(labels ?? []), [labels])
+
   // Sort + filter — pure derivation, no side effects.
   const visibleBatches = useMemo(() => {
     const filtered = batches.filter(b => {
       const status = b.progress?.status ?? 'pending'
-      return batchMatchesStatusFilter(status, effectiveStatusFilter)
+      if (!batchMatchesStatusFilter(status, effectiveStatusFilter)) return false
+      if (!batchMatchesLabelFilter(b.labels, effectiveLabelFilter)) return false
+      return true
     })
     const searched = isSearchMode
       ? filtered.filter(b => b.name.toLowerCase().includes(searchQuery.toLowerCase()))
       : filtered
     return [...searched].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
-  }, [batches, effectiveStatusFilter, isSearchMode, searchQuery])
+  }, [batches, effectiveStatusFilter, effectiveLabelFilter, isSearchMode, searchQuery])
 
   // Search active → render flat (no grouping makes sense over a search result).
   const groups = useMemo(() => {
@@ -359,6 +439,8 @@ export function BatchesListPanel({
           isSelected={selectedBatchId === batch.id}
           isFirst={indexInGroup === 0}
           isTesting={!!(batch.id && testProgress?.[batch.id])}
+          flatLabels={flatLabels}
+          labelTree={labels ?? []}
           onClick={() => onBatchClick(batch.id ?? '')}
           onStart={onStartBatch ? () => onStartBatch(batch.id ?? '') : undefined}
           onPause={onPauseBatch ? () => onPauseBatch(batch.id ?? '') : undefined}
@@ -366,6 +448,7 @@ export function BatchesListPanel({
           onTest={onTestBatch ? () => onTestBatch(batch.id ?? '') : undefined}
           onDuplicate={onDuplicateBatch ? () => onDuplicateBatch(batch.id ?? '') : undefined}
           onDelete={onDeleteBatch ? () => onDeleteBatch(batch.id ?? '') : undefined}
+          onLabelsChange={onLabelsChange}
         />
       )}
     />

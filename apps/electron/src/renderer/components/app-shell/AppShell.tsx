@@ -645,8 +645,13 @@ function AppShellContent({
   // Per-view batch filter storage. Mirrors viewFiltersMap shape but lives in a
   // separate localStorage key so the BatchStatus enum doesn't collide with SessionStatusId.
   // Only one batch view today (`all`); the keyed shape is forward-compat.
-  type BatchFilterEntry = Partial<Record<BatchStatus, FilterMode>>
-  type BatchViewFiltersMap = Record<string, { statuses: BatchFilterEntry, groupingMode?: BatchGroupingMode }>
+  type BatchStatusFilterEntry = Partial<Record<BatchStatus, FilterMode>>
+  type BatchLabelFilterEntry = Record<string, FilterMode>
+  type BatchViewFiltersMap = Record<string, {
+    statuses: BatchStatusFilterEntry,
+    labels?: BatchLabelFilterEntry,
+    groupingMode?: BatchGroupingMode,
+  }>
   const BATCH_FILTER_KEY = 'all'
 
   // Per-view filter storage: each session list view (allSessions, flagged, state:X, label:X, view:X)
@@ -752,6 +757,11 @@ function AppShellContent({
     return new Map(Object.entries(entry) as [BatchStatus, FilterMode][])
   }, [batchViewFiltersMap])
 
+  const batchLabelFilter = useMemo<Map<string, FilterMode>>(() => {
+    const entry = batchViewFiltersMap[BATCH_FILTER_KEY]?.labels ?? {}
+    return new Map(Object.entries(entry) as [string, FilterMode][])
+  }, [batchViewFiltersMap])
+
   const setBatchListFilter = useCallback((updater: Map<BatchStatus, FilterMode> | ((prev: Map<BatchStatus, FilterMode>) => Map<BatchStatus, FilterMode>)) => {
     setBatchViewFiltersMap(prev => {
       const current = new Map<BatchStatus, FilterMode>(Object.entries(prev[BATCH_FILTER_KEY]?.statuses ?? {}) as [BatchStatus, FilterMode][])
@@ -759,7 +769,19 @@ function AppShellContent({
       const existing = prev[BATCH_FILTER_KEY] ?? { statuses: {} }
       return {
         ...prev,
-        [BATCH_FILTER_KEY]: { ...existing, statuses: Object.fromEntries(next) as BatchFilterEntry }
+        [BATCH_FILTER_KEY]: { ...existing, statuses: Object.fromEntries(next) as BatchStatusFilterEntry }
+      }
+    })
+  }, [])
+
+  const setBatchLabelFilter = useCallback((updater: Map<string, FilterMode> | ((prev: Map<string, FilterMode>) => Map<string, FilterMode>)) => {
+    setBatchViewFiltersMap(prev => {
+      const current = new Map<string, FilterMode>(Object.entries(prev[BATCH_FILTER_KEY]?.labels ?? {}) as [string, FilterMode][])
+      const next = typeof updater === 'function' ? updater(current) : updater
+      const existing = prev[BATCH_FILTER_KEY] ?? { statuses: {} }
+      return {
+        ...prev,
+        [BATCH_FILTER_KEY]: { ...existing, labels: Object.fromEntries(next) as BatchLabelFilterEntry }
       }
     })
   }, [])
@@ -1034,6 +1056,19 @@ function AppShellContent({
       console.error('[Chat] Failed to set session labels:', err)
     }
   }, [])
+
+  // Handle batch label changes (Labels submenu in BatchMenu, badge edits in row).
+  // Goes through the generic batches.UPDATE handler — server validates via
+  // BatchesFileConfigSchema and emits onBatchesChanged so useBatches reloads.
+  const handleBatchLabelsChange = React.useCallback(async (batchId: string, labels: string[]) => {
+    if (!activeWorkspaceId) return
+    try {
+      await window.electronAPI.updateBatch(activeWorkspaceId, batchId, { labels })
+    } catch (err) {
+      console.error('[Batch] Failed to set batch labels:', err)
+      toast.error(t('batches.labelUpdateFailed'))
+    }
+  }, [activeWorkspaceId, t])
 
 
   // Load dynamic statuses from workspace config
@@ -3294,25 +3329,28 @@ function AppShellContent({
                       Batch creation now happens via the main session agent (mini-agent
                       can't carry the full batch authoring context). Empty-state still
                       offers an EditPopover entry inside BatchesListPanel. */}
-                  {isBatchesNavigation(navState) && (
+                  {isBatchesNavigation(navState) && (() => {
+                    const batchFiltersActive = batchListFilter.size > 0 || batchLabelFilter.size > 0
+                    return (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <HeaderIconButton
                           icon={<ListFilter className="h-4 w-4" />}
                           tooltip={t('batches.filterTooltip')}
-                          className={batchListFilter.size > 0 ? "bg-accent/5 text-accent rounded-lg shadow-tinted" : "rounded-lg"}
-                          style={batchListFilter.size > 0 ? { '--shadow-color': 'var(--accent-rgb)' } as React.CSSProperties : undefined}
+                          className={batchFiltersActive ? "bg-accent/5 text-accent rounded-lg shadow-tinted" : "rounded-lg"}
+                          style={batchFiltersActive ? { '--shadow-color': 'var(--accent-rgb)' } as React.CSSProperties : undefined}
                         />
                       </DropdownMenuTrigger>
                       <StyledDropdownMenuContent align="end" light minWidth="min-w-[200px]">
                         {/* Header with title and clear */}
                         <div className="flex items-center justify-between px-2 py-1.5">
                           <span className="text-xs font-medium text-muted-foreground">{t('batches.filterTitle')}</span>
-                          {batchListFilter.size > 0 && (
+                          {batchFiltersActive && (
                             <button
                               onClick={(e) => {
                                 e.preventDefault()
                                 setBatchListFilter(new Map())
+                                setBatchLabelFilter(new Map())
                               }}
                               className="text-xs text-muted-foreground hover:text-foreground"
                             >
@@ -3321,8 +3359,8 @@ function AppShellContent({
                           )}
                         </div>
 
-                        {/* Active status chips (mode pill, click to remove) */}
-                        {batchListFilter.size > 0 && (
+                        {/* Active filter chips (status + label, click to remove) */}
+                        {batchFiltersActive && (
                           <>
                             <StyledDropdownMenuSeparator />
                             {BATCH_STATUS_ORDER.filter(s => batchListFilter.has(s)).map(status => {
@@ -3357,6 +3395,45 @@ function AppShellContent({
                                       onRemove={() => setBatchListFilter(prev => {
                                         const next = new Map(prev)
                                         next.delete(status)
+                                        return next
+                                      })}
+                                    />
+                                  </StyledDropdownMenuSubContent>
+                                </DropdownMenuSub>
+                              )
+                            })}
+                            {Array.from(batchLabelFilter).map(([labelId, mode]) => {
+                              const label = findLabelById(labelConfigs, labelId)
+                              if (!label) return null
+                              return (
+                                <DropdownMenuSub key={`sel-batch-label-${labelId}`}>
+                                  <StyledDropdownMenuSubTrigger
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      setBatchLabelFilter(prev => {
+                                        const next = new Map(prev)
+                                        next.delete(labelId)
+                                        return next
+                                      })
+                                    }}
+                                  >
+                                    <FilterMenuRow
+                                      icon={<LabelIcon label={label} size="lg" />}
+                                      label={label.name}
+                                      accessory={<FilterModeBadge mode={mode} />}
+                                    />
+                                  </StyledDropdownMenuSubTrigger>
+                                  <StyledDropdownMenuSubContent minWidth="min-w-[140px]">
+                                    <FilterModeSubMenuItems
+                                      mode={mode}
+                                      onChangeMode={(newMode) => setBatchLabelFilter(prev => {
+                                        const next = new Map(prev)
+                                        next.set(labelId, newMode)
+                                        return next
+                                      })}
+                                      onRemove={() => setBatchLabelFilter(prev => {
+                                        const next = new Map(prev)
+                                        next.delete(labelId)
                                         return next
                                       })}
                                     />
@@ -3439,6 +3516,27 @@ function AppShellContent({
                           </StyledDropdownMenuSubContent>
                         </DropdownMenuSub>
 
+                        {/* Labels submenu — reuses workspace label tree (same as sessions) */}
+                        <DropdownMenuSub>
+                          <StyledDropdownMenuSubTrigger>
+                            <Tag className="h-3.5 w-3.5" />
+                            <span className="flex-1">{t('batches.filterLabels')}</span>
+                          </StyledDropdownMenuSubTrigger>
+                          <StyledDropdownMenuSubContent minWidth="min-w-[180px]">
+                            {labelConfigs.length === 0 ? (
+                              <StyledDropdownMenuItem disabled>
+                                <span className="text-muted-foreground">{t('table.noLabelsConfigured')}</span>
+                              </StyledDropdownMenuItem>
+                            ) : (
+                              <FilterLabelItems
+                                labels={displayLabelConfigs}
+                                labelFilter={batchLabelFilter}
+                                setLabelFilter={setBatchLabelFilter}
+                              />
+                            )}
+                          </StyledDropdownMenuSubContent>
+                        </DropdownMenuSub>
+
                         {/* Group by submenu (mirrors session 'group by') */}
                         <StyledDropdownMenuSeparator />
                         <DropdownMenuSub>
@@ -3461,7 +3559,8 @@ function AppShellContent({
                         </DropdownMenuSub>
                       </StyledDropdownMenuContent>
                     </DropdownMenu>
-                  )}
+                    )
+                  })()}
                 </>
               }
             />
@@ -3509,6 +3608,8 @@ function AppShellContent({
                 batches={batches}
                 batchFilter={batchFilter ? { kind: BATCH_STATUS_TO_FILTER_KIND[batchFilter.batchStatus] ?? 'all' } : undefined}
                 statusFilter={batchListFilter}
+                labelFilter={batchLabelFilter}
+                labels={displayLabelConfigs}
                 groupingMode={batchGroupingMode}
                 onBatchClick={handleBatchSelect}
                 onStartBatch={handleStartBatch}
@@ -3517,6 +3618,7 @@ function AppShellContent({
                 onTestBatch={handleTestBatch}
                 onDuplicateBatch={handleDuplicateBatch}
                 onDeleteBatch={handleDeleteBatch}
+                onLabelsChange={handleBatchLabelsChange}
                 selectedBatchId={isBatchesNavigation(navState) && navState.details ? navState.details.batchId : null}
                 workspaceRootPath={activeWorkspace?.rootPath}
                 testProgress={testProgress}

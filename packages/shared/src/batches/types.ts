@@ -94,6 +94,12 @@ export interface BatchConfig {
   createdAt?: number
   /** Working directory for sessions created by this batch (absolute path). Omit to use workspace default. */
   workingDirectory?: string
+  /**
+   * Labels applied to this batch entity (bare IDs or "id::value" entries).
+   * Shares the workspace label tree with sessions — see `Session.labels`.
+   * Distinct from `action.labels`, which tags the *child sessions* a batch creates.
+   */
+  labels?: string[]
   /** Data source configuration */
   source: BatchSource
   /** Execution configuration */

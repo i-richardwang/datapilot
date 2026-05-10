@@ -377,6 +377,7 @@ export const CHANNEL_MAP = {
 
   // Batches
   listBatches: invoke(RPC_CHANNELS.batches.LIST),
+  updateBatch: invoke(RPC_CHANNELS.batches.UPDATE),
   startBatch: invoke(RPC_CHANNELS.batches.START),
   pauseBatch: invoke(RPC_CHANNELS.batches.PAUSE),
   resumeBatch: invoke(RPC_CHANNELS.batches.RESUME),

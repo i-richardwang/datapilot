@@ -48,6 +48,7 @@ export const BatchConfigSchema = z.object({
   name: z.string().min(1, 'Batch name cannot be empty'),
   createdAt: z.number().int().nonnegative().optional(),
   workingDirectory: z.string().min(1, 'Working directory cannot be empty').optional(),
+  labels: z.array(z.string()).optional(),
   source: BatchSourceSchema,
   execution: BatchExecutionSchema.optional(),
   action: BatchPromptActionSchema,
