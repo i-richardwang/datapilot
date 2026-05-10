@@ -260,6 +260,7 @@ dtpilot batch delete abc123
 
 ### Notes
 - `items` only returns per-item state; for overall progress call `batch get`.
+- Top-level `labels` tags the batch itself; `action.labels` tags the child sessions it creates — they're independent.
 <!-- cli:batch:end -->
 
 ---
