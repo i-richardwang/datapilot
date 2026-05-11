@@ -52,9 +52,29 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       ca-certificates git gosu ripgrep fd-find curl gnupg \
       libpango-1.0-0 libpangoft2-1.0-0 \
-      fonts-noto-core fonts-noto-cjk && \
+      fonts-noto-core fonts-noto-cjk \
+      libreoffice-impress libreoffice-writer libreoffice-calc libreoffice-core \
+      poppler-utils && \
     ln -s /usr/bin/fdfind /usr/local/bin/fd && \
     rm -rf /var/lib/apt/lists/*
+
+# soffice wrapper: HOME is bind-mounted from macOS at runtime and unwritable,
+# so /usr/bin/soffice fails with "User installation could not be completed".
+# Inject a per-invocation UserInstallation under /tmp (and a writable
+# fontconfig cache) so `soffice --headless --convert-to pdf foo.pptx` works
+# out of the box for agent-driven PPT→PDF→PNG verification.
+RUN printf '%s\n' \
+    '#!/bin/sh' \
+    'PROFILE_DIR=$(mktemp -d /tmp/lo-profile.XXXXXX)' \
+    'export FONTCONFIG_PATH="${FONTCONFIG_PATH:-/etc/fonts}"' \
+    'export XDG_CACHE_HOME="$PROFILE_DIR/cache"' \
+    'mkdir -p "$XDG_CACHE_HOME"' \
+    '/usr/bin/soffice -env:UserInstallation="file://$PROFILE_DIR" "$@"' \
+    'rc=$?' \
+    'rm -rf "$PROFILE_DIR"' \
+    'exit $rc' \
+    > /usr/local/bin/soffice && \
+    chmod +x /usr/local/bin/soffice
 
 # Create non-root user (Claude Code SDK refuses to run as root).
 # At runtime, override with --user $(id -u):$(id -g) to match host permissions.
@@ -148,7 +168,7 @@ RUN uv venv /opt/datapilot-py --python python3 && \
     uv pip install --python /opt/datapilot-py/bin/python \
       ${PIP_INDEX_URL:+--index-url "$PIP_INDEX_URL"} \
       pandas numpy pyarrow polars openpyxl xlsxwriter \
-      weasyprint pypdf pymupdf && \
+      weasyprint pypdf pymupdf python-pptx python-docx markitdown && \
     chmod -R a+rX /opt/datapilot-py
 
 ENV DATAPILOT_RPC_HOST=0.0.0.0
