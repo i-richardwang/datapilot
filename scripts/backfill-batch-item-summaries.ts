@@ -118,8 +118,18 @@ for (const workspaceRoot of listWorkspaces(root)) {
       if (!config.id) continue
       totalBatches++
 
-      const row = selectStmt.get(config.id)
-      if (!row) {
+      // Both the production run and the `__test` sample run write to
+      // batch_state under separate keys but share the same source/prompt.
+      // Walk both so the Test Items section in the UI also reflects the
+      // new summary format.
+      const stateIds: string[] = [config.id, `${config.id}__test`]
+
+      const rowsForBatch: { stateId: string; row: { state: string } }[] = []
+      for (const stateId of stateIds) {
+        const row = selectStmt.get(stateId)
+        if (row) rowsForBatch.push({ stateId, row })
+      }
+      if (rowsForBatch.length === 0) {
         // No state row yet (batch never started) — nothing to backfill
         continue
       }
@@ -139,29 +149,32 @@ for (const workspaceRoot of listWorkspaces(root)) {
       const sourceMap = new Map<string, BatchItem>()
       for (const item of sourceItems) sourceMap.set(item.id, item)
 
-      // The state column stores JSON (drizzle's mode:'json'), but raw SQLite
-      // returns the text — parse it ourselves.
-      const state: BatchState = JSON.parse(row.state)
       const idField = config.source.idField
 
-      let rewrittenInBatch = 0
-      for (const [itemId, itemState] of Object.entries(state.items)) {
-        const sourceItem = sourceMap.get(itemId)
-        if (!sourceItem) continue
-        const expandedPrompt = expandEnvVars(config.action.prompt, buildItemEnv(sourceItem))
-        const nextSummary = buildItemSummary(sourceItem, idField, expandedPrompt)
-        if (itemState.summary !== nextSummary) {
-          itemState.summary = nextSummary
-          rewrittenInBatch++
-        }
-      }
+      for (const { stateId, row } of rowsForBatch) {
+        // The state column stores JSON (drizzle's mode:'json'), but raw
+        // SQLite returns the text — parse it ourselves.
+        const state: BatchState = JSON.parse(row.state)
 
-      if (rewrittenInBatch > 0) {
-        if (!dryRun) {
-          updateStmt.run(JSON.stringify(state), Date.now(), config.id)
+        let rewrittenInBatch = 0
+        for (const [itemId, itemState] of Object.entries(state.items)) {
+          const sourceItem = sourceMap.get(itemId)
+          if (!sourceItem) continue
+          const expandedPrompt = expandEnvVars(config.action.prompt, buildItemEnv(sourceItem))
+          const nextSummary = buildItemSummary(sourceItem, idField, expandedPrompt)
+          if (itemState.summary !== nextSummary) {
+            itemState.summary = nextSummary
+            rewrittenInBatch++
+          }
         }
-        console.log(`  [${dryRun ? 'would update' : 'updated'}] ${config.id} (${config.name}): ${rewrittenInBatch} items`)
-        totalItemsRewritten += rewrittenInBatch
+
+        if (rewrittenInBatch > 0) {
+          if (!dryRun) {
+            updateStmt.run(JSON.stringify(state), Date.now(), stateId)
+          }
+          console.log(`  [${dryRun ? 'would update' : 'updated'}] ${stateId} (${config.name}): ${rewrittenInBatch} items`)
+          totalItemsRewritten += rewrittenInBatch
+        }
       }
     }
   } finally {
