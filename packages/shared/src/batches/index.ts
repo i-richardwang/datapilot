@@ -100,4 +100,4 @@ export { buildBatchOutputInstruction } from './output-instruction.ts'
 // Processor
 // ============================================================================
 
-export { BatchProcessor } from './batch-processor.ts'
+export { BatchProcessor, buildItemSummary } from './batch-processor.ts'

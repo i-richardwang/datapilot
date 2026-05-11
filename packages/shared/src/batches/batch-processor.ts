@@ -582,11 +582,14 @@ export class BatchProcessor {
     // Expand prompt template with item variables
     const expandedPrompt = expandEnvVars(config.action.prompt, env)
 
-    // Mark as running with truncated prompt summary for UI display
+    // Mark as running with a per-item summary for UI display. Prefer a preview
+    // of the item's own fields (which is what actually distinguishes items in
+    // a batch) over the expanded prompt prefix (which is identical for every
+    // item when the template's variable slots come after the leading text).
     updateItemState(state, itemId, {
       status: 'running',
       startedAt: Date.now(),
-      summary: expandedPrompt.length > 100 ? expandedPrompt.slice(0, 100) + '…' : expandedPrompt,
+      summary: buildItemSummary(item, config.source.idField, expandedPrompt),
     })
     saveBatchState(this.options.workspaceRootPath, state)
 
@@ -857,6 +860,32 @@ export class BatchProcessor {
 
     log.debug(`[BatchProcessor] Disposed`)
   }
+}
+
+/**
+ * Build a per-item summary line shown in the batch items timeline.
+ * Picks up to 3 non-empty, non-id fields and renders them as
+ * `key=value · key=value`. Falls back to the truncated expanded prompt when
+ * the item has no usable fields (rare — most data sources have >1 column).
+ *
+ * Exported so the one-shot backfill script can regenerate summaries for
+ * batches that completed before this helper existed.
+ */
+export function buildItemSummary(item: BatchItem, idField: string, expandedPrompt: string): string {
+  const MAX_FIELDS = 3
+  const MAX_VALUE_LEN = 40
+  const parts: string[] = []
+  for (const [key, value] of Object.entries(item.fields)) {
+    if (parts.length >= MAX_FIELDS) break
+    if (key === idField) continue
+    if (value == null) continue
+    const sv = String(value).trim().replace(/\s+/g, ' ')
+    if (!sv) continue
+    const trimmed = sv.length > MAX_VALUE_LEN ? `${sv.slice(0, MAX_VALUE_LEN)}…` : sv
+    parts.push(`${key}=${trimmed}`)
+  }
+  if (parts.length > 0) return parts.join(' · ')
+  return expandedPrompt.length > 100 ? `${expandedPrompt.slice(0, 100)}…` : expandedPrompt
 }
 
 /**
