@@ -864,9 +864,14 @@ export class BatchProcessor {
 
 /**
  * Build a per-item summary line shown in the batch items timeline.
- * Picks up to 3 non-empty, non-id fields and renders them as
- * `key=value · key=value`. Falls back to the truncated expanded prompt when
- * the item has no usable fields (rare — most data sources have >1 column).
+ *
+ * Format: `value · value · value — <prompt prefix>`
+ *   - Up to 3 non-empty, non-id field values (values only, no key prefix —
+ *     keys would be redundant noise; values alone distinguish items).
+ *   - Followed by a normalized truncated prompt as bonus context. The UI
+ *     column is `flex-1 truncate`, so the prompt tail is hidden visually
+ *     when the row is narrow but remains in the DOM for wider layouts.
+ *   - When the item has no usable fields, only the prompt prefix is shown.
  *
  * Exported so the one-shot backfill script can regenerate summaries for
  * batches that completed before this helper existed.
@@ -874,18 +879,26 @@ export class BatchProcessor {
 export function buildItemSummary(item: BatchItem, idField: string, expandedPrompt: string): string {
   const MAX_FIELDS = 3
   const MAX_VALUE_LEN = 40
-  const parts: string[] = []
+  const PROMPT_MAX = 100
+
+  const values: string[] = []
   for (const [key, value] of Object.entries(item.fields)) {
-    if (parts.length >= MAX_FIELDS) break
+    if (values.length >= MAX_FIELDS) break
     if (key === idField) continue
     if (value == null) continue
     const sv = String(value).trim().replace(/\s+/g, ' ')
     if (!sv) continue
-    const trimmed = sv.length > MAX_VALUE_LEN ? `${sv.slice(0, MAX_VALUE_LEN)}…` : sv
-    parts.push(`${key}=${trimmed}`)
+    values.push(sv.length > MAX_VALUE_LEN ? `${sv.slice(0, MAX_VALUE_LEN)}…` : sv)
   }
-  if (parts.length > 0) return parts.join(' · ')
-  return expandedPrompt.length > 100 ? `${expandedPrompt.slice(0, 100)}…` : expandedPrompt
+  const valuesPart = values.join(' · ')
+
+  const promptNormalized = expandedPrompt.replace(/\s+/g, ' ').trim()
+  const promptPart = promptNormalized.length > PROMPT_MAX
+    ? `${promptNormalized.slice(0, PROMPT_MAX)}…`
+    : promptNormalized
+
+  if (valuesPart && promptPart) return `${valuesPart} — ${promptPart}`
+  return valuesPart || promptPart
 }
 
 /**
