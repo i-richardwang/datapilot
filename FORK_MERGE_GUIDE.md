@@ -160,7 +160,13 @@ Won't conflict unless upstream adds similarly-named features.
 
 ### MEDIUM Risk — Check After Upstream Changes
 
-#### `packages/session-tools-core/src/handlers/` + `session-mcp-server` `[MCP → CLI Collapse]`
+#### `apps/electron/src/renderer/components/app-shell/CompactSessionMenu.tsx` `[Granular Flags + Lite UI]`
+
+Upstream v0.9.3 引入的 compact-mode session menu。fork 端的 `SessionMenu` 已有 3 个 gate：`!FEATURE_FLAGS.disableMessaging`（Messaging row）、`!isWebMode`（Show in Finder row）、password-share submenu。前两个 gate 已经在 v0.9.3 merge 时补到 CompactSessionMenu；password-share submenu **未适配**（fork-side TODO — desktop `SessionMenu` 用 `SharePasswordDialog` + share submenu，compact 端目前是单击直接 `actions.share`）。
+
+**Conflict trigger:** 上游重构 CompactSessionMenu 行结构或新增 Row → 检查 gates 是否还在；上游若引入自家的 password-share 实现，可考虑回采。
+
+
 
 Fork 删除了三个 session 自管理 MCP tool 及其 handler:`list_sessions`、`get_session_info`、`update_user_preferences`。能力收敛到 `dtpilot session list/info` + `dtpilot preference set`(CLI 是产品内 agent 的唯一入口);新增 RPC handlers 在 `server-core/src/handlers/rpc/sessions.ts`,补齐 SessionManager 接口。`prompts/system.ts` 同步删去对这三个 tool 的引用。
 

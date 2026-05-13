@@ -77,6 +77,9 @@ import { getSessionStatus, hasUnreadMeta, hasMessagesMeta } from '@/utils/sessio
 import { getFileManagerName } from '@/lib/platform'
 import { useMessagingConnect, type MessagingPlatform } from '@/components/messaging/MessagingSessionMenuItem'
 import { useSessionMenuActions } from '@/hooks/useSessionMenuActions'
+import { FEATURE_FLAGS } from '@craft-agent/shared/feature-flags'
+
+const isWebMode = window.electronAPI.getRuntimeEnvironment() === 'web'
 
 type View = 'root' | 'status' | 'labels' | 'share' | 'messaging'
 
@@ -411,12 +414,14 @@ function RootPane({
         <Row icon={<Send className="h-4 w-4" />} label={t('sessionMenu.sendToWorkspace')} onTap={onSendToWorkspace} />
       )}
 
-      <Row
-        icon={<MessageSquare className="h-4 w-4" />}
-        label={t('sessionMenu.connectMessaging')}
-        chevron
-        onTap={onOpenMessagingSub}
-      />
+      {!FEATURE_FLAGS.disableMessaging && (
+        <Row
+          icon={<MessageSquare className="h-4 w-4" />}
+          label={t('sessionMenu.connectMessaging')}
+          chevron
+          onTap={onOpenMessagingSub}
+        />
+      )}
 
       <Separator />
 
@@ -464,11 +469,13 @@ function RootPane({
       {onOpenInNewWindow && (
         <Row icon={<AppWindow className="h-4 w-4" />} label={t('sessionMenu.openInNewWindow')} onTap={onOpenInNewWindow} />
       )}
-      <Row
-        icon={<FolderOpen className="h-4 w-4" />}
-        label={t('sessionMenu.showInFileManager', { fileManager: getFileManagerName() })}
-        onTap={onShowInFinder}
-      />
+      {!isWebMode && (
+        <Row
+          icon={<FolderOpen className="h-4 w-4" />}
+          label={t('sessionMenu.showInFileManager', { fileManager: getFileManagerName() })}
+          onTap={onShowInFinder}
+        />
+      )}
       <Row icon={<Copy className="h-4 w-4" />} label={t('sessionMenu.copyPath')} onTap={onCopyPath} />
 
       <Separator />
