@@ -233,7 +233,11 @@ function ConnectionRow({ connection, isLastConnection, onRenameClick, onDelete, 
         parts.push(piLabel ?? 'DataPilot Backend')
         break
       }
-      case 'pi_compat': parts.push('DataPilot Backend Compatible'); break
+      case 'pi_compat':
+        parts.push(connection.baseUrl?.toLowerCase().includes('manifest.build')
+          ? 'Manifest'
+          : 'DataPilot Backend Compatible')
+        break
       default: parts.push(provider || 'Unknown')
     }
 
@@ -970,7 +974,7 @@ export default function AiSettingsPage() {
                       label: conn.name,
                       description: conn.providerType === 'anthropic' ? 'Anthropic API' :
                                    conn.providerType === 'pi' ? 'DataPilot Backend' :
-                                   conn.providerType === 'pi_compat' ? 'DataPilot Backend Compatible' :
+                                   conn.providerType === 'pi_compat' ? (conn.baseUrl?.toLowerCase().includes('manifest.build') ? 'Manifest' : 'DataPilot Backend Compatible') :
                                    conn.providerType || 'Unknown',
                     }))}
                   />

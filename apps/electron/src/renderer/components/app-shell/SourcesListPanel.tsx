@@ -89,6 +89,7 @@ export function SourcesListPanel({
       selectedId={selectedSourceSlug}
       onItemClick={onSourceClick}
       className={className}
+      containerProps={{ 'data-list-role': 'sources' }}
       emptyState={
         <EntityListEmptyScreen
           icon={<DatabaseZap />}

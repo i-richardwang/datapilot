@@ -107,13 +107,11 @@ export function registerLlmConnectionsHandlers(server: RpcServer, deps: HandlerD
       if (customEndpoint) {
         updates.customEndpoint = customEndpoint
         if (customEndpoint.api === 'anthropic-claude-sdk') {
-          // Route through ClaudeAgent (Anthropic SDK) for true Anthropic-compatible endpoints.
           updates.providerType = 'anthropic_compat'
           updates.authType = 'api_key_with_endpoint'
           updates.piAuthProvider = undefined
           updates.name = 'Claude Agent SDK'
         } else {
-          // Route custom OpenAI/Anthropic-compatible endpoints through PiAgent.
           updates.providerType = 'pi_compat'
           const branch = resolveCustomEndpointSetup({
             baseUrl: setup.baseUrl ?? undefined,
@@ -123,6 +121,10 @@ export function registerLlmConnectionsHandlers(server: RpcServer, deps: HandlerD
           updates.authType = branch.authType
           if (branch.name !== undefined) updates.name = branch.name
           if (branch.piAuthProvider !== undefined) updates.piAuthProvider = branch.piAuthProvider
+
+          if (isNewConnection && !updates.name && setup.baseUrl?.toLowerCase().includes('manifest.build')) {
+            updates.name = 'Manifest'
+          }
         }
       } else if (setup.baseUrl !== undefined) {
         // Base URL was explicitly updated without custom protocol config.

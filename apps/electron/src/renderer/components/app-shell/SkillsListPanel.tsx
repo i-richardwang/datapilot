@@ -53,6 +53,7 @@ export function SkillsListPanel({
       selectedId={selectedSkillSlug}
       onItemClick={onSkillClick}
       className={className}
+      containerProps={{ 'data-list-role': 'skills' }}
       emptyState={
         <EntityListEmptyScreen
           icon={<Zap />}
