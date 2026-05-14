@@ -42,6 +42,7 @@ import {
   FolderOpen,
   Globe,
   Link2Off,
+  Lock,
   MailOpen,
   MessageSquare,
   Pencil,
@@ -78,10 +79,11 @@ import { getFileManagerName } from '@/lib/platform'
 import { useMessagingConnect, type MessagingPlatform } from '@/components/messaging/MessagingSessionMenuItem'
 import { useSessionMenuActions } from '@/hooks/useSessionMenuActions'
 import { FEATURE_FLAGS } from '@craft-agent/shared/feature-flags'
+import { SharePasswordDialog, type SharePasswordMode } from './SharePasswordDialog'
 
 const isWebMode = window.electronAPI.getRuntimeEnvironment() === 'web'
 
-type View = 'root' | 'status' | 'labels' | 'share' | 'messaging'
+type View = 'root' | 'status' | 'labels' | 'shareOptions' | 'share' | 'messaging'
 
 export interface CompactSessionMenuProps {
   /** Title text shown in the trigger button + drawer header. */
@@ -152,12 +154,24 @@ export function CompactSessionMenu({
   const isFlagged = item.isFlagged ?? false
   const isArchived = item.isArchived ?? false
   const sharedUrl = item.sharedUrl
+  const sharedPasswordSet = item.sharedPasswordSet === true
   const currentSessionStatus = getSessionStatus(item)
   const sessionLabels = item.labels ?? []
   const _hasMessages = hasMessagesMeta(item)
   const _hasUnread = hasUnreadMeta(item)
 
   const actions = useSessionMenuActions({ item, onLabelsChange })
+
+  // Password-dialog state — single dialog handles share/set/change flows.
+  // Rendered as a sibling to <Drawer> so the dialog survives the drawer close.
+  const [passwordDialog, setPasswordDialog] = React.useState<{ open: boolean; mode: SharePasswordMode }>({
+    open: false,
+    mode: 'share',
+  })
+  const openPasswordDialog = React.useCallback((mode: SharePasswordMode) => {
+    setPasswordDialog({ open: true, mode })
+    setOpen(false)
+  }, [])
 
   const flatLabelItems = React.useMemo(
     (): LabelMenuItem[] => createLabelMenuItems(labels),
@@ -190,17 +204,19 @@ export function CompactSessionMenu({
   // ---------------------------------------------------------------------------
   const headerTitle = (() => {
     switch (view) {
-      case 'status':    return t('sessionMenu.status')
-      case 'labels':    return t('sessionMenu.labels')
-      case 'share':     return t('sessionMenu.shared')
-      case 'messaging': return t('sessionMenu.connectMessaging')
-      default:          return title ?? ''
+      case 'status':       return t('sessionMenu.status')
+      case 'labels':       return t('sessionMenu.labels')
+      case 'shareOptions': return t('sessionMenu.share')
+      case 'share':        return t('sessionMenu.shared')
+      case 'messaging':    return t('sessionMenu.connectMessaging')
+      default:             return title ?? ''
     }
   })()
 
   const showBack = view !== 'root'
 
   return (
+    <>
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerTrigger asChild>
         <button
@@ -263,7 +279,7 @@ export function CompactSessionMenu({
               hasMessages={_hasMessages}
               hasUnread={_hasUnread}
               hasRemoteWorkspaces={hasRemoteWorkspaces}
-              onShare={closeAfter(actions.share)}
+              onOpenShareOptionsSub={() => setView('shareOptions')}
               onOpenShareSub={() => setView('share')}
               onSendToWorkspace={closeAfter(onSendToWorkspace)}
               onOpenMessagingSub={() => setView('messaging')}
@@ -303,11 +319,20 @@ export function CompactSessionMenu({
             />
           )}
 
+          {view === 'shareOptions' && (
+            <ShareOptionsPane
+              onSharePublic={closeAfter(actions.share)!}
+              onShareWithPassword={() => openPasswordDialog('share')}
+            />
+          )}
+
           {view === 'share' && sharedUrl && (
             <SharePane
+              sharedPasswordSet={sharedPasswordSet}
               onOpenInBrowser={closeAfter(actions.openSharedInBrowser)!}
               onCopyLink={closeAfter(actions.copySharedLink)!}
               onUpdateShare={closeAfter(actions.updateShare)!}
+              onChangePassword={() => openPasswordDialog('change')}
               onRevokeShare={closeAfter(actions.revokeShare)!}
             />
           )}
@@ -318,6 +343,13 @@ export function CompactSessionMenu({
         </div>
       </DrawerContent>
     </Drawer>
+    <SharePasswordDialog
+      open={passwordDialog.open}
+      onOpenChange={(next) => setPasswordDialog((prev) => ({ ...prev, open: next }))}
+      mode={passwordDialog.mode}
+      sessionId={item.id}
+    />
+    </>
   )
 }
 
@@ -336,7 +368,7 @@ interface RootPaneProps {
   hasMessages: boolean
   hasUnread: boolean
   hasRemoteWorkspaces?: boolean
-  onShare?: () => void
+  onOpenShareOptionsSub: () => void
   onOpenShareSub: () => void
   onSendToWorkspace?: () => void
   onOpenMessagingSub: () => void
@@ -367,7 +399,7 @@ function RootPane({
   hasMessages,
   hasUnread,
   hasRemoteWorkspaces,
-  onShare,
+  onOpenShareOptionsSub,
   onOpenShareSub,
   onSendToWorkspace,
   onOpenMessagingSub,
@@ -398,9 +430,15 @@ function RootPane({
 
   return (
     <div className="flex flex-col">
-      {/* Share / Shared */}
+      {/* Share / Shared — chevron in both cases since both lead to a sub-pane
+          (Public vs With Password for unshared; share-action list for shared). */}
       {!sharedUrl ? (
-        <Row icon={<CloudUpload className="h-4 w-4" />} label={t('sessionMenu.share')} onTap={onShare} />
+        <Row
+          icon={<CloudUpload className="h-4 w-4" />}
+          label={t('sessionMenu.share')}
+          chevron
+          onTap={onOpenShareOptionsSub}
+        />
       ) : (
         <Row
           icon={<CloudUpload className="h-4 w-4" />}
@@ -553,15 +591,43 @@ function LabelsPane({
   )
 }
 
+function ShareOptionsPane({
+  onSharePublic,
+  onShareWithPassword,
+}: {
+  onSharePublic: () => void
+  onShareWithPassword: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="flex flex-col">
+      <Row
+        icon={<CloudUpload className="h-4 w-4" />}
+        label={t('sessionMenu.sharePublic')}
+        onTap={onSharePublic}
+      />
+      <Row
+        icon={<Lock className="h-4 w-4" />}
+        label={t('sessionMenu.shareWithPassword')}
+        onTap={onShareWithPassword}
+      />
+    </div>
+  )
+}
+
 function SharePane({
+  sharedPasswordSet,
   onOpenInBrowser,
   onCopyLink,
   onUpdateShare,
+  onChangePassword,
   onRevokeShare,
 }: {
+  sharedPasswordSet: boolean
   onOpenInBrowser: () => void
   onCopyLink: () => void
   onUpdateShare: () => void
+  onChangePassword: () => void
   onRevokeShare: () => void
 }) {
   const { t } = useTranslation()
@@ -570,6 +636,9 @@ function SharePane({
       <Row icon={<Globe className="h-4 w-4" />} label={t('sessionMenu.openInBrowser')} onTap={onOpenInBrowser} />
       <Row icon={<Copy className="h-4 w-4" />} label={t('sessionMenu.copyLink')} onTap={onCopyLink} />
       <Row icon={<RefreshCw className="h-4 w-4" />} label={t('sessionMenu.updateShare')} onTap={onUpdateShare} />
+      {sharedPasswordSet && (
+        <Row icon={<Lock className="h-4 w-4" />} label={t('sessionMenu.changeSharePassword')} onTap={onChangePassword} />
+      )}
       <Separator />
       <Row icon={<Link2Off className="h-4 w-4" />} label={t('sessionMenu.stopSharing')} destructive onTap={onRevokeShare} />
     </div>

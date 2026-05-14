@@ -21,6 +21,8 @@ import { getDateLocale } from '@craft-agent/shared/i18n'
 import { parseLabelEntry, flattenLabels, type LabelConfig } from '@craft-agent/shared/labels'
 import { BatchAvatar } from './BatchAvatar'
 import { BatchMenu } from './BatchMenu'
+import { CompactBatchMenu } from './CompactBatchMenu'
+import { useAppShellContext } from '@/context/AppShellContext'
 import { cn } from '@/lib/utils'
 import {
   BATCH_STATUS_DISPLAY_KEY,
@@ -82,6 +84,7 @@ function BatchItem({
   onLabelsChange,
 }: BatchItemProps) {
   const { t } = useTranslation()
+  const { isCompactMode } = useAppShellContext()
   const status: BatchStatus = batch.progress?.status ?? 'pending'
   const statusColors = BATCH_STATUS_COLOR[status]
   const progressText = batch.progress
@@ -146,19 +149,38 @@ function BatchItem({
         ) : undefined
       }
       menuContent={
-        <BatchMenu
-          batchId={batch.id ?? ''}
-          status={status}
-          labels={labelTree}
-          batchLabels={batch.labels}
-          onLabelsChange={handleLabelsChange}
-          onStart={onStart}
-          onPause={onPause}
-          onResume={onResume}
-          onTest={onTest}
-          onDuplicate={onDuplicate}
-          onDelete={onDelete}
-        />
+        isCompactMode ? undefined : (
+          <BatchMenu
+            batchId={batch.id ?? ''}
+            status={status}
+            labels={labelTree}
+            batchLabels={batch.labels}
+            onLabelsChange={handleLabelsChange}
+            onStart={onStart}
+            onPause={onPause}
+            onResume={onResume}
+            onTest={onTest}
+            onDuplicate={onDuplicate}
+            onDelete={onDelete}
+          />
+        )
+      }
+      overlay={
+        isCompactMode ? (
+          <CompactBatchMenu
+            batchName={batch.name}
+            status={status}
+            labels={labelTree}
+            batchLabels={batch.labels}
+            onLabelsChange={handleLabelsChange}
+            onStart={onStart}
+            onPause={onPause}
+            onResume={onResume}
+            onTest={onTest}
+            onDuplicate={onDuplicate}
+            onDelete={onDelete}
+          />
+        ) : undefined
       }
     />
   )
