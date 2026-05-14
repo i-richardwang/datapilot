@@ -72,4 +72,44 @@ describe('sandbox-env', () => {
     expect(env.XDG_CACHE_HOME).toBeUndefined();
     expect(env.PYTHONPYCACHEPREFIX).toBeUndefined();
   });
+
+  it('injects DATAPILOT_WORKSPACE when workspaceId is given', () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'sandbox-env-ws-'));
+    createdDirs.push(dataDir);
+
+    const env = createScriptRuntimeEnv({
+      language: 'node',
+      dataDir,
+      workspaceId: 'talent-graph',
+    }, {});
+
+    expect(env.DATAPILOT_WORKSPACE).toBe('talent-graph');
+  });
+
+  it('omits DATAPILOT_WORKSPACE when workspaceId is not given', () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'sandbox-env-no-ws-'));
+    createdDirs.push(dataDir);
+
+    const env = createScriptRuntimeEnv({
+      language: 'node',
+      dataDir,
+    }, {});
+
+    expect(env.DATAPILOT_WORKSPACE).toBeUndefined();
+  });
+
+  it('workspaceId option overrides any DATAPILOT_WORKSPACE inherited from baseEnv', () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'sandbox-env-ws-override-'));
+    createdDirs.push(dataDir);
+
+    const env = createScriptRuntimeEnv({
+      language: 'node',
+      dataDir,
+      workspaceId: 'session-ws',
+    }, {
+      DATAPILOT_WORKSPACE: 'host-ws',
+    });
+
+    expect(env.DATAPILOT_WORKSPACE).toBe('session-ws');
+  });
 });

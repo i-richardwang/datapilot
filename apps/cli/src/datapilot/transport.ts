@@ -164,6 +164,17 @@ export async function connect(opts: ConnectOptions): Promise<{ client: CliRpcCli
   return { client, endpoint }
 }
 
+export interface WorkspaceResolution {
+  id: string
+  /** Where the workspace selection came from. `fallback` means the caller did
+   * not specify one and the server's first workspace was used. */
+  source: 'flag' | 'env' | 'fallback'
+  /** Fallback happened in a multi-workspace setup — the picked id may not be
+   * what the caller expected. Always false for `flag`/`env`, and for
+   * `fallback` when the server only has one workspace (no ambiguity). */
+  ambiguous: boolean
+}
+
 /**
  * Resolve a workspace ID for entity commands that require one.
  *
@@ -178,10 +189,7 @@ export async function connect(opts: ConnectOptions): Promise<{ client: CliRpcCli
 export async function resolveWorkspaceId(
   client: CliRpcClient,
   explicit?: string,
-): Promise<string | undefined> {
-  const fromEnv = process.env.DATAPILOT_WORKSPACE
-  const requested = explicit ?? (fromEnv && fromEnv.length > 0 ? fromEnv : undefined)
-
+): Promise<WorkspaceResolution | undefined> {
   let workspaces: Array<{ id: string; slug?: string; name?: string }> | undefined
   try {
     workspaces = (await client.invoke('workspaces:get')) as typeof workspaces
@@ -189,19 +197,29 @@ export async function resolveWorkspaceId(
     /* Fall through */
   }
 
-  if (requested) {
+  if (explicit) {
     const match = workspaces?.find(
-      w => w.id === requested || w.slug === requested || w.name === requested,
+      w => w.id === explicit || w.slug === explicit || w.name === explicit,
     )
-    const resolved = match?.id ?? requested
+    const resolved = match?.id ?? explicit
     await client.invoke('window:switchWorkspace', resolved).catch(() => {})
-    return resolved
+    return { id: resolved, source: 'flag', ambiguous: false }
+  }
+
+  const fromEnv = process.env.DATAPILOT_WORKSPACE
+  if (fromEnv && fromEnv.length > 0) {
+    const match = workspaces?.find(
+      w => w.id === fromEnv || w.slug === fromEnv || w.name === fromEnv,
+    )
+    const resolved = match?.id ?? fromEnv
+    await client.invoke('window:switchWorkspace', resolved).catch(() => {})
+    return { id: resolved, source: 'env', ambiguous: false }
   }
 
   if (workspaces && workspaces.length > 0) {
     const id = workspaces[0]!.id
     await client.invoke('window:switchWorkspace', id).catch(() => {})
-    return id
+    return { id, source: 'fallback', ambiguous: workspaces.length > 1 }
   }
   return undefined
 }

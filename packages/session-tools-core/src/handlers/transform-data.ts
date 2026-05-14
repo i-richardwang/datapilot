@@ -11,7 +11,7 @@ import type { SessionToolContext } from '../context.ts';
 import type { ToolResult } from '../types.ts';
 import { successResponse, errorResponse } from '../response.ts';
 import { spawn } from 'node:child_process';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { createScriptRuntimeEnv } from '../runtime/sandbox-env.ts';
@@ -93,10 +93,12 @@ export async function handleTransformData(
     const cmd = runtime.command;
     const spawnArgs = [...runtime.argsPrefix, tempScript, ...resolvedInputs, resolvedOutput];
 
-    // Strip sensitive env vars + redirect runtime cache/temp paths to session data dir
+    // Strip sensitive env vars + redirect runtime cache/temp paths to session data dir.
+    // Workspace id binds any `dtpilot` shell-out to this session's workspace.
     const env = createScriptRuntimeEnv({
       language: args.language,
       dataDir,
+      workspaceId: basename(ctx.workspacePath),
     });
 
     // Spawn subprocess with manual timeout that escalates to SIGKILL.

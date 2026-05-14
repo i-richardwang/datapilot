@@ -21,7 +21,7 @@ entities/actions.
 |------|-------------|
 | `--url <ws-url>` | Server URL (default: `ws://127.0.0.1:9100`, env: `DATAPILOT_SERVER_URL`) |
 | `--token <secret>` | Bearer token (env: `DATAPILOT_SERVER_TOKEN`, or discovery file) |
-| `--workspace <id\|slug\|name>` | Workspace identifier (env: `DATAPILOT_WORKSPACE`; auto-detected from the server if omitted) |
+| `--workspace <id\|slug\|name>` | Workspace identifier (env: `DATAPILOT_WORKSPACE`; auto-detected from the server if omitted — in multi-workspace setups, omitting it emits a `warning:` carrying the picked id, since the default may not match what you expected) |
 | `--timeout <ms>` | Per-request timeout (default: `30000`) |
 | `--tls-ca <path>` | Custom CA cert for self-signed `wss://` (env: `DATAPILOT_TLS_CA`) |
 | `--json` | Force JSON envelope output (default for non-TTY stdout) |

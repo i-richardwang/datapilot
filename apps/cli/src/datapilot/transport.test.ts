@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { existsSync, mkdirSync, writeFileSync, unlinkSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { resolveEndpoint, readDiscoveryFile, describeConnection, DEFAULT_URL, DISCOVERY_FILE } from './transport.ts'
+import { resolveEndpoint, readDiscoveryFile, describeConnection, resolveWorkspaceId, DEFAULT_URL, DISCOVERY_FILE } from './transport.ts'
+import type { CliRpcClient } from '../client.ts'
 
 const PREV_URL = process.env.DATAPILOT_SERVER_URL
 const PREV_TOKEN = process.env.DATAPILOT_SERVER_TOKEN
@@ -100,6 +101,74 @@ describe('describeConnection', () => {
     const info = describeConnection({ url: 'not a url', token: undefined, source: 'flag' })
     expect(info.host).toBe('')
     expect(info.sameMachine).toBe(false)
+  })
+})
+
+describe('resolveWorkspaceId', () => {
+  const PREV_WORKSPACE = process.env.DATAPILOT_WORKSPACE
+  const WORKSPACES = [
+    { id: 'ws-alpha', slug: 'alpha', name: 'Alpha' },
+    { id: 'ws-beta', slug: 'beta', name: 'Beta' },
+  ]
+
+  beforeEach(() => {
+    delete process.env.DATAPILOT_WORKSPACE
+  })
+
+  afterEach(() => {
+    if (PREV_WORKSPACE === undefined) delete process.env.DATAPILOT_WORKSPACE
+    else process.env.DATAPILOT_WORKSPACE = PREV_WORKSPACE
+  })
+
+  function fakeClient(): CliRpcClient {
+    return {
+      invoke: async (channel: string) => {
+        if (channel === 'workspaces:get') return WORKSPACES
+        return undefined
+      },
+    } as unknown as CliRpcClient
+  }
+
+  it('reports source=flag when --workspace given', async () => {
+    process.env.DATAPILOT_WORKSPACE = 'beta' // should be overridden
+    const r = await resolveWorkspaceId(fakeClient(), 'alpha')
+    expect(r?.id).toBe('ws-alpha')
+    expect(r?.source).toBe('flag')
+    expect(r?.ambiguous).toBe(false)
+  })
+
+  it('reports source=env when only $DATAPILOT_WORKSPACE set', async () => {
+    process.env.DATAPILOT_WORKSPACE = 'beta'
+    const r = await resolveWorkspaceId(fakeClient(), undefined)
+    expect(r?.id).toBe('ws-beta')
+    expect(r?.source).toBe('env')
+    expect(r?.ambiguous).toBe(false)
+  })
+
+  it('reports source=fallback + ambiguous when multi-workspace and nothing set', async () => {
+    const r = await resolveWorkspaceId(fakeClient(), undefined)
+    expect(r?.id).toBe('ws-alpha')
+    expect(r?.source).toBe('fallback')
+    expect(r?.ambiguous).toBe(true)
+  })
+
+  it('reports source=fallback + NOT ambiguous when server has exactly one workspace', async () => {
+    const single = {
+      invoke: async (channel: string) => {
+        if (channel === 'workspaces:get') return [{ id: 'ws-only', slug: 'only', name: 'Only' }]
+        return undefined
+      },
+    } as unknown as CliRpcClient
+    const r = await resolveWorkspaceId(single, undefined)
+    expect(r?.id).toBe('ws-only')
+    expect(r?.source).toBe('fallback')
+    expect(r?.ambiguous).toBe(false)
+  })
+
+  it('returns undefined when server has zero workspaces and nothing requested', async () => {
+    const empty = { invoke: async () => [] } as unknown as CliRpcClient
+    const r = await resolveWorkspaceId(empty, undefined)
+    expect(r).toBeUndefined()
   })
 })
 

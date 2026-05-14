@@ -19,7 +19,7 @@
  */
 
 import { parseArgs, UsageError } from './datapilot/args.ts'
-import { ok, fail, setOutputMode } from './datapilot/envelope.ts'
+import { ok, fail, setOutputMode, warn } from './datapilot/envelope.ts'
 import { connect, resolveEndpoint, resolveWorkspaceId, ConnectionError } from './datapilot/transport.ts'
 import { isEntity, type RouteCtx, ENTITIES } from './datapilot/router.ts'
 import { printTopHelp, printEntityHelp, printActionHelp } from './datapilot/help.ts'
@@ -116,7 +116,17 @@ function createCtx(args: ReturnType<typeof parseArgs>): RouteCtx {
     if (workspacePromise) return workspacePromise
     workspacePromise = (async () => {
       const client = await getClient()
-      return resolveWorkspaceId(client, args.global.workspace)
+      const resolution = await resolveWorkspaceId(client, args.global.workspace)
+      if (resolution?.ambiguous) {
+        // Only warn when the server has multiple workspaces and the caller
+        // didn't pick one. Single-workspace setups have no ambiguity, so
+        // staying silent there avoids per-command noise.
+        warn(
+          `workspace not specified; defaulted to "${resolution.id}" — ` +
+          `pass --workspace or set $DATAPILOT_WORKSPACE to silence`,
+        )
+      }
+      return resolution?.id
     })()
     return workspacePromise
   }

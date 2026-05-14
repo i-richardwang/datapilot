@@ -38,6 +38,12 @@ export function createSanitizedEnv(baseEnv: NodeJS.ProcessEnv = process.env): No
 export interface ScriptRuntimeEnvOptions {
   language: ScriptRuntimeLanguage;
   dataDir: string;
+  /** Workspace id (or slug) of the calling session. When set, exposed to the
+   * subprocess as `DATAPILOT_WORKSPACE` so any `dtpilot` invocation inside the
+   * script targets this session's workspace instead of the server's first one.
+   * Without this, `transform_data` / `script_sandbox` subprocesses inherit the
+   * main process env, which has no per-session workspace binding. */
+  workspaceId?: string;
 }
 
 /**
@@ -73,6 +79,10 @@ export function createScriptRuntimeEnv(
     env.UV_CACHE_DIR = uvCacheDir;
     env.XDG_CACHE_HOME = xdgCacheHome;
     env.PYTHONPYCACHEPREFIX = pythonPyCachePrefix;
+  }
+
+  if (options.workspaceId) {
+    env.DATAPILOT_WORKSPACE = options.workspaceId;
   }
 
   return env;

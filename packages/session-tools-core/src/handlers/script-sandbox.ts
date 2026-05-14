@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import type { SessionToolContext } from '../context.ts';
 import { errorResponse, successResponse } from '../response.ts';
 import type { ToolResult } from '../types.ts';
@@ -120,6 +120,7 @@ export async function handleScriptSandbox(
     const env = createScriptRuntimeEnv({
       language: args.language,
       dataDir,
+      workspaceId: basename(ctx.workspacePath),
     });
 
     const startedAt = Date.now();
