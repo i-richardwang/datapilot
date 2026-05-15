@@ -6350,7 +6350,9 @@ export class SessionManager implements ISessionManager {
 
           // If the last user message is newer than any assistant response, we got no reply
           // This can happen due to context overflow or API issues
+          let turnFailedWithoutResponse = false
           if (lastUserMsg && (!lastAssistantMsg || lastUserMsg.timestamp > lastAssistantMsg.timestamp)) {
+            turnFailedWithoutResponse = true
             sessionLog.warn(`Session ${sessionId} completed without assistant response - possible context overflow or API issue`)
 
             // Check if there's a captured API error that explains the silent failure.
@@ -6396,7 +6398,11 @@ export class SessionManager implements ISessionManager {
 
           sendSpan.mark('chat.complete')
           sendSpan.end()
-          this.onProcessingStopped(sessionId, 'complete')
+          // A turn that ended without producing any assistant response is a failure
+          // from the batch/automation perspective — propagate as 'error' so batch
+          // processors mark the item failed (and retry per config) instead of
+          // mistakenly marking it succeeded and advancing.
+          this.onProcessingStopped(sessionId, turnFailedWithoutResponse ? 'error' : 'complete')
           return  // Exit function, skip finally block (onProcessingStopped handles cleanup)
         }
 
