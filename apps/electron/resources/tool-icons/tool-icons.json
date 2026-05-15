@@ -1,7 +1,7 @@
 {
   "version": 1,
   "tools": [
-    { "id": "datapilot", "displayName": "DataPilot", "icon": "craft-agent.svg", "commands": ["datapilot"] },
+    { "id": "datapilot", "displayName": "DataPilot", "icon": "datapilot.svg", "commands": ["datapilot"] },
     { "id": "git", "displayName": "Git", "icon": "git.ico", "commands": ["git"] },
     { "id": "github", "displayName": "GitHub", "icon": "github.png", "commands": ["gh"] },
     { "id": "npm", "displayName": "npm", "icon": "npm.png", "commands": ["npm", "npx"] },

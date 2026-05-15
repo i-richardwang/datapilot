@@ -1,0 +1,13 @@
+<!-- Brand color from theme accent (see packages/shared/src/config/theme.ts: DEFAULT_THEME.accent) -->
+<svg
+  width="24"
+  height="24"
+  viewBox="-205 -196.5 1230 1230"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <path
+    fill="#D87943"
+    fill-rule="evenodd"
+    d="M0 0H564V78H666V154H769V257H820V633H769V718H718V786H615V837H0V666H102V206H0ZM308 206H512V257H564V334H615V530H564V597H512V666H308Z"
+  />
+</svg>
