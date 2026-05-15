@@ -1,5 +1,5 @@
 #!/bin/sh
-# dtpilot — agent-facing CLI wrapper.
+# datapilot — agent-facing CLI wrapper.
 #
 # Dispatches to the unified CLI entry at $DATAPILOT_CLI_ENTRY.
 export DATAPILOT_CLI_JSON_ONLY="${DATAPILOT_CLI_JSON_ONLY:-1}"

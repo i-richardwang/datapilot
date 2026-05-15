@@ -127,7 +127,7 @@ export interface Session {
  *
  * Distinct from `Session` (the full UI/persistence DTO): this is the 10-field
  * agent-facing snapshot — identity + config + runtime location, no UI noise
- * (sharing/archive/branch/SDK internals). Used by `dtpilot session get` and the
+ * (sharing/archive/branch/SDK internals). Used by `datapilot session get` and the
  * session self-management tooling.
  */
 export interface SessionInfo {

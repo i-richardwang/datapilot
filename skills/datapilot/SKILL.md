@@ -1,12 +1,12 @@
 ---
 name: datapilot
-description: 把当前 session 干不完/不该干的长任务委派给 DataPilot 后台跑——一次性分析/渲染、批量并发、定时或事件驱动的 automation 都能搞。典型触发场景：用户说"后台跑"、"委派给另一个 agent"、"批量处理一堆 item"、"定时任务 / 事件触发"、"跑完给我分享链接"、"不想占着当前会话"；或显式提到 dtpilot / DataPilot / session / batch / automation 这些原语。通过 `dtpilot` CLI（npm 包 `dtpilot`）操作远程 DataPilot server，本机无需是 DataPilot runtime。
+description: 把当前 session 干不完/不该干的长任务委派给 DataPilot 后台跑——一次性分析/渲染、批量并发、定时或事件驱动的 automation 都能搞。典型触发场景：用户说"后台跑"、"委派给另一个 agent"、"批量处理一堆 item"、"定时任务 / 事件触发"、"跑完给我分享链接"、"不想占着当前会话"；或显式提到 datapilot / DataPilot / session / batch / automation 这些原语。通过 `datapilot` CLI（npm 包 `datapilot`）操作远程 DataPilot server，本机无需是 DataPilot runtime。
 allowed-tools: Bash, Read
 ---
 
 # 调用 DataPilot
 
-在**其他项目**里把 DataPilot 当作"专业工人"用：当前 agent 通过 `dtpilot` CLI 把任务委派给 DataPilot server，拿回产物继续干自己的事。server 可以在本机也可以远程。
+在**其他项目**里把 DataPilot 当作"专业工人"用：当前 agent 通过 `datapilot` CLI 把任务委派给 DataPilot server，拿回产物继续干自己的事。server 可以在本机也可以远程。
 
 ## 三个原语怎么选
 
@@ -18,7 +18,7 @@ allowed-tools: Bash, Read
 
 ## References
 
-- [references/cli.md](references/cli.md) — 实体 / action 语义、字段、枚举、陷阱的权威参考。执行任何 `dtpilot <entity>` 命令前加载。
+- [references/cli.md](references/cli.md) — 实体 / action 语义、字段、枚举、陷阱的权威参考。执行任何 `datapilot <entity>` 命令前加载。
 - [references/connection.md](references/connection.md) — URL / token / TLS / workspace 检测。第一次跑、`CONNECTION_ERROR`、切远程 server、数据看起来空时查。
 - [references/task-delegation.md](references/task-delegation.md) — 提交 → 轮询 → 读产物 的三步模型。起任何长任务前读。
 
@@ -62,54 +62,54 @@ allowed-tools: Bash, Read
 **把对话里的任务委派成一个 session**（最常见路径）：
 ```bash
 # 1. 提交（send 立即返回，agent 在 server 后台跑）
-ID=$(dtpilot session create --name "分析 Q3 销售" | jq -r .data.id)
-dtpilot session send "$ID" "读取 /data/sales.csv 并生成趋势报告"
+ID=$(datapilot session create --name "分析 Q3 销售" | jq -r .data.id)
+datapilot session send "$ID" "读取 /data/sales.csv 并生成趋势报告"
 
 # 2. 过一阵回来看
-while [ "$(dtpilot session get "$ID" | jq -r .data.isProcessing)" = "true" ]; do sleep 2; done
+while [ "$(datapilot session get "$ID" | jq -r .data.isProcessing)" = "true" ]; do sleep 2; done
 
 # 3. 读产物（messages 返回整个 session 对象，消息在 .data.messages[]）
-dtpilot session messages "$ID" | jq -r '.data.messages[-1].content'
+datapilot session messages "$ID" | jq -r '.data.messages[-1].content'
 
 # 可选：让 session 生成的 HTML 报告转成可分享 URL 给上游 agent
-dtpilot session share "$ID" --html ./report.html | jq -r '.data.url'
+datapilot session share "$ID" --html ./report.html | jq -r '.data.url'
 ```
 
 **批量任务 — 通过 session 启动**（没有现成 server 数据文件时的常用路径）：
 ```bash
-ID=$(dtpilot session create --name "批量分析 sales" \
+ID=$(datapilot session create --name "批量分析 sales" \
   --input '{"enabledSourceSlugs":["sales-db"]}' | jq -r .data.id)
-dtpilot session send "$ID" "对 sales 表按 region 做分类统计，每 region 输出 {region, total, avg}。并发处理，完成后以 markdown 表格回复。"
-while [ "$(dtpilot session get "$ID" | jq -r .data.isProcessing)" = "true" ]; do sleep 5; done
-dtpilot session messages "$ID" | jq -r '.data.messages[-1].content'
+datapilot session send "$ID" "对 sales 表按 region 做分类统计，每 region 输出 {region, total, avg}。并发处理，完成后以 markdown 表格回复。"
+while [ "$(datapilot session get "$ID" | jq -r .data.isProcessing)" = "true" ]; do sleep 5; done
+datapilot session messages "$ID" | jq -r '.data.messages[-1].content'
 ```
 
 **直连 batch**（数据已在 server 路径上、或只是改已有 batch 的 prompt 重跑）：
 ```bash
-BATCH=$(dtpilot batch create --input "$(cat batch-config.json)" | jq -r .data.id)
-dtpilot batch start "$BATCH"
+BATCH=$(datapilot batch create --input "$(cat batch-config.json)" | jq -r .data.id)
+datapilot batch start "$BATCH"
 while :; do
-  STATUS=$(dtpilot batch get "$BATCH" | jq -r .data.progress.status)
+  STATUS=$(datapilot batch get "$BATCH" | jq -r .data.progress.status)
   case "$STATUS" in completed|failed) break ;; esac
   sleep 10
 done
-dtpilot batch items "$BATCH" | jq '.data.items[]'    # 每条 item 的 id + state.{status, sessionId, summary}
+datapilot batch items "$BATCH" | jq '.data.items[]'    # 每条 item 的 id + state.{status, sessionId, summary}
 ```
 
-`batch items` 返回的是 item state（`.data.items[].state`），**不是** agent 的回复，也不是 output JSONL 内容本身。需要回复内容：按 `.state.sessionId` 起 `dtpilot session messages <sid>` 读；需要 output JSONL 原文：另起一个 session 去读 `output.path`。
+`batch items` 返回的是 item state（`.data.items[].state`），**不是** agent 的回复，也不是 output JSONL 内容本身。需要回复内容：按 `.state.sessionId` 起 `datapilot session messages <sid>` 读；需要 output JSONL 原文：另起一个 session 去读 `output.path`。
 
 **prompt 里引用 item 字段**用 shell env 语法 `${BATCH_ITEM_<FIELD_UPPER>}`（或 `$BATCH_ITEM_<FIELD_UPPER>`），比如 item 是 `{"id":1,"text":"..."}`，prompt 里写 `${BATCH_ITEM_TEXT}`；写成 `{{text}}` 不会被替换。
 
 **装一个事件驱动的 automation**：
 ```bash
-AID=$(dtpilot automation create --name "xxx" --event "<EventName>" --input "$(cat automation.json)" | jq -r .data.id)
-dtpilot automation enable "$AID"
-dtpilot automation history "$AID" --limit 20   # 事后查执行
+AID=$(datapilot automation create --name "xxx" --event "<EventName>" --input "$(cat automation.json)" | jq -r .data.id)
+datapilot automation enable "$AID"
+datapilot automation history "$AID" --limit 20   # 事后查执行
 ```
 
 ## 失败模式快速定位
 
 - `CONNECTION_ERROR` → server 没起 / URL 错 / token 错 → 查 [connection.md](references/connection.md)
-- `VALIDATION_ERROR: No workspace available` → `dtpilot workspace list` 确认，显式传 `--workspace <id>`
+- `VALIDATION_ERROR: No workspace available` → `datapilot workspace list` 确认，显式传 `--workspace <id>`
 - `NOT_FOUND: Session/Batch '...' not found` → ID 错或在别的 workspace → 带上正确的 `--workspace`
 - `USAGE_ERROR` → 看 `suggestion` 字段，错误消息通常会直接指出正确用法

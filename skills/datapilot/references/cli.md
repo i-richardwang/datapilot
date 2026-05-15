@@ -1,16 +1,16 @@
 ---
 name: datapilot-cli
-description: dtpilot CLI 命令参考。执行任何 dtpilot 命令前加载。只记录 `dtpilot <entity>`（不带 action）列不出来的东西：输入规则、字段、返回结构、枚举、陷阱。
+description: datapilot CLI 命令参考。执行任何 datapilot 命令前加载。只记录 `datapilot <entity>`（不带 action）列不出来的东西：输入规则、字段、返回结构、枚举、陷阱。
 ---
 
 # CLI 命令参考
 
-**一手信息来源**：`dtpilot <entity>` 不带 action 会返回该实体的 action 列表；每个 action 的 positional/flag 用法在出错时通常由 `suggestion` 字段给出。本文件记录 **action 列表看不到的东西**：输入规则、必需字段、返回 JSON 结构、枚举值、陷阱。
+**一手信息来源**：`datapilot <entity>` 不带 action 会返回该实体的 action 列表；每个 action 的 positional/flag 用法在出错时通常由 `suggestion` 字段给出。本文件记录 **action 列表看不到的东西**：输入规则、必需字段、返回 JSON 结构、枚举值、陷阱。
 
 ## Usage 语法
 
 ```
-dtpilot [global-flags] <entity> [action] [positionals...] [flags...]
+datapilot [global-flags] <entity> [action] [positionals...] [flags...]
 ```
 
 只传 entity（不带 action）→ 返回该 entity 的 action 列表（JSON）。`--` 结束 flag 解析，后续全按 positional 对待。
@@ -44,7 +44,7 @@ dtpilot [global-flags] <entity> [action] [positionals...] [flags...]
 Server 端 schema 可能会演进，硬编码字段容易过时。不知道怎么填 `--input` 时按这三招依次试：
 
 1. **不带必需字段跑一次**，让错误消息吐合法值。例如不带 `--event` 跑 `automation create`，错误消息会把所有合法事件名列出来。
-2. **观察现有实例**：`dtpilot <entity> list | jq '.data[0]'` 拿一个现成的当模板。对 automation 这类按事件分组的：`dtpilot automation list | jq '.data.automations.<EventName>[0]'`。
+2. **观察现有实例**：`datapilot <entity> list | jq '.data[0]'` 拿一个现成的当模板。对 automation 这类按事件分组的：`datapilot automation list | jq '.data.automations.<EventName>[0]'`。
 3. **先 `test` 再 `create`**（只 batch 支持）：`batch test <id> --sample-size 1` 验证单条通过，再 `batch start`。
 
 **别用 `create --input '{}'` 反推 schema**：server 对部分实体（尤其 `automation`）会接受半残配置留一个可触发的存根，事后得手动 `list` + `delete` 清。探 schema 走上面三招就够，不要真 create。
@@ -72,13 +72,13 @@ Server 端 schema 可能会演进，硬编码字段容易过时。不知道怎�
 
 ## 实体参考
 
-当前 CLI 暴露 7 个实体：`session` / `batch` / `automation` / `workspace` / `source` / `skill` / `label`。每个实体完整 action 列表用 `dtpilot <entity>` 拿。下面只记**语义要点、必需字段、返回结构、枚举、陷阱**。
+当前 CLI 暴露 7 个实体：`session` / `batch` / `automation` / `workspace` / `source` / `skill` / `label`。每个实体完整 action 列表用 `datapilot <entity>` 拿。下面只记**语义要点、必需字段、返回结构、枚举、陷阱**。
 
 ### session — 会话与消息（核心）
 
 **`session create`** — 创建不发消息。**flat flag 只有 `--name`**；其它字段（`permissionMode`、`enabledSourceSlugs`、`model`、`thinkingLevel`、`isFlagged`……）全部走 `--input '<json>'`。不传 `permissionMode` 时默认 `allow-all`。返回完整 session 对象。
 
-示例：`dtpilot session create --name "分析" --input '{"permissionMode":"safe","enabledSourceSlugs":["sales"]}'`
+示例：`datapilot session create --name "分析" --input '{"permissionMode":"safe","enabledSourceSlugs":["sales"]}'`
 
 **`session send <id> <message...>`** — 消息是剩余所有 positional 拼起来（`send $ID hello world` → "hello world"）。shell 里有特殊字符用引号包起来。**立刻返回 `{started: true}`**，不是 agent 回复；轮询方式见 [task-delegation.md](task-delegation.md)。
 
@@ -98,7 +98,7 @@ Server 端 schema 可能会演进，硬编码字段容易过时。不知道怎�
 
 - `model` — 模型 slug（对应某个 LLM connection）
 - `thinkingLevel` — `low` / `medium` / `high`
-- `enabledSourceSlugs` — `string[]`，允许用的数据源 slug；**不知道 slug 先 `dtpilot source list` 看 `.data[].slug`**。不传就是空集（纯 LLM 无外部工具）
+- `enabledSourceSlugs` — `string[]`，允许用的数据源 slug；**不知道 slug 先 `datapilot source list` 看 `.data[].slug`**。不传就是空集（纯 LLM 无外部工具）
 - `workingDirectory` — agent 的 bash cwd，绝对路径或特殊值 `"user_default"` / `"none"`。默认在 `sessions/{sid}/`；需要 session agent 在 workspace 根或某个具体项目目录（git 仓库 / batch 输入文件）做事时必传
 - `isFlagged` — 标星
 
@@ -133,7 +133,7 @@ Server 端 schema 可能会演进，硬编码字段容易过时。不知道怎�
 
 **`batch items <id> [--offset N] [--limit N]`** — 每条 item 的结果。长任务的最终产物从这里读。**返回 page 对象**：`{items: [{id, state}], total, offset, limit, runningOffset}` —— item 数组在 `.data.items`（不是 `.data[]`），每个 item 的字段在 `.state` 下嵌套，不是 flat。
 
-**`item.state` 字段**：`{status, sessionId, startedAt, completedAt, retryCount, error?, summary?}`。`summary` 是展开后的 prompt 片段（做 UI 显示用），**不是 agent 的回复** —— 要拿回复得用 `.state.sessionId` 起 `dtpilot session messages <sessionId>` 读。
+**`item.state` 字段**：`{status, sessionId, startedAt, completedAt, retryCount, error?, summary?}`。`summary` 是展开后的 prompt 片段（做 UI 显示用），**不是 agent 的回复** —— 要拿回复得用 `.state.sessionId` 起 `datapilot session messages <sessionId>` 读。
 
 **`item.state.status` 合法值**（`BatchItemStatus`）：`pending` / `running` / `completed` / `failed` / `skipped`。筛失败项：`jq '.data.items[] | select(.state.status=="failed")'`。
 
@@ -157,7 +157,7 @@ Server 端 schema 可能会演进，硬编码字段容易过时。不知道怎�
 **`automation test --input '<json>'`** — 干跑一次验证 action 可执行。输入需要至少 `{event, actions}`；`workspaceId` 由 CLI 自动补。prompt action 会**真起 session**（返回 `sessionId`），不会走 matcher 过滤（不做事件匹配，就直接执行 actions）。典型：
 
 ```bash
-dtpilot automation test --input '{
+datapilot automation test --input '{
   "event": "UserPromptSubmit",
   "actions": [{"type":"prompt","prompt":"说 hello"}]
 }'

@@ -436,7 +436,7 @@ Omit sessionId to target the current session.`,
   send_agent_message: `Send a message to another session. The message is delivered with your session ID so the target can reply back.
 
 Use this to coordinate with spawned sessions, send follow-up instructions, or relay information between sessions.
-Use \`dtpilot session list\` to find session IDs, or use the sessionId returned by spawn_session.
+Use \`datapilot session list\` to find session IDs, or use the sessionId returned by spawn_session.
 
 The target session receives your message with a sender envelope containing your session ID, so it can use send_agent_message to reply.`,
 

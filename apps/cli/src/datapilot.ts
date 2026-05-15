@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * dtpilot — unified thin CLI client for the DataPilot server.
+ * datapilot — unified thin CLI client for the DataPilot server.
  *
  * Usage:
- *   dtpilot [global-flags] <entity> <action> [args...] [flags...]
+ *   datapilot [global-flags] <entity> <action> [args...] [flags...]
  *
  * Connection model:
  *   All operations talk to a running server over WebSocket. Default target
@@ -44,7 +44,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   if (args.global.json) setOutputMode('json')
   else if (args.global.human) setOutputMode('human')
 
-  // Top-level help: `dtpilot --help` or just `dtpilot`
+  // Top-level help: `datapilot --help` or just `datapilot`
   if (args.global.help && !args.entity) printTopHelp()
   if (args.global.version && !args.entity) {
     ok(VERSION, { human: () => VERSION })
@@ -57,9 +57,9 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     })
   }
 
-  // Action-level help: `dtpilot <entity> <action> --help`
+  // Action-level help: `datapilot <entity> <action> --help`
   if (args.global.help && args.action) printActionHelp(args.entity, args.action)
-  // Entity-level help: `dtpilot <entity> --help`
+  // Entity-level help: `datapilot <entity> --help`
   if (args.global.help) printEntityHelp(args.entity)
 
   const ctx = createCtx(args)
@@ -155,6 +155,6 @@ function createCtx(args: ReturnType<typeof parseArgs>): RouteCtx {
 
 // This file is an executable entry point — never imported. Running it (via
 // `node dist/datapilot.js`, `bun run src/datapilot.ts`, or the installed
-// `dtpilot` bin) always invokes `main()`. The `export` above is purely for
+// `datapilot` bin) always invokes `main()`. The `export` above is purely for
 // type-checking tools that may need to reference it.
 main()

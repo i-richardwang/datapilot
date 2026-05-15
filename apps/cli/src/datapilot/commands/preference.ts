@@ -23,14 +23,14 @@ export const PREFERENCE_SPEC: EntitySpec = {
       name: 'get',
       description: 'Show the user preferences object',
       flags: [],
-      example: 'dtpilot preference get',
+      example: 'datapilot preference get',
     },
     {
       name: 'update',
       description: 'Update preference fields (all fields go in --input)',
       flags: [],
       takesInput: true,
-      example: 'dtpilot preference update --input \'{"name":"Alex","timezone":"UTC"}\'',
+      example: 'datapilot preference update --input \'{"name":"Alex","timezone":"UTC"}\'',
     },
   ],
 }

@@ -16,14 +16,14 @@ export const WORKSPACE_SPEC: EntitySpec = {
       name: 'list',
       description: 'List all workspaces visible to this server',
       flags: [],
-      example: 'dtpilot workspace list',
+      example: 'datapilot workspace list',
     },
     {
       name: 'get',
       description: 'Show one workspace including settings and connection info',
       positionals: [{ name: 'id', required: false, description: 'Workspace id|slug|name (defaults to current)' }],
       flags: [],
-      example: 'dtpilot workspace get my-workspace',
+      example: 'datapilot workspace get my-workspace',
     },
   ],
 }

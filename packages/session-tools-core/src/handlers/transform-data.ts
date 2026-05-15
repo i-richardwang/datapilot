@@ -94,7 +94,7 @@ export async function handleTransformData(
     const spawnArgs = [...runtime.argsPrefix, tempScript, ...resolvedInputs, resolvedOutput];
 
     // Strip sensitive env vars + redirect runtime cache/temp paths to session data dir.
-    // Workspace id binds any `dtpilot` shell-out to this session's workspace.
+    // Workspace id binds any `datapilot` shell-out to this session's workspace.
     const env = createScriptRuntimeEnv({
       language: args.language,
       dataDir,

@@ -3,7 +3,7 @@
  *
  * Zod schemas for validating create/update input passed through the RPC layer.
  * Used by the statuses RPC handlers to reject bad input before it reaches
- * `createStatus()` / `updateStatus()`, so direct callers (dtpilot CLI, etc.)
+ * `createStatus()` / `updateStatus()`, so direct callers (datapilot CLI, etc.)
  * get a structured `VALIDATION_ERROR` envelope instead of a thrown Error.
  */
 

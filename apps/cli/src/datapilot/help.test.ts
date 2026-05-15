@@ -58,7 +58,7 @@ describe('spec consistency', () => {
       for (const a of e.actions) {
         expect(a.name).toBeTruthy()
         expect(a.description).toBeTruthy()
-        expect(a.example).toContain(`dtpilot ${e.name} ${a.name}`)
+        expect(a.example).toContain(`datapilot ${e.name} ${a.name}`)
         // Required positionals come before optional ones.
         const positionals = a.positionals ?? []
         const firstOptional = positionals.findIndex((p) => p.required === false)
@@ -155,10 +155,10 @@ describe('CLI --help integration', () => {
     }
     expect(data.entity).toBe('batch')
     expect(data.action).toBe('create')
-    expect(data.usage).toContain('dtpilot batch create')
+    expect(data.usage).toContain('datapilot batch create')
     expect(data.flags.find((f) => f.name === 'name')?.required).toBe(true)
     expect(data.takesInput).toBe(true)
-    expect(data.example).toContain('dtpilot batch create')
+    expect(data.example).toContain('datapilot batch create')
   })
 
   it('action --help on action without input does not advertise --input', async () => {

@@ -23,21 +23,21 @@ export const LABEL_SPEC: EntitySpec = {
       name: 'list',
       description: 'List all labels (tree-ordered)',
       flags: [],
-      example: 'dtpilot label list',
+      example: 'datapilot label list',
     },
     {
       name: 'get',
       description: 'Show one label including its auto-rules',
       positionals: [{ name: 'id', description: 'Label id' }],
       flags: [],
-      example: 'dtpilot label get bug',
+      example: 'datapilot label get bug',
     },
     {
       name: 'create',
       description: 'Create a new label (color, parentId, valueType go in --input)',
       flags: [{ name: 'name', type: 'string', required: true, description: 'Label display name (id is generated as a slug)' }],
       takesInput: true,
-      example: 'dtpilot label create --name "Bug" --input \'{"color":"accent"}\'',
+      example: 'datapilot label create --name "Bug" --input \'{"color":"accent"}\'',
     },
     {
       name: 'update',
@@ -45,14 +45,14 @@ export const LABEL_SPEC: EntitySpec = {
       positionals: [{ name: 'id', description: 'Label id' }],
       flags: [],
       takesInput: true,
-      example: 'dtpilot label update bug --input \'{"name":"Bug Report","color":"destructive"}\'',
+      example: 'datapilot label update bug --input \'{"name":"Bug Report","color":"destructive"}\'',
     },
     {
       name: 'delete',
       description: 'Delete a label',
       positionals: [{ name: 'id', description: 'Label id' }],
       flags: [],
-      example: 'dtpilot label delete bug',
+      example: 'datapilot label delete bug',
     },
     {
       name: 'auto-rule-add',
@@ -60,14 +60,14 @@ export const LABEL_SPEC: EntitySpec = {
       positionals: [{ name: 'id', description: 'Label id' }],
       flags: [],
       takesInput: true,
-      example: 'dtpilot label auto-rule-add linear-issue --input \'{"pattern":"\\\\b([A-Z]{2,5}-\\\\d+)\\\\b","valueTemplate":"$1"}\'',
+      example: 'datapilot label auto-rule-add linear-issue --input \'{"pattern":"\\\\b([A-Z]{2,5}-\\\\d+)\\\\b","valueTemplate":"$1"}\'',
     },
     {
       name: 'auto-rule-remove',
       description: 'Remove an auto-rule by its array position',
       positionals: [{ name: 'id', description: 'Label id' }],
       flags: [{ name: 'index', type: 'int', required: true, description: 'Zero-based position in the autoRules array' }],
-      example: 'dtpilot label auto-rule-remove linear-issue --index 0',
+      example: 'datapilot label auto-rule-remove linear-issue --index 0',
     },
   ],
 }
@@ -160,7 +160,7 @@ export async function routeLabel(
 
 async function requireWorkspace(ctx: RouteCtx): Promise<string> {
   const ws = await ctx.getWorkspace()
-  if (!ws) fail('VALIDATION_ERROR', 'No workspace available — pass --workspace <id> or create one with `dtpilot workspace create`')
+  if (!ws) fail('VALIDATION_ERROR', 'No workspace available — pass --workspace <id> or create one with `datapilot workspace create`')
   return ws
 }
 

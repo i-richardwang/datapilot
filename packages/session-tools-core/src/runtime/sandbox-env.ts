@@ -39,7 +39,7 @@ export interface ScriptRuntimeEnvOptions {
   language: ScriptRuntimeLanguage;
   dataDir: string;
   /** Workspace id (or slug) of the calling session. When set, exposed to the
-   * subprocess as `DATAPILOT_WORKSPACE` so any `dtpilot` invocation inside the
+   * subprocess as `DATAPILOT_WORKSPACE` so any `datapilot` invocation inside the
    * script targets this session's workspace instead of the server's first one.
    * Without this, `transform_data` / `script_sandbox` subprocesses inherit the
    * main process env, which has no per-session workspace binding. */

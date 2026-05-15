@@ -2,9 +2,9 @@
 
 Batches run a prompt action across a list of items from a CSV / JSON / JSONL data file — each item spawns its own session, results can be collected into a structured JSONL output file.
 
-> **CLI-first workflow (recommended):** Use `dtpilot batch ...` commands instead of editing `batches.json` directly.
-> - `dtpilot batch --help`
-> - Canonical command reference: [dtpilot-cli.md](./dtpilot-cli.md)
+> **CLI-first workflow (recommended):** Use `datapilot batch ...` commands instead of editing `batches.json` directly.
+> - `datapilot batch --help`
+> - Canonical command reference: [datapilot-cli.md](./datapilot-cli.md)
 
 ## Storage
 
@@ -42,7 +42,7 @@ A batch config is a single JSON object. Build it as a file and submit via `--std
 ```
 
 ```bash
-cat config.json | dtpilot batch create --name "Onboarding" --stdin
+cat config.json | datapilot batch create --name "Onboarding" --stdin
 ```
 
 For configs with multi-line prompts or non-ASCII text, build the JSON with a JSON-aware tool — `python3 -c json.dumps` or `jq -n`:
@@ -55,19 +55,19 @@ print(json.dumps({
   "action": {"type":"prompt","prompt":"Multi-line content with \"quotes\" and 中文..."},
   "output": {"path":"output/results.jsonl","schema":{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}},
 }, ensure_ascii=False))
-' | dtpilot batch create --name "Onboarding" --stdin
+' | datapilot batch create --name "Onboarding" --stdin
 
 # Or keep prompt in a separate file and inject with jq
 jq -n --arg p "$(cat prompt.md)" \
   --argjson src '{"type":"csv","path":"data/users.csv","idField":"user_id"}' \
   --argjson schema '{"type":"object","properties":{"summary":{"type":"string"}},"required":["summary"]}' \
   '{source:$src, action:{type:"prompt",prompt:$p}, output:{path:"output/results.jsonl",schema:$schema}}' \
-  | dtpilot batch create --name "Onboarding" --stdin
+  | datapilot batch create --name "Onboarding" --stdin
 ```
 
 ## Data Sources
 
-`source.path` is on the server filesystem (use `dtpilot workspace get`'s `connection.sameMachine` to check whether local absolute paths are reachable). `source.idField` must be unique across items — it tracks per-item progress and retry state.
+`source.path` is on the server filesystem (use `datapilot workspace get`'s `connection.sameMachine` to check whether local absolute paths are reachable). `source.idField` must be unique across items — it tracks per-item progress and retry state.
 
 ```csv
 user_id,name,email
@@ -105,21 +105,21 @@ Without `output.schema`, any JSON object is accepted. Without `output` entirely,
 
 ## Lifecycle
 
-`batch create` only saves the config — the batch stays at `pending` until `dtpilot batch start <id>` is called (or the user starts it from the UI).
+`batch create` only saves the config — the batch stays at `pending` until `datapilot batch start <id>` is called (or the user starts it from the UI).
 
 ```bash
-dtpilot batch start  <id>
-dtpilot batch pause  <id>      # paused is non-terminal
-dtpilot batch resume <id>
-dtpilot batch delete <id>      # no cancelled state — delete to abort
+datapilot batch start  <id>
+datapilot batch pause  <id>      # paused is non-terminal
+datapilot batch resume <id>
+datapilot batch delete <id>      # no cancelled state — delete to abort
 
-dtpilot batch get   <id> | jq .data.progress.status
-dtpilot batch items <id> | jq '.data.items[] | {id, status: .state.status, sessionId: .state.sessionId}'
-dtpilot batch retry-item <id> <item-id>
+datapilot batch get   <id> | jq .data.progress.status
+datapilot batch items <id> | jq '.data.items[] | {id, status: .state.status, sessionId: .state.sessionId}'
+datapilot batch retry-item <id> <item-id>
 ```
 
 ## Testing
 
-`dtpilot batch test <id> [--sample-size N]` runs the same pipeline on a deterministic random sample (default 3 items), writes to `{output.path}.test.jsonl`, and tracks state in `batch-state-{id}__test.json`. The call blocks until sampled items complete and returns per-item results plus the test output path.
+`datapilot batch test <id> [--sample-size N]` runs the same pipeline on a deterministic random sample (default 3 items), writes to `{output.path}.test.jsonl`, and tracks state in `batch-state-{id}__test.json`. The call blocks until sampled items complete and returns per-item results plus the test output path.
 
 The full output file at `{output.path}.test.jsonl` is the source of truth for evaluating prompt and schema quality before committing the full run.

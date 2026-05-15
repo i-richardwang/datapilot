@@ -20,14 +20,14 @@ export const SOURCE_SPEC: EntitySpec = {
       name: 'list',
       description: 'List all sources in the workspace',
       flags: [],
-      example: 'dtpilot source list',
+      example: 'datapilot source list',
     },
     {
       name: 'get',
       description: 'Show one source with its permissions and MCP tools',
       positionals: [{ name: 'slug', description: 'Source slug' }],
       flags: [],
-      example: 'dtpilot source get my-api',
+      example: 'datapilot source get my-api',
     },
     {
       name: 'create',
@@ -38,7 +38,7 @@ export const SOURCE_SPEC: EntitySpec = {
         { name: 'type', type: 'string', required: true, description: 'Source type: mcp | api | local' },
       ],
       takesInput: true,
-      example: 'dtpilot source create --name MyAPI --provider generic --type api --input \'{"baseUrl":"https://..."}\'',
+      example: 'datapilot source create --name MyAPI --provider generic --type api --input \'{"baseUrl":"https://..."}\'',
     },
     {
       name: 'update',
@@ -46,14 +46,14 @@ export const SOURCE_SPEC: EntitySpec = {
       positionals: [{ name: 'slug', description: 'Source slug' }],
       flags: [],
       takesInput: true,
-      example: 'dtpilot source update my-api --input \'{"name":"My API v2"}\'',
+      example: 'datapilot source update my-api --input \'{"name":"My API v2"}\'',
     },
     {
       name: 'delete',
       description: 'Delete a source',
       positionals: [{ name: 'slug', description: 'Source slug' }],
       flags: [],
-      example: 'dtpilot source delete my-api',
+      example: 'datapilot source delete my-api',
     },
   ],
 }

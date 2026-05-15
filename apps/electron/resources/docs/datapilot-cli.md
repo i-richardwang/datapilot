@@ -1,6 +1,6 @@
 # DataPilot CLI Guide
 
-`dtpilot` is the agent-facing CLI for the DataPilot server. Every command is a
+`datapilot` is the agent-facing CLI for the DataPilot server. Every command is a
 thin client: it speaks WebSocket RPC to a running server and prints the
 server's response. There is no direct file or SQLite access from the CLI —
 all writes flow through the same handler layer the desktop app uses.
@@ -8,11 +8,11 @@ all writes flow through the same handler layer the desktop app uses.
 ## Usage
 
 ```bash
-dtpilot [global-flags] <entity> <action> [positionals...] [flags...]
+datapilot [global-flags] <entity> <action> [positionals...] [flags...]
 ```
 
-Every command follows the `<entity> <action>` shape. Run `dtpilot` with no
-arguments (or `dtpilot <entity>` with no action) to discover the available
+Every command follows the `<entity> <action>` shape. Run `datapilot` with no
+arguments (or `datapilot <entity>` with no action) to discover the available
 entities/actions.
 
 ### Global flags
@@ -68,32 +68,32 @@ JSON envelope on stdout (`{ok, data?, error?, warnings}`); switches to human-rea
 Manage workspace labels.
 
 ### Commands
-- `dtpilot label list`
-- `dtpilot label get <id>` — returns label with `autoRules`
-- `dtpilot label create --name "<name>" [--input '<json>']` — data fields (`color`, `parentId`, `valueType`) go in `--input`
-- `dtpilot label update <id> --input '<json>'`
-- `dtpilot label delete <id>`
-- `dtpilot label auto-rule-add <id> --input '<json>'` — rule fields (`pattern`, `flags`, `valueTemplate`, `description`) go in `--input`
-- `dtpilot label auto-rule-remove <id> --index <n>`
+- `datapilot label list`
+- `datapilot label get <id>` — returns label with `autoRules`
+- `datapilot label create --name "<name>" [--input '<json>']` — data fields (`color`, `parentId`, `valueType`) go in `--input`
+- `datapilot label update <id> --input '<json>'`
+- `datapilot label delete <id>`
+- `datapilot label auto-rule-add <id> --input '<json>'` — rule fields (`pattern`, `flags`, `valueTemplate`, `description`) go in `--input`
+- `datapilot label auto-rule-remove <id> --index <n>`
 
 ### Examples
 
 ```bash
-dtpilot label list
-dtpilot label get bug
+datapilot label list
+datapilot label get bug
 
 # Identity flat, data via --input
-dtpilot label create --name "Bug" --input '{"color":"accent"}'
-dtpilot label create --name "Priority" --input '{"valueType":"number"}'
+datapilot label create --name "Bug" --input '{"color":"accent"}'
+datapilot label create --name "Priority" --input '{"valueType":"number"}'
 
 # Update is strictly <id> + --input
-dtpilot label update bug --input '{"name":"Bug Report","color":"destructive"}'
-dtpilot label update priority --input '{"valueType":"none"}'
+datapilot label update bug --input '{"name":"Bug Report","color":"destructive"}'
+datapilot label update priority --input '{"valueType":"none"}'
 
 # Auto-rules: pattern is data, lives in --input
-dtpilot label auto-rule-add linear-issue \
+datapilot label auto-rule-add linear-issue \
   --input '{"pattern":"\\b([A-Z]{2,5}-\\d+)\\b","valueTemplate":"$1"}'
-dtpilot label auto-rule-remove linear-issue --index 0
+datapilot label auto-rule-remove linear-issue --index 0
 ```
 
 ### Notes
@@ -109,33 +109,33 @@ dtpilot label auto-rule-remove linear-issue --index 0
 Manage workspace sources stored under `sources/{slug}/`.
 
 ### Commands
-- `dtpilot source list`
-- `dtpilot source get <slug>` — returns source with `permissions` and `mcpTools`
-- `dtpilot source create --name "<name>" --provider "<provider>" --type mcp|api|local [--input '<json>']`
-- `dtpilot source update <slug> --input '<json>'`
-- `dtpilot source delete <slug>`
+- `datapilot source list`
+- `datapilot source get <slug>` — returns source with `permissions` and `mcpTools`
+- `datapilot source create --name "<name>" --provider "<provider>" --type mcp|api|local [--input '<json>']`
+- `datapilot source update <slug> --input '<json>'`
+- `datapilot source delete <slug>`
 
 Type-specific config (MCP `transport`/`url`/`authType`, API `baseUrl`, local `path`) goes nested under `--input`.
 
 ### Examples
 
 ```bash
-dtpilot source list
-dtpilot source get linear
+datapilot source list
+datapilot source get linear
 
 # MCP source — nested config via --input
-dtpilot source create --name "Linear" --provider "linear" --type mcp \
+datapilot source create --name "Linear" --provider "linear" --type mcp \
   --input '{"mcp":{"transport":"http","url":"https://mcp.linear.app/sse","authType":"oauth"}}'
 
 # API source
-dtpilot source create --name "Exa" --provider "exa" --type api \
+datapilot source create --name "Exa" --provider "exa" --type api \
   --input '{"api":{"baseUrl":"https://api.exa.ai/","authType":"header","headerName":"x-api-key"}}'
 
 # Local source
-dtpilot source create --name "Docs Folder" --provider "filesystem" --type local \
+datapilot source create --name "Docs Folder" --provider "filesystem" --type local \
   --input '{"local":{"path":"~/Documents"}}'
 
-dtpilot source update linear --input '{"enabled":false}'
+datapilot source update linear --input '{"enabled":false}'
 ```
 <!-- cli:source:end -->
 
@@ -147,25 +147,25 @@ dtpilot source update linear --input '{"enabled":false}'
 Manage workspace skills stored under `skills/{slug}/SKILL.md`.
 
 ### Commands
-- `dtpilot skill list`
-- `dtpilot skill get <slug>`
-- `dtpilot skill create --name "<name>" --input '<json>'` — `description` (required), `body`, `globs`, `requiredSources`, `alwaysAllow`, and an optional explicit `slug` live in `--input`
-- `dtpilot skill update <slug> --input '<json>'`
-- `dtpilot skill delete <slug>`
+- `datapilot skill list`
+- `datapilot skill get <slug>`
+- `datapilot skill create --name "<name>" --input '<json>'` — `description` (required), `body`, `globs`, `requiredSources`, `alwaysAllow`, and an optional explicit `slug` live in `--input`
+- `datapilot skill update <slug> --input '<json>'`
+- `datapilot skill delete <slug>`
 
 ### Examples
 
 ```bash
-dtpilot skill list
+datapilot skill list
 
 # Name is identity; everything else (including required `description`) via --input.
 # Slug is auto-derived from the name — pass `"slug":"..."` in --input to override.
-dtpilot skill create --name "Commit Helper" \
+datapilot skill create --name "Commit Helper" \
   --input '{"description":"Generate conventional commits"}'
 
-dtpilot skill update commit-helper \
+datapilot skill update commit-helper \
   --input '{"requiredSources":["github"],"body":"Use concise, imperative commit messages."}'
-dtpilot skill delete commit-helper
+datapilot skill delete commit-helper
 ```
 
 ### Notes
@@ -181,34 +181,34 @@ dtpilot skill delete commit-helper
 Manage workspace automations stored in `automations.json`.
 
 ### Commands
-- `dtpilot automation list`
-- `dtpilot automation get <id>`
-- `dtpilot automation create --event <EventName> --name "<name>" --input '<json>'`
-- `dtpilot automation update <id> --input '<json>'`
-- `dtpilot automation delete <id>`
-- `dtpilot automation enable <id>`
-- `dtpilot automation disable <id>`
-- `dtpilot automation history <id> [--limit <n>]`
-- `dtpilot automation test <id>`
+- `datapilot automation list`
+- `datapilot automation get <id>`
+- `datapilot automation create --event <EventName> --name "<name>" --input '<json>'`
+- `datapilot automation update <id> --input '<json>'`
+- `datapilot automation delete <id>`
+- `datapilot automation enable <id>`
+- `datapilot automation disable <id>`
+- `datapilot automation history <id> [--limit <n>]`
+- `datapilot automation test <id>`
 
 ### Examples
 
 ```bash
-dtpilot automation list
+datapilot automation list
 
 # Simple prompt automation
-dtpilot automation create --event UserPromptSubmit --name "Summarize" \
+datapilot automation create --event UserPromptSubmit --name "Summarize" \
   --input '{"actions":[{"type":"prompt","prompt":"Summarize this prompt"}]}'
 
 # Scheduled automation with nested config via --input
-dtpilot automation create --event SchedulerTick --name "Daily Summary" \
+datapilot automation create --event SchedulerTick --name "Daily Summary" \
   --input '{"cron":"0 9 * * 1-5","actions":[{"type":"prompt","prompt":"Daily summary"}]}'
 
-dtpilot automation update abc123 --input '{"enabled":false}'
-dtpilot automation enable abc123
-dtpilot automation history abc123 --limit 10
-dtpilot automation test abc123
-dtpilot automation delete abc123
+datapilot automation update abc123 --input '{"enabled":false}'
+datapilot automation enable abc123
+datapilot automation history abc123 --limit 10
+datapilot automation test abc123
+datapilot automation delete abc123
 ```
 <!-- cli:automation:end -->
 
@@ -220,42 +220,42 @@ dtpilot automation delete abc123
 Manage batch processing jobs stored in `batches.json`.
 
 ### Commands
-- `dtpilot batch list`
-- `dtpilot batch get <id>` — returns batch with `progress`
-- `dtpilot batch create --name "<name>" [--input '<json>']`
-- `dtpilot batch update <id> --input '<json>'`
-- `dtpilot batch delete <id>`
-- `dtpilot batch start <id>`
-- `dtpilot batch pause <id>`
-- `dtpilot batch resume <id>`
-- `dtpilot batch items <id> [--offset <n>] [--limit <n>]`
-- `dtpilot batch test <id> [--sample-size <n>]`
-- `dtpilot batch retry-item <batch-id> <item-id>`
+- `datapilot batch list`
+- `datapilot batch get <id>` — returns batch with `progress`
+- `datapilot batch create --name "<name>" [--input '<json>']`
+- `datapilot batch update <id> --input '<json>'`
+- `datapilot batch delete <id>`
+- `datapilot batch start <id>`
+- `datapilot batch pause <id>`
+- `datapilot batch resume <id>`
+- `datapilot batch items <id> [--offset <n>] [--limit <n>]`
+- `datapilot batch test <id> [--sample-size <n>]`
+- `datapilot batch retry-item <batch-id> <item-id>`
 
 ### Examples
 
 ```bash
-dtpilot batch list
-dtpilot batch get abc123
+datapilot batch list
+datapilot batch get abc123
 
 # Create — `source` and `action` are nested objects (see batches.md for full schema)
-dtpilot batch create --name "User Analysis" \
+datapilot batch create --name "User Analysis" \
   --input '{"source":{"type":"csv","path":"data/users.csv","idField":"user_id"},"action":{"type":"prompt","prompt":"Summarize $BATCH_ITEM_NAME"}}'
 
-dtpilot batch update abc123 \
+datapilot batch update abc123 \
   --input '{"execution":{"retryOnFailure":true,"maxRetries":3}}'
 
-dtpilot batch start abc123
-dtpilot batch items abc123
+datapilot batch start abc123
+datapilot batch items abc123
 
 # Paginated — skip first 20, fetch next 10
-dtpilot batch items abc123 --offset 20 --limit 10
+datapilot batch items abc123 --offset 20 --limit 10
 
 # Retry one failed item; the batch transitions paused → in_progress on resume
-dtpilot batch retry-item abc123 item-42
-dtpilot batch resume abc123
+datapilot batch retry-item abc123 item-42
+datapilot batch resume abc123
 
-dtpilot batch delete abc123
+datapilot batch delete abc123
 ```
 
 ### Notes
@@ -271,40 +271,40 @@ dtpilot batch delete abc123
 Manage sessions inside a workspace. This entity is request/response.
 
 ### Commands
-- `dtpilot session list [--status <id>] [--label <name>] [--search <text>] [--sort recent|name|status] [--limit <n>] [--offset <n>]` — server-side filter/sort/paginate; default `--limit 20`, max 100
-- `dtpilot session get <id>` — returns the curated 10-field shape (id, name, labels, status, permissionMode, createdAt, workingDirectory, llmConnection, model, isActive)
-- `dtpilot session create [--name "..."] [--input '<json>']` — `permissionMode` and `enabledSourceSlugs` go in `--input`
-- `dtpilot session delete <id>`
-- `dtpilot session messages <id>`
-- `dtpilot session send <id> [<message-text...>] [--input '<json>']` — message via positional or `--input.message`; `--input.skillSlugs` loads skills for that turn
-- `dtpilot session cancel <id>`
-- `dtpilot session share <id>`
-- `dtpilot session share <id> --html <file>`
+- `datapilot session list [--status <id>] [--label <name>] [--search <text>] [--sort recent|name|status] [--limit <n>] [--offset <n>]` — server-side filter/sort/paginate; default `--limit 20`, max 100
+- `datapilot session get <id>` — returns the curated 10-field shape (id, name, labels, status, permissionMode, createdAt, workingDirectory, llmConnection, model, isActive)
+- `datapilot session create [--name "..."] [--input '<json>']` — `permissionMode` and `enabledSourceSlugs` go in `--input`
+- `datapilot session delete <id>`
+- `datapilot session messages <id>`
+- `datapilot session send <id> [<message-text...>] [--input '<json>']` — message via positional or `--input.message`; `--input.skillSlugs` loads skills for that turn
+- `datapilot session cancel <id>`
+- `datapilot session share <id>`
+- `datapilot session share <id> --html <file>`
 
 ### Examples
 
 ```bash
-dtpilot session list
-dtpilot session list --status todo --sort name --limit 50
-dtpilot session list --label urgent --search "weekly report"
+datapilot session list
+datapilot session list --status todo --sort name --limit 50
+datapilot session list --label urgent --search "weekly report"
 
-dtpilot session get sess-abc
+datapilot session get sess-abc
 # → { id, name, labels[], status, permissionMode, createdAt,
 #     workingDirectory?, llmConnection?, model?, isActive }
 
-dtpilot session create --name "Daily standup" \
+datapilot session create --name "Daily standup" \
   --input '{"enabledSourceSlugs":["linear","github"]}'
-dtpilot session create --name "Audit" --input '{"permissionMode":"safe"}'
+datapilot session create --name "Audit" --input '{"permissionMode":"safe"}'
 
-dtpilot session send sess-abc "Summarize today's open PRs"
+datapilot session send sess-abc "Summarize today's open PRs"
 
 # Load specific skills for this turn
-dtpilot session send sess-abc "Run the audit" \
+datapilot session send sess-abc "Run the audit" \
   --input '{"skillSlugs":["security-audit"]}'
 
-dtpilot session cancel sess-abc
-dtpilot session share sess-abc
-dtpilot session share sess-abc --html ./report.html
+datapilot session cancel sess-abc
+datapilot session share sess-abc
+datapilot session share sess-abc --html ./report.html
 ```
 
 ### Notes
@@ -322,14 +322,14 @@ Query workspace metadata (the top-level container for sources, labels,
 sessions, etc.).
 
 ### Commands
-- `dtpilot workspace list`
-- `dtpilot workspace get [<id|slug|name>]` — returns the workspace record merged with `settings` and `connection` info
+- `datapilot workspace list`
+- `datapilot workspace get [<id|slug|name>]` — returns the workspace record merged with `settings` and `connection` info
 
 ### Examples
 
 ```bash
-dtpilot workspace list
-dtpilot workspace get my-workspace
+datapilot workspace list
+datapilot workspace get my-workspace
 ```
 <!-- cli:workspace:end -->
 
@@ -341,20 +341,20 @@ dtpilot workspace get my-workspace
 Workspace session statuses (Todo, In Progress, Done, ...).
 
 ### Commands
-- `dtpilot status list`
-- `dtpilot status get <id>`
-- `dtpilot status create --name "<label>" --category open|closed [--input '<json>']` — `color`, `icon` go in `--input`
-- `dtpilot status update <id> --input '<json>'`
-- `dtpilot status delete <id>`
-- `dtpilot status reorder --ids <id1,id2,...>` — replaces the full order
+- `datapilot status list`
+- `datapilot status get <id>`
+- `datapilot status create --name "<label>" --category open|closed [--input '<json>']` — `color`, `icon` go in `--input`
+- `datapilot status update <id> --input '<json>'`
+- `datapilot status delete <id>`
+- `datapilot status reorder --ids <id1,id2,...>` — replaces the full order
 
 ### Examples
 
 ```bash
-dtpilot status list
-dtpilot status create --name "Needs Review" --category open --input '{"color":"#f59e0b","icon":"eye"}'
-dtpilot status update needs-review --input '{"color":"#fbbf24"}'
-dtpilot status reorder --ids todo,in-progress,needs-review,done
+datapilot status list
+datapilot status create --name "Needs Review" --category open --input '{"color":"#f59e0b","icon":"eye"}'
+datapilot status update needs-review --input '{"color":"#fbbf24"}'
+datapilot status reorder --ids todo,in-progress,needs-review,done
 ```
 
 ### Notes
@@ -370,18 +370,18 @@ dtpilot status reorder --ids todo,in-progress,needs-review,done
 User-level preferences (name, timezone, location, notes, language, `includeCoAuthoredBy`).
 
 ### Commands
-- `dtpilot preference get`
-- `dtpilot preference update --input '<json>'`
+- `datapilot preference get`
+- `datapilot preference update --input '<json>'`
 
 ### Examples
 
 ```bash
-dtpilot preference get
+datapilot preference get
 
-dtpilot preference update --input '{"name":"Alex","timezone":"Asia/Shanghai"}'
+datapilot preference update --input '{"name":"Alex","timezone":"Asia/Shanghai"}'
 
 # Clear a key by passing null; omitting the key keeps the existing value
-dtpilot preference update --input '{"timezone":null}'
+datapilot preference update --input '{"timezone":null}'
 ```
 
 ### Notes

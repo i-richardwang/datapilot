@@ -123,7 +123,7 @@ See `datapilot --help` for the full command reference.
 
 ## Agent Skill
 
-External agents (Claude Code, Codex, Cursor, etc.) can drive a DataPilot server through the published [`dtpilot`](apps/cli) CLI. Install the companion skill via [skills.sh](https://skills.sh) so the agent knows how to use it:
+External agents (Claude Code, Codex, Cursor, etc.) can drive a DataPilot server through the published [`datapilot`](apps/cli) CLI. Install the companion skill via [skills.sh](https://skills.sh) so the agent knows how to use it:
 
 ```bash
 npx skills add i-richardwang/datapilot                            # to current project (./.claude/skills/)

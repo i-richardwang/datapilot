@@ -2,9 +2,9 @@
 
 This guide explains how to configure automations in DataPilot to automate workflows based on events.
 
-> **CLI-first workflow (recommended):** Use `dtpilot automation ...` commands instead of editing JSON directly.
-> - `dtpilot automation --help`
-> - Canonical command reference: [dtpilot-cli.md](./dtpilot-cli.md)
+> **CLI-first workflow (recommended):** Use `datapilot automation ...` commands instead of editing JSON directly.
+> - `datapilot automation --help`
+> - Canonical command reference: [datapilot-cli.md](./datapilot-cli.md)
 
 ## What Are Automations?
 
@@ -25,23 +25,23 @@ Automations are configured in `automations.json` at the root of your workspace:
 ## Recommended CLI Commands
 
 ```bash
-dtpilot automation list
-dtpilot automation get <id>
-dtpilot automation history <id> --limit 20
+datapilot automation list
+datapilot automation get <id>
+datapilot automation history <id> --limit 20
 
-dtpilot automation create --event UserPromptSubmit --name "Summarize" \
+datapilot automation create --event UserPromptSubmit --name "Summarize" \
   --input '{"actions":[{"type":"prompt","prompt":"Summarize this prompt"}]}'
 
-dtpilot automation create --event SchedulerTick --name "Daily Summary" \
+datapilot automation create --event SchedulerTick --name "Daily Summary" \
   --input '{"cron":"0 9 * * 1-5","actions":[{"type":"prompt","prompt":"Daily summary"}]}'
 
-dtpilot automation update <id> --input '{"enabled":false}'
+datapilot automation update <id> --input '{"enabled":false}'
 
-dtpilot automation enable <id>
-dtpilot automation disable <id>
-dtpilot automation delete <id>
+datapilot automation enable <id>
+datapilot automation disable <id>
+datapilot automation delete <id>
 
-dtpilot automation test <id>
+datapilot automation test <id>
 ```
 
 ## Basic Structure
@@ -772,7 +772,7 @@ A single automation can have both prompt and webhook actions. They execute in or
             "method": "POST",
             "headers": {
               "Authorization": "Bearer ${CRAFT_WH_API_TOKEN}",
-              "X-Source": "dtpilot"
+              "X-Source": "datapilot"
             },
             "body": {
               "event": "${CRAFT_EVENT}",
@@ -792,7 +792,7 @@ A single automation can have both prompt and webhook actions. They execute in or
 
 Automations are validated when:
 1. The workspace is loaded
-2. You create/update an automation via the `dtpilot automation` CLI (invalid input returns a `VALIDATION_ERROR` envelope)
+2. You create/update an automation via the `datapilot automation` CLI (invalid input returns a `VALIDATION_ERROR` envelope)
 
 **Common validation errors:**
 - Invalid JSON syntax

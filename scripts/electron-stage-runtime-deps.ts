@@ -283,7 +283,7 @@ for (const server of MCP_SERVERS) {
 }
 
 // ── 3. Stage DataPilot CLI ──────────────────────────────────────────────────
-// The wrapper script resources/bin/dtpilot runs `bun run $DATAPILOT_CLI_ENTRY`,
+// The wrapper script resources/bin/datapilot runs `bun run $DATAPILOT_CLI_ENTRY`,
 // so the compiled bundle must be available in the packaged app.
 
 const CLI_SOURCE = join(ROOT_DIR, 'apps', 'cli', 'dist', 'datapilot.js')

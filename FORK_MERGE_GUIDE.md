@@ -168,7 +168,7 @@ Upstream v0.9.3 引入的 compact-mode session menu。fork 端的 `SessionMenu` 
 
 
 
-Fork 删除了三个 session 自管理 MCP tool 及其 handler:`list_sessions`、`get_session_info`、`update_user_preferences`。能力收敛到 `dtpilot session list/info` + `dtpilot preference set`(CLI 是产品内 agent 的唯一入口);新增 RPC handlers 在 `server-core/src/handlers/rpc/sessions.ts`,补齐 SessionManager 接口。`prompts/system.ts` 同步删去对这三个 tool 的引用。
+Fork 删除了三个 session 自管理 MCP tool 及其 handler:`list_sessions`、`get_session_info`、`update_user_preferences`。能力收敛到 `datapilot session list/info` + `datapilot preference set`(CLI 是产品内 agent 的唯一入口);新增 RPC handlers 在 `server-core/src/handlers/rpc/sessions.ts`,补齐 SessionManager 接口。`prompts/system.ts` 同步删去对这三个 tool 的引用。
 
 **Conflict trigger:** 上游对这三个 handler 做扩展(新字段、新 dispatch 路径)→ 不要回采,把变化吸收进对应 CLI 命令或 RPC handler。
 

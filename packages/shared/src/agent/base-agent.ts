@@ -260,7 +260,7 @@ export abstract class BaseAgent implements AgentBackend {
   constructor(config: BackendConfig, defaultModel: string, contextWindow?: number) {
     this.config = config;
     // Auto-inject DATAPILOT_WORKSPACE so the agent's child shells (Bash tool,
-    // any subprocess that calls `dtpilot`) target this session's workspace
+    // any subprocess that calls `datapilot`) target this session's workspace
     // instead of `workspaces:get`'s first entry. Caller-provided envOverrides
     // win, so a session can still target a different workspace explicitly.
     const wsHandle = config.workspace?.slug || config.workspace?.id;

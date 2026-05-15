@@ -1,6 +1,6 @@
 /**
- * Help spec types + per-entity registry + renderers for `dtpilot --help`,
- * `dtpilot <entity> --help`, and `dtpilot <entity> <action> --help`.
+ * Help spec types + per-entity registry + renderers for `datapilot --help`,
+ * `datapilot <entity> --help`, and `datapilot <entity> <action> --help`.
  *
  * Each command module exports its own `<ENTITY>_SPEC` next to its
  * `route<Entity>` function — single file, single source of truth. The
@@ -97,8 +97,8 @@ export function rejectActionFlags(flags: Flags, spec: ActionSpec): void {
 export function printTopHelp(): never {
   const entities = listEntities()
   const data = {
-    description: 'dtpilot — unified CLI for the DataPilot server',
-    usage: 'dtpilot [global-flags] <entity> <action> [positionals...] [flags...]',
+    description: 'datapilot — unified CLI for the DataPilot server',
+    usage: 'datapilot [global-flags] <entity> <action> [positionals...] [flags...]',
     entities: entities.map((e) => ({ name: e.name, description: e.description })),
   }
   ok(data, { human: () => renderTopHelpHuman(entities) })
@@ -114,7 +114,7 @@ export function printEntityHelp(entity: string): never {
   const data = {
     entity: spec.name,
     description: spec.description,
-    usage: `dtpilot ${spec.name} <action> [positionals...] [flags...]`,
+    usage: `datapilot ${spec.name} <action> [positionals...] [flags...]`,
     actions: spec.actions.map((a) => ({ name: a.name, description: a.description })),
   }
   ok(data, { human: () => renderEntityHelpHuman(spec) })
@@ -163,10 +163,10 @@ export function printActionHelp(entity: string, action: string): never {
 
 function renderTopHelpHuman(entities: EntitySpec[]): string {
   const lines: string[] = []
-  lines.push('dtpilot — unified CLI for the DataPilot server')
+  lines.push('datapilot — unified CLI for the DataPilot server')
   lines.push('')
   lines.push('Usage:')
-  lines.push('  dtpilot [global-flags] <entity> <action> [positionals...] [flags...]')
+  lines.push('  datapilot [global-flags] <entity> <action> [positionals...] [flags...]')
   lines.push('')
   lines.push('Global flags:')
   lines.push('  --url <ws-url>              Server URL (default: ws://127.0.0.1:9100, env: DATAPILOT_SERVER_URL)')
@@ -185,16 +185,16 @@ function renderTopHelpHuman(entities: EntitySpec[]): string {
     lines.push(`  ${e.name.padEnd(w)}  ${e.description}`)
   }
   lines.push('')
-  lines.push("Run 'dtpilot <entity> --help' to list actions, 'dtpilot <entity> <action> --help' for action details.")
+  lines.push("Run 'datapilot <entity> --help' to list actions, 'datapilot <entity> <action> --help' for action details.")
   return lines.join('\n')
 }
 
 function renderEntityHelpHuman(spec: EntitySpec): string {
   const lines: string[] = []
-  lines.push(`dtpilot ${spec.name} — ${spec.description}`)
+  lines.push(`datapilot ${spec.name} — ${spec.description}`)
   lines.push('')
   lines.push('Usage:')
-  lines.push(`  dtpilot ${spec.name} <action> [positionals...] [flags...]`)
+  lines.push(`  datapilot ${spec.name} <action> [positionals...] [flags...]`)
   lines.push('')
   lines.push('Actions:')
   const w = Math.max(...spec.actions.map((a) => a.name.length))
@@ -202,13 +202,13 @@ function renderEntityHelpHuman(spec: EntitySpec): string {
     lines.push(`  ${a.name.padEnd(w)}  ${a.description}`)
   }
   lines.push('')
-  lines.push(`Run 'dtpilot ${spec.name} <action> --help' for action details.`)
+  lines.push(`Run 'datapilot ${spec.name} <action> --help' for action details.`)
   return lines.join('\n')
 }
 
 function renderActionHelpHuman(entity: string, spec: ActionSpec): string {
   const lines: string[] = []
-  lines.push(`dtpilot ${entity} ${spec.name} — ${spec.description}`)
+  lines.push(`datapilot ${entity} ${spec.name} — ${spec.description}`)
   lines.push('')
   lines.push('Usage:')
   lines.push(`  ${renderUsageLine(entity, spec)}`)
@@ -263,7 +263,7 @@ function typeTag(t: FlagSpec['type']): string {
 }
 
 function renderUsageLine(entity: string, spec: ActionSpec): string {
-  const parts: string[] = ['dtpilot', entity, spec.name]
+  const parts: string[] = ['datapilot', entity, spec.name]
   for (const p of spec.positionals ?? []) {
     const required = p.required !== false
     const inner = p.variadic ? `${p.name}...` : p.name

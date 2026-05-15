@@ -2,9 +2,9 @@
 
 Labels are additive tags that can be applied to sessions. Unlike statuses (which are exclusive — one per session), labels are multi-select (many per session). They support hierarchical organization via nested JSON trees.
 
-> **CLI-first workflow (recommended):** Use `dtpilot label ...` commands instead of editing JSON directly.
-> - `dtpilot label --help`
-> - Canonical command reference: [dtpilot-cli.md](./dtpilot-cli.md)
+> **CLI-first workflow (recommended):** Use `datapilot label ...` commands instead of editing JSON directly.
+> - `datapilot label --help`
+> - Canonical command reference: [datapilot-cli.md](./datapilot-cli.md)
 
 ## Storage Locations
 
@@ -140,11 +140,11 @@ The optional `valueType` in config is a hint only — the parser always infers f
 ## Adding Labels
 
 ```bash
-dtpilot label create --name "Bug" --input '{"color":"destructive"}'
-dtpilot label create --name "Priority" --input '{"color":"accent","valueType":"number"}'
-dtpilot label create --name "Alpha" --input '{"color":"info","parentId":"project"}'
+datapilot label create --name "Bug" --input '{"color":"destructive"}'
+datapilot label create --name "Priority" --input '{"color":"accent","valueType":"number"}'
+datapilot label create --name "Alpha" --input '{"color":"info","parentId":"project"}'
 
-dtpilot label update bug --input '{"color":"destructive","name":"Bug Report"}'
+datapilot label update bug --input '{"color":"destructive","name":"Bug Report"}'
 ```
 
 Nested labels: set `parentId` to the parent label's slug.
@@ -168,7 +168,7 @@ When creating or modifying labels, follow these conventions unless the user expl
 
 ## Validation
 
-Labels are validated automatically by the `dtpilot label` CLI on every create/update/import. Invalid input returns a `VALIDATION_ERROR` envelope with the offending field.
+Labels are validated automatically by the `datapilot label` CLI on every create/update/import. Invalid input returns a `VALIDATION_ERROR` envelope with the offending field.
 
 This validates:
 - Valid JSON and recursive schema structure

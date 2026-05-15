@@ -5,7 +5,7 @@ description: DataPilot server 连接模型：URL / token / TLS / discovery 文�
 
 # 连接模型
 
-`dtpilot` CLI 是 **thin client**，通过 WebSocket 连到一个**已经在跑**的 DataPilot server。CLI 自己不启动也不管理 server 进程 —— 连不上就返 `CONNECTION_ERROR`。
+`datapilot` CLI 是 **thin client**，通过 WebSocket 连到一个**已经在跑**的 DataPilot server。CLI 自己不启动也不管理 server 进程 —— 连不上就返 `CONNECTION_ERROR`。
 
 **server 从哪里来**：
 - **本机**：打开 DataPilot Electron app，app 内部自动起 headless server 并写 discovery 文件
@@ -62,14 +62,14 @@ JSON 格式：
 
 "第一个"的顺序由 server 决定，不一定是你想的那个。**agent 自动化调用里永远显式 `--workspace <id>`**。
 
-获取 ID：`dtpilot workspace list | jq -r '.data[] | {id, slug, name}'`
+获取 ID：`datapilot workspace list | jq -r '.data[] | {id, slug, name}'`
 
 ## 远程 server 场景（最常见的 agent-to-agent 场景）
 
 ```bash
 export DATAPILOT_SERVER_URL=wss://datapilot.example.com
 export DATAPILOT_SERVER_TOKEN=<token>
-dtpilot workspace list    # 确认连通
+datapilot workspace list    # 确认连通
 ```
 
 自签名证书场景多加 `export DATAPILOT_TLS_CA=/path/to/ca.crt`。
@@ -87,5 +87,5 @@ dtpilot workspace list    # 确认连通
 
 ## 数据不对 / 看起来空的排查
 
-- **空列表多半是 workspace 绑错**：`dtpilot workspace list` 看全部，加 `--workspace <id>` 重试。
+- **空列表多半是 workspace 绑错**：`datapilot workspace list` 看全部，加 `--workspace <id>` 重试。
 - **session/batch `NOT_FOUND`**：ID 在别的 workspace 下，带正确的 `--workspace`。

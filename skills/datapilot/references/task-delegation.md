@@ -43,20 +43,20 @@ Master Agent 提交后就可以去干别的活。CLI 里**没有** `--wait` / `-
 
 ```bash
 # session
-dtpilot session send "$SID" "干活的 prompt"
-while [ "$(dtpilot session get "$SID" | jq -r .data.isProcessing)" = "true" ]; do
+datapilot session send "$SID" "干活的 prompt"
+while [ "$(datapilot session get "$SID" | jq -r .data.isProcessing)" = "true" ]; do
   sleep 2
 done
-dtpilot session messages "$SID" | jq -r '.data.messages[-1].content'
+datapilot session messages "$SID" | jq -r '.data.messages[-1].content'
 
 # batch
-dtpilot batch start "$BID"
+datapilot batch start "$BID"
 while :; do
-  STATUS=$(dtpilot batch get "$BID" | jq -r .data.progress.status)
+  STATUS=$(datapilot batch get "$BID" | jq -r .data.progress.status)
   case "$STATUS" in completed|failed) break ;; esac
   sleep 10
 done
-dtpilot batch items "$BID" | jq '.data.items[]'
+datapilot batch items "$BID" | jq '.data.items[]'
 ```
 
 **轮询间隔怎么选**：
@@ -97,31 +97,31 @@ dtpilot batch items "$BID" | jq '.data.items[]'
 ### Session
 ```bash
 # 最终回复文本（messages 返回整个 session 对象，消息在 .data.messages[]）
-dtpilot session messages "$SID" | jq -r '.data.messages[-1].content'
+datapilot session messages "$SID" | jq -r '.data.messages[-1].content'
 # 整段 session 的只读分享链接
-dtpilot session share "$SID" | jq -r '.data.url'
+datapilot session share "$SID" | jq -r '.data.url'
 # 单独一个 HTML 文件上传分享（给上游 agent）
-dtpilot session share "$SID" --html ./report.html | jq -r '.data.url'
+datapilot session share "$SID" --html ./report.html | jq -r '.data.url'
 ```
 
 ### Batch
 ```bash
 # 所有 item 的 state（id + state.{status, sessionId, summary, ...}）
-dtpilot batch items "$BID" | jq '.data.items[] | {id, status: .state.status, sessionId: .state.sessionId, summary: .state.summary, error: .state.error}'
+datapilot batch items "$BID" | jq '.data.items[] | {id, status: .state.status, sessionId: .state.sessionId, summary: .state.summary, error: .state.error}'
 
 # 只要失败项（state.status ∈ pending/running/completed/failed/skipped）
-dtpilot batch items "$BID" | jq '.data.items[] | select(.state.status=="failed")'
+datapilot batch items "$BID" | jq '.data.items[] | select(.state.status=="failed")'
 
 # agent 的实际回复不在 items 里，要按 sessionId 去 session 读
-dtpilot batch items "$BID" | jq -r '.data.items[].state.sessionId' | while read SID; do
+datapilot batch items "$BID" | jq -r '.data.items[].state.sessionId' | while read SID; do
   echo "=== $SID ==="
-  dtpilot session messages "$SID" | jq -r '.data.messages[-1].content'
+  datapilot session messages "$SID" | jq -r '.data.messages[-1].content'
 done
 ```
 
 ### Automation
 ```bash
-dtpilot automation history "$AID" --limit 50 | jq '.data[]'
+datapilot automation history "$AID" --limit 50 | jq '.data[]'
 ```
 
 ## 关键原则

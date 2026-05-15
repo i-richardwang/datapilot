@@ -1,5 +1,5 @@
 /**
- * End-to-end test — exercises the agent-facing `dtpilot` wrapper and verifies
+ * End-to-end test — exercises the agent-facing `datapilot` wrapper and verifies
  * a multi-entity flow round-trips through the unified CLI binary, hitting the
  * expected RPC channels on a running mock server.
  */
@@ -15,7 +15,7 @@ import type { MessageEnvelope } from '@craft-agent/shared/protocol'
 
 // Repo root relative to this test file (apps/cli/src/datapilot/parity.test.ts).
 const REPO_ROOT = join(import.meta.dir, '..', '..', '..', '..')
-const WRAPPER = join(REPO_ROOT, 'apps/electron/resources/bin/dtpilot')
+const WRAPPER = join(REPO_ROOT, 'apps/electron/resources/bin/datapilot')
 const CLI_ENTRY = join(REPO_ROOT, 'apps/cli/src/datapilot.ts')
 
 interface RecordedRequest { channel: string; args: unknown[] }
@@ -123,11 +123,11 @@ afterEach(() => {
   server = null
 })
 
-// The sh wrapper isn't invoked on Windows — Windows CI would use dtpilot.cmd
+// The sh wrapper isn't invoked on Windows — Windows CI would use datapilot.cmd
 // with separate test coverage. Current CI matrix is ubuntu-latest for this job.
 const describeUnix = process.platform === 'win32' ? describe.skip : describe
 
-describeUnix('dtpilot wrapper routes to the unified CLI', () => {
+describeUnix('datapilot wrapper routes to the unified CLI', () => {
   it('routes a multi-entity flow through the unified CLI', async () => {
     let createdLabel: { id: string; name: string; color: string } | null = null
     let createdSource: { slug: string; name: string; provider: string; type: string } | null = null

@@ -1,11 +1,11 @@
-# dtpilot
+# datapilot
 
 Thin CLI client for a running [DataPilot](https://github.com/i-richardwang/datapilot) server. The CLI is designed to be driven by external agent tools (Claude Code, Codex, etc.) — every capability is reachable through a uniform `entity action` grammar with flat flags for identity and JSON input for data.
 
 ## Install
 
 ```bash
-npm install -g dtpilot
+npm install -g datapilot
 ```
 
 Requires **Node.js ≥ 22** (for native `WebSocket` and `crypto.randomUUID`). No runtime dependencies are pulled in.
@@ -13,8 +13,8 @@ Requires **Node.js ≥ 22** (for native `WebSocket` and `crypto.randomUUID`). No
 Verify the install:
 
 ```bash
-dtpilot --version
-dtpilot --help
+datapilot --version
+datapilot --help
 ```
 
 ## Connect to a server
@@ -26,12 +26,12 @@ The CLI talks to a DataPilot server over WebSocket. It resolves the URL and toke
 3. Discovery file at `~/.datapilot/.server.endpoint` (written by the DataPilot desktop app)
 4. Default: `ws://127.0.0.1:9100`
 
-For a DataPilot desktop install the discovery file is written automatically — once the app is running, `dtpilot workspace list` works out of the box. For other setups, point the CLI at your server explicitly:
+For a DataPilot desktop install the discovery file is written automatically — once the app is running, `datapilot workspace list` works out of the box. For other setups, point the CLI at your server explicitly:
 
 ```bash
 export DATAPILOT_SERVER_URL=ws://127.0.0.1:9100
 export DATAPILOT_SERVER_TOKEN=...secret...
-dtpilot workspace list
+datapilot workspace list
 ```
 
 For self-signed TLS: `--tls-ca <path>` or `$DATAPILOT_TLS_CA`.
@@ -39,14 +39,14 @@ For self-signed TLS: `--tls-ca <path>` or `$DATAPILOT_TLS_CA`.
 ## Command shape
 
 ```
-dtpilot [global-flags] <entity> <action> [positionals...] [flags...]
+datapilot [global-flags] <entity> <action> [positionals...] [flags...]
 ```
 
 - **Entities** — `workspace`, `session`, `source`, `label`, `skill`, `automation`, `batch`
 - **Flat flags** carry only identity or query params: `--name`, `--event`, `--limit`, etc.
 - **Data fields go through JSON**: `--input '<json>'` or `--stdin` for payloads
 
-Run `dtpilot <entity>` with no action to list that entity's actions.
+Run `datapilot <entity>` with no action to list that entity's actions.
 
 ## Output
 
@@ -64,26 +64,26 @@ This envelope contract is what makes the CLI agent-friendly — stable, parseabl
 List workspaces and sessions:
 
 ```bash
-dtpilot workspace list
-dtpilot --workspace <id> session list
+datapilot workspace list
+datapilot --workspace <id> session list
 ```
 
 Create a label:
 
 ```bash
-dtpilot label create --name TODO --input '{"color":"blue"}'
+datapilot label create --name TODO --input '{"color":"blue"}'
 ```
 
 Send a message to an existing session:
 
 ```bash
-dtpilot session message <session-id> --input '{"text":"summarize yesterday"}'
+datapilot session message <session-id> --input '{"text":"summarize yesterday"}'
 ```
 
 Create an automation:
 
 ```bash
-dtpilot automation create \
+datapilot automation create \
   --name "nightly-recap" \
   --event SchedulerTick \
   --input '{"cron":"0 22 * * *","actions":[{"type":"prompt","prompt":"Post a recap"}]}'
