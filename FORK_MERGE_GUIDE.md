@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: 合并 upstream 时的唯一操作手册 — 冲突风险、合并策略、检查清单。
 >
-> **Last upstream merge:** v0.9.3 (2026-05-14).
+> **Last upstream merge:** v0.9.4 (2026-05-16).
 
 ## Overview
 
@@ -491,3 +491,4 @@ bun run tsc --noEmit
 | v0.9.1 | 2026-05-06 | 17 | Pinned `@sentry/core@10.50.0` via root `package.json` `overrides`+`resolutions` — upstream's `@sentry/electron@7.13.0` (core 10.50.0) and `@sentry/react@10.51.0` (core 10.51.0) otherwise pull mismatched core types and break renderer typecheck. `TOKEN_LIMIT` → `tokenLimitFor(contextWindow)` in `pi-agent-server` (large-response.ts re-exports `TOKEN_LIMIT` for legacy callers). |
 | v0.9.2 | 2026-05-10 | 6 | Upstream introduced `applySystemPromptOverride()` (new file `pi-agent-server/src/system-prompt-override.ts`) for the Pi per-turn-prompt-reset problem — same root cause as our resourceLoader integration. Adopted upstream's helper at the ephemeral `queryLlm` call site (no resourceLoader there), but **kept fork's closure + reload + setActiveToolsByName** at `handlePrompt` because upstream's helper rewrites `_rebuildSystemPrompt = () => prompt`, bypassing our resourceLoader's append of contextFiles/skills/date/cwd. Guide entry for `pi-agent-server/src/index.ts` already calls this out — left as-is. Browser Tools section in `system.ts` was factored into `browserToolsSection` const upstream; gated on both `getBrowserToolEnabled()` (upstream runtime toggle) and our `!FEATURE_FLAGS.disableBrowser && !isBatch` (build-time + batch). Upstream's new oauth-refresh regression test (`sendmessage-oauth-refresh.test.ts`) marked `it.skip` — fork's sendMessage harness needs more setup than upstream's; fix is verifiable by reading SessionManager.ts (refresh at L6191 < getOrCreateAgent at L6203). |
 | v0.9.3 | 2026-05-14 | 17 | Mobile/compact UI rework (new CompactSessionMenu, CompactWorkspaceSwitcher, CompactSessionListFilter, FabNewChat, etc.); Manifest provider preset; upstream extracted share actions into `useSessionMenuActions` hook and refactored `ShareMenuItems` API — fork's password-dialog share flow adapted to new callback API. Upstream's `AppMenu` extraction adopted, fork's inline TopBar menu handlers dropped. Added `'batches'` to new `nav-helpers.ts` switch. |
+| v0.9.4 | 2026-05-16 | 8 | RTK Bash token compression (opt-in), Pi SDK 0.73.1 (Codex transport stability), `SkillMenu` API switched to required `onShowInFinder` + new `canShowInFinder` prop — fork's web-mode hide-gate moved *inside* `SkillMenu.tsx` (callers now just pass `canShowInFinder={canRevealLocally}` and the platform gate stays in one place). `apps/cli/package.json` version kept on fork's independent cadence (0.1.5), not bumped to upstream's 0.9.4. |

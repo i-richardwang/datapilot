@@ -35,8 +35,9 @@ export interface SkillMenuProps {
   skillName: string
   /** Callbacks */
   onOpenInNewWindow: () => void
-  onShowInFinder?: () => void
+  onShowInFinder: () => void | Promise<void>
   onDelete?: () => void
+  canShowInFinder?: boolean
   canDelete?: boolean
   deleteLabel?: string
   /** Send to another workspace (omit to hide the option) */
@@ -53,6 +54,7 @@ export function SkillMenu({
   onOpenInNewWindow,
   onShowInFinder,
   onDelete,
+  canShowInFinder = true,
   canDelete = true,
   deleteLabel,
   onSendToWorkspace,
@@ -71,8 +73,8 @@ export function SkillMenu({
       </MenuItem>
 
       {/* Show in file manager — hidden in web mode */}
-      {!isWebMode && onShowInFinder && (
-        <MenuItem onClick={onShowInFinder}>
+      {!isWebMode && (
+        <MenuItem onClick={onShowInFinder} disabled={!canShowInFinder}>
           <FolderOpen className="h-3.5 w-3.5" />
           <span className="flex-1">{t("sessionMenu.showInFileManager", { fileManager: getFileManagerName() })}</span>
         </MenuItem>
