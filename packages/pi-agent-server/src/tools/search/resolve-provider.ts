@@ -1,8 +1,9 @@
 /**
  * [fork] Builds an ordered cascade of web search providers.
  *
- * Cascade order: TinyFish → Exa → DuckDuckGo
- *   - TinyFish / Exa are included only when their API key env var is set.
+ * Cascade order: TinyFish → Firecrawl → Tavily → Exa → DuckDuckGo
+ *   - TinyFish / Firecrawl / Tavily / Exa are included only when their API key
+ *     env var is set.
  *   - DuckDuckGo is always the final fallback (no key required).
  *
  * The cascade is consumed by `createSearchTool(providers[])`, which tries each
@@ -27,6 +28,8 @@
 import type { WebSearchProvider } from './types.ts';
 import { DDGSearchProvider } from './providers/ddg.ts';
 import { TinyFishSearchProvider } from './providers/tinyfish.ts';
+import { FirecrawlSearchProvider } from './providers/firecrawl.ts';
+import { TavilySearchProvider } from './providers/tavily.ts';
 import { ExaSearchProvider } from './providers/exa.ts';
 
 // [fork] Upstream-parity legacy imports — used only by the commented-out
@@ -64,6 +67,16 @@ export function resolveSearchProviders(
   const tinyfishKey = readKey(env, 'TINYFISH_API_KEY');
   if (tinyfishKey) {
     chain.push(new TinyFishSearchProvider({ apiKey: tinyfishKey }));
+  }
+
+  const firecrawlKey = readKey(env, 'FIRECRAWL_API_KEY');
+  if (firecrawlKey) {
+    chain.push(new FirecrawlSearchProvider({ apiKey: firecrawlKey }));
+  }
+
+  const tavilyKey = readKey(env, 'TAVILY_API_KEY');
+  if (tavilyKey) {
+    chain.push(new TavilySearchProvider({ apiKey: tavilyKey }));
   }
 
   const exaKey = readKey(env, 'EXA_API_KEY');

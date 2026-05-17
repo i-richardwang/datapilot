@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { resolveSearchProviders } from './resolve-provider.ts';
 import { TinyFishSearchProvider } from './providers/tinyfish.ts';
+import { FirecrawlSearchProvider } from './providers/firecrawl.ts';
+import { TavilySearchProvider } from './providers/tavily.ts';
 import { ExaSearchProvider } from './providers/exa.ts';
 import { DDGSearchProvider } from './providers/ddg.ts';
 
@@ -18,6 +20,20 @@ describe('resolveSearchProviders (env-driven cascade)', () => {
     expect(chain[1]).toBeInstanceOf(DDGSearchProvider);
   });
 
+  it('prepends Firecrawl when FIRECRAWL_API_KEY is set', () => {
+    const chain = resolveSearchProviders({ env: { FIRECRAWL_API_KEY: 'fc-test' } });
+    expect(chain.length).toBe(2);
+    expect(chain[0]).toBeInstanceOf(FirecrawlSearchProvider);
+    expect(chain[1]).toBeInstanceOf(DDGSearchProvider);
+  });
+
+  it('prepends Tavily when TAVILY_API_KEY is set', () => {
+    const chain = resolveSearchProviders({ env: { TAVILY_API_KEY: 'tvly-test' } });
+    expect(chain.length).toBe(2);
+    expect(chain[0]).toBeInstanceOf(TavilySearchProvider);
+    expect(chain[1]).toBeInstanceOf(DDGSearchProvider);
+  });
+
   it('prepends Exa when EXA_API_KEY is set', () => {
     const chain = resolveSearchProviders({ env: { EXA_API_KEY: 'exa-test' } });
     expect(chain.length).toBe(2);
@@ -25,19 +41,41 @@ describe('resolveSearchProviders (env-driven cascade)', () => {
     expect(chain[1]).toBeInstanceOf(DDGSearchProvider);
   });
 
-  it('orders TinyFish → Exa → DDG when both keys are set', () => {
+  it('orders TinyFish → Firecrawl → Tavily → Exa → DDG when all keys are set', () => {
     const chain = resolveSearchProviders({
-      env: { TINYFISH_API_KEY: 'tf-test', EXA_API_KEY: 'exa-test' },
+      env: {
+        TINYFISH_API_KEY: 'tf-test',
+        FIRECRAWL_API_KEY: 'fc-test',
+        TAVILY_API_KEY: 'tvly-test',
+        EXA_API_KEY: 'exa-test',
+      },
+    });
+    expect(chain.length).toBe(5);
+    expect(chain[0]).toBeInstanceOf(TinyFishSearchProvider);
+    expect(chain[1]).toBeInstanceOf(FirecrawlSearchProvider);
+    expect(chain[2]).toBeInstanceOf(TavilySearchProvider);
+    expect(chain[3]).toBeInstanceOf(ExaSearchProvider);
+    expect(chain[4]).toBeInstanceOf(DDGSearchProvider);
+  });
+
+  it('preserves cascade order with partial config (Firecrawl + Tavily only)', () => {
+    const chain = resolveSearchProviders({
+      env: { FIRECRAWL_API_KEY: 'fc-test', TAVILY_API_KEY: 'tvly-test' },
     });
     expect(chain.length).toBe(3);
-    expect(chain[0]).toBeInstanceOf(TinyFishSearchProvider);
-    expect(chain[1]).toBeInstanceOf(ExaSearchProvider);
+    expect(chain[0]).toBeInstanceOf(FirecrawlSearchProvider);
+    expect(chain[1]).toBeInstanceOf(TavilySearchProvider);
     expect(chain[2]).toBeInstanceOf(DDGSearchProvider);
   });
 
   it('treats whitespace-only or empty key values as unconfigured', () => {
     const chain = resolveSearchProviders({
-      env: { TINYFISH_API_KEY: '   ', EXA_API_KEY: '' },
+      env: {
+        TINYFISH_API_KEY: '   ',
+        FIRECRAWL_API_KEY: '',
+        TAVILY_API_KEY: '   ',
+        EXA_API_KEY: '',
+      },
     });
     expect(chain.length).toBe(1);
     expect(chain[0]).toBeInstanceOf(DDGSearchProvider);

@@ -38,9 +38,13 @@ services:
       - DATAPILOT_RPC_PORT=9100
       - DATAPILOT_HEALTH_PORT=9101
       - DATAPILOT_VIEWER_URL=${DATAPILOT_VIEWER_URL:-http://host.docker.internal:9101}
-      # [fork] Optional search-provider cascade keys (TinyFish → Exa → DDG).
-      # Leave unset to fall back to DuckDuckGo only.
+      # [fork] Optional search/fetch provider cascade keys.
+      # Order: TinyFish → Firecrawl → Tavily → Exa → DDG (search) / local (fetch).
+      # Each key is shared by web_search and web_fetch for that vendor. Leave unset
+      # to fall back to DuckDuckGo (search) or the local fetch+Turndown path (fetch).
       - TINYFISH_API_KEY=${TINYFISH_API_KEY:-}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
       - EXA_API_KEY=${EXA_API_KEY:-}
     volumes:
       - ${DATAPILOT_DATA_DIR:-~/.datapilot}:/home/datapilot/.datapilot
