@@ -362,9 +362,14 @@ export class BatchProcessor {
     if (!itemState) return false
 
     if (reason === 'complete') {
+      // Clear any stale `error` left over from a previous failed attempt that
+      // was auto-retried. Without this, a successful retry still shows the old
+      // "error (retry N)" string in the UI (BatchItemTimeline prefers `error`
+      // over `summary`), contradicting the green completed status.
       updateItemState(state, itemId, {
         status: 'completed',
         completedAt: Date.now(),
+        error: undefined,
       })
       log.debug(`[BatchProcessor] Item "${itemId}" completed in batch "${batchId}"`)
     } else {
