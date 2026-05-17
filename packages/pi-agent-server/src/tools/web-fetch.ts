@@ -7,6 +7,11 @@ import { join } from 'node:path';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { lookup } from 'node:dns/promises';
 import { randomUUID } from 'node:crypto';
+// [fork] HTML-fetch cascade: TinyFish → Exa → local Turndown.
+// Only HTML pages go through the cascade; PDF/image/JSON/text stay on the local
+// path because the remote backends only return text content.
+import { resolveHtmlFetchProviders } from './fetch/resolve-provider.ts';
+import type { HtmlFetchProvider } from './fetch/types.ts';
 
 const schema = Type.Object({
   url: Type.String({ description: 'URL to fetch' }),
@@ -37,6 +42,28 @@ const MIME_TO_EXT: Record<string, string> = {
   'image/webp': '.webp',
   'image/svg+xml': '.svg',
 };
+
+// [fork] URL extensions that bypass the HTML cascade. Sending these to TinyFish/Exa
+// is wasteful (their browser renders binary URLs as either empty pages or download
+// shells) and would lose the local handlers' PDF text extraction + image disk save.
+const BINARY_URL_EXTENSIONS = new Set([
+  '.pdf',
+  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico',
+  '.zip', '.tar', '.gz', '.bz2', '.7z', '.rar',
+  '.mp3', '.mp4', '.wav', '.ogg', '.webm', '.mov', '.avi',
+  '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+]);
+
+function hasBinaryUrlExtension(url: string): boolean {
+  try {
+    const pathname = new URL(url).pathname.toLowerCase();
+    const dot = pathname.lastIndexOf('.');
+    if (dot < 0) return false;
+    return BINARY_URL_EXTENSIONS.has(pathname.slice(dot));
+  } catch {
+    return false;
+  }
+}
 
 // ============================================================
 // SSRF protection
@@ -292,6 +319,21 @@ function handleHtml(
   return result(prefix + truncate(markdown));
 }
 
+// [fork] Format markdown produced by a remote HTML provider with the same prefix
+// shape as `handleHtml`, plus `(via <ProviderName>)` attribution so callers can
+// tell which backend rendered the page (mirrors the search cascade's signage).
+function formatRemoteHtml(
+  markdown: string,
+  url: string,
+  prompt: string | undefined,
+  providerName: string,
+): AgentToolResult<{ isError?: boolean }> {
+  const prefix = prompt
+    ? `Content from ${url} (via ${providerName}, asked: "${prompt}"):\n\n`
+    : `Content from ${url} (via ${providerName}):\n\n`;
+  return result(prefix + truncate(markdown));
+}
+
 function handleJson(
   raw: string,
   url: string,
@@ -316,8 +358,14 @@ function handleText(
 // Factory
 // ============================================================
 
+export interface CreateWebFetchToolOptions {
+  /** Override the env-driven HTML cascade. Used by tests to inject mock providers. */
+  htmlProviders?: HtmlFetchProvider[];
+}
+
 export function createWebFetchTool(
   getSessionPath: () => string | null,
+  options: CreateWebFetchToolOptions = {},
 ): ToolDefinition<typeof schema> {
   async function saveBinary(buffer: Buffer, url: string, ext: string): Promise<string> {
     const sessionPath = getSessionPath();
@@ -334,6 +382,80 @@ export function createWebFetchTool(
     return abs;
   }
 
+  // [fork] Local fetch + content-type dispatch — the pre-cascade implementation,
+  // extracted so it can serve both as the binary-URL fast path and the universal
+  // fallback when the HTML cascade is empty or all providers fail.
+  async function localFetchAndDispatch(
+    url: string,
+    prompt: string | undefined,
+  ): Promise<AgentToolResult<{ isError?: boolean }>> {
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; CraftAgent/1.0)',
+          Accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (err) {
+      return result(
+        `Failed to fetch ${url}: ${err instanceof Error ? err.message : String(err)}`,
+        true,
+      );
+    }
+
+    if (!response.ok) {
+      return result(
+        `Failed to fetch ${url}: HTTP ${response.status} ${response.statusText}`,
+        true,
+      );
+    }
+
+    // Use the final URL after redirects for all output messages
+    const finalUrl = response.url || url;
+
+    const contentType = (response.headers.get('content-type') || '')
+      .toLowerCase()
+      .split(';')[0]
+      .trim();
+
+    // Binary content types — stream with size limit
+    if (contentType === 'application/pdf') {
+      const buffer = await readResponseBytes(response, MAX_DOWNLOAD_SIZE);
+      return handlePdf(buffer, finalUrl, saveBinary);
+    }
+
+    if (contentType.startsWith('image/')) {
+      const buffer = await readResponseBytes(response, MAX_DOWNLOAD_SIZE);
+      return handleImage(buffer, finalUrl, contentType, saveBinary);
+    }
+
+    // Text content types — stream with size limit then decode
+    const text = await readResponseText(response, MAX_DOWNLOAD_SIZE);
+
+    if (contentType.includes('html')) {
+      return handleHtml(text, finalUrl, prompt);
+    }
+
+    if (
+      contentType === 'application/json' ||
+      contentType.endsWith('+json')
+    ) {
+      return handleJson(text, finalUrl);
+    }
+
+    return handleText(text, finalUrl);
+  }
+
+  // [fork] HTML cascade — resolved once per tool instance from env (or injected
+  // via options for tests). Empty when no API keys are configured, in which case
+  // every request goes straight to localFetchAndDispatch (preserves pre-fork
+  // behavior bit-for-bit).
+  const htmlProviders = options.htmlProviders ?? resolveHtmlFetchProviders();
+
   return {
     name: 'web_fetch',
     label: 'Web Fetch',
@@ -345,7 +467,9 @@ export function createWebFetchTool(
     async execute(toolCallId, params) {
       const { url, prompt } = params;
 
-      // SSRF protection: block non-HTTP schemes and private/reserved IPs
+      // SSRF protection: block non-HTTP schemes and private/reserved IPs.
+      // Applied even when delegating to remote providers — defense in depth and
+      // it stops "fetch internal admin URL via TinyFish" exfiltration patterns.
       try {
         await validateUrl(url);
       } catch (err) {
@@ -355,65 +479,32 @@ export function createWebFetchTool(
         );
       }
 
-      let response: Response;
-      try {
-        response = await fetch(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; CraftAgent/1.0)',
-            Accept:
-              'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          },
-          redirect: 'follow',
-          signal: AbortSignal.timeout(30_000),
-        });
-      } catch (err) {
-        return result(
-          `Failed to fetch ${url}: ${err instanceof Error ? err.message : String(err)}`,
-          true,
-        );
+      // [fork] Skip the cascade for binary URLs — local handlers own PDF text
+      // extraction and image disk save, which TinyFish/Exa cannot replicate.
+      // The empty-cascade case (no API keys configured) also bypasses the loop
+      // naturally since `for` over a 0-length array is a no-op, but we short
+      // circuit explicitly to skip the binary-extension URL parse when irrelevant.
+      if (htmlProviders.length === 0 || hasBinaryUrlExtension(url)) {
+        return localFetchAndDispatch(url, prompt);
       }
 
-      if (!response.ok) {
-        return result(
-          `Failed to fetch ${url}: HTTP ${response.status} ${response.statusText}`,
-          true,
-        );
+      // [fork] HTML cascade: try each provider in order. On any failure, log
+      // server-side (never to the LLM — error bodies may carry key fragments)
+      // and continue. If all fail, fall back to localFetchAndDispatch which will
+      // also handle non-HTML content types the providers refused.
+      for (const provider of htmlProviders) {
+        try {
+          const { markdown, finalUrl } = await provider.fetchHtml(url);
+          return formatRemoteHtml(markdown, finalUrl, prompt, provider.name);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `[web_fetch] provider "${provider.name}" failed: ${msg}; trying next in cascade`,
+          );
+        }
       }
 
-      // Use the final URL after redirects for all output messages
-      const finalUrl = response.url || url;
-
-      const contentType = (response.headers.get('content-type') || '')
-        .toLowerCase()
-        .split(';')[0]
-        .trim();
-
-      // Binary content types — stream with size limit
-      if (contentType === 'application/pdf') {
-        const buffer = await readResponseBytes(response, MAX_DOWNLOAD_SIZE);
-        return handlePdf(buffer, finalUrl, saveBinary);
-      }
-
-      if (contentType.startsWith('image/')) {
-        const buffer = await readResponseBytes(response, MAX_DOWNLOAD_SIZE);
-        return handleImage(buffer, finalUrl, contentType, saveBinary);
-      }
-
-      // Text content types — stream with size limit then decode
-      const text = await readResponseText(response, MAX_DOWNLOAD_SIZE);
-
-      if (contentType.includes('html')) {
-        return handleHtml(text, finalUrl, prompt);
-      }
-
-      if (
-        contentType === 'application/json' ||
-        contentType.endsWith('+json')
-      ) {
-        return handleJson(text, finalUrl);
-      }
-
-      return handleText(text, finalUrl);
+      return localFetchAndDispatch(url, prompt);
     },
   };
 }
