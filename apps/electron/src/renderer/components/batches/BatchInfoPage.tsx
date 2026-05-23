@@ -27,7 +27,7 @@ import { BatchItemTimeline } from './BatchItemTimeline'
 import { BATCH_STATUS_DISPLAY_KEY, BATCH_STATUS_BADGE_COLOR, getPermissionModeKey } from './types'
 import { TEST_BATCH_SUFFIX } from '@craft-agent/shared/batches/constants'
 import type { BatchListItem } from './types'
-import type { BatchState, BatchStatus, BatchProgress, BatchItemState, BatchItemsPage, TestBatchResult } from '@craft-agent/shared/batches'
+import type { BatchState, BatchStatus, BatchProgress, BatchItemState, BatchItemStatus, BatchItemsPage, TestBatchResult } from '@craft-agent/shared/batches'
 
 // ============================================================================
 // Constants
@@ -49,7 +49,7 @@ export interface BatchInfoPageProps {
   onDelete?: () => void
   onRetryItem?: (itemId: string) => void
   getBatchState?: (batchId: string) => Promise<BatchState | null>
-  getBatchItems?: (batchId: string, offset: number, limit: number) => Promise<BatchItemsPage | null>
+  getBatchItems?: (batchId: string, offset: number, limit: number, filterStatus?: BatchItemStatus) => Promise<BatchItemsPage | null>
   testProgress?: BatchProgress
   testResult?: TestBatchResult
   className?: string
@@ -88,21 +88,23 @@ export function BatchInfoPage({
 
   const [itemsPage, setItemsPage] = useState<BatchItemsPage | null>(null)
   const [pageOffset, setPageOffset] = useState(0)
+  const [filterStatus, setFilterStatus] = useState<BatchItemStatus | undefined>(undefined)
   const hasAutoPositioned = useRef(false)
 
   // Fetch current page of items
   useEffect(() => {
     if (!getBatchItems || !batch.id) return
     let stale = false
-    getBatchItems(batch.id, pageOffset, PAGE_SIZE).then(page => {
+    getBatchItems(batch.id, pageOffset, PAGE_SIZE, filterStatus).then(page => {
       if (!stale) setItemsPage(page)
     })
     return () => { stale = true }
-  }, [getBatchItems, batch.id, pageOffset, batch.progress])
+  }, [getBatchItems, batch.id, pageOffset, filterStatus, batch.progress])
 
-  // Auto-position to execution frontier on first load
+  // Auto-position to execution frontier on first load — skip when filtering,
+  // since frontier navigation is not meaningful under a status filter.
   useEffect(() => {
-    if (hasAutoPositioned.current || !itemsPage) return
+    if (hasAutoPositioned.current || !itemsPage || filterStatus) return
     hasAutoPositioned.current = true
     if (itemsPage.runningOffset >= 0) {
       const frontierPage = Math.floor(itemsPage.runningOffset / PAGE_SIZE) * PAGE_SIZE
@@ -116,8 +118,19 @@ export function BatchInfoPage({
   useEffect(() => {
     hasAutoPositioned.current = false
     setPageOffset(0)
+    setFilterStatus(undefined)
     setItemsPage(null)
   }, [batch.id])
+
+  // Reset to first page when toggling filter
+  const toggleFailedFilter = () => {
+    setFilterStatus(prev => (prev === 'failed' ? undefined : 'failed'))
+    setPageOffset(0)
+  }
+  const clearFilter = () => {
+    setFilterStatus(undefined)
+    setPageOffset(0)
+  }
 
   const itemCount = itemsPage?.total ?? batch.progress?.totalItems ?? 0
 
@@ -374,7 +387,18 @@ export function BatchInfoPage({
                 <Info_Badge color="success">{batch.progress.completedItems}</Info_Badge>
               </Info_Table.Row>
               <Info_Table.Row label={t('batches.statusFailed')}>
-                <Info_Badge color="destructive">{batch.progress.failedItems}</Info_Badge>
+                {batch.progress.failedItems > 0 ? (
+                  <button
+                    type="button"
+                    onClick={toggleFailedFilter}
+                    title={filterStatus === 'failed' ? t('batches.filterShowAll') : t('batches.filterFailedOnly')}
+                    className="cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded"
+                  >
+                    <Info_Badge color="destructive">{batch.progress.failedItems}</Info_Badge>
+                  </button>
+                ) : (
+                  <Info_Badge color="destructive">{batch.progress.failedItems}</Info_Badge>
+                )}
               </Info_Table.Row>
               <Info_Table.Row label={t('batches.statusRunning')}>
                 <Info_Badge color="warning">{batch.progress.runningItems}</Info_Badge>
@@ -390,6 +414,15 @@ export function BatchInfoPage({
         <Info_Section
           title={t('batches.sectionItems')}
           description={itemCount > 0 ? t('batches.itemsInBatch', { count: itemCount }) : undefined}
+          actions={filterStatus === 'failed' ? (
+            <button
+              type="button"
+              onClick={clearFilter}
+              className="text-xs text-accent hover:underline cursor-pointer"
+            >
+              {t('batches.filterShowAll')}
+            </button>
+          ) : undefined}
         >
           <BatchItemTimeline items={pageItemsRecord} batchId={batch.id} onRetryItem={onRetryItem} />
           {itemsPage && itemsPage.total > PAGE_SIZE && (

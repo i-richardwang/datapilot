@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { getWorkspaceDb } from '../db/connection.ts';
 import { dbEvents } from '../db/events.ts';
 import { batchState as batchStateTable, batchTestResults } from '../db/schema/batches.sql.ts';
-import type { BatchState, BatchItemState, BatchProgress, BatchItemsPage, TestBatchResult, PersistedTestResult } from './types.ts';
+import type { BatchState, BatchItemState, BatchItemStatus, BatchProgress, BatchItemsPage, TestBatchResult, PersistedTestResult } from './types.ts';
 
 // ============================================================================
 // Batch State Path (compatibility)
@@ -164,17 +164,28 @@ export function deleteBatchState(workspaceRootPath: string, batchId: string): vo
 /**
  * Return a page of items from a batch state.
  * Used by the GET_ITEMS RPC to avoid sending all items over IPC.
+ *
+ * When `filterStatus` is provided, only items matching that status are
+ * considered for paging — `total` reflects the filtered count and
+ * `runningOffset` is -1 because frontier navigation is not meaningful
+ * under a status filter.
  */
 export function getBatchItemsPage(
   state: BatchState,
   offset: number,
   limit: number,
+  filterStatus?: BatchItemStatus,
 ): BatchItemsPage {
   const allEntries = Object.entries(state.items)
-  const total = allEntries.length
+  const entries = filterStatus
+    ? allEntries.filter(([, item]) => item.status === filterStatus)
+    : allEntries
+  const total = entries.length
   const clampedOffset = total === 0 ? 0 : Math.max(0, Math.min(offset, total - 1))
-  const sliced = allEntries.slice(clampedOffset, clampedOffset + limit)
-  const runningOffset = allEntries.findIndex(([, item]) => item.status === 'running')
+  const sliced = entries.slice(clampedOffset, clampedOffset + limit)
+  const runningOffset = filterStatus
+    ? -1
+    : allEntries.findIndex(([, item]) => item.status === 'running')
   return {
     items: sliced.map(([id, state]) => ({ id, state })),
     total,

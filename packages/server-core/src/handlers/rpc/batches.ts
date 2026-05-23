@@ -3,6 +3,7 @@ import { join } from 'path'
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { getWorkspaceByNameOrId } from '@craft-agent/shared/config'
 import { BATCHES_CONFIG_FILE, BATCH_STATE_FILE_PREFIX, BATCH_TEST_RESULT_FILE_PREFIX, TEST_BATCH_SUFFIX } from '@craft-agent/shared/batches'
+import type { BatchItemStatus } from '@craft-agent/shared/batches'
 import { loadLabelConfig } from '@craft-agent/shared/labels/storage'
 import { resolveSessionLabels } from '@craft-agent/shared/labels'
 import type { RpcServer } from '@craft-agent/server-core/transport'
@@ -162,12 +163,12 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     return processor.getState(batchId)
   })
 
-  server.handle(RPC_CHANNELS.batches.GET_ITEMS, async (_ctx, workspaceId: string, batchId: string, offset: number, limit: number) => {
+  server.handle(RPC_CHANNELS.batches.GET_ITEMS, async (_ctx, workspaceId: string, batchId: string, offset: number, limit: number, filterStatus?: BatchItemStatus) => {
     const workspace = getWorkspaceByNameOrId(workspaceId)
     if (!workspace) throw new Error('Workspace not found')
 
     const processor = deps.sessionManager.ensureBatchProcessor(workspace.rootPath, workspaceId)
-    return processor.getItems(batchId, offset, limit)
+    return processor.getItems(batchId, offset, limit, filterStatus)
   })
 
   // Create a new batch entry in batches.json

@@ -16,7 +16,7 @@ import { toast } from 'sonner'
 import { batchesAtom } from '@/atoms/batches'
 import type { BatchListItem } from '@/components/batches/types'
 import { TEST_BATCH_SUFFIX } from '@craft-agent/shared/batches/constants'
-import type { BatchProgress, BatchState, BatchItemsPage, TestBatchResult } from '@craft-agent/shared/batches'
+import type { BatchProgress, BatchState, BatchItemsPage, BatchItemStatus, TestBatchResult } from '@craft-agent/shared/batches'
 
 export interface UseBatchesResult {
   batches: BatchListItem[]
@@ -25,7 +25,7 @@ export interface UseBatchesResult {
   handleResumeBatch: (batchId: string) => void
   handleTestBatch: (batchId: string) => void
   getBatchState: (batchId: string) => Promise<BatchState | null>
-  getBatchItems: (batchId: string, offset: number, limit: number) => Promise<BatchItemsPage | null>
+  getBatchItems: (batchId: string, offset: number, limit: number, filterStatus?: BatchItemStatus) => Promise<BatchItemsPage | null>
   updateBatchProgress: (progress: BatchProgress) => void
   handleBatchComplete: (batchId: string) => void
   testProgress: Record<string, BatchProgress>
@@ -183,11 +183,11 @@ export function useBatches(
 
   // Get a paginated slice of items
   const getBatchItems = useCallback(async (
-    batchId: string, offset: number, limit: number,
+    batchId: string, offset: number, limit: number, filterStatus?: BatchItemStatus,
   ): Promise<BatchItemsPage | null> => {
     if (!activeWorkspaceId) return null
     try {
-      return await window.electronAPI.getBatchItems(activeWorkspaceId, batchId, offset, limit)
+      return await window.electronAPI.getBatchItems(activeWorkspaceId, batchId, offset, limit, filterStatus)
     } catch {
       return null
     }

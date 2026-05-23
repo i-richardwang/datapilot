@@ -31,6 +31,7 @@ import type {
   BatchConfig,
   BatchesFileConfig,
   BatchItem,
+  BatchItemStatus,
   BatchState,
   BatchProgress,
   BatchSystemOptions,
@@ -308,12 +309,14 @@ export class BatchProcessor {
   }
 
   /**
-   * Get a paginated slice of items for a batch.
+   * Get a paginated slice of items for a batch. When `filterStatus` is
+   * provided, only items matching that status are returned and `total`
+   * reflects the filtered count.
    */
-  getItems(batchId: string, offset: number, limit: number): BatchItemsPage | null {
+  getItems(batchId: string, offset: number, limit: number, filterStatus?: BatchItemStatus): BatchItemsPage | null {
     const state = this.activeStates.get(batchId) ?? loadBatchState(this.options.workspaceRootPath, batchId)
     if (!state) return null
-    return getBatchItemsPage(state, offset, limit)
+    return getBatchItemsPage(state, offset, limit, filterStatus)
   }
 
   /**
