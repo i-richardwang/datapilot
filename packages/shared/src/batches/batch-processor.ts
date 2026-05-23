@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { createLogger } from '../utils/debug.ts'
-import { BATCHES_CONFIG_FILE, DEFAULT_MAX_CONCURRENCY, DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS, DEFAULT_MAX_RETRIES, BATCH_ITEM_ENV_PREFIX } from './constants.ts'
+import { BATCHES_CONFIG_FILE, DEFAULT_MAX_CONCURRENCY, DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS, DEFAULT_MAX_RETRIES, BATCH_ITEM_ENV_PREFIX, DEFAULT_ITEM_TIMEOUT_MS } from './constants.ts'
 import { BatchesFileConfigSchema } from './schemas.ts'
 import { loadBatchItems } from './data-source.ts'
 import {
@@ -50,6 +50,9 @@ export class BatchProcessor {
   /** Reverse lookup: sessionId → { batchId, itemId } */
   private sessionToItem: Map<string, { batchId: string; itemId: string }> = new Map()
 
+  /** Interval handle for periodic timeout checks */
+  private timeoutCheckInterval: ReturnType<typeof setInterval> | null = null
+
   constructor(options: BatchSystemOptions) {
     this.options = options
     log.debug(`[BatchProcessor] Created for workspace: ${options.workspaceId}`)
@@ -75,7 +78,7 @@ export class BatchProcessor {
       let changed = false
       for (const batch of raw.batches) {
         if (typeof batch === 'object' && batch !== null && !batch.id) {
-          batch.id = randomBytes(3).toString('hex')
+          batch.id = randomBytes(8).toString('hex')
           changed = true
         }
       }
@@ -435,7 +438,70 @@ export class BatchProcessor {
       this.options.onError?.(batchId, error instanceof Error ? error : new Error(String(error)))
     })
 
+    this.startTimeoutCheckIfNeeded()
+
     return progress
+  }
+
+  // ============================================================================
+  // Internal: Item Timeout
+  // ============================================================================
+
+  private startTimeoutCheckIfNeeded(): void {
+    if (this.timeoutCheckInterval) return
+
+    const hasTimeout = [...this.activeStates.keys()].some((batchId) => {
+      const config = this.getBatchConfig(batchId)
+      return config?.execution?.itemTimeoutMs != null
+    })
+    if (!hasTimeout) return
+
+    this.timeoutCheckInterval = setInterval(() => this.checkItemTimeouts(), 30_000)
+  }
+
+  private stopTimeoutCheck(): void {
+    // Only stop if no running batches with timeouts remain
+    const hasRunningWithTimeout = [...this.activeStates.entries()].some(([batchId, state]) => {
+      if (state.status !== 'running') return false
+      return this.getBatchConfig(batchId)?.execution?.itemTimeoutMs != null
+    })
+    if (!hasRunningWithTimeout && this.timeoutCheckInterval) {
+      clearInterval(this.timeoutCheckInterval)
+      this.timeoutCheckInterval = null
+    }
+  }
+
+  private checkItemTimeouts(): void {
+    const now = Date.now()
+    for (const [batchId, state] of this.activeStates) {
+      if (state.status !== 'running') continue
+      const config = this.getBatchConfig(batchId)
+      const timeoutMs = config?.execution?.itemTimeoutMs ?? DEFAULT_ITEM_TIMEOUT_MS
+      if (!timeoutMs) continue
+
+      let changed = false
+      for (const [itemId, item] of Object.entries(state.items)) {
+        if (item.status !== 'running' || !item.startedAt) continue
+        if ((now - item.startedAt) > timeoutMs) {
+          log.warn(`[BatchProcessor] Item "${itemId}" in batch "${batchId}" timed out after ${Math.round((now - item.startedAt) / 1000)}s`)
+          updateItemState(state, itemId, { status: 'failed', completedAt: now, error: 'timeout' })
+          // The underlying session keeps running — it will complete on its own
+          // and onSessionComplete will no-op (mapping already removed).
+          if (item.sessionId) this.sessionToItem.delete(item.sessionId)
+          changed = true
+        }
+      }
+
+      if (changed) {
+        saveBatchState(this.options.workspaceRootPath, state)
+        this.options.onProgress?.(computeProgress(state))
+        if (isBatchDone(state)) {
+          this.completeBatch(batchId)
+        } else {
+          this.dispatchAllRunning()
+        }
+      }
+    }
   }
 
   // ============================================================================
@@ -525,6 +591,21 @@ export class BatchProcessor {
     // Check if all items finished during dispatch (e.g. all session creations failed)
     if (isBatchDone(state)) {
       this.completeBatch(batchId)
+      return
+    }
+
+    // If items failed during dispatch (no session created), remaining pending
+    // items would be stranded because onSessionComplete never fires for them.
+    // Re-dispatch to fill the freed slots.
+    if (toDispatch.length > 0 && state.status === 'running') {
+      const stillRunning = Object.values(state.items).filter(i => i.status === 'running').length
+      const stillPending = Object.values(state.items).filter(i => i.status === 'pending').length
+      if (stillPending > 0 && stillRunning < (config.execution?.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY)) {
+        this.dispatchNext(batchId).catch((error) => {
+          log.error(`[BatchProcessor] Failed to re-dispatch items for batch "${batchId}":`, error)
+          this.options.onError?.(batchId, error instanceof Error ? error : new Error(String(error)))
+        })
+      }
     }
   }
 
@@ -655,8 +736,9 @@ export class BatchProcessor {
 
     saveBatchState(this.options.workspaceRootPath, state)
 
-    log.info(`[BatchProcessor] Batch "${batchId}" ${state.status}: ${progress.completedItems} completed, ${progress.failedItems} failed`)
+    log.info(`[BatchProcessor] Batch "${batchId}" ${state.status}: ${progress.completedItems} completed, ${progress.failedItems} failed, ${progress.skippedItems} skipped`)
 
+    this.stopTimeoutCheck()
     this.options.onBatchComplete?.(batchId, state.status)
     this.options.onProgress?.(computeProgress(state))
   }
@@ -684,6 +766,11 @@ export class BatchProcessor {
    * Save all active batch states as paused. Called during cleanup.
    */
   dispose(): void {
+    if (this.timeoutCheckInterval) {
+      clearInterval(this.timeoutCheckInterval)
+      this.timeoutCheckInterval = null
+    }
+
     for (const [batchId, state] of this.activeStates) {
       if (state.status === 'running') {
         state.status = 'paused'

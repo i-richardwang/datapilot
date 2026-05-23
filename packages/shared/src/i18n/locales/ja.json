@@ -184,6 +184,7 @@
   "batches.statusPaused": "一時停止",
   "batches.statusPending": "待機中",
   "batches.statusRunning": "実行中",
+  "batches.statusSkipped": "スキップ",
   "batches.totalItems_one": "{{count}} 件",
   "batches.totalItems_other": "{{count}} 件",
   "browser.newWindow": "新しいブラウザウィンドウ",

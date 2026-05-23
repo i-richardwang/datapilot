@@ -13,7 +13,7 @@
  */
 
 import { dirname } from 'node:path';
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from 'node:fs';
 import Ajv from 'ajv';
 import type { SessionToolContext } from '../context.ts';
 import type { ToolResult } from '../types.ts';
@@ -109,39 +109,48 @@ function coerceData(raw: Record<string, unknown> | string): { data: Record<strin
 /**
  * Replace or append an output record in a JSONL file.
  *
- * Reads existing lines, removes any with the same _item_id, then
- * writes back all lines plus the new record. Serialized per-file
- * via writeQueues to prevent concurrent read-modify-write races.
+ * First-write path: if the file doesn't exist or doesn't contain a record
+ * for this item, appends a single line — O(1) write for the common case.
+ *
+ * Retry path: if a record for this _item_id already exists (e.g. after a
+ * retry), reads the full file, removes the old record, and rewrites.
+ *
+ * Serialized per-file via writeQueues to prevent concurrent races.
  */
 function upsertRecord(outputPath: string, record: Record<string, unknown>): void {
   const itemId = record._item_id;
+  const newLine = JSON.stringify(record);
 
-  // Ensure output directory exists
   const dir = dirname(outputPath);
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
 
-  // Read existing lines (if file exists)
-  let existingLines: string[] = [];
-  if (existsSync(outputPath)) {
-    const content = readFileSync(outputPath, 'utf-8');
-    existingLines = content.split('\n').filter(line => line.trim() !== '');
+  if (!existsSync(outputPath)) {
+    writeFileSync(outputPath, newLine + '\n', 'utf-8');
+    return;
   }
 
-  // Filter out previous records for this item
-  const filteredLines = existingLines.filter(line => {
-    try {
-      const parsed = JSON.parse(line);
-      return parsed._item_id !== itemId;
-    } catch {
-      return true; // keep malformed lines
-    }
+  const content = readFileSync(outputPath, 'utf-8');
+  const lines = content.split('\n').filter(line => line.trim() !== '');
+
+  const hasExisting = lines.some(line => {
+    try { return JSON.parse(line)._item_id === itemId; }
+    catch { return false; }
   });
 
-  // Append the new record and write back
-  filteredLines.push(JSON.stringify(record));
-  writeFileSync(outputPath, filteredLines.join('\n') + '\n', 'utf-8');
+  if (!hasExisting) {
+    appendFileSync(outputPath, newLine + '\n', 'utf-8');
+    return;
+  }
+
+  // Retry case: filter old record and rewrite
+  const filtered = lines.filter(line => {
+    try { return JSON.parse(line)._item_id !== itemId; }
+    catch { return true; }
+  });
+  filtered.push(newLine);
+  writeFileSync(outputPath, filtered.join('\n') + '\n', 'utf-8');
 }
 
 /**

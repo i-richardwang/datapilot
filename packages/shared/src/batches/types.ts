@@ -50,6 +50,8 @@ export interface BatchExecution {
   model?: string
   /** LLM connection slug for created sessions */
   llmConnection?: string
+  /** Timeout in milliseconds for individual items. Items running longer are marked failed. */
+  itemTimeoutMs?: number
 }
 
 // ============================================================================
@@ -156,6 +158,7 @@ export interface BatchProgress {
   totalItems: number
   completedItems: number
   failedItems: number
+  skippedItems: number
   runningItems: number
   pendingItems: number
 }

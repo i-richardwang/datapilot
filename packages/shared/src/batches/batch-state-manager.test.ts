@@ -61,14 +61,12 @@ describe('batch-state-manager', () => {
       expect(loadBatchState(tempDir, 'missing')).toBeNull()
     })
 
-    it('should create a valid JSON file', () => {
+    it('should persist state to SQLite and load it back', () => {
       const state = createInitialBatchState('batch1', ['a'])
       saveBatchState(tempDir, state)
 
-      const path = getBatchStatePath(tempDir, 'batch1')
-      expect(existsSync(path)).toBe(true)
-      const content = readFileSync(path, 'utf-8')
-      expect(JSON.parse(content)).toEqual(state)
+      const loaded = loadBatchState(tempDir, 'batch1')
+      expect(loaded).toEqual(state)
     })
   })
 
@@ -100,6 +98,7 @@ describe('batch-state-manager', () => {
         totalItems: 3,
         completedItems: 0,
         failedItems: 0,
+        skippedItems: 0,
         runningItems: 0,
         pendingItems: 3,
       })
@@ -116,7 +115,8 @@ describe('batch-state-manager', () => {
 
       const progress = computeProgress(state)
       expect(progress.completedItems).toBe(1)
-      expect(progress.failedItems).toBe(2) // failed + skipped
+      expect(progress.failedItems).toBe(1)
+      expect(progress.skippedItems).toBe(1)
       expect(progress.runningItems).toBe(1)
       expect(progress.pendingItems).toBe(1)
     })

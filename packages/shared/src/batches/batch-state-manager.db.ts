@@ -103,6 +103,7 @@ export function updateItemState(
 export function computeProgress(state: BatchState): BatchProgress {
   let completedItems = 0;
   let failedItems = 0;
+  let skippedItems = 0;
   let runningItems = 0;
   let pendingItems = 0;
 
@@ -112,8 +113,10 @@ export function computeProgress(state: BatchState): BatchProgress {
         completedItems++;
         break;
       case 'failed':
-      case 'skipped':
         failedItems++;
+        break;
+      case 'skipped':
+        skippedItems++;
         break;
       case 'running':
         runningItems++;
@@ -130,6 +133,7 @@ export function computeProgress(state: BatchState): BatchProgress {
     totalItems: state.totalItems,
     completedItems,
     failedItems,
+    skippedItems,
     runningItems,
     pendingItems,
   };

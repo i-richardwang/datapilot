@@ -1,8 +1,8 @@
-import { readFile, writeFile, unlink } from 'fs/promises'
+import { readFile, writeFile } from 'fs/promises'
 import { join } from 'path'
 import { RPC_CHANNELS } from '@craft-agent/shared/protocol'
 import { getWorkspaceByNameOrId } from '@craft-agent/shared/config'
-import { BATCHES_CONFIG_FILE, BATCH_STATE_FILE_PREFIX } from '@craft-agent/shared/batches'
+import { BATCHES_CONFIG_FILE, deleteBatchState } from '@craft-agent/shared/batches'
 import type { BatchItemStatus } from '@craft-agent/shared/batches'
 import { loadLabelConfig } from '@craft-agent/shared/labels/storage'
 import { resolveSessionLabels } from '@craft-agent/shared/labels'
@@ -75,7 +75,7 @@ async function withBatchMutation(
 
   await withConfigMutex(workspace.rootPath, async () => {
     const { randomBytes } = await import('crypto')
-    const genId = () => randomBytes(3).toString('hex')
+    const genId = () => randomBytes(8).toString('hex')
     const configPath = join(workspace.rootPath, BATCHES_CONFIG_FILE)
     const raw = await readFile(configPath, 'utf-8')
     const config = JSON.parse(raw)
@@ -195,7 +195,7 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
       }
 
       const newBatch = withValidatedBatchLabels(workspace.rootPath, batch)
-      if (!newBatch.id) newBatch.id = randomBytes(3).toString('hex')
+      if (!newBatch.id) newBatch.id = randomBytes(8).toString('hex')
       if (typeof newBatch.createdAt !== 'number') newBatch.createdAt = Date.now()
       config.batches.push(newBatch)
 
@@ -261,14 +261,17 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
   })
 
   server.handle(RPC_CHANNELS.batches.DUPLICATE, async (_ctx, workspaceId: string, batchId: string) => {
+    let cloned!: Record<string, unknown>
     await withBatchMutation(workspaceId, batchId, (batches, idx, _config, genId) => {
       const clone = JSON.parse(JSON.stringify(batches[idx]))
       clone.id = genId()
       clone.name = clone.name ? `${clone.name} Copy` : 'Untitled Copy'
       clone.createdAt = Date.now()
       batches.splice(idx + 1, 0, clone)
+      cloned = clone
     })
     deps.sessionManager.notifyBatchesChanged(workspaceId)
+    return cloned
   })
 
   server.handle(RPC_CHANNELS.batches.DELETE, async (_ctx, workspaceId: string, batchId: string) => {
@@ -279,17 +282,10 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
       batches.splice(idx, 1)
     })
 
-    // Stop after config mutation succeeds
     const processor = deps.sessionManager.getBatchProcessor?.(workspace.rootPath)
-    processor?.stop(batchId) // optional — only stop if processor was already running
+    processor?.stop(batchId)
 
-    // Clean up state file
-    const cleanupFiles = [
-      join(workspace.rootPath, `${BATCH_STATE_FILE_PREFIX}${batchId}.json`),
-    ]
-    for (const f of cleanupFiles) {
-      try { await unlink(f) } catch { /* file may not exist */ }
-    }
+    deleteBatchState(workspace.rootPath, batchId)
     deps.sessionManager.notifyBatchesChanged(workspaceId)
   })
 

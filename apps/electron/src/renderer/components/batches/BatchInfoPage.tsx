@@ -284,7 +284,7 @@ export function BatchInfoPage({
           <Info_Section
             title={t('batches.sectionProgress')}
             description={t('batches.itemsProcessed', {
-              done: batch.progress.completedItems + batch.progress.failedItems,
+              done: batch.progress.completedItems + batch.progress.failedItems + (batch.progress.skippedItems ?? 0),
               total: batch.progress.totalItems,
             })}
           >
@@ -312,6 +312,11 @@ export function BatchInfoPage({
                   )}
                 </div>
               </Info_Table.Row>
+              {(batch.progress.skippedItems ?? 0) > 0 && (
+                <Info_Table.Row label={t('batches.statusSkipped')}>
+                  <Info_Badge color="muted">{batch.progress.skippedItems}</Info_Badge>
+                </Info_Table.Row>
+              )}
               <Info_Table.Row label={t('batches.statusRunning')}>
                 <Info_Badge color="warning">{batch.progress.runningItems}</Info_Badge>
               </Info_Table.Row>

@@ -6,7 +6,10 @@
 
 import { readFileSync } from 'node:fs'
 import { resolve, isAbsolute } from 'node:path'
+import { createLogger } from '../utils/debug.ts'
 import type { BatchSource, BatchItem } from './types.ts'
+
+const log = createLogger('batch-data-source')
 
 /**
  * Load batch items from a data source file.
@@ -91,6 +94,9 @@ function parseCsv(content: string): Record<string, unknown>[] {
     if (line.trim() === '') continue
 
     const values = parseCsvLine(line)
+    if (values.length < headers.length) {
+      log.warn(`[CSV] Row ${i} has ${values.length} columns, expected ${headers.length} — missing columns padded with empty strings`)
+    }
     const row: Record<string, unknown> = {}
     for (let j = 0; j < headers.length; j++) {
       row[headers[j]!] = values[j] ?? ''

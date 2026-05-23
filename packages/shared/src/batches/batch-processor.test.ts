@@ -102,7 +102,7 @@ describe('BatchProcessor', () => {
     it('should load and parse batches.json', () => {
       const config = setup.processor.loadConfig()
       expect(config).not.toBeNull()
-      expect(config!.batches).toHaveLength(3)
+      expect(config!.batches).toHaveLength(2)
       expect(config!.batches[0]!.id).toBe('test-batch')
     })
 
@@ -129,7 +129,7 @@ describe('BatchProcessor', () => {
   describe('listBatches', () => {
     it('should list all batches', () => {
       const batches = setup.processor.listBatches()
-      expect(batches).toHaveLength(3)
+      expect(batches).toHaveLength(2)
     })
   })
 

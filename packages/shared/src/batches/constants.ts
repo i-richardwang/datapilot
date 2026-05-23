@@ -18,5 +18,11 @@ export const DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS = 5
 /** Default maximum retry attempts per item */
 export const DEFAULT_MAX_RETRIES = 2
 
+/**
+ * Default item timeout (undefined = no timeout). Only applied when
+ * `execution.itemTimeoutMs` is explicitly set in the batch config.
+ */
+export const DEFAULT_ITEM_TIMEOUT_MS: number | undefined = undefined
+
 /** Environment variable prefix for batch item fields */
 export const BATCH_ITEM_ENV_PREFIX = 'BATCH_ITEM_'

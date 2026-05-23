@@ -25,6 +25,7 @@ export const BatchExecutionSchema = z.object({
   toolProfile: z.enum(['default', 'minimal']).optional(),
   model: z.string().min(1).optional(),
   llmConnection: z.string().min(1).optional(),
+  itemTimeoutMs: z.number().int().min(60_000).optional(),
 })
 
 export const BatchPromptActionSchema = z.object({

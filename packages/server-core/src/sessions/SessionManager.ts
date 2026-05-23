@@ -1533,16 +1533,7 @@ export class SessionManager implements ISessionManager {
         })
       },
       onProgress: (progress) => {
-        this.sendEvent({
-          type: 'batch_progress',
-          batchId: progress.batchId,
-          status: progress.status,
-          totalItems: progress.totalItems,
-          completedItems: progress.completedItems,
-          failedItems: progress.failedItems,
-          runningItems: progress.runningItems,
-          pendingItems: progress.pendingItems,
-        }, workspaceId)
+        this.sendEvent({ type: 'batch_progress', ...progress }, workspaceId)
       },
       onBatchComplete: (batchId, status) => {
         this.sendEvent({

@@ -73,6 +73,7 @@ export {
   computeProgress,
   isBatchDone,
   getBatchItemsPage,
+  deleteBatchState,
 } from './batch-state-manager.db.ts'
 
 // ============================================================================

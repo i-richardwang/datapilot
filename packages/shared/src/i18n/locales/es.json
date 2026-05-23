@@ -184,6 +184,7 @@
   "batches.statusPaused": "Pausado",
   "batches.statusPending": "Pendiente",
   "batches.statusRunning": "En ejecución",
+  "batches.statusSkipped": "Omitido",
   "batches.totalItems_one": "{{count}} elemento",
   "batches.totalItems_other": "{{count}} elementos",
   "browser.newWindow": "Nueva ventana del navegador",

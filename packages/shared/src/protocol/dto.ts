@@ -280,7 +280,7 @@ export type SessionEvent =
   | { type: 'auth_completed'; sessionId: string; requestId: string; success: boolean; cancelled?: boolean; error?: string }
   | { type: 'source_activated'; sessionId: string; sourceSlug: string; originalMessage: string }
   | { type: 'usage_update'; sessionId: string; tokenUsage: { inputTokens: number; contextWindow?: number } }
-  // Batch processing events
+  // Batch processing events (BatchProgress spread inline — includes skippedItems)
   | { type: 'batch_progress' } & import('../batches/types').BatchProgress
   | { type: 'batch_complete'; batchId: string; status: import('../batches/types').BatchStatus }
   | { type: 'message_annotations_updated'; sessionId: string; messageId: string; annotations: AnnotationV1[] }

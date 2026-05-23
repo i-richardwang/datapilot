@@ -184,6 +184,7 @@
   "batches.statusPaused": "已暂停",
   "batches.statusPending": "待运行",
   "batches.statusRunning": "运行中",
+  "batches.statusSkipped": "已跳过",
   "batches.totalItems_one": "{{count}} 个",
   "batches.totalItems_other": "{{count}} 个",
   "browser.newWindow": "新建浏览器窗口",

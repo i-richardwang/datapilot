@@ -84,7 +84,7 @@ function BatchItem({
   const status: BatchStatus = batch.progress?.status ?? 'pending'
   const statusColors = BATCH_STATUS_COLOR[status]
   const progressText = batch.progress
-    ? `${batch.progress.completedItems + batch.progress.failedItems}/${batch.progress.totalItems}`
+    ? `${batch.progress.completedItems + batch.progress.failedItems + (batch.progress.skippedItems ?? 0)}/${batch.progress.totalItems}`
     : undefined
 
   // Resolve applied labels against the workspace tree. Stale references
