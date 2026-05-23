@@ -212,7 +212,7 @@ export interface BatchSystemOptions {
   /** Progress update callback */
   onProgress?: (progress: BatchProgress) => void
   /** Batch completion callback */
-  onBatchComplete?: (batchId: string, status: BatchStatus) => void
+  onBatchComplete?: (batchId: string, status: BatchStatus, progress: BatchProgress) => void
   /** Error callback */
   onError?: (batchId: string, error: Error) => void
   /**

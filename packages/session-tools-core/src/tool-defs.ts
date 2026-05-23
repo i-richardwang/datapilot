@@ -101,11 +101,14 @@ export const CallLlmSchema = z.object({
   thinkingBudget: z.number().optional().describe('Token budget for thinking (1024-100000). Defaults to 10000'),
   outputFormat: z.enum(['summary', 'classification', 'extraction', 'analysis', 'comparison', 'validation']).optional()
     .describe('Predefined output format'),
-  outputSchema: z.object({
-    type: z.literal('object'),
-    properties: z.record(z.string(), z.unknown()),
-    required: z.array(z.string()).optional(),
-  }).optional().describe('Custom JSON Schema for structured output'),
+  outputSchema: z.union([
+    z.object({
+      type: z.literal('object'),
+      properties: z.record(z.string(), z.unknown()),
+      required: z.array(z.string()).optional(),
+    }),
+    z.object({}).strict().transform(() => undefined),
+  ]).optional().describe('Custom JSON Schema for structured output'),
 });
 
 export const TransformDataSchema = z.object({

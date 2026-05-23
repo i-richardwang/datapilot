@@ -19,7 +19,9 @@ export type AppEvent =
   | 'PermissionModeChange'
   | 'FlagChange'
   | 'SessionStatusChange'
-  | 'SchedulerTick';
+  | 'SchedulerTick'
+  | 'BatchCompleted'
+  | 'BatchFailed';
 
 /** Agent events - passed to Claude SDK */
 export type AgentEvent =
@@ -41,7 +43,8 @@ export type AutomationEvent = AppEvent | AgentEvent;
 
 export const APP_EVENTS: AppEvent[] = [
   'LabelAdd', 'LabelRemove', 'LabelConfigChange',
-  'PermissionModeChange', 'FlagChange', 'SessionStatusChange', 'SchedulerTick'
+  'PermissionModeChange', 'FlagChange', 'SessionStatusChange', 'SchedulerTick',
+  'BatchCompleted', 'BatchFailed',
 ];
 
 export const AGENT_EVENTS: AgentEvent[] = [

@@ -201,8 +201,9 @@ function parseObjectJson(raw: string, errorMessage: string): Record<string, unkn
   let parsed: unknown
   try {
     parsed = JSON.parse(raw)
-  } catch {
-    throw new UsageError(errorMessage)
+  } catch (e) {
+    const detail = e instanceof SyntaxError ? `: ${e.message}` : ''
+    throw new UsageError(`${errorMessage}${detail}`)
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new UsageError(errorMessage)

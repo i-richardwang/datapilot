@@ -1535,12 +1535,31 @@ export class SessionManager implements ISessionManager {
       onProgress: (progress) => {
         this.sendEvent({ type: 'batch_progress', ...progress }, workspaceId)
       },
-      onBatchComplete: (batchId, status) => {
+      onBatchComplete: (batchId, status, progress) => {
         this.sendEvent({
           type: 'batch_complete',
           batchId,
           status,
         }, workspaceId)
+
+        const automationSystem = this.automationSystems.get(workspaceRootPath)
+        if (automationSystem) {
+          automationSystem.emit(
+            status === 'completed' ? 'BatchCompleted' : 'BatchFailed',
+            {
+              workspaceId,
+              timestamp: Date.now(),
+              batchId,
+              batchStatus: status,
+              totalItems: progress.totalItems,
+              completedItems: progress.completedItems,
+              failedItems: progress.failedItems,
+              skippedItems: progress.skippedItems,
+            },
+          ).catch((err) => {
+            sessionLog.error(`[Batch] Failed to emit automation event for batch ${batchId}:`, err)
+          })
+        }
       },
       onError: (batchId, error) => {
         sessionLog.error(`[Batch] Error in batch ${batchId}:`, error.message)

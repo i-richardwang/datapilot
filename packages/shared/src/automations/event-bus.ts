@@ -63,6 +63,16 @@ export interface LabelConfigChangePayload extends BaseEventPayload {
   // No additional fields - just signals that config changed
 }
 
+/** Batch completion/failure payload */
+export interface BatchEventPayload extends BaseEventPayload {
+  batchId: string;
+  batchStatus: import('../batches/types.ts').BatchStatus;
+  totalItems: number;
+  completedItems: number;
+  failedItems: number;
+  skippedItems: number;
+}
+
 /** Generic event payload for agent events */
 export interface GenericEventPayload extends BaseEventPayload {
   data: Record<string, unknown>;
@@ -84,6 +94,8 @@ export interface EventPayloadMap {
   FlagChange: FlagChangePayload;
   SessionStatusChange: SessionStatusChangePayload;
   SchedulerTick: SchedulerTickPayload;
+  BatchCompleted: BatchEventPayload;
+  BatchFailed: BatchEventPayload;
 
   // Agent events (generic payload)
   PreToolUse: GenericEventPayload;

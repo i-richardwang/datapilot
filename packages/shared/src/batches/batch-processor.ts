@@ -739,7 +739,7 @@ export class BatchProcessor {
     log.info(`[BatchProcessor] Batch "${batchId}" ${state.status}: ${progress.completedItems} completed, ${progress.failedItems} failed, ${progress.skippedItems} skipped`)
 
     this.stopTimeoutCheck()
-    this.options.onBatchComplete?.(batchId, state.status)
+    this.options.onBatchComplete?.(batchId, state.status, progress)
     this.options.onProgress?.(computeProgress(state))
   }
 
