@@ -127,10 +127,6 @@ export function BatchInfoPage({
     setFilterStatus(prev => (prev === 'failed' ? undefined : 'failed'))
     setPageOffset(0)
   }
-  const clearFilter = () => {
-    setFilterStatus(undefined)
-    setPageOffset(0)
-  }
 
   const itemCount = itemsPage?.total ?? batch.progress?.totalItems ?? 0
 
@@ -387,18 +383,18 @@ export function BatchInfoPage({
                 <Info_Badge color="success">{batch.progress.completedItems}</Info_Badge>
               </Info_Table.Row>
               <Info_Table.Row label={t('batches.statusFailed')}>
-                {batch.progress.failedItems > 0 ? (
-                  <button
-                    type="button"
-                    onClick={toggleFailedFilter}
-                    title={filterStatus === 'failed' ? t('batches.filterShowAll') : t('batches.filterFailedOnly')}
-                    className="cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded"
-                  >
-                    <Info_Badge color="destructive">{batch.progress.failedItems}</Info_Badge>
-                  </button>
-                ) : (
+                <div className="flex items-center gap-3">
                   <Info_Badge color="destructive">{batch.progress.failedItems}</Info_Badge>
-                )}
+                  {batch.progress.failedItems > 0 && (
+                    <button
+                      type="button"
+                      onClick={toggleFailedFilter}
+                      className="text-xs text-accent hover:underline cursor-pointer"
+                    >
+                      {filterStatus === 'failed' ? t('batches.filterShowAll') : t('batches.filterFailedOnly')}
+                    </button>
+                  )}
+                </div>
               </Info_Table.Row>
               <Info_Table.Row label={t('batches.statusRunning')}>
                 <Info_Badge color="warning">{batch.progress.runningItems}</Info_Badge>
@@ -414,15 +410,6 @@ export function BatchInfoPage({
         <Info_Section
           title={t('batches.sectionItems')}
           description={itemCount > 0 ? t('batches.itemsInBatch', { count: itemCount }) : undefined}
-          actions={filterStatus === 'failed' ? (
-            <button
-              type="button"
-              onClick={clearFilter}
-              className="text-xs text-accent hover:underline cursor-pointer"
-            >
-              {t('batches.filterShowAll')}
-            </button>
-          ) : undefined}
         >
           <BatchItemTimeline items={pageItemsRecord} batchId={batch.id} onRetryItem={onRetryItem} />
           {itemsPage && itemsPage.total > PAGE_SIZE && (
