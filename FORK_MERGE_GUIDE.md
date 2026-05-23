@@ -162,9 +162,9 @@ Won't conflict unless upstream adds similarly-named features.
 
 #### `apps/electron/src/renderer/components/app-shell/CompactSessionMenu.tsx` `[Granular Flags + Lite UI]`
 
-Upstream v0.9.3 引入的 compact-mode session menu。fork 端的 `SessionMenu` 已有 3 个 gate：`!FEATURE_FLAGS.disableMessaging`（Messaging row）、`!isWebMode`（Show in Finder row）、password-share submenu。前两个 gate 已经在 v0.9.3 merge 时补到 CompactSessionMenu；password-share submenu **未适配**（fork-side TODO — desktop `SessionMenu` 用 `SharePasswordDialog` + share submenu，compact 端目前是单击直接 `actions.share`）。
+Upstream v0.9.3 引入的 compact-mode session menu。fork 端的 `SessionMenu` 已有 3 个 gate：`!FEATURE_FLAGS.disableMessaging`（Messaging row）、`!isWebMode`（Show in Finder row）、password-share submenu。三个 gate 均已适配（v0.9.5 merge 确认 `SharePasswordDialog` + change-password row 已齐备）。
 
-**Conflict trigger:** 上游重构 CompactSessionMenu 行结构或新增 Row → 检查 gates 是否还在；上游若引入自家的 password-share 实现，可考虑回采。
+**Conflict trigger:** 上游重构 CompactSessionMenu 行结构或新增 Row → 检查 gates 是否还在。
 
 
 
