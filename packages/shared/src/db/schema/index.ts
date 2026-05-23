@@ -26,4 +26,4 @@ export { sessions, messages, turnUsage } from './sessions.sql.ts';
 export { automationHistory } from './automations.sql.ts';
 
 // Batches
-export { batchState, batchTestResults } from './batches.sql.ts';
+export { batchState } from './batches.sql.ts';

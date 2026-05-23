@@ -227,7 +227,7 @@ export class UsageError extends Error {
  * Enforces the "identity goes flat, data goes JSON" CLI rule: flat flags are
  * only ever identity (`--name`) or schema-branch selectors (`--event`,
  * `--provider`, `--type`) or read-side query params (`--limit`, `--offset`,
- * `--sample-size`, `--index`, `--session`). Every data field must flow through
+ * `--index`, `--session`). Every data field must flow through
  * `--input '<json>'` or `--stdin`. Unknown flags fail loudly here so removed
  * flat flags can't be silently dropped.
  *

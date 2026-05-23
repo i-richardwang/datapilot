@@ -3,7 +3,7 @@
  *
  * Tests for:
  * - automations/history-store.db.ts: append + compaction retention
- * - batches/batch-state-manager.db.ts: state CRUD, test result CRUD + configHash
+ * - batches/batch-state-manager.db.ts: state CRUD
  */
 
 import { describe, test, expect, beforeAll, beforeEach, afterEach } from 'bun:test';
@@ -31,12 +31,9 @@ import {
   computeProgress,
   isBatchDone,
   deleteBatchState,
-  saveTestResult,
-  loadTestResult,
-  deleteTestResult,
 } from '../../batches/batch-state-manager.db.ts';
 
-import type { BatchState, TestBatchResult } from '../../batches/types.ts';
+import type { BatchState } from '../../batches/types.ts';
 
 beforeAll(async () => {
   await autoRegisterDriver();
@@ -241,73 +238,3 @@ describe('Batch State DB Manager', () => {
   });
 });
 
-// ─── Test Results ────────────────────────────────────────────────────────────
-
-describe('Batch Test Results', () => {
-  const makeTestResult = (batchId: string): TestBatchResult => ({
-    batchId,
-    testKey: `${batchId}__test`,
-    sampleSize: 3,
-    status: 'completed',
-    durationMs: 1234,
-    items: [
-      { itemId: 'item-1', status: 'completed', durationMs: 400 },
-      { itemId: 'item-2', status: 'completed', durationMs: 500 },
-      { itemId: 'item-3', status: 'failed', error: 'timeout' },
-    ],
-  });
-
-  test('loadTestResult returns null for nonexistent', () => {
-    expect(loadTestResult(testDir, 'nonexistent')).toBeNull();
-  });
-
-  test('saveTestResult and loadTestResult round-trip', () => {
-    const result = makeTestResult('batch-1');
-    saveTestResult(testDir, result, 'hash-abc123');
-
-    const loaded = loadTestResult(testDir, 'batch-1');
-    expect(loaded).not.toBeNull();
-    expect(loaded!.result.batchId).toBe('batch-1');
-    expect(loaded!.result.sampleSize).toBe(3);
-    expect(loaded!.result.items).toHaveLength(3);
-    expect(loaded!.configHash).toBe('hash-abc123');
-    expect(loaded!.persistedAt).toBeGreaterThan(0);
-  });
-
-  test('saveTestResult upserts on conflict', () => {
-    const result = makeTestResult('batch-1');
-    saveTestResult(testDir, result, 'hash-v1');
-
-    const updatedResult = { ...result, status: 'failed' as const };
-    saveTestResult(testDir, updatedResult, 'hash-v2');
-
-    const loaded = loadTestResult(testDir, 'batch-1');
-    expect(loaded!.result.status).toBe('failed');
-    expect(loaded!.configHash).toBe('hash-v2');
-  });
-
-  test('configHash validates staleness', () => {
-    const result = makeTestResult('batch-1');
-    saveTestResult(testDir, result, 'original-hash');
-
-    const loaded = loadTestResult(testDir, 'batch-1');
-    expect(loaded!.configHash).toBe('original-hash');
-
-    // A caller would compare configHash to current config hash
-    // If different, the result is stale
-    expect(loaded!.configHash !== 'new-config-hash').toBe(true);
-  });
-
-  test('deleteTestResult removes result', () => {
-    const result = makeTestResult('batch-del');
-    saveTestResult(testDir, result, 'hash');
-
-    deleteTestResult(testDir, 'batch-del');
-    expect(loadTestResult(testDir, 'batch-del')).toBeNull();
-  });
-
-  test('deleteTestResult is safe for nonexistent', () => {
-    // Should not throw
-    deleteTestResult(testDir, 'nonexistent');
-  });
-});

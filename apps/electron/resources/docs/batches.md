@@ -117,9 +117,3 @@ datapilot batch get   <id> | jq .data.progress.status
 datapilot batch items <id> | jq '.data.items[] | {id, status: .state.status, sessionId: .state.sessionId}'
 datapilot batch retry-item <id> <item-id>
 ```
-
-## Testing
-
-`datapilot batch test <id> [--sample-size N]` runs the same pipeline on a deterministic random sample (default 3 items), writes to `{output.path}.test.jsonl`, and tracks state in `batch-state-{id}__test.json`. The call blocks until sampled items complete and returns per-item results plus the test output path.
-
-The full output file at `{output.path}.test.jsonl` is the source of truth for evaluating prompt and schema quality before committing the full run.

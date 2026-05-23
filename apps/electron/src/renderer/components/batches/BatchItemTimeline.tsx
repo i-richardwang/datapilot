@@ -35,10 +35,9 @@ const statusConfig: Record<BatchItemStatus, { icon: React.ElementType; classes: 
 export interface BatchItemTimelineProps {
   items: Record<string, BatchItemState>
   /**
-   * Owning batch ID. When set, "Open Session" navigates into the per-batch
+   * Owning batch ID. "Open Session" navigates into the per-batch
    * sidebar view (filter.kind='batchInstance') so the user keeps context for
-   * peer items. Omit for test-run timelines where session navigation isn't
-   * meaningful.
+   * peer items.
    */
   batchId?: string
   onRetryItem?: (itemId: string) => void

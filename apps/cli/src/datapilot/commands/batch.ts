@@ -4,7 +4,7 @@
  * Flag rule: `create` keeps only `--name` (identity). Everything else —
  * `source`, `idField`, `promptFile`, execution config — goes through
  * `--input '<json>'`. Read-side actions keep query-param flat flags
- * (`--offset`, `--limit`, `--sample-size`).
+ * (`--offset`, `--limit`).
  */
 
 import { ok, fail } from '../envelope.ts'
@@ -81,13 +81,6 @@ export const BATCH_SPEC: EntitySpec = {
         { name: 'limit', type: 'int', description: 'Page size', default: 100 },
       ],
       example: 'datapilot batch items my-batch-id --offset 0 --limit 100',
-    },
-    {
-      name: 'test',
-      description: 'Dry-run the batch on a deterministic random sample (writes to {output}.test.jsonl)',
-      positionals: [{ name: 'id', description: 'Batch id' }],
-      flags: [{ name: 'sample-size', type: 'int', description: 'Number of items to sample', default: 3 }],
-      example: 'datapilot batch test my-batch-id --sample-size 3',
     },
     {
       name: 'retry-item',
@@ -192,14 +185,6 @@ export async function routeBatch(
       const offset = intFlag(flags, 'offset') ?? 0
       const limit = intFlag(flags, 'limit') ?? 100
       ok(await client.invoke('batches:getItems', ws, id, offset, limit))
-    }
-
-    case 'test': {
-      rejectActionFlags(flags, specOf('test'))
-      const id = positionals[0]
-      if (!id) fail('USAGE_ERROR', 'Missing batch id')
-      const sampleSize = intFlag(flags, 'sample-size')
-      ok(await client.invoke('batches:test', ws, id, sampleSize))
     }
 
     case 'retry-item': {

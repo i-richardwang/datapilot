@@ -32,7 +32,7 @@ import {
   type BatchGroupingMode,
 } from './types'
 import type { BatchListItem } from './types'
-import type { BatchProgress, BatchStatus } from '@craft-agent/shared/batches'
+import type { BatchStatus } from '@craft-agent/shared/batches'
 import type { FilterMode } from '@/hooks/useSessionSearch'
 
 /** Tiny inline badge for batch status */
@@ -52,7 +52,6 @@ interface BatchItemProps {
   batch: BatchListItem
   isSelected: boolean
   isFirst: boolean
-  isTesting?: boolean
   /** Flattened workspace labels for badge resolution. */
   flatLabels: LabelConfig[]
   /** Full hierarchical label tree for the right-click submenu. Empty array hides the submenu. */
@@ -61,7 +60,6 @@ interface BatchItemProps {
   onStart?: () => void
   onPause?: () => void
   onResume?: () => void
-  onTest?: () => void
   onDuplicate?: () => void
   onDelete?: () => void
   onLabelsChange?: (batchId: string, labels: string[]) => void
@@ -71,14 +69,12 @@ function BatchItem({
   batch,
   isSelected,
   isFirst,
-  isTesting,
   flatLabels,
   labelTree,
   onClick,
   onStart,
   onPause,
   onResume,
-  onTest,
   onDuplicate,
   onDelete,
   onLabelsChange,
@@ -125,11 +121,6 @@ function BatchItem({
           <MicroBadge colorClass={`${statusColors.bg} ${statusColors.text}`}>
             {t(BATCH_STATUS_DISPLAY_KEY[status])}
           </MicroBadge>
-          {isTesting && (
-            <MicroBadge colorClass="bg-info/10 text-info">
-              {t('batches.badgeTesting')}
-            </MicroBadge>
-          )}
           {resolvedLabels.map(({ config, rawValue }, idx) => (
             <EntityListLabelBadge
               key={`${config.id}-${idx}`}
@@ -159,7 +150,6 @@ function BatchItem({
             onStart={onStart}
             onPause={onPause}
             onResume={onResume}
-            onTest={onTest}
             onDuplicate={onDuplicate}
             onDelete={onDelete}
           />
@@ -176,7 +166,6 @@ function BatchItem({
             onStart={onStart}
             onPause={onPause}
             onResume={onResume}
-            onTest={onTest}
             onDuplicate={onDuplicate}
             onDelete={onDelete}
           />
@@ -316,14 +305,12 @@ export interface BatchesListPanelProps {
   onStartBatch?: (batchId: string) => void
   onPauseBatch?: (batchId: string) => void
   onResumeBatch?: (batchId: string) => void
-  onTestBatch?: (batchId: string) => void
   onDuplicateBatch?: (batchId: string) => void
   onDeleteBatch?: (batchId: string) => void
   /** Apply / remove labels on a batch (calls updateBatch RPC). */
   onLabelsChange?: (batchId: string, labels: string[]) => void
   selectedBatchId?: string | null
   workspaceRootPath?: string
-  testProgress?: Record<string, BatchProgress>
   className?: string
 }
 
@@ -338,13 +325,11 @@ export function BatchesListPanel({
   onStartBatch,
   onPauseBatch,
   onResumeBatch,
-  onTestBatch,
   onDuplicateBatch,
   onDeleteBatch,
   onLabelsChange,
   selectedBatchId,
   workspaceRootPath,
-  testProgress,
   className,
 }: BatchesListPanelProps) {
   const { t, i18n } = useTranslation()
@@ -460,14 +445,12 @@ export function BatchesListPanel({
           batch={batch}
           isSelected={selectedBatchId === batch.id}
           isFirst={indexInGroup === 0}
-          isTesting={!!(batch.id && testProgress?.[batch.id])}
           flatLabels={flatLabels}
           labelTree={labels ?? []}
           onClick={() => onBatchClick(batch.id ?? '')}
           onStart={onStartBatch ? () => onStartBatch(batch.id ?? '') : undefined}
           onPause={onPauseBatch ? () => onPauseBatch(batch.id ?? '') : undefined}
           onResume={onResumeBatch ? () => onResumeBatch(batch.id ?? '') : undefined}
-          onTest={onTestBatch ? () => onTestBatch(batch.id ?? '') : undefined}
           onDuplicate={onDuplicateBatch ? () => onDuplicateBatch(batch.id ?? '') : undefined}
           onDelete={onDeleteBatch ? () => onDeleteBatch(batch.id ?? '') : undefined}
           onLabelsChange={onLabelsChange}

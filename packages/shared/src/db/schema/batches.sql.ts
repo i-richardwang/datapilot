@@ -1,7 +1,7 @@
 /**
  * Batch State Schema
  *
- * Tracks batch processing job state and test results.
+ * Tracks batch processing job state.
  * Replaces: {workspace}/batch-state-{batchId}.json
  */
 
@@ -13,14 +13,4 @@ export const batchState = sqliteTable('batch_state', {
   /** Full BatchState object as JSON */
   state: text('state', { mode: 'json' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'number' }).notNull(),
-});
-
-/** Batch test results (persisted across restarts, invalidated on config change) */
-export const batchTestResults = sqliteTable('batch_test_results', {
-  batchId: text('batch_id').primaryKey(),
-  /** Full test result object as JSON */
-  result: text('result', { mode: 'json' }).notNull(),
-  /** Hash of batch config — used to invalidate stale results */
-  configHash: text('config_hash').notNull(),
-  persistedAt: integer('persisted_at', { mode: 'number' }).notNull(),
 });

@@ -232,32 +232,3 @@ export interface BatchItem {
   /** All fields from the data source (values coerced to strings) */
   fields: Record<string, string>
 }
-
-// ============================================================================
-// Test Batch Types
-// ============================================================================
-
-export interface TestBatchResult {
-  batchId: string
-  testKey: string
-  sampleSize: number
-  status: 'completed' | 'failed'
-  durationMs: number
-  items: Array<{
-    itemId: string
-    status: BatchItemStatus
-    sessionId?: string
-    durationMs?: number
-    error?: string
-  }>
-  outputPath?: string
-}
-
-/** On-disk wrapper for TestBatchResult with config hash for invalidation */
-export interface PersistedTestResult {
-  result: TestBatchResult
-  /** MD5 hash of the batch config at test time — stale results are discarded on load */
-  configHash: string
-  /** Timestamp when the result was persisted */
-  persistedAt: number
-}

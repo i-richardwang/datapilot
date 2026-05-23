@@ -42,7 +42,7 @@ One rule, no exceptions: **identity goes flat, data goes JSON.**
 - `update` is strictly `<id>` + `--input '<json>'`. No data flat flags.
 - `enable`, `disable`, `start`, `pause`, `resume`, `cancel`, `delete` take
   a positional id only.
-- Read-side query params (`--limit`, `--offset`, `--sample-size`, `--index`,
+- Read-side query params (`--limit`, `--offset`, `--index`,
   `--session`) stay as flat flags — they describe *how to read*, not what
   the entity *is*.
 
@@ -229,7 +229,6 @@ Manage batch processing jobs stored in `batches.json`.
 - `datapilot batch pause <id>`
 - `datapilot batch resume <id>`
 - `datapilot batch items <id> [--offset <n>] [--limit <n>]`
-- `datapilot batch test <id> [--sample-size <n>]`
 - `datapilot batch retry-item <batch-id> <item-id>`
 
 ### Examples

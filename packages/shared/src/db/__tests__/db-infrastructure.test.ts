@@ -28,7 +28,7 @@ import {
   sources,
   sessions, messages,
   automationHistory,
-  batchState, batchTestResults,
+  batchState,
 } from '../schema/index.ts';
 import { dbEvents } from '../events.ts';
 

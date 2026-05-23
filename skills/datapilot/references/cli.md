@@ -33,7 +33,7 @@ datapilot [global-flags] <entity> [action] [positionals...] [flags...]
 - **参数传入规则**：普通 flag **只用于三类场景**：
   - **身份标识**：`--name`
   - **子类型选择**：`--event`、`--provider`、`--type`
-  - **查询参数**：`--limit`、`--offset`、`--sample-size`、`--index`、`--session`、`--html <file>`
+  - **查询参数**：`--limit`、`--offset`、`--index`、`--session`、`--html <file>`
 
   其它**所有数据字段**（`color`、`parentId`、`valueType`、`permissionMode`、`enabledSourceSlugs`、`pattern`、`description`……）一律通过 `--input '<json-object>'` 或 `--stdin` 传入。传入不支持的 flag 会立即报 `USAGE_ERROR`，错误消息中会提示对应的 JSON key，例如：`Unknown flag --mode. Pass data fields via --input '<json>' (e.g., --input '{"permissionMode":"..."}')`。
 
@@ -45,7 +45,6 @@ Server 端 schema 可能会演进，硬编码字段容易过时。不确定怎�
 
 1. **不带必需字段跑一次**，让错误消息吐合法值。例如不带 `--event` 跑 `automation create`，错误消息会把所有合法事件名列出来。
 2. **观察现有实例**：`datapilot <entity> list | jq '.data[0]'` 拿一个现成的当模板。对 automation 这类按事件分组的：`datapilot automation list | jq '.data.automations.<EventName>[0]'`。
-3. **先 `test` 再 `create`**（只 batch 支持）：`batch test <id> --sample-size 1` 验证单条通过，再 `batch start`。
 
 **不要用 `create --input '{}'` 反推 schema**：server 对部分实体（尤其 `automation`）会接受不完整的配置并创建一个可触发的存根，事后需要手动 `list` + `delete` 清理。探索 schema 用上面三种方法即可，不要通过真正 create 来试探。
 
@@ -136,8 +135,6 @@ Server 端 schema 可能会演进，硬编码字段容易过时。不确定怎�
 **`item.state` 字段**：`{status, sessionId, startedAt, completedAt, retryCount, error?, summary?}`。`summary` 是展开后的 prompt 片段（用于 UI 显示），**不是 agent 的回复** —— 要拿回复得用 `.state.sessionId` 起 `datapilot session messages <sessionId>` 读。
 
 **`item.state.status` 合法值**（`BatchItemStatus`）：`pending` / `running` / `completed` / `failed` / `skipped`。筛失败项：`jq '.data.items[] | select(.state.status=="failed")'`。
-
-**`batch test <id> [--sample-size N]`** — 用已创建 batch 的配置跑单条/小样本，不做 full run。第一次写 config 先 test 再 start 省很多时间。
 
 ### automation — 事件驱动（核心）
 

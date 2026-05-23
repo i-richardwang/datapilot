@@ -25,8 +25,6 @@ export type {
   BatchSystemOptions,
   BatchExecutePromptParams,
   BatchItem,
-  TestBatchResult,
-  PersistedTestResult,
   BatchItemsPage,
 } from './types.ts'
 
@@ -37,12 +35,9 @@ export type {
 export {
   BATCHES_CONFIG_FILE,
   BATCH_STATE_FILE_PREFIX,
-  BATCH_TEST_RESULT_FILE_PREFIX,
   DEFAULT_MAX_CONCURRENCY,
   DEFAULT_MAX_RETRIES,
   BATCH_ITEM_ENV_PREFIX,
-  DEFAULT_TEST_SAMPLE_SIZE,
-  TEST_BATCH_SUFFIX,
 } from './constants.ts'
 
 // ============================================================================
@@ -77,10 +72,6 @@ export {
   updateItemState,
   computeProgress,
   isBatchDone,
-  getTestResultPath,
-  saveTestResult,
-  loadTestResult,
-  deleteTestResult,
   getBatchItemsPage,
 } from './batch-state-manager.db.ts'
 

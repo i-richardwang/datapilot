@@ -7,7 +7,7 @@
  */
 
 import * as React from 'react'
-import { Play, Pause, RotateCcw, Copy, Trash2, FlaskConical, Tag } from 'lucide-react'
+import { Play, Pause, RotateCcw, Copy, Trash2, Tag } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useMenuComponents } from '@/components/ui/menu-context'
 import { LabelMenuItems } from '@/components/app-shell/SessionMenuParts'
@@ -27,7 +27,6 @@ export interface BatchMenuProps {
   onStart?: () => void
   onPause?: () => void
   onResume?: () => void
-  onTest?: () => void
   onDuplicate?: () => void
   onDelete?: () => void
 }
@@ -41,7 +40,6 @@ export function BatchMenu({
   onStart,
   onPause,
   onResume,
-  onTest,
   onDuplicate,
   onDelete,
 }: BatchMenuProps) {
@@ -87,14 +85,6 @@ export function BatchMenu({
         <MenuItem onClick={onResume}>
           <RotateCcw className="h-3.5 w-3.5" />
           <span className="flex-1">{t('batches.menuResume')}</span>
-        </MenuItem>
-      )}
-
-      {/* Test - available in all states except running */}
-      {status !== 'running' && onTest && (
-        <MenuItem onClick={onTest}>
-          <FlaskConical className="h-3.5 w-3.5" />
-          <span className="flex-1">{t('batches.menuTest')}</span>
         </MenuItem>
       )}
 

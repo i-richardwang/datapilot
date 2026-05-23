@@ -2,17 +2,16 @@
  * Batch State Manager — SQLite Backend
  *
  * Drop-in replacement for batch-state-manager.ts.
- * Reads/writes batch state and test results from workspace.db instead of
- * batch-state-{id}.json and batch-test-result-{id}.json files.
+ * Reads/writes batch state from workspace.db instead of batch-state-{id}.json files.
  */
 
 import { eq } from 'drizzle-orm';
-import { BATCH_STATE_FILE_PREFIX, BATCH_TEST_RESULT_FILE_PREFIX } from './constants.ts';
+import { BATCH_STATE_FILE_PREFIX } from './constants.ts';
 import { join } from 'node:path';
 import { getWorkspaceDb } from '../db/connection.ts';
 import { dbEvents } from '../db/events.ts';
-import { batchState as batchStateTable, batchTestResults } from '../db/schema/batches.sql.ts';
-import type { BatchState, BatchItemState, BatchItemStatus, BatchProgress, BatchItemsPage, TestBatchResult, PersistedTestResult } from './types.ts';
+import { batchState as batchStateTable } from '../db/schema/batches.sql.ts';
+import type { BatchState, BatchItemState, BatchItemStatus, BatchProgress, BatchItemsPage } from './types.ts';
 
 // ============================================================================
 // Batch State Path (compatibility)
@@ -195,66 +194,3 @@ export function getBatchItemsPage(
   }
 }
 
-// ============================================================================
-// Test Result Persistence
-// ============================================================================
-
-/**
- * Get the file path for a persisted test result (kept for compatibility).
- */
-export function getTestResultPath(workspaceRootPath: string, batchId: string): string {
-  return join(workspaceRootPath, `${BATCH_TEST_RESULT_FILE_PREFIX}${batchId}.json`);
-}
-
-/**
- * Save a test result to DB with a config hash for invalidation.
- */
-export function saveTestResult(
-  workspaceRootPath: string,
-  result: TestBatchResult,
-  configHash: string,
-): void {
-  const db = getWorkspaceDb(workspaceRootPath);
-  const existing = db.select()
-    .from(batchTestResults)
-    .where(eq(batchTestResults.batchId, result.batchId))
-    .get();
-
-  if (existing) {
-    db.update(batchTestResults)
-      .set({ result, configHash, persistedAt: Date.now() })
-      .where(eq(batchTestResults.batchId, result.batchId))
-      .run();
-  } else {
-    db.insert(batchTestResults).values({
-      batchId: result.batchId,
-      result,
-      configHash,
-      persistedAt: Date.now(),
-    }).run();
-  }
-}
-
-/**
- * Load a persisted test result from DB.
- * Returns null if no result exists.
- */
-export function loadTestResult(workspaceRootPath: string, batchId: string): PersistedTestResult | null {
-  const db = getWorkspaceDb(workspaceRootPath);
-  const row = db.select().from(batchTestResults).where(eq(batchTestResults.batchId, batchId)).get();
-  if (!row) return null;
-
-  return {
-    result: row.result as TestBatchResult,
-    configHash: row.configHash,
-    persistedAt: row.persistedAt,
-  };
-}
-
-/**
- * Delete a persisted test result from DB.
- */
-export function deleteTestResult(workspaceRootPath: string, batchId: string): void {
-  const db = getWorkspaceDb(workspaceRootPath);
-  db.delete(batchTestResults).where(eq(batchTestResults.batchId, batchId)).run();
-}

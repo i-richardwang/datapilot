@@ -27,7 +27,6 @@ import {
   ChevronRight,
   Check,
   Copy,
-  FlaskConical,
   MoreHorizontal,
   Pause,
   Play,
@@ -67,7 +66,6 @@ export interface CompactBatchMenuProps {
   onStart?: () => void
   onPause?: () => void
   onResume?: () => void
-  onTest?: () => void
   onDuplicate?: () => void
   onDelete?: () => void
 }
@@ -81,7 +79,6 @@ export function CompactBatchMenu({
   onStart,
   onPause,
   onResume,
-  onTest,
   onDuplicate,
   onDelete,
 }: CompactBatchMenuProps) {
@@ -184,10 +181,6 @@ export function CompactBatchMenu({
               {status === 'paused' && onResume && (
                 <Row icon={<RotateCcw className="h-4 w-4" />} label={t('batches.menuResume')} onTap={closeAfter(onResume)} />
               )}
-              {status !== 'running' && onTest && (
-                <Row icon={<FlaskConical className="h-4 w-4" />} label={t('batches.menuTest')} onTap={closeAfter(onTest)} />
-              )}
-
               {showLabels && (
                 <Row
                   icon={<Tag className="h-4 w-4" />}
