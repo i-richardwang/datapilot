@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: 合并 upstream 时的唯一操作手册 — 冲突风险、合并策略、检查清单。
 >
-> **Last upstream merge:** v0.9.5 (2026-05-23).
+> **Last upstream merge:** v0.9.6 (2026-05-26).
 
 ## Overview
 
@@ -493,3 +493,4 @@ bun run tsc --noEmit
 | v0.9.3 | 2026-05-14 | 17 | Mobile/compact UI rework (new CompactSessionMenu, CompactWorkspaceSwitcher, CompactSessionListFilter, FabNewChat, etc.); Manifest provider preset; upstream extracted share actions into `useSessionMenuActions` hook and refactored `ShareMenuItems` API — fork's password-dialog share flow adapted to new callback API. Upstream's `AppMenu` extraction adopted, fork's inline TopBar menu handlers dropped. Added `'batches'` to new `nav-helpers.ts` switch. |
 | v0.9.4 | 2026-05-16 | 8 | RTK Bash token compression (opt-in), Pi SDK 0.73.1 (Codex transport stability), `SkillMenu` API switched to required `onShowInFinder` + new `canShowInFinder` prop — fork's web-mode hide-gate moved *inside* `SkillMenu.tsx` (callers now just pass `canShowInFinder={canRevealLocally}` and the platform gate stays in one place). `apps/cli/package.json` version kept on fork's independent cadence (0.1.5), not bumped to upstream's 0.9.4. |
 | v0.9.5 | 2026-05-23 | 12 | Compact model picker + working-directory selector; Pi turn-anchor sidecar for branch-of-branch; source activation drain; MCP validation refactor; `AcceptPlanDropdown` switched to Radix `DropdownMenu`. Upstream's new `groupConnectionsByProvider` helper adopted in `model-picker-helpers.ts` but fork's inline `FreeFormInput` grouping kept (uses `isAnthropicProvider` for `anthropic_compat`). |
+| v0.9.6 | 2026-05-26 | 7 | Ported orphan-credential cleanup from upstream's `storage.ts` into fork's `storage.db.ts`; adapted its test for SQLite driver. |
