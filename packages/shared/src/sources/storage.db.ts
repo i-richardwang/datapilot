@@ -23,6 +23,7 @@ import { debug } from '../utils/debug.ts';
 import { getBuiltinSources, isBuiltinSource, getDocsSource } from './builtin-sources.ts';
 import { expandPath, toPortablePath } from '../utils/paths.ts';
 import { getWorkspaceSourcesPath } from '../workspaces/storage.ts';
+import { getSourceCredentialManager } from './credential-manager.ts';
 import {
   validateIconValue,
   findIconFile,
@@ -160,6 +161,29 @@ export function saveSourceConfig(
   }
 
   dbEvents.emit('source:saved', config.slug);
+
+  if (storageConfig.type === 'api' && storageConfig.api?.authType === 'none') {
+    deleteApiKeyCredentialBestEffort(workspaceRootPath, storageConfig);
+  }
+}
+
+function deleteApiKeyCredentialBestEffort(
+  workspaceRootPath: string,
+  config: FolderSourceConfig
+): void {
+  try {
+    const cm = getSourceCredentialManager();
+    const source: LoadedSource = {
+      config,
+      guide: null,
+      folderPath: getSourcePath(workspaceRootPath, config.slug),
+      workspaceRootPath,
+      workspaceId: basename(workspaceRootPath),
+    };
+    cm.deleteSync(source);
+  } catch (err) {
+    debug('[saveSourceConfig] orphan credential cleanup threw:', err);
+  }
 }
 
 // ============================================================
