@@ -22,6 +22,8 @@ function createTestHarness(overrides?: { workspaceId?: string | null }) {
       return undefined
     },
     updateClientWorkspace() {},
+    hasClientCapability() { return false },
+    findClientsWithCapability() { return [] },
   }
 
   const deps: HandlerDeps = {

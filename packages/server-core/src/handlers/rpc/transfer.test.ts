@@ -20,6 +20,8 @@ function createHarness() {
       return undefined
     },
     updateClientWorkspace() {},
+    hasClientCapability() { return false },
+    findClientsWithCapability() { return [] },
   }
 
   registerTransferHandlers(server)

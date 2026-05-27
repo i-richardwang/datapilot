@@ -231,6 +231,7 @@ const instance = await (async () => {
         }
       }),
       createSessionManager: () => new SessionManager(),
+      bindRpcServer: (sm, server) => sm.setRpcServer(server),
       createHandlerDeps: ({ sessionManager, platform, oauthFlowStore }) => {
         // Gated by DATAPILOT_DISABLE_MESSAGING. When set, the WhatsApp worker
         // is not spawned and the messaging RPC handlers self-skip

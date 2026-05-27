@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: 合并 upstream 时的唯一操作手册 — 冲突风险、合并策略、检查清单。
 >
-> **Last upstream merge:** v0.9.6 (2026-05-26).
+> **Last upstream merge:** v0.10.0 (2026-05-27).
 
 ## Overview
 
@@ -334,6 +334,7 @@ For each conflicting file, look it up in the "Modified Upstream Files" section a
 | New config domains | Add to `cli-domains.ts`, implement CLI commands, add PreToolUse guards |
 | Automations config format | Update `apps/cli/src/datapilot/commands/automation.ts` parsing |
 | `packages/session-tools-core/tsconfig.json` | Don't blindly take upstream — fork's tsconfig is self-contained (`target/lib: ESNext`, all options inline). Upstream extends `../../tsconfig.base.json` which doesn't exist in their repo, masking their own tsc errors (e.g. v0.9.1: regex `/es6/` flag, `Set` iteration without `downlevelIteration`). Adopting upstream's version would inherit those errors. |
+| `RpcServer` interface (`packages/server-core/src/transport/types.ts`) | Every fake/mock `RpcServer` in test files (grep `RpcServer = {` or `createMockServer`) needs the new method. Fork's `updateClientWorkspace` stays required — upstream periodically redeclares it as optional, discard. v0.10.0 added `hasClientCapability` + `findClientsWithCapability` to 8 mocks. |
 
 ### Step 5 — Post-Merge Verification
 
@@ -494,3 +495,4 @@ bun run tsc --noEmit
 | v0.9.4 | 2026-05-16 | 8 | RTK Bash token compression (opt-in), Pi SDK 0.73.1 (Codex transport stability), `SkillMenu` API switched to required `onShowInFinder` + new `canShowInFinder` prop — fork's web-mode hide-gate moved *inside* `SkillMenu.tsx` (callers now just pass `canShowInFinder={canRevealLocally}` and the platform gate stays in one place). `apps/cli/package.json` version kept on fork's independent cadence (0.1.5), not bumped to upstream's 0.9.4. |
 | v0.9.5 | 2026-05-23 | 12 | Compact model picker + working-directory selector; Pi turn-anchor sidecar for branch-of-branch; source activation drain; MCP validation refactor; `AcceptPlanDropdown` switched to Radix `DropdownMenu`. Upstream's new `groupConnectionsByProvider` helper adopted in `model-picker-helpers.ts` but fork's inline `FreeFormInput` grouping kept (uses `isAnthropicProvider` for `anthropic_compat`). |
 | v0.9.6 | 2026-05-26 | 7 | Ported orphan-credential cleanup from upstream's `storage.ts` into fork's `storage.db.ts`; adapted its test for SQLite driver. |
+| v0.10.0 | 2026-05-27 | 13 | Remote `browser_tool` bridging — upstream extended `RpcServer` with `hasClientCapability` / `findClientsWithCapability`; every fork test mocking `RpcServer` (8 files) needs both new methods AND fork's `updateClientWorkspace`. Conflict in `transport/types.ts`: upstream redeclared `updateClientWorkspace` as optional — keep fork's required form. `pi-agent.ts`: fork's batch tool-defs gating and upstream's `getBrowserToolEnabled()` filter combine sequentially on `sessionToolDefs`. |

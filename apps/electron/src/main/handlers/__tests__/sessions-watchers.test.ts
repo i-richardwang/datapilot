@@ -42,6 +42,8 @@ describe('sessions file watchers', () => {
         return null
       },
       updateClientWorkspace() {},
+      hasClientCapability() { return false },
+      findClientsWithCapability() { return [] },
     }
 
     const deps: HandlerDeps = {
