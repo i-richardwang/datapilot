@@ -21,6 +21,7 @@
 // [fork] new file
 
 import type { HtmlFetchProvider, HtmlFetchResult } from '../types.ts';
+import { pickKey } from '../../shared/key-pool.ts';
 
 interface TavilyExtractResultItem {
   url?: string;
@@ -38,7 +39,8 @@ interface TavilyExtractResponse {
 }
 
 export interface TavilyFetchConfig {
-  apiKey: string;
+  /** One key, or many for per-request random load-spreading (see shared/key-pool.ts). */
+  apiKey: string | string[];
   endpoint?: string;
   /** Per-request timeout in ms (default 45s — basic extraction is fast, advanced can be slower). */
   timeoutMs?: number;
@@ -53,10 +55,11 @@ export class TavilyFetchProvider implements HtmlFetchProvider {
   constructor(private config: TavilyFetchConfig) {}
 
   async fetchHtml(url: string): Promise<HtmlFetchResult> {
+    const apiKey = pickKey(this.config.apiKey);
     const response = await fetch(this.config.endpoint || DEFAULT_ENDPOINT, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${this.config.apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },

@@ -87,6 +87,22 @@ describe('resolveSearchProviders (env-driven cascade)', () => {
     expect(chain.length).toBeGreaterThanOrEqual(1);
     expect(chain[chain.length - 1]).toBeInstanceOf(DDGSearchProvider);
   });
+
+  it('adds a vendor ONCE when its key var holds comma-separated keys (not one per key)', () => {
+    const chain = resolveSearchProviders({
+      env: { TINYFISH_API_KEY: 'tf-a, tf-b ,tf-c' },
+    });
+    // TinyFish + DDG — multi-key spreads inside the single provider, not as extra tiers.
+    expect(chain.length).toBe(2);
+    expect(chain[0]).toBeInstanceOf(TinyFishSearchProvider);
+    expect(chain[1]).toBeInstanceOf(DDGSearchProvider);
+  });
+
+  it('treats a comma/whitespace-only key value as unconfigured', () => {
+    const chain = resolveSearchProviders({ env: { TINYFISH_API_KEY: ' , , ' } });
+    expect(chain.length).toBe(1);
+    expect(chain[0]).toBeInstanceOf(DDGSearchProvider);
+  });
 });
 
 // =============================================================================

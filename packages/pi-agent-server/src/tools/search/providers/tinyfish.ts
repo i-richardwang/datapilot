@@ -13,6 +13,7 @@
 // [fork] new file
 
 import type { WebSearchProvider, WebSearchResult } from '../types.ts';
+import { pickKey } from '../../shared/key-pool.ts';
 
 interface TinyFishApiResult {
   position?: number;
@@ -29,7 +30,8 @@ interface TinyFishApiResponse {
 }
 
 export interface TinyFishSearchConfig {
-  apiKey: string;
+  /** One key, or many for per-request random load-spreading (see shared/key-pool.ts). */
+  apiKey: string | string[];
   endpoint?: string;
   location?: string;
   language?: string;
@@ -48,10 +50,11 @@ export class TinyFishSearchProvider implements WebSearchProvider {
     if (this.config.location) url.searchParams.set('location', this.config.location);
     if (this.config.language) url.searchParams.set('language', this.config.language);
 
+    const apiKey = pickKey(this.config.apiKey);
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
-        'X-API-Key': this.config.apiKey,
+        'X-API-Key': apiKey,
         Accept: 'application/json',
       },
       signal: AbortSignal.timeout(15_000),

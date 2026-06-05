@@ -16,6 +16,7 @@
 // [fork] new file
 
 import type { HtmlFetchProvider, HtmlFetchResult } from '../types.ts';
+import { pickKey } from '../../shared/key-pool.ts';
 
 interface TinyFishFetchResultItem {
   url?: string;
@@ -37,7 +38,8 @@ interface TinyFishFetchResponse {
 }
 
 export interface TinyFishFetchConfig {
-  apiKey: string;
+  /** One key, or many for per-request random load-spreading (see shared/key-pool.ts). */
+  apiKey: string | string[];
   endpoint?: string;
   /** Per-request timeout in ms (default 45s — JS rendering needs the headroom). */
   timeoutMs?: number;
@@ -52,10 +54,11 @@ export class TinyFishFetchProvider implements HtmlFetchProvider {
   constructor(private config: TinyFishFetchConfig) {}
 
   async fetchHtml(url: string): Promise<HtmlFetchResult> {
+    const apiKey = pickKey(this.config.apiKey);
     const response = await fetch(this.config.endpoint || DEFAULT_ENDPOINT, {
       method: 'POST',
       headers: {
-        'X-API-Key': this.config.apiKey,
+        'X-API-Key': apiKey,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },

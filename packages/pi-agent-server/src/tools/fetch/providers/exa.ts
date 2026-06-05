@@ -19,6 +19,7 @@
 // [fork] new file
 
 import type { HtmlFetchProvider, HtmlFetchResult } from '../types.ts';
+import { pickKey } from '../../shared/key-pool.ts';
 
 interface ExaContentsResultItem {
   url?: string;
@@ -39,7 +40,8 @@ interface ExaContentsResponse {
 }
 
 export interface ExaFetchConfig {
-  apiKey: string;
+  /** One key, or many for per-request random load-spreading (see shared/key-pool.ts). */
+  apiKey: string | string[];
   endpoint?: string;
   /** Per-request timeout in ms (default 45s — live-crawl fallback can take time). */
   timeoutMs?: number;
@@ -54,10 +56,11 @@ export class ExaFetchProvider implements HtmlFetchProvider {
   constructor(private config: ExaFetchConfig) {}
 
   async fetchHtml(url: string): Promise<HtmlFetchResult> {
+    const apiKey = pickKey(this.config.apiKey);
     const response = await fetch(this.config.endpoint || DEFAULT_ENDPOINT, {
       method: 'POST',
       headers: {
-        'x-api-key': this.config.apiKey,
+        'x-api-key': apiKey,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },

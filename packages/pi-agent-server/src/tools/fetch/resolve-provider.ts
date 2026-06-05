@@ -20,6 +20,7 @@
 // [fork] new file
 
 import type { HtmlFetchProvider } from './types.ts';
+import { parseKeys } from '../shared/key-pool.ts';
 import { TinyFishFetchProvider } from './providers/tinyfish.ts';
 import { FirecrawlFetchProvider } from './providers/firecrawl.ts';
 import { TavilyFetchProvider } from './providers/tavily.ts';
@@ -30,20 +31,14 @@ export interface ResolveHtmlFetchProvidersOptions {
   env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
 }
 
-function readKey(
-  env: NodeJS.ProcessEnv | Record<string, string | undefined>,
-  name: string,
-): string | undefined {
-  const raw = env[name];
-  if (typeof raw !== 'string') return undefined;
-  const trimmed = raw.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-}
-
 /**
  * Resolve the active HTML-fetch provider cascade based on environment variables.
  * Returns an empty array when no keys are configured — the caller MUST treat that
  * as "skip cascade, go straight to local fetch."
+ *
+ * Each key var may hold a comma-separated list of keys (`parseKeys`); the vendor
+ * is added to the cascade once and picks one key per request at random (see
+ * `shared/key-pool.ts`). A single key behaves exactly as before.
  */
 export function resolveHtmlFetchProviders(
   options: ResolveHtmlFetchProvidersOptions = {},
@@ -51,24 +46,24 @@ export function resolveHtmlFetchProviders(
   const env = options.env ?? process.env;
   const chain: HtmlFetchProvider[] = [];
 
-  const tinyfishKey = readKey(env, 'TINYFISH_API_KEY');
-  if (tinyfishKey) {
-    chain.push(new TinyFishFetchProvider({ apiKey: tinyfishKey }));
+  const tinyfishKeys = parseKeys(env.TINYFISH_API_KEY);
+  if (tinyfishKeys.length > 0) {
+    chain.push(new TinyFishFetchProvider({ apiKey: tinyfishKeys }));
   }
 
-  const firecrawlKey = readKey(env, 'FIRECRAWL_API_KEY');
-  if (firecrawlKey) {
-    chain.push(new FirecrawlFetchProvider({ apiKey: firecrawlKey }));
+  const firecrawlKeys = parseKeys(env.FIRECRAWL_API_KEY);
+  if (firecrawlKeys.length > 0) {
+    chain.push(new FirecrawlFetchProvider({ apiKey: firecrawlKeys }));
   }
 
-  const tavilyKey = readKey(env, 'TAVILY_API_KEY');
-  if (tavilyKey) {
-    chain.push(new TavilyFetchProvider({ apiKey: tavilyKey }));
+  const tavilyKeys = parseKeys(env.TAVILY_API_KEY);
+  if (tavilyKeys.length > 0) {
+    chain.push(new TavilyFetchProvider({ apiKey: tavilyKeys }));
   }
 
-  const exaKey = readKey(env, 'EXA_API_KEY');
-  if (exaKey) {
-    chain.push(new ExaFetchProvider({ apiKey: exaKey }));
+  const exaKeys = parseKeys(env.EXA_API_KEY);
+  if (exaKeys.length > 0) {
+    chain.push(new ExaFetchProvider({ apiKey: exaKeys }));
   }
 
   return chain;

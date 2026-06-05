@@ -76,4 +76,18 @@ describe('resolveHtmlFetchProviders (env-driven HTML cascade)', () => {
     // Just confirms the no-arg call path doesn't throw.
     expect(() => resolveHtmlFetchProviders()).not.toThrow();
   });
+
+  it('adds a vendor ONCE when its key var holds comma-separated keys (not one per key)', () => {
+    const chain = resolveHtmlFetchProviders({
+      env: { TINYFISH_API_KEY: 'tf-a, tf-b ,tf-c' },
+    });
+    // multi-key spreads inside the single provider, not as extra cascade tiers.
+    expect(chain.length).toBe(1);
+    expect(chain[0]).toBeInstanceOf(TinyFishFetchProvider);
+  });
+
+  it('treats a comma/whitespace-only key value as unconfigured', () => {
+    const chain = resolveHtmlFetchProviders({ env: { TINYFISH_API_KEY: ' , , ' } });
+    expect(chain.length).toBe(0);
+  });
 });

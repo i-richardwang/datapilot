@@ -16,6 +16,7 @@
 // [fork] new file
 
 import type { WebSearchProvider, WebSearchResult } from '../types.ts';
+import { pickKey } from '../../shared/key-pool.ts';
 
 interface ExaApiResult {
   title?: string;
@@ -31,7 +32,8 @@ interface ExaApiResponse {
 }
 
 export interface ExaSearchConfig {
-  apiKey: string;
+  /** One key, or many for per-request random load-spreading (see shared/key-pool.ts). */
+  apiKey: string | string[];
   endpoint?: string;
   /** Max characters per result text snippet (default 500) */
   snippetMaxChars?: number;
@@ -59,10 +61,11 @@ export class ExaSearchProvider implements WebSearchProvider {
   async search(query: string, count: number): Promise<WebSearchResult[]> {
     const snippetMax = this.config.snippetMaxChars ?? DEFAULT_SNIPPET_MAX;
 
+    const apiKey = pickKey(this.config.apiKey);
     const response = await fetch(this.config.endpoint || DEFAULT_ENDPOINT, {
       method: 'POST',
       headers: {
-        'x-api-key': this.config.apiKey,
+        'x-api-key': apiKey,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },

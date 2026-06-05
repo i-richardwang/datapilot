@@ -26,6 +26,7 @@
  */
 
 import type { WebSearchProvider } from './types.ts';
+import { parseKeys } from '../shared/key-pool.ts';
 import { DDGSearchProvider } from './providers/ddg.ts';
 import { TinyFishSearchProvider } from './providers/tinyfish.ts';
 import { FirecrawlSearchProvider } from './providers/firecrawl.ts';
@@ -44,19 +45,13 @@ export interface ResolveSearchProvidersOptions {
   env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
 }
 
-function readKey(
-  env: NodeJS.ProcessEnv | Record<string, string | undefined>,
-  name: string,
-): string | undefined {
-  const raw = env[name];
-  if (typeof raw !== 'string') return undefined;
-  const trimmed = raw.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-}
-
 /**
  * Resolve the active search-provider cascade based on environment variables.
  * Always returns a non-empty array (DDG is the universal fallback).
+ *
+ * Each key var may hold a comma-separated list of keys (`parseKeys`); the vendor
+ * is added to the cascade once and picks one key per request at random (see
+ * `shared/key-pool.ts`). A single key behaves exactly as before.
  */
 export function resolveSearchProviders(
   options: ResolveSearchProvidersOptions = {},
@@ -64,24 +59,24 @@ export function resolveSearchProviders(
   const env = options.env ?? process.env;
   const chain: WebSearchProvider[] = [];
 
-  const tinyfishKey = readKey(env, 'TINYFISH_API_KEY');
-  if (tinyfishKey) {
-    chain.push(new TinyFishSearchProvider({ apiKey: tinyfishKey }));
+  const tinyfishKeys = parseKeys(env.TINYFISH_API_KEY);
+  if (tinyfishKeys.length > 0) {
+    chain.push(new TinyFishSearchProvider({ apiKey: tinyfishKeys }));
   }
 
-  const firecrawlKey = readKey(env, 'FIRECRAWL_API_KEY');
-  if (firecrawlKey) {
-    chain.push(new FirecrawlSearchProvider({ apiKey: firecrawlKey }));
+  const firecrawlKeys = parseKeys(env.FIRECRAWL_API_KEY);
+  if (firecrawlKeys.length > 0) {
+    chain.push(new FirecrawlSearchProvider({ apiKey: firecrawlKeys }));
   }
 
-  const tavilyKey = readKey(env, 'TAVILY_API_KEY');
-  if (tavilyKey) {
-    chain.push(new TavilySearchProvider({ apiKey: tavilyKey }));
+  const tavilyKeys = parseKeys(env.TAVILY_API_KEY);
+  if (tavilyKeys.length > 0) {
+    chain.push(new TavilySearchProvider({ apiKey: tavilyKeys }));
   }
 
-  const exaKey = readKey(env, 'EXA_API_KEY');
-  if (exaKey) {
-    chain.push(new ExaSearchProvider({ apiKey: exaKey }));
+  const exaKeys = parseKeys(env.EXA_API_KEY);
+  if (exaKeys.length > 0) {
+    chain.push(new ExaSearchProvider({ apiKey: exaKeys }));
   }
 
   chain.push(new DDGSearchProvider());

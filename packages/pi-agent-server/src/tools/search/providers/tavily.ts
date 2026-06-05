@@ -23,6 +23,7 @@
 // [fork] new file
 
 import type { WebSearchProvider, WebSearchResult } from '../types.ts';
+import { pickKey } from '../../shared/key-pool.ts';
 
 interface TavilySearchResultItem {
   title?: string;
@@ -35,7 +36,8 @@ interface TavilySearchResponse {
 }
 
 export interface TavilySearchConfig {
-  apiKey: string;
+  /** One key, or many for per-request random load-spreading (see shared/key-pool.ts). */
+  apiKey: string | string[];
   endpoint?: string;
   timeoutMs?: number;
 }
@@ -49,10 +51,11 @@ export class TavilySearchProvider implements WebSearchProvider {
   constructor(private config: TavilySearchConfig) {}
 
   async search(query: string, count: number): Promise<WebSearchResult[]> {
+    const apiKey = pickKey(this.config.apiKey);
     const response = await fetch(this.config.endpoint || DEFAULT_ENDPOINT, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${this.config.apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
