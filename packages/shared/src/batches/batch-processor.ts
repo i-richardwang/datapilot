@@ -201,8 +201,10 @@ export class BatchProcessor {
    * disk — ensureActive() transparently loads it back into memory.
    */
   resume(batchId: string): BatchProgress {
+    const recoveredFromDisk = !this.activeStates.has(batchId)
+
     // Load into memory if needed (cold restart case)
-    if (!this.activeStates.has(batchId)) {
+    if (recoveredFromDisk) {
       this.ensureActive(batchId)
     }
 
@@ -212,10 +214,14 @@ export class BatchProcessor {
       throw new Error(`Batch "${batchId}" is not paused (status: ${state.status})`)
     }
 
-    // Crash recovery: running items lost their sessions on restart
-    for (const [itemId, itemState] of Object.entries(state.items)) {
-      if (itemState.status === 'running') {
-        updateItemState(state, itemId, { status: 'pending', sessionId: undefined })
+    if (recoveredFromDisk) {
+      // Crash recovery: running items lost their in-memory session mappings on
+      // restart, so they must be re-dispatched. During a normal pause/resume,
+      // those mappings are still valid and running sessions should continue.
+      for (const [itemId, itemState] of Object.entries(state.items)) {
+        if (itemState.status === 'running') {
+          updateItemState(state, itemId, { status: 'pending', sessionId: undefined })
+        }
       }
     }
 
@@ -824,4 +830,3 @@ export function buildItemSummary(item: BatchItem, idField: string, expandedPromp
   if (valuesPart && promptPart) return `${valuesPart} — ${promptPart}`
   return valuesPart || promptPart
 }
-

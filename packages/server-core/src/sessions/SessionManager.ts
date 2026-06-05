@@ -6977,10 +6977,7 @@ export class SessionManager implements ISessionManager {
     // Clear agent control overlay between turns. The session keeps browser
     // ownership (boundSessionId) — only the visual overlay is removed.
     // Full unbind happens below when the queue is empty (session truly done).
-    const turnBpm = this.getBrowserPaneManagerForSession(sessionId)
-    if (turnBpm) {
-      await turnBpm.clearVisualsForSession(sessionId)
-    }
+    await this.clearBrowserVisualsBestEffort(sessionId, 'turn cleanup')
 
     // 2. Handle unread state based on whether user is viewing this session
     //    This is the explicit state machine for NEW badge:
@@ -7029,11 +7026,8 @@ export class SessionManager implements ISessionManager {
       // Session is truly done — release browser ownership.
       // The window stays alive (hidden) and becomes reusable by future sessions.
       // On the next turn, getOrCreateForSession() will re-bind it.
-      const doneBpm = this.getBrowserPaneManagerForSession(sessionId)
-      if (doneBpm) {
-        await doneBpm.clearVisualsForSession(sessionId)
-        doneBpm.unbindAllForSession(sessionId)
-      }
+      await this.clearBrowserVisualsBestEffort(sessionId, 'completion cleanup')
+      this.unbindBrowserSessionBestEffort(sessionId, 'completion cleanup')
 
       // No queue - emit complete to UI (include tokenUsage and hasUnread for state updates)
       this.sendEvent({
@@ -7063,6 +7057,32 @@ export class SessionManager implements ISessionManager {
     if (this.shouldHibernateOnComplete(managed) && this.isHibernationSafe(managed)) {
       this.hibernateSession(sessionId).catch(err => {
         sessionLog.error(`Failed to hibernate session ${sessionId}:`, err)
+      })
+    }
+  }
+
+  private async clearBrowserVisualsBestEffort(sessionId: string, context: string): Promise<void> {
+    const bpm = this.getBrowserPaneManagerForSession(sessionId)
+    if (!bpm) return
+
+    try {
+      await bpm.clearVisualsForSession(sessionId)
+    } catch (err) {
+      sessionLog.warn(`[browser-pane] Failed to clear visuals for session ${sessionId} during ${context}; continuing session completion`, {
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
+
+  private unbindBrowserSessionBestEffort(sessionId: string, context: string): void {
+    const bpm = this.getBrowserPaneManagerForSession(sessionId)
+    if (!bpm) return
+
+    try {
+      bpm.unbindAllForSession(sessionId)
+    } catch (err) {
+      sessionLog.warn(`[browser-pane] Failed to unbind browser for session ${sessionId} during ${context}; continuing session completion`, {
+        error: err instanceof Error ? err.message : String(err),
       })
     }
   }

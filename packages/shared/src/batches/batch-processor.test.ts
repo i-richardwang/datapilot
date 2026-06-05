@@ -393,6 +393,25 @@ describe('BatchProcessor', () => {
       expect(progress.status).toBe('running')
     })
 
+    it('should preserve active running sessions when resuming without restart', async () => {
+      setup.processor.start('test-batch')
+      await tick()
+      const initialSessions = setup.createdSessions.map(s => s.sessionId)
+
+      setup.processor.pause('test-batch')
+      const progress = setup.processor.resume('test-batch')
+      await tick()
+
+      expect(progress.runningItems).toBe(2)
+      expect(progress.pendingItems).toBe(1)
+      expect(setup.createdSessions.map(s => s.sessionId)).toEqual(initialSessions)
+      const state = setup.processor.getState('test-batch')!
+      const runningSessionIds = Object.values(state.items)
+        .filter(i => i.status === 'running')
+        .map(i => i.sessionId)
+      expect(runningSessionIds).toEqual(initialSessions)
+    })
+
     it('should not dispatch new items while paused', async () => {
       setup.processor.start('test-batch')
       await tick()
