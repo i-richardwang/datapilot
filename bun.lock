@@ -458,9 +458,6 @@
     "koffi",
     "@sentry/cli",
   ],
-  "overrides": {
-    "@sentry/core": "10.50.0",
-  },
   "packages": {
     "7zip-bin": ["7zip-bin@5.2.0", "", {}, "sha512-ukTPVhqG4jNzMro2qA9HSCSSVJN3aN7tlb+hfqYCt3ER0yWroeA2VR38MNrOHLQ/cVj+DaIMad0kFCtWWowh/A=="],
 
@@ -1280,7 +1277,7 @@
 
     "@sentry/cli-win32-x64": ["@sentry/cli-win32-x64@2.58.4", "", { "os": "win32", "cpu": "x64" }, "sha512-cSzN4PjM1RsCZ4pxMjI0VI7yNCkxiJ5jmWncyiwHXGiXrV1eXYdQ3n1LhUYLZ91CafyprR0OhDcE+RVZ26Qb5w=="],
 
-    "@sentry/core": ["@sentry/core@10.50.0", "", {}, "sha512-J4A+vzUO3adl0TkFCjaN1+4miamrjHiEIYuLHiuu1lmAjq5WIVw32ObvAh4yMwNtxyaEMosTrrh5M6f12XSJFg=="],
+    "@sentry/core": ["@sentry/core@10.36.0", "", {}, "sha512-EYJjZvofI+D93eUsPLDIUV0zQocYqiBRyXS6CCV6dHz64P/Hob5NJQOwPa8/v6nD+UvJXvwsFfvXOHhYZhZJOQ=="],
 
     "@sentry/electron": ["@sentry/electron@7.7.0", "", { "dependencies": { "@sentry/browser": "10.36.0", "@sentry/core": "10.36.0", "@sentry/node": "10.36.0" }, "peerDependencies": { "@sentry/node-native": "10.36.0" }, "optionalPeers": ["@sentry/node-native"] }, "sha512-2BapanbCoAzrw7nFoP1vS05+O/sLNakhoXI3tyoGMWpSNZiSCYTf50d9D6zp/U3FeHGKhZrcQ4SdBKEwgRXGJA=="],
 

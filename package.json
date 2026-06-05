@@ -217,11 +217,5 @@
     "@img/sharp-libvips-darwin-x64": "1.2.4",
     "@img/sharp-libvips-linux-arm64": "1.2.4",
     "@img/sharp-libvips-linux-x64": "1.2.4"
-  },
-  "resolutions": {
-    "@sentry/core": "10.50.0"
-  },
-  "overrides": {
-    "@sentry/core": "10.50.0"
   }
 }
