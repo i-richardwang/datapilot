@@ -40,7 +40,7 @@ import {
 import { parseValidationError, type LlmValidationResult } from '../../config/llm-validation.ts';
 import type { ModelFetchResult } from '../../config/model-fetcher.ts';
 // Model resolution utilities
-import { getModelProvider, DEFAULT_MODEL } from '../../config/models.ts';
+import { getModelProvider, DEFAULT_MODEL, normalizeDeprecatedModelId } from '../../config/models.ts';
 import { homedir } from 'node:os';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -648,25 +648,33 @@ export function resolveModelForProvider(
 ): string {
   // Cross-provider guard: if the model belongs to a different provider, fall back
   // to the connection's default. This prevents e.g. sending a Claude model to Pi.
-  // Skip the guard for custom endpoints — they use standard model IDs (e.g.
+  // [fork] Skip the guard for custom endpoints — they use standard model IDs (e.g.
   // claude-sonnet-4-6) which resolve to 'anthropic' in MODEL_REGISTRY, but the
   // connection provider is 'pi'. Without this bypass, every model selection is
   // silently replaced by the connection's defaultModel.
   const isCustomEndpoint = !!connection?.customEndpoint;
   if (managedModel && !isCustomEndpoint) {
+    managedModel = normalizeDeprecatedModelId(managedModel);
     const modelProvider = getModelProvider(managedModel);
     if (modelProvider && modelProvider !== provider) {
       managedModel = undefined; // Clear — will fall through to connection default
     }
   }
 
-  // Resolve tier-hint short names (e.g. 'sonnet', 'haiku') against the connection's
+  // [upstream] Normalize the connection default (deprecated model IDs → current).
+  // The switch below resolves through this value.
+  let connectionDefault = connection?.defaultModel
+    ? normalizeDeprecatedModelId(connection.defaultModel)
+    : undefined;
+
+  // [fork] Resolve tier-hint short names (e.g. 'sonnet', 'haiku') against the connection's
   // model list. EditPopover and other callers use these as capability tier hints, not
   // as literal model IDs. For custom connections whose models may be non-Anthropic
   // (e.g. GLM, Kimi), we map them to the appropriate tier:
   //   'haiku' → fastest/smallest model (via getMiniModel)
-  //   'sonnet' → connection's default model (primary/capable)
-  // Only applies when the managedModel is not already a valid ID in the connection's list.
+  //   anything else → connection's default model (primary/capable)
+  // This supersedes upstream's plain "clear if not in list" for pi: instead of
+  // dropping an unrecognized managedModel, we map it to a tier-appropriate model.
   if (managedModel && connection?.models && connection.models.length > 0) {
     const toId = (m: { id: string } | string) => typeof m === 'string' ? m : m.id;
     const connectionModelIds = connection.models.map(toId);
@@ -674,18 +682,27 @@ export function resolveModelForProvider(
 
     if (!isAlreadyValidId) {
       if (managedModel.toLowerCase() === 'haiku') {
-        managedModel = getMiniModel(connection) || connection.defaultModel || undefined;
+        managedModel = getMiniModel(connection) || connectionDefault || undefined;
       } else {
-        managedModel = connection.defaultModel || undefined;
+        managedModel = connectionDefault || undefined;
       }
+    }
+  }
+
+  // [upstream] For pi connections, make sure the resolved default is itself a model
+  // the connection actually exposes; otherwise fall back to the first listed model.
+  if (provider === 'pi' && connection?.models?.length) {
+    const connectionModelIds = connection.models.map(m => typeof m === 'string' ? m : m.id);
+    if (connectionDefault && !connectionModelIds.includes(connectionDefault)) {
+      connectionDefault = connectionModelIds[0];
     }
   }
 
   switch (provider) {
     case 'pi':
-      return managedModel || connection?.defaultModel || '';
+      return managedModel || connectionDefault || '';
     default:
-      return managedModel || connection?.defaultModel || DEFAULT_MODEL;
+      return managedModel || connectionDefault || DEFAULT_MODEL;
   }
 }
 

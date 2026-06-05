@@ -16,17 +16,23 @@ import './index.css'
 // Initialize i18n before any React rendering
 setupI18n([LanguageDetector, initReactI18next])
 
-// [fork] Push the renderer's detected language to the main process at startup so
-// server-side i18n (used by system-prompt preferences and any future main-process
-// LLM call) reflects the user's actual UI language. Without this, main process
-// stays on 'en' fallback until the user manually changes Settings → Appearance →
-// Language. The IPC handler also persists this to preferences.json so the
-// standalone server picks it up on next start.
-const detectedLang = i18n.resolvedLanguage
-if (detectedLang) {
-  void window.electronAPI?.changeLanguage?.(detectedLang).catch?.((err: unknown) => {
-    console.warn('[i18n] Failed to sync language to main process:', err)
-  })
+// One-shot bootstrap: ensure the main process's i18n + preferences.json learn
+// the language we just restored from localStorage. The main-process IPC handler
+// validates the code and persists idempotently, so this is safe to run on every
+// renderer startup. Without this push, a freshly-installed (or freshly-upgraded)
+// app would still generate titles in English until the user manually re-picks
+// the language in Appearance.
+const resolvedLanguage = i18n.resolvedLanguage
+// Diagnostic: console-log the bootstrap push so it shows up in DevTools and
+// (via captureConsoleIntegration) in Sentry, alongside the main-process
+// [i18n] startup hydration log. If these two diverge, the renderer's
+// localStorage isn't tracking the user's Appearance selection.
+console.info('[i18n] renderer bootstrap push', {
+  resolvedLanguage: resolvedLanguage ?? null,
+  localStorageI18nextLng: typeof window !== 'undefined' ? window.localStorage?.getItem('i18nextLng') : null,
+})
+if (resolvedLanguage) {
+  void window.electronAPI?.changeLanguage?.(resolvedLanguage)
 }
 
 // Known-harmless console messages that should NOT be sent to Sentry.

@@ -3,7 +3,7 @@ import { join } from 'path';
 import { ensureConfigDir } from './storage.ts';
 import { CONFIG_DIR } from './paths.ts';
 import { readJsonFileSync } from '../utils/files.ts';
-import { i18n } from '../i18n/index.ts';
+import { i18n, SUPPORTED_LANGUAGE_CODES } from '../i18n/index.ts';
 import { LOCALE_REGISTRY, type LanguageCode } from '../i18n/registry.ts';
 
 export interface UserLocation {
@@ -27,13 +27,18 @@ export interface UserPreferences {
   name?: string;
   timezone?: string;
   location?: UserLocation;
-  language?: string;
   // Free-form notes the agent learns about the user
   notes?: string;
   // Diff viewer display preferences
   diffViewer?: DiffViewerPreferences;
   // Whether to include Co-Authored-By trailer on git commits (default: true)
   includeCoAuthoredBy?: boolean;
+  /**
+   * Internal: persisted UI language code (mirrors Appearance → Language).
+   * Maintained only by the main-process `i18n:changeLanguage` IPC handler.
+   * Not user-editable; not exposed via the `update_user_preferences` tool.
+   */
+  uiLanguage?: LanguageCode;
   // When the preferences were last updated
   updatedAt?: number;
 }
@@ -45,7 +50,14 @@ export function loadPreferences(): UserPreferences {
     if (!existsSync(PREFERENCES_FILE)) {
       return {};
     }
-    return readJsonFileSync<UserPreferences>(PREFERENCES_FILE);
+    const raw = readJsonFileSync<UserPreferences & { language?: unknown }>(PREFERENCES_FILE);
+    // Scrub legacy free-text `language` field on read so it never leaks
+    // back into a write. Old values were free-text ("Hungarian", "English") —
+    // not language codes — so we drop them rather than migrate.
+    if (raw && typeof raw === 'object' && 'language' in raw) {
+      delete (raw as { language?: unknown }).language;
+    }
+    return raw;
   } catch {
     return {};
   }
@@ -90,24 +102,44 @@ export function getPreferencesPath(): string {
 }
 
 /**
+ * Read the persisted UI language code (validated against the supported set).
+ * Returns `undefined` when the field is missing or holds an unrecognised value.
+ */
+export function getPersistedUiLanguage(): LanguageCode | undefined {
+  const prefs = loadPreferences();
+  const candidate = prefs.uiLanguage;
+  if (!candidate) return undefined;
+  if (!SUPPORTED_LANGUAGE_CODES.includes(candidate)) return undefined;
+  return candidate;
+}
+
+/**
+ * Persist the UI language code. Idempotent — does not rewrite the file
+ * (or bump `updatedAt`) when the value is unchanged. This avoids re-triggering
+ * the config watcher on startup syncs and duplicate IPC calls.
+ */
+export function setPersistedUiLanguage(code: LanguageCode): void {
+  const current = loadPreferences();
+  if (current.uiLanguage === code) return;
+  savePreferences({ ...current, uiLanguage: code });
+}
+
+/**
  * Format preferences for inclusion in system prompt
  */
 export function formatPreferencesForPrompt(): string {
   const prefs = loadPreferences();
 
   // [fork] Resolve the preferred language for prompt injection.
-  // Original behavior: always derived from i18n.resolvedLanguage and ignored prefs.language.
-  // Problem: server-side i18n is unreliable (Electron main fallbacks to 'en' at startup;
-  //   standalone server never inits i18n). This caused `Preferred language: English` to be
-  //   injected for every user regardless of UI language.
-  // New priority: prefs.language (persisted, authoritative) → i18n.resolvedLanguage (fallback).
-  // If neither is set we omit the "Preferred language" hint entirely so the LLM detects from messages
+  // Upstream always derives from i18n.resolvedLanguage (falling back to 'en').
+  // Problem: server-side i18n is unreliable — the standalone/headless server never
+  // inits i18n, so that path injects `Preferred language: English` for every user
+  // regardless of their actual UI language.
+  // New priority: persisted uiLanguage (authoritative, file-based, works in any
+  // process) → i18n.resolvedLanguage (fallback). If neither is set we omit the
+  // "Preferred language" hint entirely (see below) so the LLM detects from messages
   // instead of being misled into English.
-  // Original (replaced):
-  //   const langCode = (i18n.resolvedLanguage ?? 'en') as LanguageCode;
-  //   const langEntry = LOCALE_REGISTRY[langCode];
-  //   const langName = langEntry?.nativeName ?? 'English';
-  const resolvedCode = (prefs.language ?? i18n.resolvedLanguage) as LanguageCode | undefined;
+  const resolvedCode = (getPersistedUiLanguage() ?? i18n.resolvedLanguage) as LanguageCode | undefined;
   const langEntry = resolvedCode ? LOCALE_REGISTRY[resolvedCode] : undefined;
   const langName = langEntry?.nativeName;
 
@@ -135,10 +167,8 @@ export function formatPreferencesForPrompt(): string {
   }
 
   // [fork] Only include the language hint when we have an authoritative source
-  // (persisted prefs.language or initialized i18n). Avoids injecting a wrong
+  // (persisted uiLanguage or initialized i18n). Avoids injecting a wrong
   // "Preferred language: English" when server-side i18n is uninitialized.
-  // Original (replaced):
-  //   lines.push(`- Preferred language: ${langName}`);
   if (langName) {
     lines.push(`- Preferred language: ${langName}`);
   }

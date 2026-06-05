@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: 合并 upstream 时的唯一操作手册 — 冲突风险、合并策略、检查清单。
 >
-> **Last upstream merge:** v0.10.0 (2026-05-27).
+> **Last upstream merge:** v0.10.1 (2026-06-05).
 
 ## Overview
 
@@ -170,7 +170,7 @@ Upstream v0.9.3 引入的 compact-mode session menu。fork 端的 `SessionMenu` 
 
 Fork 删除了三个 session 自管理 MCP tool 及其 handler:`list_sessions`、`get_session_info`、`update_user_preferences`。能力收敛到 `datapilot session list/info` + `datapilot preference set`(CLI 是产品内 agent 的唯一入口);新增 RPC handlers 在 `server-core/src/handlers/rpc/sessions.ts`,补齐 SessionManager 接口。`prompts/system.ts` 同步删去对这三个 tool 的引用。
 
-**Conflict trigger:** 上游对这三个 handler 做扩展(新字段、新 dispatch 路径)→ 不要回采,把变化吸收进对应 CLI 命令或 RPC handler。
+**Conflict trigger:** 上游对这三个 handler 做扩展(新字段、新 dispatch 路径)→ 不要回采,把变化吸收进对应 CLI 命令或 RPC handler。v0.10.1 实证:upstream 不仅改 `update-preferences.ts` handler,还**新增了它的测试** `update-preferences.test.ts` —— modify/delete 冲突保留删除后,记得把新加的 `.test.ts` 也一并 `git rm`(否则 import 已删 handler,tsc 挂)。
 
 #### `packages/shared/src/agent/backend/factory.ts` `[Custom Endpoint Fix]`
 
@@ -335,6 +335,7 @@ For each conflicting file, look it up in the "Modified Upstream Files" section a
 | Automations config format | Update `apps/cli/src/datapilot/commands/automation.ts` parsing |
 | `packages/session-tools-core/tsconfig.json` | Don't blindly take upstream — fork's tsconfig is self-contained (`target/lib: ESNext`, all options inline). Upstream extends `../../tsconfig.base.json` which doesn't exist in their repo, masking their own tsc errors (e.g. v0.9.1: regex `/es6/` flag, `Set` iteration without `downlevelIteration`). Adopting upstream's version would inherit those errors. |
 | `RpcServer` interface (`packages/server-core/src/transport/types.ts`) | Every fake/mock `RpcServer` in test files (grep `RpcServer = {` or `createMockServer`) needs the new method. Fork's `updateClientWorkspace` stays required — upstream periodically redeclares it as optional, discard. v0.10.0 added `hasClientCapability` + `findClientsWithCapability` to 8 mocks. |
+| New config/i18n **test files** upstream adds (spawn-subprocess pattern) | They hard-code `CRAFT_CONFIG_DIR` to isolate the tmpdir; fork's `paths.ts` reads `DATAPILOT_CONFIG_DIR`. A wrong env var = test silently uses the real `~/.datapilot` and fails. After merge, grep new `*.test.ts` for `CRAFT_CONFIG_DIR` → rename to `DATAPILOT_CONFIG_DIR`. v0.10.1 hit this in `preferences-ui-language.test.ts` + `i18n-bootstrap.test.ts`. |
 
 ### Step 5 — Post-Merge Verification
 
@@ -496,3 +497,4 @@ bun run tsc --noEmit
 | v0.9.5 | 2026-05-23 | 12 | Compact model picker + working-directory selector; Pi turn-anchor sidecar for branch-of-branch; source activation drain; MCP validation refactor; `AcceptPlanDropdown` switched to Radix `DropdownMenu`. Upstream's new `groupConnectionsByProvider` helper adopted in `model-picker-helpers.ts` but fork's inline `FreeFormInput` grouping kept (uses `isAnthropicProvider` for `anthropic_compat`). |
 | v0.9.6 | 2026-05-26 | 7 | Ported orphan-credential cleanup from upstream's `storage.ts` into fork's `storage.db.ts`; adapted its test for SQLite driver. |
 | v0.10.0 | 2026-05-27 | 13 | Remote `browser_tool` bridging — upstream extended `RpcServer` with `hasClientCapability` / `findClientsWithCapability`; every fork test mocking `RpcServer` (8 files) needs both new methods AND fork's `updateClientWorkspace`. Conflict in `transport/types.ts`: upstream redeclared `updateClientWorkspace` as optional — keep fork's required form. `pi-agent.ts`: fork's batch tool-defs gating and upstream's `getBrowserToolEnabled()` filter combine sequentially on `sessionToolDefs`. |
+| v0.10.1 | 2026-06-05 | 16 | **Upstream absorbed the fork's cross-process UI-language persistence** — reimplemented as a canonical internal `uiLanguage` field + `getPersistedUiLanguage`/`setPersistedUiLanguage` helpers (legacy free-text `language` field removed, scrubbed on read). Took upstream's helpers/hydration (`main/index.ts`, `main.tsx`) wholesale; rebased fork's two standing decisions onto them — (a) `formatPreferencesForPrompt` still omits the language hint when no authoritative source (headless server never inits i18n), now reading `getPersistedUiLanguage()`; (b) `SessionManager` title-gen still passes no language (content auto-detect). `validators.ts`: kept fork's `.nullable()` clear-semantics, dropped `language`, added upstream's `uiLanguage` enum. `factory.ts` `resolveModelForProvider`: merged fork's tier-hint resolution + custom-endpoint guard-skip with upstream's `normalizeDeprecatedModelId` + `connectionDefault`. `update_user_preferences` removal recurred (see risk entry). |
