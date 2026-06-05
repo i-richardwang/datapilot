@@ -104,7 +104,7 @@ import { extractLabelId, resolveSessionLabels } from '@craft-agent/shared/labels
 import { ensureLabelsExist } from '@craft-agent/shared/labels/crud'
 import { loadStatusConfig } from '@craft-agent/shared/statuses/storage'
 import { AutomationSystem, createPromptHistoryEntry, appendAutomationHistoryEntry, type AutomationSystemMetadataSnapshot } from '@craft-agent/shared/automations'
-import { BatchProcessor } from '@craft-agent/shared/batches'
+import { BatchProcessor, resolveGlobalMaxConcurrentSessions } from '@craft-agent/shared/batches'
 import { buildBackendRuntimeSignature, buildRestartRequiredSignature, filterAttachmentsForModelInput } from './runtime-config'
 
 // Import from server-core domain utilities
@@ -1683,6 +1683,7 @@ export class SessionManager implements ISessionManager {
     const batchProcessor = new BatchProcessor({
       workspaceRootPath,
       workspaceId,
+      globalMaxConcurrentSessions: resolveGlobalMaxConcurrentSessions(),
       onExecutePrompt: async (params) => {
         return this.executePromptAutomation({
           workspaceId: params.workspaceId,

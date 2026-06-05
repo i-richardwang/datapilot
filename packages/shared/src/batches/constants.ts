@@ -15,6 +15,22 @@ export const DEFAULT_MAX_CONCURRENCY = 3
  */
 export const DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS = 5
 
+/** Env var to override the global concurrent-session ceiling at deploy time */
+export const GLOBAL_MAX_CONCURRENT_SESSIONS_ENV = 'DATAPILOT_BATCH_GLOBAL_MAX_CONCURRENT_SESSIONS'
+
+/**
+ * Resolve the global concurrent-session ceiling. Reads
+ * `DATAPILOT_BATCH_GLOBAL_MAX_CONCURRENT_SESSIONS` (a positive integer) and
+ * falls back to {@link DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS} when unset or
+ * invalid. Evaluated at process start; changing the env mid-run requires a
+ * restart to take effect.
+ */
+export function resolveGlobalMaxConcurrentSessions(): number {
+  const v = Number(process.env[GLOBAL_MAX_CONCURRENT_SESSIONS_ENV])
+  if (Number.isFinite(v) && v > 0) return Math.floor(v)
+  return DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS
+}
+
 /** Default maximum retry attempts per item */
 export const DEFAULT_MAX_RETRIES = 2
 

@@ -5,7 +5,12 @@ import { tmpdir } from 'node:os'
 import { autoRegisterDriver } from '../db/driver.ts'
 import { BatchProcessor } from './batch-processor.ts'
 import { loadBatchState } from './batch-state-manager.db.ts'
-import { BATCH_STATE_FILE_PREFIX } from './constants.ts'
+import {
+  BATCH_STATE_FILE_PREFIX,
+  DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS,
+  GLOBAL_MAX_CONCURRENT_SESSIONS_ENV,
+  resolveGlobalMaxConcurrentSessions,
+} from './constants.ts'
 import type { BatchSystemOptions, BatchExecutePromptParams, BatchProgress } from './types.ts'
 
 beforeAll(async () => {
@@ -672,5 +677,41 @@ describe('BatchProcessor', () => {
       processor.dispose()
       rmSync(tempDir, { recursive: true, force: true })
     })
+  })
+})
+
+describe('resolveGlobalMaxConcurrentSessions', () => {
+  const ENV = GLOBAL_MAX_CONCURRENT_SESSIONS_ENV
+  let previous: string | undefined
+
+  beforeEach(() => {
+    previous = process.env[ENV]
+    delete process.env[ENV]
+  })
+
+  afterEach(() => {
+    if (previous === undefined) delete process.env[ENV]
+    else process.env[ENV] = previous
+  })
+
+  it('falls back to the default when unset', () => {
+    expect(resolveGlobalMaxConcurrentSessions()).toBe(DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS)
+  })
+
+  it('honors a positive integer override', () => {
+    process.env[ENV] = '25'
+    expect(resolveGlobalMaxConcurrentSessions()).toBe(25)
+  })
+
+  it('floors fractional values', () => {
+    process.env[ENV] = '4.9'
+    expect(resolveGlobalMaxConcurrentSessions()).toBe(4)
+  })
+
+  it('falls back on zero, negative, or non-numeric values', () => {
+    for (const bad of ['0', '-3', 'abc', '']) {
+      process.env[ENV] = bad
+      expect(resolveGlobalMaxConcurrentSessions()).toBe(DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS)
+    }
   })
 })
