@@ -187,6 +187,8 @@ export interface AppShellContextType {
   onDeleteBatch?: (batchId: string) => void
   /** Retry a single failed batch item */
   onRetryBatchItem?: (batchId: string, itemId: string) => void
+  /** Retry all failed items in a batch */
+  onRetryFailedBatch?: (batchId: string) => void
 }
 
 const AppShellContext = createContext<AppShellContextType | null>(null)

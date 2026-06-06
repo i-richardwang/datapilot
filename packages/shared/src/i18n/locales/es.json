@@ -165,6 +165,7 @@
   "batches.pageIndicator": "página {{current}} de {{total}}",
   "batches.pageRange": "{{start}}–{{end}} de {{total}}",
   "batches.prev": "Anterior",
+  "batches.retryAllFailed": "Reintentar fallidos",
   "batches.schemaDefined": "Definido",
   "batches.schemaFreeform": "Libre",
   "batches.searchPlaceholder": "Buscar batches...",

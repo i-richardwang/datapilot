@@ -108,6 +108,7 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.batches.DELETE,
   RPC_CHANNELS.batches.VALIDATE,
   RPC_CHANNELS.batches.RETRY_ITEM,
+  RPC_CHANNELS.batches.RETRY_FAILED,
 ] as const
 
 export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): void {
@@ -295,5 +296,13 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
 
     const processor = deps.sessionManager.ensureBatchProcessor(workspace.rootPath, workspaceId)
     return processor.retryItem(batchId, itemId)
+  })
+
+  server.handle(RPC_CHANNELS.batches.RETRY_FAILED, async (_ctx, workspaceId: string, batchId: string) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error('Workspace not found')
+
+    const processor = deps.sessionManager.ensureBatchProcessor(workspace.rootPath, workspaceId)
+    return processor.retryFailedItems(batchId)
   })
 }

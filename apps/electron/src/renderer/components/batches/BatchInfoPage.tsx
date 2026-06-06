@@ -46,6 +46,7 @@ export interface BatchInfoPageProps {
   onDuplicate?: () => void
   onDelete?: () => void
   onRetryItem?: (itemId: string) => void
+  onRetryFailed?: (batchId: string) => void
   getBatchItems?: (batchId: string, offset: number, limit: number, filterStatus?: BatchItemStatus) => Promise<BatchItemsPage | null>
   className?: string
 }
@@ -58,6 +59,7 @@ export function BatchInfoPage({
   onDuplicate,
   onDelete,
   onRetryItem,
+  onRetryFailed,
   getBatchItems,
   className,
 }: BatchInfoPageProps) {
@@ -308,6 +310,15 @@ export function BatchInfoPage({
                       className="text-xs text-accent hover:underline cursor-pointer"
                     >
                       {filterStatus === 'failed' ? t('batches.filterShowAll') : t('batches.filterFailedOnly')}
+                    </button>
+                  )}
+                  {batch.progress.failedItems > 0 && onRetryFailed && batch.id && (
+                    <button
+                      type="button"
+                      onClick={() => onRetryFailed(batch.id!)}
+                      className="text-xs text-accent hover:underline cursor-pointer"
+                    >
+                      {t('batches.retryAllFailed')}
                     </button>
                   )}
                 </div>

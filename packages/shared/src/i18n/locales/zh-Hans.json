@@ -165,6 +165,7 @@
   "batches.pageIndicator": "第 {{current}}/{{total}} 页",
   "batches.pageRange": "{{start}}–{{end}} / 共 {{total}}",
   "batches.prev": "上一页",
+  "batches.retryAllFailed": "重试失败",
   "batches.schemaDefined": "已定义",
   "batches.schemaFreeform": "自由格式",
   "batches.searchPlaceholder": "搜索批处理...",

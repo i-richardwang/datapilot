@@ -165,6 +165,7 @@
   "batches.pageIndicator": "{{current}} / {{total}} ページ",
   "batches.pageRange": "{{start}}–{{end}} / 全 {{total}}",
   "batches.prev": "前へ",
+  "batches.retryAllFailed": "失敗を再試行",
   "batches.schemaDefined": "定義済み",
   "batches.schemaFreeform": "自由形式",
   "batches.searchPlaceholder": "バッチを検索...",

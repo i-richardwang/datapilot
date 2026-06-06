@@ -928,7 +928,7 @@ function AppShellContent({
     getBatchItems,
     updateBatchProgress, handleBatchComplete,
     batchPendingDelete, pendingDeleteBatch, setBatchPendingDelete,
-    handleRetryBatchItem,
+    handleRetryBatchItem, handleRetryFailedBatchItems,
     handleDuplicateBatch, handleDeleteBatch, confirmDeleteBatch,
   } = useBatches(activeWorkspaceId)
 
@@ -1749,7 +1749,8 @@ function AppShellContent({
     onDuplicateBatch: handleDuplicateBatch,
     onDeleteBatch: handleDeleteBatch,
     onRetryBatchItem: handleRetryBatchItem,
-  }), [contextValue, handleDeleteSession, sources, skills, activeSessionWorkingDirectory, displayLabelConfigs, handleSessionLabelsChange, enabledModes, effectiveSessionStatuses, handleSessionSourcesChange, isAutoCompact, searchActive, searchQuery, handleChatMatchInfoChange, handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, automationTestResults, getAutomationHistory, handleReplayAutomation, handleStartBatch, handlePauseBatch, handleResumeBatch, getBatchItems, handleRetryBatchItem, handleDuplicateBatch, handleDeleteBatch])
+    onRetryFailedBatch: handleRetryFailedBatchItems,
+  }), [contextValue, handleDeleteSession, sources, skills, activeSessionWorkingDirectory, displayLabelConfigs, handleSessionLabelsChange, enabledModes, effectiveSessionStatuses, handleSessionSourcesChange, isAutoCompact, searchActive, searchQuery, handleChatMatchInfoChange, handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, automationTestResults, getAutomationHistory, handleReplayAutomation, handleStartBatch, handlePauseBatch, handleResumeBatch, getBatchItems, handleRetryBatchItem, handleRetryFailedBatchItems, handleDuplicateBatch, handleDeleteBatch])
 
   // Persist expanded folders to localStorage (workspace-scoped)
   React.useEffect(() => {

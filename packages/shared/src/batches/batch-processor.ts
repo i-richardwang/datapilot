@@ -288,6 +288,64 @@ export class BatchProcessor {
   }
 
   /**
+   * Retry every failed item in a batch at once. Resets each failed item to
+   * pending (preserving retryCount for historical tracking) and dispatches.
+   * Mirrors retryItem() but for the whole failed set. No-op if nothing failed.
+   */
+  retryFailedItems(batchId: string): BatchProgress {
+    // Load into memory if needed (cold restart / completed batch on disk only)
+    if (!this.activeStates.has(batchId)) {
+      this.ensureActive(batchId)
+    }
+
+    const state = this.activeStates.get(batchId)!
+
+    const failedIds = Object.entries(state.items)
+      .filter(([, item]) => item.status === 'failed')
+      .map(([itemId]) => itemId)
+
+    if (failedIds.length === 0) {
+      // Nothing to retry — return current progress unchanged.
+      return computeProgress(state)
+    }
+
+    for (const itemId of failedIds) {
+      // Reset item to pending — preserve retryCount for historical tracking
+      updateItemState(state, itemId, {
+        status: 'pending',
+        sessionId: undefined,
+        completedAt: undefined,
+        error: undefined,
+      })
+    }
+
+    if (state.status === 'completed' || state.status === 'failed') {
+      // Reactivate a finished batch
+      state.status = 'running'
+      state.completedAt = undefined
+      saveBatchState(this.options.workspaceRootPath, state)
+
+      log.info(`[BatchProcessor] Retrying ${failedIds.length} failed items — reactivated batch "${batchId}"`)
+      return this.beginDispatching(batchId, state)
+    }
+
+    saveBatchState(this.options.workspaceRootPath, state)
+
+    if (state.status === 'running') {
+      this.dispatchNext(batchId).catch((error) => {
+        log.error(`[BatchProcessor] Failed to dispatch after retry-failed for batch "${batchId}":`, error)
+        this.options.onError?.(batchId, error instanceof Error ? error : new Error(String(error)))
+      })
+    }
+
+    log.info(`[BatchProcessor] Retrying ${failedIds.length} failed items in batch "${batchId}" (batch status: ${state.status})`)
+
+    const progress = computeProgress(state)
+    this.options.onProgress?.(progress)
+    return progress
+  }
+
+  /**
    * Get progress for a batch.
    */
   getProgress(batchId: string): BatchProgress | null {

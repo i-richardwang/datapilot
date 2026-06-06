@@ -391,6 +391,7 @@ export const CHANNEL_MAP = {
   getBatchState: invoke(RPC_CHANNELS.batches.GET_STATE),
   getBatchItems: invoke(RPC_CHANNELS.batches.GET_ITEMS),
   retryBatchItem: invoke(RPC_CHANNELS.batches.RETRY_ITEM),
+  retryFailedBatchItems: invoke(RPC_CHANNELS.batches.RETRY_FAILED),
   duplicateBatch: invoke(RPC_CHANNELS.batches.DUPLICATE),
   deleteBatch: invoke(RPC_CHANNELS.batches.DELETE),
   onBatchesChanged: listener(RPC_CHANNELS.batches.CHANGED),

@@ -433,6 +433,7 @@ export const RPC_CHANNELS = {
     DELETE: 'batches:delete',
     VALIDATE: 'batches:validate',
     RETRY_ITEM: 'batches:retryItem',
+    RETRY_FAILED: 'batches:retryFailed',
     CHANGED: 'batches:changed',
   },
   resources: {

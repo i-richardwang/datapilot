@@ -90,6 +90,7 @@ export function MainContentPanel({
     onDuplicateBatch,
     onDeleteBatch,
     onRetryBatchItem,
+    onRetryFailedBatch,
     activeSessionWorkingDirectory,
   } = useAppShellContext()
 
@@ -382,6 +383,7 @@ export function MainContentPanel({
               onDuplicate={onDuplicateBatch ? () => onDuplicateBatch(batch.id ?? '') : undefined}
               onDelete={onDeleteBatch ? () => onDeleteBatch(batch.id ?? '') : undefined}
               onRetryItem={onRetryBatchItem ? (itemId: string) => onRetryBatchItem(batch.id ?? '', itemId) : undefined}
+              onRetryFailed={onRetryFailedBatch}
               getBatchItems={getBatchItems}
             />
           </Panel>

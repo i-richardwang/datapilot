@@ -369,6 +369,54 @@ describe('BatchProcessor', () => {
   })
 
   // =========================================================================
+  // Retry all failed items
+  // =========================================================================
+
+  describe('retryFailedItems', () => {
+    /** Drive test-batch (3 items, concurrency 2, no auto-retry) to all-failed. */
+    async function failWholeBatch() {
+      setup.processor.start('test-batch')
+      await tick()
+      setup.processor.onSessionComplete(setup.createdSessions[0]!.sessionId, 'error')
+      await tick()
+      setup.processor.onSessionComplete(setup.createdSessions[1]!.sessionId, 'error')
+      await tick()
+      setup.processor.onSessionComplete(setup.createdSessions[2]!.sessionId, 'error')
+      await tick()
+    }
+
+    it('should reset all failed items and reactivate a finished batch', async () => {
+      await failWholeBatch()
+
+      const finished = setup.processor.getState('test-batch')!
+      expect(Object.values(finished.items).filter(i => i.status === 'failed')).toHaveLength(3)
+      expect(finished.status).toBe('failed')
+
+      const sessionsBefore = setup.createdSessions.length
+      const progress = setup.processor.retryFailedItems('test-batch')
+
+      expect(progress.status).toBe('running')
+      expect(progress.failedItems).toBe(0)
+      await tick()
+
+      const state = setup.processor.getState('test-batch')!
+      const running = Object.values(state.items).filter(i => i.status === 'running')
+      expect(running).toHaveLength(2) // refilled up to maxConcurrency
+      expect(setup.createdSessions.length).toBeGreaterThan(sessionsBefore)
+    })
+
+    it('should be a no-op when there are no failed items', () => {
+      const started = setup.processor.start('test-batch')
+      expect(started.failedItems).toBe(0)
+
+      const progress = setup.processor.retryFailedItems('test-batch')
+
+      expect(progress.failedItems).toBe(0)
+      expect(progress.status).toBe('running')
+    })
+  })
+
+  // =========================================================================
   // Pause & Resume
   // =========================================================================
 
