@@ -50,7 +50,7 @@ RUN ln -s /usr/local/bin/bun /usr/local/bin/bunx
 # Latin renders sans and CJK becomes tofu in the PDF.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      ca-certificates git gosu ripgrep fd-find curl gnupg \
+      ca-certificates git gosu ripgrep fd-find jq curl gnupg \
       libpango-1.0-0 libpangoft2-1.0-0 \
       fonts-noto-core fonts-noto-cjk \
       libreoffice-impress libreoffice-writer libreoffice-calc libreoffice-core \
