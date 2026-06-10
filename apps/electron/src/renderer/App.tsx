@@ -520,6 +520,9 @@ export default function App() {
 
       // Initialize per-session atoms and metadata map
       // NOTE: No sessionsAtom used - sessions are only in per-session atoms
+      // Drop buffered meta updates first — a pending flush must not overwrite
+      // this authoritative snapshot with older event-derived metas.
+      pendingSessionMetasRef.current.clear()
       initializeSessions(loadedSessions)
 
       // Initialize unified sessionOptions from session data. The payload
@@ -597,6 +600,9 @@ export default function App() {
       // Single transactional atom write — all cross-atom mutations happen
       // inside one Jotai write function so React subscribers see one
       // consistent update instead of intermediate states.
+      // Drop buffered meta updates first — a pending flush must not overwrite
+      // this authoritative refresh with older event-derived metas.
+      pendingSessionMetasRef.current.clear()
       const nextMetaMap = store.set(refreshSessionsMetadataAtom, { sessions, loadedSessionIds, removeMissing })
 
       // Sync app-level state (React hooks / non-atom concerns) after the atom
@@ -810,6 +816,44 @@ export default function App() {
     }
   }, [windowWorkspaceId, refreshLlmConnections])
 
+  // Coalesced sessionMetaMapAtom updates. Every set of this atom clones the
+  // full map (33k+ entries at scale) and recomputes all sidebar counts/filters,
+  // so per-event writes during batch runs (dozens of concurrent sessions
+  // emitting lifecycle events) saturate the main thread. Buffer per-session
+  // meta updates and apply them in one clone per flush window instead.
+  const pendingSessionMetasRef = useRef<Map<string, SessionMeta>>(new Map())
+  const sessionMetaFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const flushSessionMetaUpdates = useCallback(() => {
+    if (sessionMetaFlushTimerRef.current) {
+      clearTimeout(sessionMetaFlushTimerRef.current)
+      sessionMetaFlushTimerRef.current = null
+    }
+    const pending = pendingSessionMetasRef.current
+    if (pending.size === 0) return
+    pendingSessionMetasRef.current = new Map()
+    const metaMap = store.get(sessionMetaMapAtom)
+    const newMetaMap = new Map(metaMap)
+    for (const [id, meta] of pending) {
+      newMetaMap.set(id, meta)
+    }
+    store.set(sessionMetaMapAtom, newMetaMap)
+  }, [store])
+
+  const scheduleSessionMetaUpdate = useCallback((sessionId: string, meta: SessionMeta) => {
+    pendingSessionMetasRef.current.set(sessionId, meta)
+    if (!sessionMetaFlushTimerRef.current) {
+      sessionMetaFlushTimerRef.current = setTimeout(flushSessionMetaUpdates, 150)
+    }
+  }, [flushSessionMetaUpdates])
+
+  // Flush any buffered meta updates on unmount so they aren't lost
+  useEffect(() => {
+    return () => {
+      flushSessionMetaUpdates()
+    }
+  }, [flushSessionMetaUpdates])
+
   // Listen for session events - uses centralized event processor for consistent state transitions
   //
   // SOURCE OF TRUTH LOGIC:
@@ -945,6 +989,9 @@ export default function App() {
         window.electronAPI.getSessionMessages(sessionId)
           .then((createdSession: Session | null) => {
             if (createdSession) {
+              // Drop any stub meta buffered from pre-creation events so the
+              // flush can't overwrite this authoritative snapshot
+              pendingSessionMetasRef.current.delete(sessionId)
               const existingMeta = store.get(sessionMetaMapAtom).has(sessionId)
               if (existingMeta) {
                 replaceLoadedSession(createdSession)
@@ -961,6 +1008,8 @@ export default function App() {
       }
 
       if (event.type === 'session_deleted') {
+        // Drop any buffered meta update so the flush can't resurrect the session
+        pendingSessionMetasRef.current.delete(sessionId)
         removeSession(sessionId)
         return
       }
@@ -1009,11 +1058,8 @@ export default function App() {
         // For handoff events, update metadata map for list display
         // NOTE: No sessionsAtom to sync - atom and metadata are the source of truth
         if (isHandoff) {
-          // Update metadata map
-          const metaMap = store.get(sessionMetaMapAtom)
-          const newMetaMap = new Map(metaMap)
-          newMetaMap.set(sessionId, extractSessionMeta(updatedSession))
-          store.set(sessionMetaMapAtom, newMetaMap)
+          // Update metadata map (coalesced — one map clone per flush window)
+          scheduleSessionMetaUpdate(sessionId, extractSessionMeta(updatedSession))
 
           // Show notification on complete (when window is not focused)
           // Skip hidden sessions (mini-agent sessions) - they shouldn't trigger notifications
@@ -1050,11 +1096,8 @@ export default function App() {
       // Update per-session atom
       updateSessionDirect(sessionId, () => updatedSession)
 
-      // Update metadata map
-      const metaMap = store.get(sessionMetaMapAtom)
-      const newMetaMap = new Map(metaMap)
-      newMetaMap.set(sessionId, extractSessionMeta(updatedSession))
-      store.set(sessionMetaMapAtom, newMetaMap)
+      // Update metadata map (coalesced — one map clone per flush window)
+      scheduleSessionMetaUpdate(sessionId, extractSessionMeta(updatedSession))
     })
 
     return cleanup
@@ -1066,6 +1109,7 @@ export default function App() {
     updateSessionDirect,
     replaceLoadedSession,
     showSessionNotification,
+    scheduleSessionMetaUpdate,
     initializeSessions,
     addSession,
     removeSession,
@@ -1177,6 +1221,8 @@ export default function App() {
 
     await window.electronAPI.deleteSession(sessionId)
     // Remove from per-session atom and metadata map (no sessionsAtom)
+    // Drop any buffered meta so the flush can't resurrect the deleted session
+    pendingSessionMetasRef.current.delete(sessionId)
     removeSession(sessionId)
     return true
   }, [store, removeSession])
@@ -1184,6 +1230,7 @@ export default function App() {
   // Auto-delete handler for empty sessions (fire-and-forget, no confirmation)
   const handleAutoDeleteEmptySession = useCallback((sessionId: string) => {
     window.electronAPI.deleteSession(sessionId)
+    pendingSessionMetasRef.current.delete(sessionId)
     removeSession(sessionId)
   }, [removeSession])
 
@@ -1734,6 +1781,7 @@ export default function App() {
       await window.electronAPI.logout()
       // Reset all state
       // Clear session atoms - initialize with empty array clears all per-session atoms
+      pendingSessionMetasRef.current.clear()
       initializeSessions([])
       setWorkspaces([])
       setWindowWorkspaceId(null)
@@ -1796,6 +1844,8 @@ export default function App() {
 
       // 8. Clear session atoms BEFORE workspace switch
       // This prevents stale session data from the previous workspace being visible.
+      // Also drop buffered meta updates so a pending flush can't re-add old-workspace sessions.
+      pendingSessionMetasRef.current.clear()
       store.set(sessionMetaMapAtom, new Map())
       store.set(sessionIdsAtom, [])
 

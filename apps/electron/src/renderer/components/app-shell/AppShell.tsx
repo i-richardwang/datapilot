@@ -1499,9 +1499,21 @@ function AppShellContent({
 
   // Count sessions by todo state (scoped to workspace)
   const isMetaDone = (s: SessionMeta) => s.sessionStatus === 'done' || s.sessionStatus === 'cancelled'
-  const flaggedCount = activeSessionMetas.filter(s => s.isFlagged).length
-  const archivedCount = workspaceSessionMetas.filter(s => s.isArchived).length
-  const batchSessionCount = workspaceSessionMetas.filter(s => s.isBatch).length
+  // Single memoized pass — these previously ran as three unmemoized .filter()
+  // scans on every render, which at 30k+ sessions burned ~100k comparisons per
+  // sidebar render. flaggedCount intentionally matches activeSessionMetas
+  // semantics (excludes archived and batch sessions).
+  const { flaggedCount, archivedCount, batchSessionCount } = useMemo(() => {
+    let flagged = 0
+    let archived = 0
+    let batch = 0
+    for (const s of workspaceSessionMetas) {
+      if (s.isArchived) archived++
+      if (s.isBatch) batch++
+      if (s.isFlagged && !s.isArchived && !s.isBatch) flagged++
+    }
+    return { flaggedCount: flagged, archivedCount: archived, batchSessionCount: batch }
+  }, [workspaceSessionMetas])
 
   // Compute session counts per label (cumulative: parent includes descendants).
   // Flatten the tree for iteration, use the tree for descendant lookups.
@@ -1509,21 +1521,47 @@ function AppShellContent({
   // are reflected in the count (matches what the label filter view shows).
   const labelCounts = useMemo(() => {
     const allLabels = flattenLabels(labelConfigs)
+
+    // Invert the descendant relation once (tree-sized, no session scan):
+    // ancestorsOf[childId] = every label whose descendant set contains childId.
+    const ancestorsOf = new Map<string, string[]>()
+    for (const label of allLabels) {
+      for (const descId of getDescendantIds(labelConfigs, label.id)) {
+        const list = ancestorsOf.get(descId)
+        if (list) list.push(label.id)
+        else ancestorsOf.set(descId, [label.id])
+      }
+    }
+
+    // Single pass over sessions. Per label: a session contributes 1 to the
+    // direct count when it carries the label itself, and 1 to the descendant
+    // count when it carries at least one descendant label (deduped per
+    // session, matching the previous .some() semantics). Total = direct +
+    // descendant, same as the previous per-label scans.
+    const directCounts = new Map<string, number>()
+    const descendantHitCounts = new Map<string, number>()
+    for (const s of taggableSessionMetas) {
+      if (!s.labels?.length) continue
+      const labelIds = new Set<string>()
+      for (const l of s.labels) {
+        labelIds.add(extractLabelId(l))
+      }
+      const ancestorHits = new Set<string>()
+      for (const id of labelIds) {
+        directCounts.set(id, (directCounts.get(id) || 0) + 1)
+        const ancestors = ancestorsOf.get(id)
+        if (ancestors) {
+          for (const anc of ancestors) ancestorHits.add(anc)
+        }
+      }
+      for (const anc of ancestorHits) {
+        descendantHitCounts.set(anc, (descendantHitCounts.get(anc) || 0) + 1)
+      }
+    }
+
     const counts: Record<string, number> = {}
     for (const label of allLabels) {
-      const directCount = taggableSessionMetas.filter(
-        s => s.labels?.some(l => extractLabelId(l) === label.id)
-      ).length
-      counts[label.id] = directCount
-    }
-    for (const label of allLabels) {
-      const descendants = getDescendantIds(labelConfigs, label.id)
-      if (descendants.length > 0) {
-        const descendantCount = taggableSessionMetas.filter(
-          s => s.labels?.some(l => descendants.includes(extractLabelId(l)))
-        ).length
-        counts[label.id] = (counts[label.id] || 0) + descendantCount
-      }
+      counts[label.id] = (directCounts.get(label.id) || 0) + (descendantHitCounts.get(label.id) || 0)
     }
     return counts
   }, [taggableSessionMetas, labelConfigs])
