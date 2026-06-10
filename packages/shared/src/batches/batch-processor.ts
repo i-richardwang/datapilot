@@ -16,7 +16,11 @@ import { loadBatchItems } from './data-source.ts'
 import {
   loadBatchState,
   loadAllBatchStates,
+  loadBatchProgress,
   saveBatchState,
+  saveBatchMeta,
+  saveBatchItemStates,
+  appendBatchItems,
   createInitialBatchState,
   updateItemState,
   computeProgress,
@@ -136,10 +140,16 @@ export class BatchProcessor {
     if (!config) return []
 
     return config.batches.map((batch) => {
-      const state = this.activeStates.get(batch.id!) ?? loadBatchState(this.options.workspaceRootPath, batch.id!)
+      // Active batches compute from memory; inactive ones aggregate item
+      // counts in SQL — loading full item state here made the batch list
+      // parse several multi-MB blobs on every visit.
+      const state = this.activeStates.get(batch.id!)
+      const progress = state
+        ? computeProgress(state)
+        : loadBatchProgress(this.options.workspaceRootPath, batch.id!) ?? undefined
       return {
         ...batch,
-        progress: state ? computeProgress(state) : undefined,
+        progress,
       }
     })
   }
@@ -188,7 +198,7 @@ export class BatchProcessor {
     }
 
     state.status = 'paused'
-    saveBatchState(this.options.workspaceRootPath, state)
+    saveBatchMeta(this.options.workspaceRootPath, state)
 
     log.info(`[BatchProcessor] Paused batch "${batchId}"`)
 
@@ -219,11 +229,12 @@ export class BatchProcessor {
       // Crash recovery: running items lost their in-memory session mappings on
       // restart, so they must be re-dispatched. During a normal pause/resume,
       // those mappings are still valid and running sessions should continue.
-      this.resetRunningItems(state)
+      const rePended = this.resetRunningItems(state)
+      saveBatchItemStates(this.options.workspaceRootPath, state, rePended)
     }
 
     state.status = 'running'
-    saveBatchState(this.options.workspaceRootPath, state)
+    saveBatchMeta(this.options.workspaceRootPath, state)
 
     log.info(`[BatchProcessor] Resumed batch "${batchId}"`)
 
@@ -236,14 +247,18 @@ export class BatchProcessor {
    * so onSessionComplete can never fire for it and it would stay running
    * forever — it must be re-dispatched from scratch. Mutates `state` in place;
    * the caller persists. Shared by resume() (cold-restart recovery) and
-   * reconcileCrashedBatches() (boot-time recovery).
+   * reconcileCrashedBatches() (boot-time recovery). Returns the re-pended
+   * item IDs so callers can persist just those rows.
    */
-  private resetRunningItems(state: BatchState): void {
+  private resetRunningItems(state: BatchState): string[] {
+    const rePended: string[] = []
     for (const [itemId, itemState] of Object.entries(state.items)) {
       if (itemState.status === 'running') {
         updateItemState(state, itemId, { status: 'pending', sessionId: undefined })
+        rePended.push(itemId)
       }
     }
+    return rePended
   }
 
   /**
@@ -276,8 +291,9 @@ export class BatchProcessor {
       if (this.activeStates.has(state.batchId)) continue
 
       state.status = 'paused'
-      this.resetRunningItems(state)
-      saveBatchState(this.options.workspaceRootPath, state)
+      const rePended = this.resetRunningItems(state)
+      saveBatchMeta(this.options.workspaceRootPath, state)
+      saveBatchItemStates(this.options.workspaceRootPath, state, rePended)
       reconciled.push(state.batchId)
       log.info(`[BatchProcessor] Reconciled crashed batch "${state.batchId}": running → paused, re-pended in-flight items`)
     }
@@ -312,17 +328,17 @@ export class BatchProcessor {
       error: undefined,
     })
 
+    saveBatchItemStates(this.options.workspaceRootPath, state, [itemId])
+
     if (state.status === 'completed' || state.status === 'failed') {
       // Reactivate a finished batch
       state.status = 'running'
       state.completedAt = undefined
-      saveBatchState(this.options.workspaceRootPath, state)
+      saveBatchMeta(this.options.workspaceRootPath, state)
 
       log.info(`[BatchProcessor] Retrying item "${itemId}" — reactivated batch "${batchId}"`)
       return this.beginDispatching(batchId, state)
     }
-
-    saveBatchState(this.options.workspaceRootPath, state)
 
     if (state.status === 'running') {
       this.dispatchNext(batchId).catch((error) => {
@@ -370,17 +386,17 @@ export class BatchProcessor {
       })
     }
 
+    saveBatchItemStates(this.options.workspaceRootPath, state, failedIds)
+
     if (state.status === 'completed' || state.status === 'failed') {
       // Reactivate a finished batch
       state.status = 'running'
       state.completedAt = undefined
-      saveBatchState(this.options.workspaceRootPath, state)
+      saveBatchMeta(this.options.workspaceRootPath, state)
 
       log.info(`[BatchProcessor] Retrying ${failedIds.length} failed items — reactivated batch "${batchId}"`)
       return this.beginDispatching(batchId, state)
     }
-
-    saveBatchState(this.options.workspaceRootPath, state)
 
     if (state.status === 'running') {
       this.dispatchNext(batchId).catch((error) => {
@@ -397,11 +413,13 @@ export class BatchProcessor {
   }
 
   /**
-   * Get progress for a batch.
+   * Get progress for a batch. For inactive batches this aggregates item
+   * counts in SQL instead of loading every item row into memory.
    */
   getProgress(batchId: string): BatchProgress | null {
-    const state = this.activeStates.get(batchId) ?? loadBatchState(this.options.workspaceRootPath, batchId)
-    return state ? computeProgress(state) : null
+    const state = this.activeStates.get(batchId)
+    if (state) return computeProgress(state)
+    return loadBatchProgress(this.options.workspaceRootPath, batchId)
   }
 
   /**
@@ -477,7 +495,7 @@ export class BatchProcessor {
     }
 
     this.sessionToItem.delete(sessionId)
-    saveBatchState(this.options.workspaceRootPath, state)
+    saveBatchItemStates(this.options.workspaceRootPath, state, [itemId])
 
     // Check completion
     if (isBatchDone(state)) {
@@ -526,11 +544,19 @@ export class BatchProcessor {
     if (state) {
       log.info(`[BatchProcessor] Recovering batch "${batchId}" from persisted state`)
       // Add any new items that appeared in the data source
+      const newIds: string[] = []
       for (const item of items) {
         if (!(item.id in state.items)) {
           state.items[item.id] = { status: 'pending', retryCount: 0 }
           state.totalItems++
+          newIds.push(item.id)
         }
+      }
+      // Persist appended items immediately — callers like resume() only write
+      // meta + changed rows afterwards, so new rows must exist by then.
+      if (newIds.length > 0) {
+        appendBatchItems(this.options.workspaceRootPath, state, newIds)
+        saveBatchMeta(this.options.workspaceRootPath, state)
       }
     } else {
       state = createInitialBatchState(batchId, items.map((i) => i.id))
@@ -594,7 +620,7 @@ export class BatchProcessor {
       const timeoutMs = config?.execution?.itemTimeoutMs ?? DEFAULT_ITEM_TIMEOUT_MS
       if (!timeoutMs) continue
 
-      let changed = false
+      const timedOut: string[] = []
       for (const [itemId, item] of Object.entries(state.items)) {
         if (item.status !== 'running' || !item.startedAt) continue
         if ((now - item.startedAt) > timeoutMs) {
@@ -603,12 +629,12 @@ export class BatchProcessor {
           // The underlying session keeps running — it will complete on its own
           // and onSessionComplete will no-op (mapping already removed).
           if (item.sessionId) this.sessionToItem.delete(item.sessionId)
-          changed = true
+          timedOut.push(itemId)
         }
       }
 
-      if (changed) {
-        saveBatchState(this.options.workspaceRootPath, state)
+      if (timedOut.length > 0) {
+        saveBatchItemStates(this.options.workspaceRootPath, state, timedOut)
         this.options.onProgress?.(computeProgress(state))
         if (isBatchDone(state)) {
           this.completeBatch(batchId)
@@ -736,7 +762,7 @@ export class BatchProcessor {
     if (!item) {
       log.warn(`[BatchProcessor] Item "${itemId}" not found in data source, skipping`)
       updateItemState(state, itemId, { status: 'skipped', error: 'Item not found in data source' })
-      saveBatchState(this.options.workspaceRootPath, state)
+      saveBatchItemStates(this.options.workspaceRootPath, state, [itemId])
       return
     }
 
@@ -755,7 +781,7 @@ export class BatchProcessor {
       startedAt: Date.now(),
       summary: buildItemSummary(item, config.source.idField, expandedPrompt),
     })
-    saveBatchState(this.options.workspaceRootPath, state)
+    saveBatchItemStates(this.options.workspaceRootPath, state, [itemId])
 
     try {
       const params: BatchExecutePromptParams = {
@@ -792,7 +818,7 @@ export class BatchProcessor {
       params.onSessionCreated = (sessionId) => {
         updateItemState(state, itemId, { sessionId })
         this.sessionToItem.set(sessionId, { batchId, itemId })
-        saveBatchState(this.options.workspaceRootPath, state)
+        saveBatchItemStates(this.options.workspaceRootPath, state, [itemId])
         log.debug(`[BatchProcessor] Dispatched item "${itemId}" → session ${sessionId}`)
       }
 
@@ -816,7 +842,7 @@ export class BatchProcessor {
         completedAt: Date.now(),
         error: error instanceof Error ? error.message : String(error),
       })
-      saveBatchState(this.options.workspaceRootPath, state)
+      saveBatchItemStates(this.options.workspaceRootPath, state, [itemId])
     }
   }
 
@@ -849,7 +875,7 @@ export class BatchProcessor {
     state.status = progress.failedItems > 0 ? 'failed' : 'completed'
     state.completedAt = Date.now()
 
-    saveBatchState(this.options.workspaceRootPath, state)
+    saveBatchMeta(this.options.workspaceRootPath, state)
 
     log.info(`[BatchProcessor] Batch "${batchId}" ${state.status}: ${progress.completedItems} completed, ${progress.failedItems} failed, ${progress.skippedItems} skipped`)
 
@@ -889,7 +915,10 @@ export class BatchProcessor {
     for (const [batchId, state] of this.activeStates) {
       if (state.status === 'running') {
         state.status = 'paused'
-        saveBatchState(this.options.workspaceRootPath, state)
+        // Meta-only write: in-flight items stay `running` on disk and are
+        // re-pended by resume()/reconcileCrashedBatches(). Keeping dispose
+        // O(1) matters — it races the docker-stop grace period.
+        saveBatchMeta(this.options.workspaceRootPath, state)
         log.debug(`[BatchProcessor] Saved batch "${batchId}" as paused during dispose`)
       }
     }

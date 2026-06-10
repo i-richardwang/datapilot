@@ -2,11 +2,18 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'bun:test
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { eq } from 'drizzle-orm'
 import { autoRegisterDriver } from '../db/driver.ts'
+import { getWorkspaceDb } from '../db/connection.ts'
+import { batchState as batchStateTable } from '../db/schema/batches.sql.ts'
 import {
   getBatchStatePath,
   loadBatchState,
+  loadBatchProgress,
   saveBatchState,
+  saveBatchMeta,
+  saveBatchItemStates,
+  appendBatchItems,
   createInitialBatchState,
   updateItemState,
   computeProgress,
@@ -146,6 +153,121 @@ describe('batch-state-manager', () => {
       updateItemState(state, 'a', { status: 'completed' })
       updateItemState(state, 'b', { status: 'failed' })
       expect(isBatchDone(state)).toBe(true)
+    })
+  })
+
+  describe('per-item persistence (batch_items split)', () => {
+    /** Insert a pre-split row: full items record inline in the meta blob. */
+    function insertLegacyBlob(state: BatchState): void {
+      const db = getWorkspaceDb(tempDir)
+      db.insert(batchStateTable).values({
+        batchId: state.batchId,
+        state,
+        updatedAt: Date.now(),
+      }).run()
+    }
+
+    function rawMetaBlob(batchId: string): BatchState {
+      const db = getWorkspaceDb(tempDir)
+      const row = db.select().from(batchStateTable).where(eq(batchStateTable.batchId, batchId)).get()
+      return row!.state as BatchState
+    }
+
+    it('migrates a legacy inline-items blob to batch_items on first load', () => {
+      const legacy = createInitialBatchState('legacy1', ['a', 'b', 'c'])
+      updateItemState(legacy, 'b', { status: 'completed', sessionId: 's1', completedAt: 123 })
+      legacy.status = 'paused'
+      insertLegacyBlob(legacy)
+
+      // First load serves the legacy blob and migrates it
+      const first = loadBatchState(tempDir, 'legacy1')
+      expect(first).toEqual(legacy)
+
+      // Blob is stripped after migration; items now live in batch_items
+      expect(Object.keys(rawMetaBlob('legacy1').items)).toHaveLength(0)
+
+      // Second load reconstructs identically from rows
+      const second = loadBatchState(tempDir, 'legacy1')
+      expect(second).toEqual(legacy)
+    })
+
+    it('saveBatchItemStates persists only the targeted items', () => {
+      const state = createInitialBatchState('batch1', ['a', 'b'])
+      saveBatchState(tempDir, state)
+
+      updateItemState(state, 'a', { status: 'running', sessionId: 's1', startedAt: 1000 })
+      // Mutate 'b' in memory but do NOT persist it — proves writes are targeted
+      updateItemState(state, 'b', { status: 'skipped' })
+      saveBatchItemStates(tempDir, state, ['a'])
+
+      const loaded = loadBatchState(tempDir, 'batch1')!
+      expect(loaded.items['a']).toEqual({ status: 'running', sessionId: 's1', startedAt: 1000, retryCount: 0 })
+      expect(loaded.items['b']!.status).toBe('pending')
+    })
+
+    it('saveBatchMeta persists status without touching items', () => {
+      const state = createInitialBatchState('batch1', ['a'])
+      state.status = 'running'
+      saveBatchState(tempDir, state)
+
+      state.status = 'paused'
+      updateItemState(state, 'a', { status: 'completed' })
+      saveBatchMeta(tempDir, state)
+
+      const loaded = loadBatchState(tempDir, 'batch1')!
+      expect(loaded.status).toBe('paused')
+      expect(loaded.items['a']!.status).toBe('pending')
+    })
+
+    it('loadBatchProgress aggregates from rows and falls back to legacy blobs', () => {
+      const state = createInitialBatchState('batch1', ['a', 'b', 'c'])
+      updateItemState(state, 'a', { status: 'completed' })
+      updateItemState(state, 'b', { status: 'failed' })
+      saveBatchState(tempDir, state)
+
+      expect(loadBatchProgress(tempDir, 'batch1')).toEqual({
+        batchId: 'batch1',
+        status: 'pending',
+        totalItems: 3,
+        completedItems: 1,
+        failedItems: 1,
+        skippedItems: 0,
+        runningItems: 0,
+        pendingItems: 1,
+      })
+
+      // Legacy blob not yet migrated — progress comes from inline items
+      const legacy = createInitialBatchState('legacy2', ['x', 'y'])
+      updateItemState(legacy, 'x', { status: 'completed' })
+      insertLegacyBlob(legacy)
+      const legacyProgress = loadBatchProgress(tempDir, 'legacy2')!
+      expect(legacyProgress.completedItems).toBe(1)
+      expect(legacyProgress.pendingItems).toBe(1)
+
+      expect(loadBatchProgress(tempDir, 'missing')).toBeNull()
+    })
+
+    it('preserves item order across save/load (paging depends on it)', () => {
+      const ids = Array.from({ length: 25 }, (_, i) => `item-${i}`)
+      const state = createInitialBatchState('batch1', ids)
+      saveBatchState(tempDir, state)
+
+      const loaded = loadBatchState(tempDir, 'batch1')!
+      expect(Object.keys(loaded.items)).toEqual(ids)
+    })
+
+    it('appendBatchItems appends new items behind existing ones', () => {
+      const state = createInitialBatchState('batch1', ['a', 'b'])
+      saveBatchState(tempDir, state)
+
+      state.items['c'] = { status: 'pending', retryCount: 0 }
+      state.totalItems++
+      appendBatchItems(tempDir, state, ['c'])
+      saveBatchMeta(tempDir, state)
+
+      const loaded = loadBatchState(tempDir, 'batch1')!
+      expect(Object.keys(loaded.items)).toEqual(['a', 'b', 'c'])
+      expect(loaded.totalItems).toBe(3)
     })
   })
 })

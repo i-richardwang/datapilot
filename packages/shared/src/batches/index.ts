@@ -70,7 +70,12 @@ export { loadBatchItems } from './data-source.ts'
 export {
   getBatchStatePath,
   loadBatchState,
+  loadAllBatchStates,
+  loadBatchProgress,
   saveBatchState,
+  saveBatchMeta,
+  saveBatchItemStates,
+  appendBatchItems,
   createInitialBatchState,
   updateItemState,
   computeProgress,

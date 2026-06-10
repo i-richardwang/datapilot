@@ -229,6 +229,31 @@ const WORKSPACE_MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_sessions_batch ON sessions(batch_id);
     `,
   },
+  {
+    name: '0006_batch_items',
+    sql: `
+      -- Per-item batch state, split out of the batch_state JSON blob so a
+      -- single item's status change is one row write instead of a multi-MB
+      -- re-serialization of the whole batch. Existing blobs are migrated
+      -- lazily on first load (see batch-state-manager.db.ts).
+      -- position preserves data-source order for item paging.
+      CREATE TABLE IF NOT EXISTS batch_items (
+        batch_id TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        session_id TEXT,
+        started_at INTEGER,
+        completed_at INTEGER,
+        error TEXT,
+        summary TEXT,
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (batch_id, item_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_batch_items_batch_pos ON batch_items(batch_id, position);
+      CREATE INDEX IF NOT EXISTS idx_batch_items_batch_status ON batch_items(batch_id, status);
+    `,
+  },
 ];
 
 /**
