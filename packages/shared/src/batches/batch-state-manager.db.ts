@@ -39,6 +39,18 @@ export function loadBatchState(workspaceRootPath: string, batchId: string): Batc
 }
 
 /**
+ * Load every persisted batch state in the workspace.
+ *
+ * Used by startup reconcile to find batches the server left `running` when it
+ * died without a graceful shutdown. Returns all rows regardless of status; the
+ * caller filters.
+ */
+export function loadAllBatchStates(workspaceRootPath: string): BatchState[] {
+  const db = getWorkspaceDb(workspaceRootPath);
+  return db.select().from(batchStateTable).all().map((row) => row.state as BatchState);
+}
+
+/**
  * Save batch state to DB.
  */
 export function saveBatchState(workspaceRootPath: string, state: BatchState): void {

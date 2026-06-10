@@ -15,6 +15,7 @@ import { BatchesFileConfigSchema } from './schemas.ts'
 import { loadBatchItems } from './data-source.ts'
 import {
   loadBatchState,
+  loadAllBatchStates,
   saveBatchState,
   createInitialBatchState,
   updateItemState,
@@ -218,11 +219,7 @@ export class BatchProcessor {
       // Crash recovery: running items lost their in-memory session mappings on
       // restart, so they must be re-dispatched. During a normal pause/resume,
       // those mappings are still valid and running sessions should continue.
-      for (const [itemId, itemState] of Object.entries(state.items)) {
-        if (itemState.status === 'running') {
-          updateItemState(state, itemId, { status: 'pending', sessionId: undefined })
-        }
-      }
+      this.resetRunningItems(state)
     }
 
     state.status = 'running'
@@ -231,6 +228,60 @@ export class BatchProcessor {
     log.info(`[BatchProcessor] Resumed batch "${batchId}"`)
 
     return this.beginDispatching(batchId, state)
+  }
+
+  /**
+   * Re-pend every in-flight (running) item back to pending. After the owning
+   * process dies, a "running" item's in-memory session→item mapping is gone,
+   * so onSessionComplete can never fire for it and it would stay running
+   * forever — it must be re-dispatched from scratch. Mutates `state` in place;
+   * the caller persists. Shared by resume() (cold-restart recovery) and
+   * reconcileCrashedBatches() (boot-time recovery).
+   */
+  private resetRunningItems(state: BatchState): void {
+    for (const [itemId, itemState] of Object.entries(state.items)) {
+      if (itemState.status === 'running') {
+        updateItemState(state, itemId, { status: 'pending', sessionId: undefined })
+      }
+    }
+  }
+
+  /**
+   * Reconcile batches the server left `running` after a crash.
+   *
+   * A batch's `running` status is an in-memory, process-liveness fact that is
+   * mirrored to disk only so the UI can show live progress. The single path
+   * that flips it back to `paused` is dispose() on graceful shutdown. When the
+   * server dies without one — power loss, `docker kill`, or a `docker stop`
+   * that outruns the stop grace period before dispose() finishes — the on-disk
+   * status is stranded at `running` with no live process behind it. That zombie
+   * shows as active in the UI forever, pollutes status aggregates, and cannot be
+   * paused via the normal API (it is not in `activeStates`).
+   *
+   * This is dispose()'s boot-time counterpart: it scans every persisted batch
+   * state and, for any still `running`, flips it to `paused` and re-pends its
+   * in-flight items so a later resume() re-dispatches them. Because the owning
+   * process is gone, every disk-only `running` is by definition a crash
+   * leftover. Idempotent; intended to run once per workspace when its
+   * BatchProcessor is first initialised (before any batch is activated).
+   *
+   * Returns the IDs of the batches it reconciled (empty on a clean boot).
+   */
+  reconcileCrashedBatches(): string[] {
+    const reconciled: string[] = []
+    for (const state of loadAllBatchStates(this.options.workspaceRootPath)) {
+      if (state.status !== 'running') continue
+      // A genuinely active batch is tracked in memory; never touch one. At init
+      // time activeStates is empty, so this only guards against misuse.
+      if (this.activeStates.has(state.batchId)) continue
+
+      state.status = 'paused'
+      this.resetRunningItems(state)
+      saveBatchState(this.options.workspaceRootPath, state)
+      reconciled.push(state.batchId)
+      log.info(`[BatchProcessor] Reconciled crashed batch "${state.batchId}": running → paused, re-pended in-flight items`)
+    }
+    return reconciled
   }
 
   /**

@@ -4,14 +4,14 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { autoRegisterDriver } from '../db/driver.ts'
 import { BatchProcessor } from './batch-processor.ts'
-import { loadBatchState } from './batch-state-manager.db.ts'
+import { loadBatchState, saveBatchState } from './batch-state-manager.db.ts'
 import {
   BATCH_STATE_FILE_PREFIX,
   DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS,
   GLOBAL_MAX_CONCURRENT_SESSIONS_ENV,
   resolveGlobalMaxConcurrentSessions,
 } from './constants.ts'
-import type { BatchSystemOptions, BatchExecutePromptParams, BatchProgress } from './types.ts'
+import type { BatchSystemOptions, BatchExecutePromptParams, BatchProgress, BatchState } from './types.ts'
 
 beforeAll(async () => {
   await autoRegisterDriver();
@@ -610,6 +610,88 @@ describe('BatchProcessor', () => {
       expect(progress.totalItems).toBe(3)
 
       newProcessor.dispose()
+    })
+  })
+
+  // =========================================================================
+  // Boot-time crash recovery (reconcileCrashedBatches)
+  // =========================================================================
+
+  describe('reconcileCrashedBatches', () => {
+    /** A fresh processor over the same workspace = a server reboot. */
+    const reboot = () =>
+      new BatchProcessor({ ...setup.processor['options'], onExecutePrompt: setup.executePrompt })
+
+    it('flips a disk-only running batch to paused and re-pends its in-flight items', () => {
+      // A hard kill (no graceful dispose) leaves the batch stranded at `running`
+      // with a live-looking but dead in-flight item — persist that exact shape.
+      const crashed: BatchState = {
+        batchId: 'test-batch',
+        status: 'running',
+        totalItems: 3,
+        startedAt: 1000,
+        items: {
+          acme: { status: 'completed', retryCount: 0, completedAt: 1500 },
+          beta: { status: 'running', retryCount: 0, startedAt: 1200, sessionId: 'dead-session' },
+          gamma: { status: 'pending', retryCount: 0 },
+        },
+      }
+      saveBatchState(setup.tempDir, crashed)
+
+      const rebooted = reboot()
+      const reconciled = rebooted.reconcileCrashedBatches()
+      expect(reconciled).toEqual(['test-batch'])
+
+      const state = loadBatchState(setup.tempDir, 'test-batch')!
+      expect(state.status).toBe('paused')                  // zombie healed
+      expect(state.items.beta!.status).toBe('pending')     // in-flight re-pended
+      expect(state.items.beta!.sessionId).toBeUndefined()  // dead session cleared
+      expect(state.items.acme!.status).toBe('completed')   // finished work preserved
+      expect(state.items.gamma!.status).toBe('pending')    // pending untouched
+
+      rebooted.dispose()
+    })
+
+    it('is a no-op on a clean boot (nothing left running)', () => {
+      const clean: BatchState = {
+        batchId: 'test-batch',
+        status: 'paused',
+        totalItems: 3,
+        items: {
+          acme: { status: 'completed', retryCount: 0 },
+          beta: { status: 'pending', retryCount: 0 },
+          gamma: { status: 'pending', retryCount: 0 },
+        },
+      }
+      saveBatchState(setup.tempDir, clean)
+
+      const rebooted = reboot()
+      expect(rebooted.reconcileCrashedBatches()).toEqual([])
+      expect(loadBatchState(setup.tempDir, 'test-batch')!.status).toBe('paused')
+
+      rebooted.dispose()
+    })
+
+    it('reconciles config-orphaned running batches too (state with no batches.json entry)', () => {
+      // Orphan = batch_state row whose config was deleted. It is invisible to the
+      // UI but still pollutes status aggregates if stuck running. Reconcile must
+      // still flip it, even though it can never be resumed (no config to dispatch).
+      const orphan: BatchState = {
+        batchId: 'deleted-batch',
+        status: 'running',
+        totalItems: 1,
+        items: { only: { status: 'running', retryCount: 0, sessionId: 'dead', startedAt: 1 } },
+      }
+      saveBatchState(setup.tempDir, orphan)
+
+      const rebooted = reboot()
+      expect(rebooted.reconcileCrashedBatches()).toContain('deleted-batch')
+
+      const state = loadBatchState(setup.tempDir, 'deleted-batch')!
+      expect(state.status).toBe('paused')
+      expect(state.items.only!.status).toBe('pending')
+
+      rebooted.dispose()
     })
   })
 

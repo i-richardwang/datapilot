@@ -1736,6 +1736,22 @@ export class SessionManager implements ISessionManager {
     })
     batchProcessor.ensureConfigIds()
     this.batchProcessors.set(workspaceRootPath, batchProcessor)
+
+    // Boot-time crash recovery: a server death without graceful shutdown
+    // (power loss, `docker kill`, or a `docker stop` that outruns the grace
+    // period before dispose()) strands batches at `running` on disk with no
+    // live process behind them. This runs once per workspace at first init —
+    // before any batch is activated — to flip those zombies back to `paused`
+    // and re-pend their in-flight items so they become resumable.
+    try {
+      const reconciled = batchProcessor.reconcileCrashedBatches()
+      if (reconciled.length > 0) {
+        sessionLog.warn(`[Batch] Reconciled ${reconciled.length} crashed batch(es) for workspace ${workspaceId} (running → paused): ${reconciled.join(', ')}`)
+      }
+    } catch (error) {
+      sessionLog.error(`[Batch] Failed to reconcile crashed batches for workspace ${workspaceId}:`, error)
+    }
+
     sessionLog.info(`Initialized BatchProcessor for workspace ${workspaceId}`)
     return batchProcessor
   }
