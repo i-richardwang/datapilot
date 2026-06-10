@@ -3,7 +3,7 @@
 > Records all fork changes relative to `upstream/main` (lukilabs/craft-agents-oss).
 > Purpose: 合并 upstream 时的唯一操作手册 — 冲突风险、合并策略、检查清单。
 >
-> **Last upstream merge:** v0.10.1 (2026-06-05).
+> **Last upstream merge:** v0.10.3 (2026-06-10).
 
 ## Overview
 
@@ -194,7 +194,9 @@ Extended `ClaudeContextOptions` with `batchContext?`; added `validateBatches` to
 
 #### `packages/shared/src/agent/core/prompt-builder.ts` `[Batch]`
 
-`buildContextParts()`: if `batchOutputSchema` present, appends `<batch_output_instructions>` block.
+Context is split into `buildVolatileContextParts(options, sourceBlock)` + `buildStableContextParts(options?)` (composed by `buildContextParts`) for prompt caching (#862). Fork's `<batch_output_instructions>` block (gated on `options.batchOutputSchema`) rides the **stable** builder — batch schema is session-fixed, so it belongs in the cached prefix. Fork made the stable builder's `options` param optional so upstream's `buildStableContextParts()` callsites (tests) still compile.
+
+**Conflict trigger:** upstream rebalances which blocks are volatile vs stable, or makes `buildStableContextParts` argless again → re-thread `batchOutputSchema` through whichever builder carries stable content.
 
 #### `packages/server-core/src/handlers/session-manager-interface.ts` `[Batch]`
 
@@ -498,4 +500,5 @@ bun run tsc --noEmit
 | v0.9.5 | 2026-05-23 | 12 | Compact model picker + working-directory selector; Pi turn-anchor sidecar for branch-of-branch; source activation drain; MCP validation refactor; `AcceptPlanDropdown` switched to Radix `DropdownMenu`. Upstream's new `groupConnectionsByProvider` helper adopted in `model-picker-helpers.ts` but fork's inline `FreeFormInput` grouping kept (uses `isAnthropicProvider` for `anthropic_compat`). |
 | v0.9.6 | 2026-05-26 | 7 | Ported orphan-credential cleanup from upstream's `storage.ts` into fork's `storage.db.ts`; adapted its test for SQLite driver. |
 | v0.10.0 | 2026-05-27 | 13 | Remote `browser_tool` bridging — upstream extended `RpcServer` with `hasClientCapability` / `findClientsWithCapability`; every fork test mocking `RpcServer` (8 files) needs both new methods AND fork's `updateClientWorkspace`. Conflict in `transport/types.ts`: upstream redeclared `updateClientWorkspace` as optional — keep fork's required form. `pi-agent.ts`: fork's batch tool-defs gating and upstream's `getBrowserToolEnabled()` filter combine sequentially on `sessionToolDefs`. |
+| v0.10.3 | 2026-06-10 | 11 | Upstream split per-turn context into volatile/stable builders for prompt caching (#862); fork's batch-output block re-threaded through `buildStableContextParts` (now takes optional `options`). `link` label valueType + Fable model + duplicate-Anthropic-account badge adopted as-is (locales arrived pre-translated). |
 | v0.10.1 | 2026-06-05 | 16 | **Upstream absorbed the fork's cross-process UI-language persistence** — reimplemented as a canonical internal `uiLanguage` field + `getPersistedUiLanguage`/`setPersistedUiLanguage` helpers (legacy free-text `language` field removed, scrubbed on read). Took upstream's helpers/hydration (`main/index.ts`, `main.tsx`) wholesale; rebased fork's two standing decisions onto them — (a) `formatPreferencesForPrompt` still omits the language hint when no authoritative source (headless server never inits i18n), now reading `getPersistedUiLanguage()`; (b) `SessionManager` title-gen still passes no language (content auto-detect). `validators.ts`: kept fork's `.nullable()` clear-semantics, dropped `language`, added upstream's `uiLanguage` enum. `factory.ts` `resolveModelForProvider`: merged fork's tier-hint resolution + custom-endpoint guard-skip with upstream's `normalizeDeprecatedModelId` + `connectionDefault`. `update_user_preferences` removal recurred (see risk entry). |

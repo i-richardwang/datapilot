@@ -1,6 +1,6 @@
 {
   "name": "@craft-agent/core",
-  "version": "0.10.1",
+  "version": "0.10.3",
   "license": "Apache-2.0",
   "description": "Core types, storage, and agent logic for DataPilot",
   "type": "module",
@@ -12,7 +12,7 @@
     "./utils": "./src/utils/index.ts"
   },
   "peerDependencies": {
-    "@anthropic-ai/claude-agent-sdk": "0.3.154",
+    "@anthropic-ai/claude-agent-sdk": "0.3.170",
     "@modelcontextprotocol/sdk": ">=1.29.0"
   },
   "devDependencies": {

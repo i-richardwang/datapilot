@@ -302,3 +302,41 @@ describe('Bedrock-native model display', () => {
     expect(isClaudeModel('eu.anthropic.claude-haiku-4-5-20251001-v1:0')).toBe(true)
   })
 })
+
+// ============================================================
+// Claude Fable 5 registration (Claude Agent SDK path)
+// ============================================================
+
+describe('Claude Fable 5', () => {
+  it('is registered as an Anthropic model with the expected metadata', () => {
+    const fable = ANTHROPIC_MODELS.find(m => m.id === 'claude-fable-5')
+    expect(fable).toBeDefined()
+    expect(fable!.provider).toBe('anthropic')
+    expect(fable!.name).toBe('Fable 5')
+    expect(fable!.shortName).toBe('Fable')
+    expect(fable!.contextWindow).toBe(1_000_000)
+    expect(fable!.descriptionKey).toBe('model.fableDesc')
+  })
+
+  it('resolves display/short name, context window, and Claude detection', () => {
+    expect(getModelDisplayName('claude-fable-5')).toBe('Fable 5')
+    expect(getModelShortName('claude-fable-5')).toBe('Fable')
+    expect(getModelContextWindow('claude-fable-5')).toBe(1_000_000)
+    expect(isClaudeModel('claude-fable-5')).toBe(true)
+  })
+
+  it('does NOT become the Anthropic default (Opus 4.8 stays default)', () => {
+    expect(getDefaultModelForConnection('anthropic')).toBe('claude-opus-4-8')
+  })
+
+  it('round-trips through the Bedrock inference-profile mapping', () => {
+    expect(toBedrockNativeId('claude-fable-5')).toBe('us.anthropic.claude-fable-5')
+    expect(toBedrockNativeId('claude-fable-5', 'eu')).toBe('eu.anthropic.claude-fable-5')
+    expect(fromBedrockNativeId('us.anthropic.claude-fable-5')).toBe('claude-fable-5')
+    expect(fromBedrockNativeId('eu.anthropic.claude-fable-5')).toBe('claude-fable-5')
+    expect(fromBedrockNativeId('global.anthropic.claude-fable-5')).toBe('claude-fable-5')
+    expect(fromBedrockNativeId('anthropic.claude-fable-5')).toBe('claude-fable-5')
+    // Bedrock-native id resolves to display metadata too
+    expect(getModelDisplayName('us.anthropic.claude-fable-5')).toBe('Fable 5')
+  })
+})

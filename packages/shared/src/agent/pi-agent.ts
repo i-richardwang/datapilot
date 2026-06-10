@@ -2019,13 +2019,21 @@ export class PiAgent extends BaseAgent {
         `modeVersion=${promptModeDiagnostics.modeVersion} changedBy=${promptModeDiagnostics.lastChangedBy} changedAt=${promptModeDiagnostics.lastChangedAt}`
       )
 
-      // Build context parts using centralized PromptBuilder
+      // Build context parts using centralized PromptBuilder, split into stable
+      // vs volatile (issue #862). Stable blocks (workspace capabilities, working
+      // directory, batch output instructions) stay in the cached system prefix;
+      // volatile blocks (date/time, session_state, source state) ride the
+      // user-message tail so a per-turn re-stamp doesn't invalidate the prompt
+      // cache. buildVolatileContextParts consumes the one-shot mode-change
+      // signal, so it is called exactly once. Fork: the batch output schema is
+      // session-fixed, so it rides the stable (cached) prefix.
       const batchCtx = getSessionBatchContext(this._sessionId);
-      const contextParts = this.promptBuilder.buildContextParts(
-        {
-          plansFolderPath: getSessionPlansPath(this.config.workspace.rootPath, this._sessionId),
-          batchOutputSchema: batchCtx?.outputSchema,
-        },
+      const plansFolderPath = getSessionPlansPath(this.config.workspace.rootPath, this._sessionId);
+      const stableParts = this.promptBuilder.buildStableContextParts({
+        batchOutputSchema: batchCtx?.outputSchema,
+      });
+      const volatileParts = this.promptBuilder.buildVolatileContextParts(
+        { plansFolderPath },
         sourceContext
       );
 
@@ -2052,17 +2060,20 @@ export class PiAgent extends BaseAgent {
         }
       }
 
-      // For Pi, context parts go into the system prompt (not the user message).
-      // Unlike Claude, other LLMs behind Pi don't know to ignore inline context
-      // blocks and will echo <session_state>, <sources>, etc. back in their response.
+      // System prompt carries only stable context (issue #862): the system block
+      // is pi-ai's cache prefix before all history, so anything volatile here
+      // re-stamps the prefix every turn and drops cacheRead to 0. Volatile blocks
+      // ride the user-message tail instead — exactly as the Claude path already
+      // does (buildTextPrompt / buildSDKUserMessage append context to the tail).
       const fullSystemPrompt = [
         systemPrompt,
-        ...contextParts,
+        ...stableParts,
       ].filter(Boolean).join('\n\n');
 
-      // User message: attachments + the actual message
+      // User message: volatile context + attachments + the actual message
       // (skill read directive is already prepended to message by BaseAgent.chat())
       const userParts = [
+        ...volatileParts,
         ...attachmentParts,
         message,
       ].filter(Boolean);

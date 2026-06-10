@@ -1,6 +1,6 @@
 {
   "name": "datapilot",
-  "version": "0.10.1",
+  "version": "0.10.3",
   "license": "Apache-2.0",
   "description": "Claude Code-like agent for data analysis",
   "type": "module",
@@ -144,7 +144,7 @@
     "vite": "^6.2.4"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "0.3.154",
+    "@anthropic-ai/claude-agent-sdk": "0.3.170",
     "@anthropic-ai/sdk": "^0.100.0",
     "@dnd-kit/dom": "^0.4.0-beta-20260227032529",
     "@dnd-kit/helpers": "^0.4.0-beta-20260227032529",

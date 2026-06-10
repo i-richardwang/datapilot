@@ -190,6 +190,16 @@ export interface LlmConnection {
    */
   midStreamBehavior?: MidStreamBehavior;
 
+  // --- Resolved Anthropic OAuth identity (issue #838) ---
+  // Captured from the token-exchange response; lets the UI flag two Claude
+  // connections that resolve to the same underlying account. All optional and
+  // fail-soft — absent identity simply means nothing is shown.
+  oauthAccountUuid?: string;
+  oauthAccountEmail?: string;
+  oauthOrganizationUuid?: string;
+  oauthOrganizationName?: string;
+  oauthProfileVerifiedAt?: number; // epoch ms
+
   // --- Timestamps ---
 
   /** Timestamp when connection was created */
@@ -595,7 +605,7 @@ export function getModelsForProviderType(providerType: LlmProviderType, piAuthPr
  * Format: bare model IDs (without pi/ prefix). Matched against pi/{id} or pi/{id}-*.
  */
 export const PI_PREFERRED_DEFAULTS: Record<string, string[]> = {
-  anthropic: ['claude-opus-4-8', 'claude-opus-4-7', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
+  anthropic: ['claude-opus-4-8', 'claude-opus-4-7', 'claude-fable-5', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
   openai: ['gpt-5.5', 'gpt-5.2', 'gpt-5.1', 'gpt-5', 'o4-mini', 'o3', 'gpt-4o'],
   'openai-codex': ['gpt-5.5', 'gpt-5.2', 'gpt-5.1', 'gpt-5', 'o4-mini', 'o3', 'gpt-4o'],
   // Stable models first so the connection-setup test (which uses
@@ -743,6 +753,7 @@ export function isValidProviderAuthCombination(
 const BEDROCK_MODEL_MAP: Record<string, string> = {
   'claude-opus-4-8': 'us.anthropic.claude-opus-4-8',
   'claude-opus-4-7': 'us.anthropic.claude-opus-4-7',
+  'claude-fable-5': 'us.anthropic.claude-fable-5',
   'claude-sonnet-4-6': 'us.anthropic.claude-sonnet-4-6',
   'claude-haiku-4-5-20251001': 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
   // Older models (for migration of existing connections)
@@ -751,6 +762,7 @@ const BEDROCK_MODEL_MAP: Record<string, string> = {
   // Also map base IDs (without region prefix) to US inference profiles
   'anthropic.claude-opus-4-8': 'us.anthropic.claude-opus-4-8',
   'anthropic.claude-opus-4-7': 'us.anthropic.claude-opus-4-7',
+  'anthropic.claude-fable-5': 'us.anthropic.claude-fable-5',
   'anthropic.claude-sonnet-4-6': 'us.anthropic.claude-sonnet-4-6',
   'anthropic.claude-haiku-4-5-20251001-v1:0': 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
   'anthropic.claude-opus-4-5-20251101-v1:0': 'us.anthropic.claude-opus-4-5-20251101-v1:0',
@@ -761,6 +773,7 @@ const BEDROCK_MODEL_MAP: Record<string, string> = {
 const BEDROCK_REVERSE_MAP: Record<string, string> = {
   // US inference profiles
   'us.anthropic.claude-opus-4-8': 'claude-opus-4-8',
+  'us.anthropic.claude-fable-5': 'claude-fable-5',
   'us.anthropic.claude-opus-4-7': 'claude-opus-4-7',
   'us.anthropic.claude-opus-4-7-v1': 'claude-opus-4-7',
   'us.anthropic.claude-sonnet-4-6': 'claude-sonnet-4-6',
@@ -769,6 +782,7 @@ const BEDROCK_REVERSE_MAP: Record<string, string> = {
   'us.anthropic.claude-sonnet-4-5-20250929-v1:0': 'claude-sonnet-4-5-20250929',
   // EU inference profiles
   'eu.anthropic.claude-opus-4-8': 'claude-opus-4-8',
+  'eu.anthropic.claude-fable-5': 'claude-fable-5',
   'eu.anthropic.claude-opus-4-7': 'claude-opus-4-7',
   'eu.anthropic.claude-opus-4-7-v1': 'claude-opus-4-7',
   'eu.anthropic.claude-sonnet-4-6': 'claude-sonnet-4-6',
@@ -777,12 +791,14 @@ const BEDROCK_REVERSE_MAP: Record<string, string> = {
   'eu.anthropic.claude-sonnet-4-5-20250929-v1:0': 'claude-sonnet-4-5-20250929',
   // Global inference profiles
   'global.anthropic.claude-opus-4-8': 'claude-opus-4-8',
+  'global.anthropic.claude-fable-5': 'claude-fable-5',
   'global.anthropic.claude-opus-4-7': 'claude-opus-4-7',
   'global.anthropic.claude-opus-4-7-v1': 'claude-opus-4-7',
   'global.anthropic.claude-sonnet-4-6': 'claude-sonnet-4-6',
   'global.anthropic.claude-haiku-4-5-20251001-v1:0': 'claude-haiku-4-5-20251001',
   // Base IDs (no region prefix)
   'anthropic.claude-opus-4-8': 'claude-opus-4-8',
+  'anthropic.claude-fable-5': 'claude-fable-5',
   'anthropic.claude-opus-4-7': 'claude-opus-4-7',
   'anthropic.claude-opus-4-7-v1': 'claude-opus-4-7',
   'anthropic.claude-sonnet-4-6': 'claude-sonnet-4-6',

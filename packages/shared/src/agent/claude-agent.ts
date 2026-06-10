@@ -22,7 +22,7 @@ import {
 } from '../config/llm-connections.ts';
 import type { McpClientPool } from '../mcp/mcp-pool.ts';
 import { loadPlanFromPath, type SessionConfig as Session } from '../sessions/storage.db.ts';
-import { DEFAULT_MODEL, isClaudeModel, getDefaultSummarizationModel, getModelContextWindow } from '../config/models.ts';
+import { DEFAULT_MODEL, isClaudeModel, isAdaptiveThinkingAlwaysOnModel, getDefaultSummarizationModel, getModelContextWindow } from '../config/models.ts';
 import { getCredentialManager } from '../credentials/index.ts';
 import { loadPreferences, formatPreferencesForPrompt, getCoAuthorPreference } from '../config/preferences.ts';
 import type { FileAttachment } from '../utils/files.ts';
@@ -148,8 +148,15 @@ export function resolveClaudeThinkingOptions(args: {
   const effort = THINKING_TO_EFFORT[thinkingLevel];
   const isHaiku = model.toLowerCase().includes('haiku');
   const supportsAdaptiveThinking = isClaude && !isHaiku;
+  // Mythos-class models (Fable 5 / Mythos 5) have adaptive thinking ALWAYS ON and
+  // reject `thinking: { type: 'disabled' }`. There's no way to turn thinking off;
+  // the lowest we can go is adaptive + 'low' effort.
+  const adaptiveAlwaysOn = isAdaptiveThinkingAlwaysOnModel(model);
 
   if (minimizeThinking || !isClaude || !effort) {
+    if (adaptiveAlwaysOn) {
+      return { thinking: { type: 'adaptive' as const }, effort: 'low' as const };
+    }
     return supportsAdaptiveThinking
       ? { thinking: { type: 'disabled' as const } }
       : { maxThinkingTokens: 0 };
