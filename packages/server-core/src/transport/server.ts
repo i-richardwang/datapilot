@@ -28,6 +28,30 @@ import { serializeEnvelope, deserializeEnvelope } from './codec'
 import { createLogger } from '@craft-agent/shared/utils'
 
 // ---------------------------------------------------------------------------
+// WebSocket compression
+// ---------------------------------------------------------------------------
+
+/**
+ * permessage-deflate config shared by all WebSocketServer instances.
+ *
+ * Large frames are highly repetitive JSON — the full-workspace getSessions
+ * response (~33k sessions, ~33MB) compresses roughly 10x. Browsers negotiate
+ * the extension by default; per-connection zlib state is negligible at this
+ * deployment's client count. Small frames (heartbeats, deltas) stay
+ * uncompressed via the threshold.
+ *
+ * Runtime caveat (verified 2026-06): this only takes effect when the server
+ * runs under Node (Electron-embedded, local dev). Bun replaces the `ws`
+ * package with its native shim, which silently ignores `perMessageDeflate`
+ * (the 101 response carries no Sec-WebSocket-Extensions header), so the
+ * Docker deployment (`bun run`) is NOT compressed by this option. Shrinking
+ * that payload needs app-layer compression or list pagination instead.
+ */
+const PER_MESSAGE_DEFLATE = {
+  threshold: 8 * 1024,
+}
+
+// ---------------------------------------------------------------------------
 // Client connection state
 // ---------------------------------------------------------------------------
 
@@ -278,7 +302,7 @@ export class WsRpcServer implements RpcServer {
           this.httpHandler,
         )
 
-        this.wss = new WebSocketServer({ server: this.httpsServer })
+        this.wss = new WebSocketServer({ server: this.httpsServer, perMessageDeflate: PER_MESSAGE_DEFLATE })
 
         this.httpsServer.on('error', (err) => reject(err))
 
@@ -294,7 +318,7 @@ export class WsRpcServer implements RpcServer {
         // Plain WS + HTTP handler: create an HTTP server for both.
         this._protocol = 'ws'
         this.httpServer = createHttpServer(this.httpHandler)
-        this.wss = new WebSocketServer({ server: this.httpServer })
+        this.wss = new WebSocketServer({ server: this.httpServer, perMessageDeflate: PER_MESSAGE_DEFLATE })
 
         this.httpServer.on('error', (err) => reject(err))
 
@@ -312,6 +336,7 @@ export class WsRpcServer implements RpcServer {
         this.wss = new WebSocketServer({
           host: this.host,
           port: this.requestedPort,
+          perMessageDeflate: PER_MESSAGE_DEFLATE,
         })
 
         this.wss.on('listening', () => {
