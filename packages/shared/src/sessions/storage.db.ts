@@ -22,7 +22,7 @@ import {
   unlinkSync,
 } from 'fs';
 import { join, basename } from 'path';
-import { eq, desc } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import { getWorkspaceSessionsPath } from '../workspaces/storage.ts';
 import { generateUniqueSessionId } from './slug-generator.ts';
 import { toPortablePath, expandPath, normalizePath } from '../utils/paths.ts';
@@ -171,9 +171,18 @@ export function generateSessionId(workspaceRootPath: string): string {
 type SessionRow = typeof sessionsTable.$inferSelect;
 
 /**
- * Convert a StoredSession to a DB row values object
+ * StoredSession without message-derived state. Used by saveSessionMeta() so
+ * metadata-only writes never need the messages array in memory.
  */
-function sessionToRow(session: StoredSession, workspaceRootPath: string): typeof sessionsTable.$inferInsert {
+export type StoredSessionMeta = Omit<StoredSession, 'messages' | 'tokenUsage'>;
+
+/**
+ * Convert session metadata to DB row values — everything EXCEPT the
+ * message-derived columns (messageCount, lastMessageRole, preview,
+ * lastFinalMessageId, tokenUsage). Those are owned by the message-writing
+ * paths (saveSession / saveSessionMessageUpdate).
+ */
+function sessionMetaToRow(session: StoredSessionMeta): Omit<typeof sessionsTable.$inferInsert, 'messageCount' | 'lastMessageRole' | 'preview' | 'lastFinalMessageId' | 'tokenUsage'> {
   return {
     id: session.id,
     sdkSessionId: session.sdkSessionId ?? null,
@@ -214,6 +223,15 @@ function sessionToRow(session: StoredSession, workspaceRootPath: string): typeof
     transferredSessionSummary: session.transferredSessionSummary ?? null,
     transferredSessionSummaryApplied: session.transferredSessionSummaryApplied ?? null,
     triggeredBy: session.triggeredBy ?? null,
+  };
+}
+
+/**
+ * Convert a StoredSession to a DB row values object
+ */
+function sessionToRow(session: StoredSession, workspaceRootPath: string): typeof sessionsTable.$inferInsert {
+  return {
+    ...sessionMetaToRow(session),
     // Pre-computed fields
     messageCount: session.messages.length,
     lastMessageRole: extractLastMessageRole(session.messages),
@@ -526,6 +544,134 @@ export function saveSession(session: StoredSession): void {
         position: i,
         content: portableContent,
       }).run();
+    }
+  });
+
+  dbEvents.emit('session:saved', session.id);
+}
+
+/**
+ * Save session metadata only — writes the sessions row WITHOUT touching
+ * message rows or the message-derived columns (messageCount, lastMessageRole,
+ * preview, lastFinalMessageId, tokenUsage). Those keep their current DB values.
+ *
+ * Use for metadata-only mutations (flag, archive, status, labels, name, ...).
+ * Unlike saveSession, this never needs the messages array, so callers can skip
+ * cold-loading messages for hibernated sessions just to write one flag.
+ */
+export function saveSessionMeta(meta: StoredSessionMeta): void {
+  const db = getWorkspaceDb(meta.workspaceRootPath);
+
+  const rowValues = sessionMetaToRow(meta);
+
+  // Deferred-load guard: SessionManager leaves these row-resident fields
+  // undefined on sessions never opened since boot (rowToMetadata does not
+  // carry them; hydrateMessagesForColdPersist backfills them on the full-save
+  // path). Here, undefined means "not loaded in memory" — never "clear" — so
+  // drop the column from the write and keep the DB value. Fields that ARE
+  // intentionally cleared to undefined via meta writes (sdkSessionId,
+  // branchFrom*, archivedAt, ...) must stay OUT of this list.
+  const deferredLoadFields = [
+    'enabledSourceSlugs',
+    'lastReadMessageId',
+    'hasUnread',
+    'sharedUrl',
+    'sharedId',
+    'transferredSessionSummary',
+    'transferredSessionSummaryApplied',
+    'pendingPlanExecution',
+    'triggeredBy',
+  ] as const;
+  for (const field of deferredLoadFields) {
+    if (meta[field] === undefined) {
+      delete rowValues[field];
+    }
+  }
+
+  const existing = db.select({ id: sessionsTable.id })
+    .from(sessionsTable)
+    .where(eq(sessionsTable.id, meta.id))
+    .get();
+
+  if (existing) {
+    const { id: _id, ...updateValues } = rowValues;
+    db.update(sessionsTable)
+      .set(updateValues)
+      .where(eq(sessionsTable.id, meta.id))
+      .run();
+  } else {
+    // Row not yet created (createSession full-saves first, so this is rare).
+    // Message-derived columns fall back to their schema defaults.
+    db.insert(sessionsTable).values(rowValues).run();
+  }
+
+  dbEvents.emit('session:saved', meta.id);
+}
+
+/**
+ * Targeted message write — upserts ONLY the rows in `changedMessageIds` plus
+ * the sessions row (including message-derived columns, computed from the full
+ * `session.messages` array the caller already holds in memory).
+ *
+ * This is the hot-path replacement for saveSession's delete-all + reinsert-all:
+ * a streaming session appending its 500th message writes 1 message row instead
+ * of re-serializing and rewriting all 500.
+ *
+ * `position` is the message's index in `session.messages` — identical to what
+ * a full saveSession would assign, so targeted and full writes interleave
+ * consistently. Paths that REMOVE messages must use saveSession (full rewrite);
+ * the per-turn full persist in onProcessingStopped acts as the reconciliation
+ * anchor for any transient position drift.
+ */
+export function saveSessionMessageUpdate(session: StoredSession, changedMessageIds: string[]): void {
+  const db = getWorkspaceDb(session.workspaceRootPath);
+  const sessionDir = getSessionPath(session.workspaceRootPath, session.id);
+  const changed = new Set(changedMessageIds);
+
+  db.transaction((tx) => {
+    // Upsert session row (same as saveSession — derived fields recomputed)
+    const rowValues = sessionToRow(session, session.workspaceRootPath);
+    const existing = tx.select({ id: sessionsTable.id })
+      .from(sessionsTable)
+      .where(eq(sessionsTable.id, session.id))
+      .get();
+
+    if (existing) {
+      const { id: _id, ...updateValues } = rowValues;
+      tx.update(sessionsTable)
+        .set(updateValues)
+        .where(eq(sessionsTable.id, session.id))
+        .run();
+    } else {
+      tx.insert(sessionsTable).values(rowValues).run();
+    }
+
+    for (let i = 0; i < session.messages.length; i++) {
+      const msg = session.messages[i]!;
+      if (!changed.has(msg.id)) continue;
+
+      const contentJson = JSON.stringify(msg);
+      const portableJson = makeContentPortable(contentJson, sessionDir);
+      const portableContent = JSON.parse(portableJson);
+
+      const existingMsg = tx.select({ id: messagesTable.id })
+        .from(messagesTable)
+        .where(and(eq(messagesTable.sessionId, session.id), eq(messagesTable.id, msg.id)))
+        .get();
+
+      if (existingMsg) {
+        tx.update(messagesTable)
+          .set({ position: i, content: portableContent })
+          .where(and(eq(messagesTable.sessionId, session.id), eq(messagesTable.id, msg.id)))
+          .run();
+      } else {
+        tx.insert(messagesTable).values({
+          id: msg.id,
+          sessionId: session.id,
+          position: i,
+          content: portableContent,
+        }).run();
+      }
     }
   });
 

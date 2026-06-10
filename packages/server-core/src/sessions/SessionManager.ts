@@ -77,7 +77,10 @@ import {
   type SessionMetadata,
   type SessionStatus,
   type SessionHeader,
+  type StoredSessionMeta,
   pickSessionFields,
+  saveSessionMeta,
+  saveSessionMessageUpdate,
   saveTurnUsage,
 } from '@craft-agent/shared/sessions'
 import { loadWorkspaceSources, loadAllSources, getSourcesBySlugs, isSourceUsable, type LoadedSource, type McpServerConfig, getSourcesNeedingAuth, getSourceCredentialManager, getSourceServerBuilder, type SourceWithCredential, isApiOAuthProvider, hasRenewEndpoint, SERVER_BUILD_ERRORS, TokenRefreshManager, createTokenGetter } from '@craft-agent/shared/sources'
@@ -1439,7 +1442,7 @@ export class SessionManager implements ISessionManager {
 
       // Prevent stale pending writes from reverting externally-updated metadata.
       sessionPersistenceQueue.cancel(sessionId)
-      this.persistSession(managed)
+      this.persistSessionMeta(managed)
     }
 
     return changed
@@ -2068,6 +2071,58 @@ export class SessionManager implements ISessionManager {
       this.hydrateMessagesForColdPersist(managed)
     }
     this.enqueuePersist(managed)
+  }
+
+  // Metadata-only persist: writes the sessions row without touching message
+  // rows or message-derived columns. Crucially, this never cold-loads
+  // messages — flagging or archiving a hibernated session must not round-trip
+  // its entire message history through memory just to flip one column.
+  // Use ONLY at call sites that did not mutate managed.messages.
+  private persistSessionMeta(managed: ManagedSession): void {
+    try {
+      const meta: StoredSessionMeta = {
+        ...pickSessionFields(managed),
+        workspaceRootPath: managed.workspace.rootPath,
+        createdAt: managed.createdAt ?? Date.now(),
+        lastUsedAt: Date.now(),
+      } as StoredSessionMeta
+      saveSessionMeta(meta)
+    } catch (error) {
+      sessionLog.error(`Failed to persist session meta ${managed.id}:`, error)
+    }
+  }
+
+  // Targeted message persist: upserts only the changed message rows plus the
+  // sessions row (derived fields recomputed from the in-memory array). This is
+  // the streaming hot path — appending message N writes 1 row instead of
+  // delete-all + reinsert-all N rows (O(N²) over a session's lifetime).
+  // Paths that REMOVE messages must keep using persistSession; the per-turn
+  // full persist in onProcessingStopped reconciles any transient drift.
+  private persistSessionMessages(managed: ManagedSession, changedMessageIds: string[]): void {
+    if (!managed.messagesLoaded) {
+      // Can't compute positions without the full array — fall back to the
+      // full path (hydrates, then rewrites everything).
+      this.persistSession(managed)
+      return
+    }
+    try {
+      const persistableMessages = managed.messages.filter(m =>
+        m.role !== 'status'
+      )
+
+      const storedSession: StoredSession = {
+        ...pickSessionFields(managed),
+        workspaceRootPath: managed.workspace.rootPath,
+        createdAt: managed.createdAt ?? Date.now(),
+        lastUsedAt: Date.now(),
+        messages: persistableMessages.map(messageToStored),
+        tokenUsage: managed.tokenUsage ?? DEFAULT_TOKEN_USAGE,
+      } as StoredSession
+
+      saveSessionMessageUpdate(storedSession, changedMessageIds)
+    } catch (error) {
+      sessionLog.error(`Failed to persist session messages ${managed.id}:`, error)
+    }
   }
 
   // Cold-persist hydration. Mirrors the messages/queue-recovery half of
@@ -3391,7 +3446,7 @@ export class SessionManager implements ISessionManager {
         managed.llmConnection = connection.slug
         managed.connectionLocked = true
         sessionLog.info(`Locked session ${managed.id} to connection "${connection.slug}"`)
-        this.persistSession(managed)
+        this.persistSessionMeta(managed)
 
         // Keep renderer session capabilities in sync when auto-locking the connection.
         this.sendEvent({
@@ -3499,14 +3554,14 @@ export class SessionManager implements ISessionManager {
         } else {
           sessionLog.info(`SDK session ID captured for ${managed.id}: ${sdkSessionId}`)
         }
-        this.persistSession(managed)
+        this.persistSessionMeta(managed)
         sessionPersistenceQueue.flush(managed.id)
       }
 
       const onSdkSessionIdCleared = () => {
         managed.sdkSessionId = undefined
         sessionLog.info(`SDK session ID cleared for ${managed.id} (resume recovery)`)
-        this.persistSession(managed)
+        this.persistSessionMeta(managed)
         sessionPersistenceQueue.flush(managed.id)
       }
 
@@ -3516,7 +3571,7 @@ export class SessionManager implements ISessionManager {
         managed.branchFromSdkCwd = undefined
         managed.branchFromSdkTurnId = undefined
         sessionLog.info(`Branch fork invalidated for ${managed.id}: cleared all fork metadata`)
-        this.persistSession(managed)
+        this.persistSessionMeta(managed)
         sessionPersistenceQueue.flush(managed.id)
       }
 
@@ -3575,7 +3630,7 @@ export class SessionManager implements ISessionManager {
       const markTransferredSessionSummaryApplied = () => {
         if (managed.transferredSessionSummaryApplied || !managed.transferredSessionSummary) return
         managed.transferredSessionSummaryApplied = true
-        this.persistSession(managed)
+        this.persistSessionMeta(managed)
         sessionLog.info('Transferred session summary applied', {
           sessionId: managed.id,
         })
@@ -4488,7 +4543,7 @@ export class SessionManager implements ISessionManager {
         sessionLog.info(`Auto-enabled source ${sourceSlug} for session ${managed.id}`)
 
         // Persist session with updated enabled sources
-        this.persistSession(managed)
+        this.persistSessionMeta(managed)
 
         // Notify renderer of source change
         this.sendEvent({
@@ -4533,7 +4588,7 @@ export class SessionManager implements ISessionManager {
     if (managed) {
       managed.isFlagged = true
       // Persist in-memory state directly to avoid race with pending queue writes
-      this.persistSession(managed)
+      this.persistSessionMeta(managed)
       await this.flushSession(managed.id)
       // Notify all windows for this workspace
       this.sendEvent({ type: 'session_flagged', sessionId }, managed.workspace.id)
@@ -4550,7 +4605,7 @@ export class SessionManager implements ISessionManager {
     if (managed) {
       managed.isFlagged = false
       // Persist in-memory state directly to avoid race with pending queue writes
-      this.persistSession(managed)
+      this.persistSessionMeta(managed)
       await this.flushSession(managed.id)
       // Notify all windows for this workspace
       this.sendEvent({ type: 'session_unflagged', sessionId }, managed.workspace.id)
@@ -4568,7 +4623,7 @@ export class SessionManager implements ISessionManager {
       managed.isArchived = true
       managed.archivedAt = Date.now()
       // Persist in-memory state directly to avoid race with pending queue writes
-      this.persistSession(managed)
+      this.persistSessionMeta(managed)
       await this.flushSession(managed.id)
       // Notify all windows for this workspace
       this.sendEvent({ type: 'session_archived', sessionId }, managed.workspace.id)
@@ -4582,7 +4637,7 @@ export class SessionManager implements ISessionManager {
       managed.isArchived = false
       managed.archivedAt = undefined
       // Persist in-memory state directly to avoid race with pending queue writes
-      this.persistSession(managed)
+      this.persistSessionMeta(managed)
       await this.flushSession(managed.id)
       // Notify all windows for this workspace
       this.sendEvent({ type: 'session_unarchived', sessionId }, managed.workspace.id)
@@ -4596,7 +4651,7 @@ export class SessionManager implements ISessionManager {
       managed.sessionStatus = sessionStatus
       this.setMetadataWriteGuard(managed)
       // Persist in-memory state directly to avoid race with pending queue writes
-      this.persistSession(managed)
+      this.persistSessionMeta(managed)
       await this.flushSession(managed.id)
       // Notify all windows for this workspace
       this.sendEvent({ type: 'session_status_changed', sessionId, sessionStatus }, managed.workspace.id)
@@ -4636,7 +4691,7 @@ export class SessionManager implements ISessionManager {
 
     managed.llmConnection = connectionSlug
     // Persist in-memory state directly to avoid race with pending queue writes
-    this.persistSession(managed)
+    this.persistSessionMeta(managed)
     await this.flushSession(managed.id)
     sessionLog.info(`Set LLM connection for session ${sessionId} to ${connectionSlug}`)
 
@@ -5378,7 +5433,7 @@ export class SessionManager implements ISessionManager {
     }
 
     // Persist the session with updated sources
-    this.persistSession(managed)
+    this.persistSessionMeta(managed)
 
     // Notify renderer of the source change
     this.sendEvent({
@@ -5531,7 +5586,7 @@ export class SessionManager implements ISessionManager {
     const managed = this.sessions.get(sessionId)
     if (managed) {
       managed.name = name
-      this.persistSession(managed)
+      this.persistSessionMeta(managed)
       // Notify renderer of the name change
       this.sendEvent({ type: 'title_generated', sessionId, title: name }, managed.workspace.id)
       // Workaround: Bun's fs.watch({ recursive: true }) on Linux doesn't track
@@ -5634,7 +5689,7 @@ export class SessionManager implements ISessionManager {
       sessionLog.info(`refreshTitle: regenerateTitle returned: ${title ? `"${title}"` : 'null'}`)
       if (title) {
         managed.name = title
-        this.persistSession(managed)
+        this.persistSessionMeta(managed)
         // title_generated will also clear isRegeneratingTitle via the event handler
         this.sendEvent({ type: 'title_generated', sessionId, title }, managed.workspace.id)
         sessionLog.info(`Refreshed title for session ${sessionId}: "${title}"`)
@@ -5710,7 +5765,7 @@ export class SessionManager implements ISessionManager {
         }
       }
 
-      this.persistSession(managed)
+      this.persistSessionMeta(managed)
       // Notify renderer of the working directory change
       this.sendEvent({ type: 'working_directory_changed', sessionId, workingDirectory: path }, managed.workspace.id)
     }
@@ -5775,8 +5830,8 @@ export class SessionManager implements ISessionManager {
 
     // Update the message content
     message.content = content
-    // Persist the updated session
-    this.persistSession(managed)
+    // Persist the updated message (targeted row write)
+    this.persistSessionMessages(managed, [message.id])
     sessionLog.info(`Updated message ${messageId} content in session ${sessionId}`)
   }
 
@@ -5840,7 +5895,7 @@ export class SessionManager implements ISessionManager {
     }
 
     message.annotations = [...existing, safeAnnotation]
-    this.persistSession(managed)
+    this.persistSessionMessages(managed, [message.id])
     this.sendEvent({ type: 'message_annotations_updated', sessionId, messageId, annotations: message.annotations }, managed.workspace.id)
   }
 
@@ -5922,7 +5977,7 @@ export class SessionManager implements ISessionManager {
     const next = [...existing]
     next[idx] = updated
     message.annotations = next
-    this.persistSession(managed)
+    this.persistSessionMessages(managed, [message.id])
     this.sendEvent({ type: 'message_annotations_updated', sessionId, messageId, annotations: message.annotations }, managed.workspace.id)
   }
 
@@ -5952,7 +6007,7 @@ export class SessionManager implements ISessionManager {
     }
 
     message.annotations = existing.filter(a => a.id !== annotationId)
-    this.persistSession(managed)
+    this.persistSessionMessages(managed, [message.id])
     this.sendEvent({ type: 'message_annotations_updated', sessionId, messageId, annotations: message.annotations }, managed.workspace.id)
   }
 
@@ -6302,10 +6357,9 @@ export class SessionManager implements ISessionManager {
         managed.wasInterrupted = true
       }
 
-      this.persistSession(managed)
-      // Force a synchronous flush so the user message is genuinely on disk
-      // before we tell the renderer "accepted" — `persistSession` only
-      // enqueues with a 500ms debounce. (#616 reliability fix.)
+      // Targeted write — the user message is synchronously on disk (DB mode)
+      // before we tell the renderer "accepted". (#616 reliability fix.)
+      this.persistSessionMessages(managed, [userMessage.id])
       await this.flushSession(managed.id)
       onAck?.(userMessage.id)
       return
@@ -6336,9 +6390,8 @@ export class SessionManager implements ISessionManager {
       managed.lastMessageRole = 'user'
 
       // Persist + flush before announcing — the user message must be
-      // genuinely on disk before we tell the renderer "accepted", and
-      // `persistSession` is debounced (500ms). #616.
-      this.persistSession(managed)
+      // genuinely on disk before we tell the renderer "accepted". #616.
+      this.persistSessionMessages(managed, [userMessage.id])
       await this.flushSession(managed.id)
       onAck?.(userMessage.id)
 
@@ -6370,7 +6423,7 @@ export class SessionManager implements ISessionManager {
         const sanitized = sanitizeForTitle(titleSource)
         const initialTitle = sanitized.slice(0, 50) + (sanitized.length > 50 ? '…' : '')
         managed.name = initialTitle
-        this.persistSession(managed)
+        this.persistSessionMeta(managed)
         // Flush immediately so disk is authoritative before notifying renderer
         await this.flushSession(managed.id)
         this.sendEvent({
@@ -6400,7 +6453,7 @@ export class SessionManager implements ISessionManager {
 
         if (newEntries.length > 0) {
           managed.labels = [...existingLabels, ...newEntries]
-          this.persistSession(managed)
+          this.persistSessionMeta(managed)
           this.sendEvent({
             type: 'labels_changed',
             sessionId,
@@ -6483,7 +6536,7 @@ export class SessionManager implements ISessionManager {
           if (toEnable.length > 0) {
             managed.enabledSourceSlugs = [...(managed.enabledSourceSlugs || []), ...toEnable]
             sessionLog.info(`Pre-enabled sources for skill invocation: ${toEnable.join(', ')}`)
-            this.persistSession(managed)
+            this.persistSessionMeta(managed)
             this.sendEvent({
               type: 'sources_changed',
               sessionId,
@@ -6636,7 +6689,7 @@ export class SessionManager implements ISessionManager {
             managed.sdkSessionId = sdkId
             sessionLog.info(`Captured SDK session ID via fallback: ${sdkId}`)
             // Also flush here since we're in fallback mode
-            this.persistSession(managed)
+            this.persistSessionMeta(managed)
             sessionPersistenceQueue.flush(managed.id)
           }
         }
@@ -6825,6 +6878,10 @@ export class SessionManager implements ISessionManager {
     // Remove queued user messages from the persisted messages array
     if (queuedMessageIds.size > 0) {
       managed.messages = managed.messages.filter(m => !queuedMessageIds.has(m.id))
+      // Full save now: targeted message writes can't delete rows, so without
+      // this the removed isQueued rows survive until the turn-end full persist
+      // — a crash in that window would re-queue messages the user canceled.
+      this.persistSession(managed)
     }
 
     // Signal intent to stop - let the event loop drain remaining events before clearing isProcessing
@@ -6930,6 +6987,9 @@ export class SessionManager implements ISessionManager {
           const lastUserMsgIndex = managed.messages.findLastIndex(m => m.role === 'user')
           if (lastUserMsgIndex !== -1) {
             managed.messages.splice(lastUserMsgIndex, 1)
+            // Full save: targeted writes can't delete the removed row — persist
+            // now so the retry's message doesn't share a position with it.
+            this.persistSession(managed)
           }
 
           managed.authRetryInProgress = false
@@ -7129,7 +7189,7 @@ export class SessionManager implements ISessionManager {
       if (existingMessage) {
         // Clear isQueued flag and persist - prevents re-queueing if crash during processing
         existingMessage.isQueued = false
-        this.persistSession(managed)
+        this.persistSessionMessages(managed, [existingMessage.id])
 
         this.sendEvent({
           type: 'user_message',
@@ -7420,7 +7480,7 @@ export class SessionManager implements ISessionManager {
         transitionDisplay: diagnostics.transitionDisplay,
       }, managed.workspace.id)
       // Persist to disk
-      this.persistSession(managed)
+      this.persistSessionMeta(managed)
     }
   }
 
@@ -7492,7 +7552,7 @@ export class SessionManager implements ISessionManager {
         labels: managed.labels,
       }, managed.workspace.id)
       // Persist in-memory state directly to avoid race with pending queue writes
-      this.persistSession(managed)
+      this.persistSessionMeta(managed)
       await this.flushSession(managed.id)
       // Workaround: Bun's fs.watch({ recursive: true }) on Linux doesn't track
       // directories created after the watcher started.
@@ -7519,7 +7579,7 @@ export class SessionManager implements ISessionManager {
 
       sessionLog.info(`Session ${sessionId}: thinking level set to ${level}`)
       // Persist to disk
-      this.persistSession(managed)
+      this.persistSessionMeta(managed)
     }
   }
 
@@ -7589,7 +7649,7 @@ export class SessionManager implements ISessionManager {
       const title = await agent.generateTitle(userMessage)
       if (title) {
         managed.name = title
-        this.persistSession(managed)
+        this.persistSessionMeta(managed)
         // Flush immediately to ensure disk is up-to-date before notifying renderer.
         // This prevents race condition where lazy loading reads stale disk data
         // (the persistence queue has a 500ms debounce).
@@ -7694,7 +7754,8 @@ export class SessionManager implements ISessionManager {
         this.sendEvent({ type: 'text_complete', sessionId, text: event.text, isIntermediate: event.isIntermediate, turnId: event.turnId, parentToolUseId: event.parentToolUseId, timestamp: assistantMessage.timestamp, messageId: assistantMessage.id }, workspaceId)
 
         // Persist session after complete message to prevent data loss on quit
-        this.persistSession(managed)
+        // (targeted: only the appended assistant message row)
+        this.persistSessionMessages(managed, [assistantMessage.id])
         break
       }
 
@@ -7876,6 +7937,9 @@ export class SessionManager implements ISessionManager {
         // parentToolUseId comes from CraftAgent (SDK-authoritative) or existing message
         const parentToolUseId = existingToolMsg?.parentToolUseId || event.parentToolUseId
 
+        // Message rows mutated in this handler — persisted via targeted write below
+        const changedMessageIds: string[] = []
+
         if (existingToolMsg) {
           // Keep lightweight status text in `content` and store full payload in `toolResult` only.
           existingToolMsg.toolResult = formattedResult
@@ -7885,6 +7949,7 @@ export class SessionManager implements ISessionManager {
           if (!existingToolMsg.parentToolUseId && event.parentToolUseId) {
             existingToolMsg.parentToolUseId = event.parentToolUseId
           }
+          changedMessageIds.push(existingToolMsg.id)
         } else {
           // No matching tool_start found — create message from result.
           // This is normal for background subagent child tools where tool_result arrives
@@ -7909,6 +7974,7 @@ export class SessionManager implements ISessionManager {
             isError: inferredError,
           }
           managed.messages.push(toolMessage)
+          changedMessageIds.push(toolMessage.id)
         }
 
         // Send event to renderer if: (a) first completion, or (b) result content changed
@@ -7942,6 +8008,7 @@ export class SessionManager implements ISessionManager {
           for (const child of pendingChildren) {
             child.toolStatus = 'completed'
             child.toolResult = child.toolResult || ''
+            changedMessageIds.push(child.id)
             sessionLog.info(`CHILD AUTO-COMPLETED: toolUseId=${child.toolUseId}, toolName=${child.toolName} (parent ${toolName} completed)`)
             this.sendEvent({
               type: 'tool_result',
@@ -7956,7 +8023,8 @@ export class SessionManager implements ISessionManager {
         }
 
         // Persist session after tool completes to prevent data loss on quit
-        this.persistSession(managed)
+        // (targeted: only the tool message rows touched above)
+        this.persistSessionMessages(managed, changedMessageIds)
         break
       }
 
@@ -8458,7 +8526,7 @@ export class SessionManager implements ISessionManager {
     const managed = this.sessions.get(session.id)
     if (managed) {
       managed.triggeredBy = { automationName, timestamp: Date.now() }
-      this.persistSession(managed)
+      this.persistSessionMeta(managed)
     }
 
     // Notify renderer to hydrate full session metadata (including title)

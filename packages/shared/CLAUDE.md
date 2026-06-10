@@ -126,8 +126,12 @@ Cascading theme configuration: app → workspace (last wins)
 **Functions:** `resolveTheme()`, `themeToCSS()`, dark mode support via `dark: { ... }` overrides
 
 ### Session Persistence (`src/sessions/`)
-- **persistence-queue.ts:** Debounced async session writes (500ms)
-- **storage.ts:** Session CRUD, portable path format
+- **storage.db.ts:** Session CRUD against workspace.db (active implementation). Three write tiers — use the narrowest that fits:
+  - `saveSessionMeta(meta)` — sessions row only; never touches message rows or message-derived columns (messageCount, preview, lastMessageRole, lastFinalMessageId, tokenUsage). For metadata-only mutations (flag, archive, status, labels, name, ...). Never requires messages in memory.
+  - `saveSessionMessageUpdate(session, changedMessageIds)` — upserts only the changed message rows + sessions row (derived columns recomputed). Streaming hot path.
+  - `saveSession(session)` — full rewrite (delete-all + reinsert-all messages). Required for any path that REMOVES messages (branch, queue-cancel, compaction); also the per-turn reconciliation anchor in SessionManager.onProcessingStopped.
+- **persistence-adapter-db.ts:** DB-mode adapter — writes are synchronous (WAL, < 1ms); the old 500ms debounce queue (persistence-queue.ts) is file-mode legacy.
+- **storage.ts:** Legacy file-based CRUD (session.jsonl), portable path format
 - **index.ts:** Session listing and metadata
 
 ### Credentials (`src/credentials/`)
