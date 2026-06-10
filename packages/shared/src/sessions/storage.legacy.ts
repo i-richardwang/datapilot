@@ -396,8 +396,8 @@ function headerToMetadata(header: SessionHeader, workspaceRootPath: string): Ses
     // Validate sessionStatus against workspace status config
     const validatedStatus = validateSessionStatus(workspaceRootPath, rawStatus);
 
-    // Count plan files for this session
-    const planCount = listPlanFiles(workspaceRootPath, header.id).length;
+    // planCount disabled — see SessionMetadata.planCount in types.ts.
+    // const planCount = listPlanFiles(workspaceRootPath, header.id).length;
 
     // Migration: For sessions created before sdkCwd was added, use workingDirectory as fallback.
     const workingDir = header.workingDirectory ? expandPath(header.workingDirectory) : undefined;
@@ -414,7 +414,7 @@ function headerToMetadata(header: SessionHeader, workspaceRootPath: string): Ses
       ...headerFields,
       workspaceRootPath,
       sessionStatus: validatedStatus,
-      planCount: planCount > 0 ? planCount : undefined,
+      // planCount: planCount > 0 ? planCount : undefined,
       workingDirectory: workingDir,
       sdkCwd,
     } as SessionMetadata;

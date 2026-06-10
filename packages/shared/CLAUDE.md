@@ -130,6 +130,7 @@ Cascading theme configuration: app → workspace (last wins)
   - `saveSessionMeta(meta)` — sessions row only; never touches message rows or message-derived columns (messageCount, preview, lastMessageRole, lastFinalMessageId, tokenUsage). For metadata-only mutations (flag, archive, status, labels, name, ...). Never requires messages in memory.
   - `saveSessionMessageUpdate(session, changedMessageIds)` — upserts only the changed message rows + sessions row (derived columns recomputed). Streaming hot path.
   - `saveSession(session)` — full rewrite (delete-all + reinsert-all messages). Required for any path that REMOVES messages (branch, queue-cancel, compaction); also the per-turn reconciliation anchor in SessionManager.onProcessingStopped.
+- **List-time invariant:** `rowToMetadata` in storage.db.ts runs once per row over the whole sessions table (33k+ rows in large workspaces, and Docker bind mounts make filesystem syscalls 10-100x slower). It must stay O(1) per row — no SQL queries and no filesystem access inside it. Anything per-workspace (e.g. the valid-status-ID set) is loaded once in `listSessions` and passed in; anything per-session that needs I/O (e.g. plan file counts) must be a denormalized DB column or fetched on demand, never computed at list time.
 - **persistence-adapter-db.ts:** DB-mode adapter — writes are synchronous (WAL, < 1ms); the old 500ms debounce queue (persistence-queue.ts) is file-mode legacy.
 - **storage.ts:** Legacy file-based CRUD (session.jsonl), portable path format
 - **index.ts:** Session listing and metadata

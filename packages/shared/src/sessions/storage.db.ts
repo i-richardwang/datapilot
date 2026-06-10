@@ -27,7 +27,7 @@ import { getWorkspaceSessionsPath } from '../workspaces/storage.ts';
 import { generateUniqueSessionId } from './slug-generator.ts';
 import { toPortablePath, expandPath, normalizePath } from '../utils/paths.ts';
 import { sanitizeSessionId } from './validation.ts';
-import { validateSessionStatus } from '../statuses/validation.ts';
+import { listStatuses } from '../statuses/storage.db.ts';
 import type {
   SessionConfig,
   StoredSession,
@@ -290,11 +290,38 @@ function rowToSessionConfig(row: SessionRow, workspaceRootPath: string): Session
 }
 
 /**
- * Convert a session DB row to SessionMetadata for list views
+ * Convert a session DB row to SessionMetadata for list views.
+ *
+ * List-time invariant: this runs once per row over the whole sessions table
+ * (33k+ rows in large workspaces), so it must stay O(1) per row — no SQL
+ * queries and no filesystem access in here. Status validity comes from the
+ * caller-provided set (one statuses query per list call).
  */
-function rowToMetadata(row: SessionRow, workspaceRootPath: string): SessionMetadata {
-  const validatedStatus = validateSessionStatus(workspaceRootPath, row.sessionStatus ?? undefined);
-  const planCount = listPlanFiles(workspaceRootPath, row.id).length;
+function rowToMetadata(
+  row: SessionRow,
+  workspaceRootPath: string,
+  validStatusIds: Set<string>
+): SessionMetadata {
+  // Same semantics as validateSessionStatus(): undefined or unknown → 'todo'.
+  const rawStatus = row.sessionStatus ?? undefined;
+  let validatedStatus: string;
+  if (!rawStatus) {
+    validatedStatus = 'todo';
+  } else if (validStatusIds.has(rawStatus)) {
+    validatedStatus = rawStatus;
+  } else {
+    console.warn(
+      `[listSessions] Invalid status '${rawStatus}' for workspace, ` +
+      `falling back to 'todo'. The status may have been deleted.`
+    );
+    validatedStatus = 'todo';
+  }
+  // planCount disabled: listPlanFiles() does a per-session readdir/stat (very
+  // slow over Docker bind mounts at this scale) and the value never reached
+  // the UI — managedToSession drops it and no renderer code reads it. Plan
+  // APIs still call listPlanFiles() on demand. Re-enable only via a
+  // denormalized DB column.
+  // const planCount = listPlanFiles(workspaceRootPath, row.id).length;
 
   return {
     id: row.id,
@@ -311,7 +338,7 @@ function rowToMetadata(row: SessionRow, workspaceRootPath: string): SessionMetad
     labels: (row.labels as string[] | null) ?? undefined,
     permissionMode: row.permissionMode as SessionMetadata['permissionMode'],
     previousPermissionMode: row.previousPermissionMode as SessionMetadata['permissionMode'],
-    planCount: planCount > 0 ? planCount : undefined,
+    // planCount: planCount > 0 ? planCount : undefined,
     sharedUrl: row.sharedUrl ?? undefined,
     sharedId: row.sharedId ?? undefined,
     sharedPasswordSet: row.sharedPasswordSet ?? undefined,
@@ -725,13 +752,17 @@ export function loadSession(workspaceRootPath: string, sessionId: string): Store
 export function listSessions(workspaceRootPath: string): SessionMetadata[] {
   const db = getWorkspaceDb(workspaceRootPath);
 
+  // One statuses query for the entire list; rowToMetadata must not issue
+  // per-row SQL or filesystem calls (see its doc comment).
+  const validStatusIds = new Set(listStatuses(workspaceRootPath).map(s => s.id));
+
   const rows = db.select()
     .from(sessionsTable)
     .where(eq(sessionsTable.hidden, false))
     .orderBy(desc(sessionsTable.lastUsedAt))
     .all();
 
-  return rows.map(row => rowToMetadata(row, workspaceRootPath));
+  return rows.map(row => rowToMetadata(row, workspaceRootPath, validStatusIds));
 }
 
 /**

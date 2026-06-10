@@ -399,8 +399,14 @@ export interface SessionMetadata {
   permissionMode?: PermissionMode;
   /** Previous permission mode (used to preserve modeTransition context across restarts) */
   previousPermissionMode?: PermissionMode;
-  /** Number of plan files for this session */
-  planCount?: number;
+  /**
+   * Number of plan files for this session.
+   * Disabled: computing it cost a per-session readdir/stat in listSessions
+   * (33k+ sessions, brutal over Docker bind mounts) and the value never
+   * reached the UI (managedToSession drops it, no renderer consumer).
+   * Re-enable only with a denormalized DB column.
+   */
+  // planCount?: number;
   /** Shared viewer URL (if shared via viewer) */
   sharedUrl?: string;
   /** Shared session ID in viewer (for revoke) */
