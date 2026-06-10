@@ -64,6 +64,14 @@ export interface Session {
   isFlagged?: boolean
   /** Permission mode for this session ('safe', 'ask', 'allow-all') */
   permissionMode?: PermissionMode
+  /**
+   * Authoritative permission-mode snapshot (mode + monotonic version) bundled
+   * into list responses so clients can seed their mode-sync baseline directly
+   * from the payload instead of issuing one getSessionPermissionModeState RPC
+   * per session (a startup storm on workspaces with tens of thousands of
+   * batch sessions).
+   */
+  permissionModeState?: PermissionModeState
   sessionStatus?: SessionStatus
   /** Labels (additive tags, many-per-session — bare IDs or "id::value" entries) */
   labels?: string[]

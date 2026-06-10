@@ -2445,7 +2445,11 @@ export class SessionManager implements ISessionManager {
     }
 
     return sessions
-      .map(m => managedToSession(m))
+      .map(m => managedToSession(m, {
+        // Bundle the authoritative mode snapshot so clients don't need a
+        // per-session getSessionPermissionModeState RPC after list loads.
+        permissionModeState: this.getSessionPermissionModeState(m.id) ?? undefined,
+      }))
       .sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0))
   }
 

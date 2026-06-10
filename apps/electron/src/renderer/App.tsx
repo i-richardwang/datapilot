@@ -369,6 +369,48 @@ export default function App() {
     sessionOptionsRef.current = sessionOptions
   }, [sessionOptions])
 
+  /**
+   * Merge one session's payload (including the bundled authoritative
+   * permission-mode snapshot) into a session-options map, in place.
+   *
+   * Mirrors syncSessionOptionsFromSession followed by
+   * applyPermissionModeState(..., 'reconcile'), but operates on a plain Map so
+   * a whole session list folds into a single setSessionOptions update. The
+   * previous shape — one getSessionPermissionModeState RPC plus one Map-cloning
+   * state update per session — stalled startup for minutes on workspaces with
+   * tens of thousands of batch sessions.
+   */
+  const mergeSessionIntoOptionsMap = useCallback((map: Map<string, SessionOptions>, session: Session): void => {
+    const current = map.get(session.id) ?? defaultSessionOptions
+    const merged: SessionOptions = {
+      ...defaultSessionOptions,
+      ...current,
+      permissionMode: session.permissionMode ?? defaultSessionOptions.permissionMode,
+      thinkingLevel: session.thinkingLevel ?? DEFAULT_THINKING_LEVEL,
+    }
+
+    const state = session.permissionModeState
+    if (state) {
+      const currentVersion = current.permissionModeVersion ?? -1
+      if (state.modeVersion >= currentVersion) {
+        merged.permissionMode = state.permissionMode
+        merged.permissionModeVersion = state.modeVersion
+      } else {
+        // Stale snapshot — keep the newer locally-known mode state
+        merged.permissionMode = current.permissionMode
+        merged.permissionModeVersion = current.permissionModeVersion
+      }
+    }
+
+    const hasNonDefaultMode = merged.permissionMode !== defaultSessionOptions.permissionMode
+    const hasNonDefaultThinking = merged.thinkingLevel !== DEFAULT_THINKING_LEVEL
+    if (!hasNonDefaultMode && !hasNonDefaultThinking && merged.permissionModeVersion == null) {
+      map.delete(session.id)
+    } else {
+      map.set(session.id, merged)
+    }
+  }, [])
+
   const applyPermissionModeState = useCallback((sessionId: string, state: PermissionModeState, source: 'event' | 'reconcile') => {
     setSessionOptions(prev => {
       const next = new Map(prev)
@@ -480,23 +522,14 @@ export default function App() {
       // NOTE: No sessionsAtom used - sessions are only in per-session atoms
       initializeSessions(loadedSessions)
 
-      // Initialize unified sessionOptions from session data
+      // Initialize unified sessionOptions from session data. The payload
+      // carries each session's authoritative permission-mode snapshot, so no
+      // per-session reconcile RPC is needed here.
       const optionsMap = new Map<string, SessionOptions>()
       for (const s of loadedSessions) {
-        const hasNonDefaultMode = s.permissionMode && s.permissionMode !== 'ask'
-        const hasNonDefaultThinking = s.thinkingLevel && s.thinkingLevel !== DEFAULT_THINKING_LEVEL
-        if (hasNonDefaultMode || hasNonDefaultThinking) {
-          optionsMap.set(s.id, {
-            permissionMode: s.permissionMode ?? 'ask',
-            thinkingLevel: s.thinkingLevel ?? DEFAULT_THINKING_LEVEL,
-          })
-        }
+        mergeSessionIntoOptionsMap(optionsMap, s)
       }
       setSessionOptions(optionsMap)
-
-      await Promise.allSettled(
-        loadedSessions.map((s) => reconcilePermissionModeState(s.id))
-      )
 
       setSessionsLoaded(true)
 
@@ -520,7 +553,7 @@ export default function App() {
       setSessionLoadError(formatSessionLoadFailure(err))
       setSessionsLoaded(true)
     }
-  }, [initializeSessions, initialSessionId, reconcilePermissionModeState, windowWorkspaceId])
+  }, [initializeSessions, initialSessionId, mergeSessionIntoOptionsMap, windowWorkspaceId])
 
   const refreshSessionListMetadataFromServer = useCallback(async (options: SessionListRefreshOptions = {}): Promise<Map<string, SessionMeta> | null> => {
     const {
@@ -566,11 +599,16 @@ export default function App() {
       // consistent update instead of intermediate states.
       const nextMetaMap = store.set(refreshSessionsMetadataAtom, { sessions, loadedSessionIds, removeMissing })
 
-      // Sync app-level state (React hooks / non-atom concerns) after the atom transaction
-      for (const session of sessions) {
-        syncSessionOptionsFromSession(session)
-      }
-      await Promise.allSettled(sessions.map(s => reconcilePermissionModeState(s.id)))
+      // Sync app-level state (React hooks / non-atom concerns) after the atom
+      // transaction — one batched update; the payload already carries each
+      // session's authoritative permission-mode snapshot.
+      setSessionOptions(prev => {
+        const next = new Map(prev)
+        for (const session of sessions) {
+          mergeSessionIntoOptionsMap(next, session)
+        }
+        return next
+      })
 
       return nextMetaMap
     } catch (err) {
@@ -588,7 +626,7 @@ export default function App() {
       })
       return null
     }
-  }, [store, syncSessionOptionsFromSession, reconcilePermissionModeState, windowWorkspaceId, windowRemoteWorkspaceId])
+  }, [store, mergeSessionIntoOptionsMap, windowWorkspaceId, windowRemoteWorkspaceId])
 
   // Stale session watchdog — catches stuck sessions that the reconnect protocol misses
   const { trackSessionActivity } = useStaleSessionRecovery({
