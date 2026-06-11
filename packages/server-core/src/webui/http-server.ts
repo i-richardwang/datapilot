@@ -411,7 +411,10 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
     if (!session) {
       const accept = req.headers.get('accept') ?? ''
       if (accept.includes('text/html') || path === '/' || path === '') {
-        return Response.redirect('/login', 302)
+        // Not Response.redirect(): undici (Node) requires an absolute URL there
+        // and throws on '/login'; only Bun accepts relative paths. A relative
+        // Location header is RFC-compliant and proxy-agnostic.
+        return new Response(null, { status: 302, headers: { Location: '/login' } })
       }
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
