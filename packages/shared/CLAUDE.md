@@ -196,6 +196,7 @@ Multi-workspace configuration stored in `~/.datapilot/config.json`. Supports:
 File watcher for live config updates:
 - Watches `config.json`, `theme.json`, `permissions.json` at all levels
 - Callbacks: `onConfigChange`, `onThemeChange`, `onWorkspacePermissionsChange`, `onSourcePermissionsChange`
+- **DB-mode watch scope invariant:** in DB mode the workspace watcher must never recursively watch the workspace root (and especially not `sessions/`) — on Linux a recursive `fs.watch` registers inotify per subdirectory, so 30k+ session dirs cost tens of seconds at startup for events the sessions branch discards anyway (DB events cover them). Watch the root non-recursively plus only the subtrees that genuinely need filesystem events (`sources/`, `skills/`, `statuses/`). A new file-watched subtree must be added to `watchWorkspaceDir`'s subtree list, not by widening the watch back to the root.
 
 ### Sources (`src/sources/`)
 Sources are external data connections (MCP servers, APIs, local filesystems). Stored at `~/.datapilot/workspaces/{id}/sources/{slug}/` with config.json and guide.md. Types: `mcp`, `api`, `local`, `gmail`.

@@ -2,18 +2,20 @@
  * Config File Watcher
  *
  * Watches configuration files for changes and triggers callbacks.
- * Uses recursive directory watching for simplicity and reliability.
  *
  * Watched paths:
  * - ~/.datapilot/config.json - Main app configuration
  * - ~/.datapilot/preferences.json - User preferences
  * - ~/.datapilot/theme.json - App-level theme overrides
  * - ~/.datapilot/themes/*.json - Preset theme files (app-level)
- * - ~/.datapilot/workspaces/{slug}/ - Workspace directory (recursive)
- *   - sources/{slug}/config.json, guide.md, permissions.json
- *   - skills/{slug}/SKILL.md, icon.*
- *   - sessions/{id}/session.jsonl (header metadata only)
- *   - permissions.json
+ * - ~/.datapilot/workspaces/{slug}/ - Workspace directory
+ *   - permissions.json, automations.json, batches.json (root, non-recursive)
+ *   - sources/{slug}/config.json, guide.md, permissions.json (recursive)
+ *   - skills/{slug}/SKILL.md, icon.* (recursive)
+ *   - statuses/icons/* (recursive)
+ *   - sessions/{id}/session.jsonl — file mode only; in DB mode session
+ *     changes arrive via dbEvents and sessions/ is deliberately NOT watched
+ *     (a recursive watch would register inotify on every session directory)
  */
 
 import { watch, existsSync, readdirSync, statSync, readFileSync, mkdirSync } from 'fs';
@@ -229,6 +231,11 @@ export class ConfigWatcher {
   private sourcesDir: string;
   private skillsDir: string;
 
+  // Workspace watch roots, recorded for testing — guards the DB-mode
+  // invariant that the workspace root (and so sessions/) is never watched
+  // recursively (see watchWorkspaceDir).
+  private workspaceWatchRoots: Array<{ path: string; recursive: boolean }> = [];
+
   constructor(workspaceIdOrPath: string, callbacks: ConfigWatcherCallbacks, options?: { useDbMode?: boolean }) {
     this.callbacks = callbacks;
     this.useDbMode = options?.useDbMode ?? true;
@@ -252,6 +259,11 @@ export class ConfigWatcher {
    */
   getWorkspaceSlug(): string {
     return this.workspaceId;
+  }
+
+  /** Exported for testing only */
+  _getWorkspaceWatchRoots(): ReadonlyArray<{ path: string; recursive: boolean }> {
+    return this.workspaceWatchRoots;
   }
 
   /**
@@ -416,6 +428,7 @@ export class ConfigWatcher {
       watcher.close();
     }
     this.watchers = [];
+    this.workspaceWatchRoots = [];
 
     this.knownSources.clear();
     this.knownSkills.clear();
@@ -461,23 +474,98 @@ export class ConfigWatcher {
   }
 
   /**
-   * Watch workspace directory recursively
+   * Watch workspace directory for file changes.
+   *
+   * In DB mode, sessions/statuses/labels/sources configs are DB-event driven
+   * (see registerDbEventListeners); the filesystem only matters for root-level
+   * config files and the sources/, skills/, statuses/ subtrees. A recursive
+   * watch over the whole workspace root would also register a watch for every
+   * sessions/{id} directory — on Linux inotify is registered per subdirectory,
+   * so with tens of thousands of sessions this alone takes tens of seconds at
+   * startup (worse over Docker bind mounts) for events the sessions branch of
+   * handleWorkspaceFileChange discards anyway. So in DB mode we watch the root
+   * non-recursively plus each needed subtree recursively, and never touch
+   * sessions/.
+   *
+   * In file mode (legacy), keep the original whole-tree recursive watch:
+   * sessions/{id}/session.jsonl changes are only observable via the filesystem.
    */
   private watchWorkspaceDir(): void {
     debug('[ConfigWatcher] Setting up workspace watcher for:', this.workspaceDir);
-    try {
-      const watcher = watch(this.workspaceDir, { recursive: true }, (eventType, filename) => {
-        if (!filename) return;
 
-        // Normalize path separators
+    if (!this.useDbMode) {
+      try {
+        const watcher = watch(this.workspaceDir, { recursive: true }, (eventType, filename) => {
+          if (!filename) return;
+
+          // Normalize path separators
+          const normalizedPath = filename.replace(/\\/g, '/');
+          this.handleWorkspaceFileChange(normalizedPath, eventType);
+        });
+
+        this.watchers.push(watcher);
+        this.workspaceWatchRoots.push({ path: this.workspaceDir, recursive: true });
+        debug('[ConfigWatcher] Watching workspace recursively:', this.workspaceDir);
+      } catch (error) {
+        debug('[ConfigWatcher] Error watching workspace directory:', error);
+      }
+      return;
+    }
+
+    // DB mode: non-recursive root watch for workspace-level config files
+    // (permissions.json, automations.json, batches.json).
+    try {
+      const watcher = watch(this.workspaceDir, (eventType, filename) => {
+        if (!filename) return;
         const normalizedPath = filename.replace(/\\/g, '/');
         this.handleWorkspaceFileChange(normalizedPath, eventType);
       });
 
       this.watchers.push(watcher);
-      debug('[ConfigWatcher] Watching workspace recursively:', this.workspaceDir);
+      this.workspaceWatchRoots.push({ path: this.workspaceDir, recursive: false });
     } catch (error) {
       debug('[ConfigWatcher] Error watching workspace directory:', error);
+    }
+
+    // Subtrees that still need filesystem events in DB mode:
+    // - sources/  → per-source permissions.json (not in DB)
+    // - skills/   → SKILL.md, icon files, folder add/remove
+    // - statuses/ → icon files under statuses/icons/
+    this.watchWorkspaceSubtree('sources');
+    this.watchWorkspaceSubtree('skills');
+    this.watchWorkspaceSubtree('statuses');
+
+    debug('[ConfigWatcher] Watching workspace selectively (DB mode):', this.workspaceDir);
+  }
+
+  /**
+   * Recursively watch one workspace subtree, routing events through
+   * handleWorkspaceFileChange with the subtree prefix restored so the
+   * existing relative-path routing is unchanged.
+   *
+   * Note: if the subtree directory is deleted at runtime its watcher goes
+   * quiet until the watcher restarts. These directories are app-managed and
+   * recreated on startup, so this is acceptable.
+   */
+  private watchWorkspaceSubtree(subtree: 'sources' | 'skills' | 'statuses'): void {
+    const dir = join(this.workspaceDir, subtree);
+
+    // fs.watch requires the directory to exist
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
+
+    try {
+      const watcher = watch(dir, { recursive: true }, (eventType, filename) => {
+        if (!filename) return;
+        const normalizedPath = `${subtree}/${filename.replace(/\\/g, '/')}`;
+        this.handleWorkspaceFileChange(normalizedPath, eventType);
+      });
+
+      this.watchers.push(watcher);
+      this.workspaceWatchRoots.push({ path: dir, recursive: true });
+    } catch (error) {
+      debug(`[ConfigWatcher] Error watching workspace ${subtree}/:`, error);
     }
   }
 
