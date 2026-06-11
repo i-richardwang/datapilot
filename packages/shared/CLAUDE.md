@@ -198,6 +198,9 @@ File watcher for live config updates:
 - Callbacks: `onConfigChange`, `onThemeChange`, `onWorkspacePermissionsChange`, `onSourcePermissionsChange`
 - **DB-mode watch scope invariant:** in DB mode the workspace watcher must never recursively watch the workspace root (and especially not `sessions/`) — on Linux a recursive `fs.watch` registers inotify per subdirectory, so 30k+ session dirs cost tens of seconds at startup for events the sessions branch discards anyway (DB events cover them). Watch the root non-recursively plus only the subtrees that genuinely need filesystem events (`sources/`, `skills/`, `statuses/`). A new file-watched subtree must be added to `watchWorkspaceDir`'s subtree list, not by widening the watch back to the root.
 
+### Batch item ordering (`src/batches/`)
+Processing/persistence order is `BatchState.itemOrder` (mirrors `batch_items.position`; rebuilt from row order on every load, never persisted in the meta blob). **Never derive order from `Object.keys/entries(state.items)`** — item ids come from the data source's `idField` and are often integer-like strings, which JS objects iterate in ascending numeric order regardless of insertion order. Dispatch (`dispatchNext`) and full saves (`replaceItemRows`) must go through `itemOrder`; reordering `batch_items.position` externally (e.g. shuffling pending items) is a supported operation and must survive load → full save round-trips.
+
 ### Sources (`src/sources/`)
 Sources are external data connections (MCP servers, APIs, local filesystems). Stored at `~/.datapilot/workspaces/{id}/sources/{slug}/` with config.json and guide.md. Types: `mcp`, `api`, `local`, `gmail`.
 

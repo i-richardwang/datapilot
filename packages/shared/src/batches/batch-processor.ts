@@ -694,18 +694,19 @@ export class BatchProcessor {
     const maxConcurrency = config.execution?.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY
     const globalMax = this.options.globalMaxConcurrentSessions ?? DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS
 
-    // Count currently running items in this batch
+    // Count running items and collect pending ones in dispatch order.
+    // Order MUST come from itemOrder (mirrors batch_items.position) — not from
+    // Object.keys/entries(state.items): item ids are often integer-like strings
+    // (they come from the data source's idField), and JS objects iterate such
+    // keys in ascending numeric order regardless of insertion order, which
+    // would silently override the persisted ordering.
+    const orderedIds = state.itemOrder ?? Object.keys(state.items)
     let runningCount = 0
-    for (const item of Object.values(state.items)) {
-      if (item.status === 'running') runningCount++
-    }
-
-    // Find pending items and dispatch
     const pendingIds: string[] = []
-    for (const [itemId, item] of Object.entries(state.items)) {
-      if (item.status === 'pending') {
-        pendingIds.push(itemId)
-      }
+    for (const itemId of orderedIds) {
+      const status = state.items[itemId]?.status
+      if (status === 'running') runningCount++
+      else if (status === 'pending') pendingIds.push(itemId)
     }
 
     const globalRunning = this.countGlobalRunning()

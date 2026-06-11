@@ -150,6 +150,15 @@ export interface BatchState {
   completedAt?: number
   totalItems: number
   items: Record<string, BatchItemState>
+  /**
+   * Item ids in processing order (mirrors `batch_items.position`). In-memory
+   * only — rebuilt from row order on load, never persisted in the meta blob.
+   * `items` cannot carry this: JS objects iterate integer-like keys (the
+   * common case — ids come from the data source's idField, often numeric) in
+   * ascending numeric order regardless of insertion order, so dispatch and
+   * persistence must order by this array, never by `Object.keys(items)`.
+   */
+  itemOrder?: string[]
 }
 
 export interface BatchProgress {

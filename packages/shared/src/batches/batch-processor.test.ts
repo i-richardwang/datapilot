@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { autoRegisterDriver } from '../db/driver.ts'
 import { BatchProcessor } from './batch-processor.ts'
-import { loadBatchState, saveBatchState } from './batch-state-manager.db.ts'
+import { createInitialBatchState, loadBatchState, saveBatchState } from './batch-state-manager.db.ts'
 import {
   BATCH_STATE_FILE_PREFIX,
   DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS,
@@ -265,6 +265,53 @@ describe('BatchProcessor', () => {
   // =========================================================================
   // Session Completion & Dispatch Chain
   // =========================================================================
+
+  describe('dispatch order', () => {
+    // Regression: item ids are often integer-like strings (data-source idField),
+    // and JS objects iterate such keys numerically ascending — dispatch must
+    // follow itemOrder (batch_items.position), not Object.keys(state.items).
+    it('should dispatch pending items in itemOrder, not numeric id order', async () => {
+      writeFileSync(join(setup.tempDir, 'companies-numeric.json'), JSON.stringify([
+        { id: '1', name: 'Alpha' },
+        { id: '2', name: 'Beta' },
+        { id: '3', name: 'Gamma' },
+        { id: '4', name: 'Delta' },
+      ]))
+      writeFileSync(join(setup.tempDir, 'batches.json'), JSON.stringify({
+        version: 1,
+        batches: [
+          {
+            id: 'numeric-batch',
+            name: 'Numeric Batch',
+            source: { type: 'json', path: 'companies-numeric.json', idField: 'id' },
+            execution: { maxConcurrency: 1 },
+            action: { type: 'prompt', prompt: 'Analyze $BATCH_ITEM_NAME' },
+          },
+        ],
+      }))
+
+      // Persist a paused state whose order differs from numeric id order —
+      // the same shape an externally reordered batch_items.position produces.
+      const seeded = createInitialBatchState('numeric-batch', ['3', '1', '4', '2'])
+      seeded.status = 'paused'
+      saveBatchState(setup.tempDir, seeded)
+
+      setup.processor.resume('numeric-batch')
+      await tick()
+
+      // maxConcurrency = 1 → complete sessions one at a time and record order
+      const dispatchedIds: string[] = []
+      for (let i = 0; i < 4; i++) {
+        const session = setup.createdSessions[i]
+        expect(session).toBeDefined()
+        dispatchedIds.push(session!.params.batchContext!.itemId)
+        setup.processor.onSessionComplete(session!.sessionId, 'complete')
+        await tick()
+      }
+
+      expect(dispatchedIds).toEqual(['3', '1', '4', '2'])
+    })
+  })
 
   describe('onSessionComplete', () => {
     it('should mark item as completed on success', async () => {

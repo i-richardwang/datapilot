@@ -74,9 +74,11 @@ function itemStateToRow(batchId: string, itemId: string, position: number, item:
   };
 }
 
-/** Meta blob written to `batch_state` — same shape as BatchState, items emptied. */
+/** Meta blob written to `batch_state` — same shape as BatchState, items emptied.
+ * `itemOrder` is also stripped: it is derived from `batch_items.position` on
+ * load, and a persisted copy would go stale the moment positions change. */
 function toMetaBlob(state: BatchState): BatchState {
-  return { ...state, items: {} };
+  return { ...state, items: {}, itemOrder: undefined };
 }
 
 function readItemRows(db: DrizzleDatabase, batchId: string): BatchItemRow[] {
@@ -87,11 +89,20 @@ function readItemRows(db: DrizzleDatabase, batchId: string): BatchItemRow[] {
     .all();
 }
 
-/** Replace all item rows for a batch with the given items record (object order = position). */
-function replaceItemRows(db: DrizzleDatabase, batchId: string, items: Record<string, BatchItemState>): void {
+/**
+ * Replace all item rows for a batch (row index = position).
+ *
+ * Position comes from `itemOrder` when present — NOT from `Object.keys(items)`:
+ * for integer-like item ids JS object key order is numeric ascending, which
+ * would silently reset any persisted ordering on every full save. An id listed
+ * in `itemOrder` but missing from `items` throws (undefined deref in
+ * itemStateToRow) rather than silently dropping rows.
+ */
+function replaceItemRows(db: DrizzleDatabase, batchId: string, items: Record<string, BatchItemState>, itemOrder?: string[]): void {
   db.delete(batchItemsTable).where(eq(batchItemsTable.batchId, batchId)).run();
-  const rows = Object.entries(items).map(([itemId, item], position) =>
-    itemStateToRow(batchId, itemId, position, item));
+  const orderedIds = itemOrder ?? Object.keys(items);
+  const rows = orderedIds.map((itemId, position) =>
+    itemStateToRow(batchId, itemId, position, items[itemId]!));
   for (let i = 0; i < rows.length; i += INSERT_CHUNK_SIZE) {
     db.insert(batchItemsTable).values(rows.slice(i, i + INSERT_CHUNK_SIZE)).run();
   }
@@ -117,14 +128,16 @@ function stateFromMetaRow(db: DrizzleDatabase, meta: BatchState): BatchState {
   if (itemRows.length === 0 && meta.items && Object.keys(meta.items).length > 0) {
     // Legacy blob written before the items split — migrate, then serve from the blob.
     migrateLegacyBlob(db, meta);
-    return meta;
+    return { ...meta, itemOrder: Object.keys(meta.items) };
   }
 
   const items: Record<string, BatchItemState> = {};
+  const itemOrder: string[] = [];
   for (const row of itemRows) {
     items[row.itemId] = rowToItemState(row);
+    itemOrder.push(row.itemId);
   }
-  return { ...meta, items };
+  return { ...meta, items, itemOrder };
 }
 
 // ============================================================================
@@ -163,7 +176,7 @@ export function saveBatchState(workspaceRootPath: string, state: BatchState): vo
   const db = getWorkspaceDb(workspaceRootPath);
   db.transaction((tx) => {
     upsertMeta(tx, state);
-    replaceItemRows(tx, state.batchId, state.items);
+    replaceItemRows(tx, state.batchId, state.items, state.itemOrder);
   });
   dbEvents.emit('batch:state', state.batchId);
 }
@@ -230,11 +243,13 @@ export function saveBatchItemStates(workspaceRootPath: string, state: BatchState
 
 /**
  * Append new items (discovered in the data source after the batch was first
- * persisted) behind the existing ones, preserving order.
+ * persisted) behind the existing ones, preserving order. Also appends the ids
+ * to `state.itemOrder` so the in-memory order stays in sync with the rows.
  */
 export function appendBatchItems(workspaceRootPath: string, state: BatchState, itemIds: string[]): void {
   if (itemIds.length === 0) return;
   const db = getWorkspaceDb(workspaceRootPath);
+  const appended: string[] = [];
   db.transaction((tx) => {
     const maxRow = tx.select({ max: sql<number | null>`MAX(${batchItemsTable.position})` })
       .from(batchItemsTable)
@@ -246,11 +261,13 @@ export function appendBatchItems(workspaceRootPath: string, state: BatchState, i
       const item = state.items[itemId];
       if (!item) continue;
       rows.push(itemStateToRow(state.batchId, itemId, position++, item));
+      appended.push(itemId);
     }
     for (let i = 0; i < rows.length; i += INSERT_CHUNK_SIZE) {
       tx.insert(batchItemsTable).values(rows.slice(i, i + INSERT_CHUNK_SIZE)).run();
     }
   });
+  state.itemOrder?.push(...appended);
   dbEvents.emit('batch:state', state.batchId);
 }
 
@@ -269,6 +286,7 @@ export function createInitialBatchState(batchId: string, itemIds: string[]): Bat
     status: 'pending',
     totalItems: itemIds.length,
     items,
+    itemOrder: [...itemIds],
   };
 }
 

@@ -2,10 +2,10 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'bun:test
 import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { autoRegisterDriver } from '../db/driver.ts'
 import { getWorkspaceDb } from '../db/connection.ts'
-import { batchState as batchStateTable } from '../db/schema/batches.sql.ts'
+import { batchState as batchStateTable, batchItems as batchItemsTable } from '../db/schema/batches.sql.ts'
 import {
   getBatchStatePath,
   loadBatchState,
@@ -52,6 +52,54 @@ describe('batch-state-manager', () => {
       expect(Object.keys(state.items)).toHaveLength(3)
       expect(state.items['a']).toEqual({ status: 'pending', retryCount: 0 })
       expect(state.items['b']).toEqual({ status: 'pending', retryCount: 0 })
+    })
+  })
+
+  describe('itemOrder', () => {
+    it('should preserve source order for integer-like ids across save/load', () => {
+      const state = createInitialBatchState('order1', ['3', '1', '4', '2'])
+      expect(state.itemOrder).toEqual(['3', '1', '4', '2'])
+      // The items record itself cannot carry this order — JS objects iterate
+      // integer-like keys in ascending numeric order. This is exactly why
+      // itemOrder exists.
+      expect(Object.keys(state.items)).toEqual(['1', '2', '3', '4'])
+
+      saveBatchState(tempDir, state)
+      const loaded = loadBatchState(tempDir, 'order1')!
+      expect(loaded.itemOrder).toEqual(['3', '1', '4', '2'])
+    })
+
+    it('should follow externally reordered positions and survive a full save', () => {
+      const state = createInitialBatchState('order2', ['1', '2', '3'])
+      saveBatchState(tempDir, state)
+
+      // Simulate an external position reorder (e.g. shuffling pending items
+      // directly in the DB): swap items '1' and '3'.
+      const db = getWorkspaceDb(tempDir)
+      db.update(batchItemsTable).set({ position: 100 })
+        .where(and(eq(batchItemsTable.batchId, 'order2'), eq(batchItemsTable.itemId, '1'))).run()
+      db.update(batchItemsTable).set({ position: 0 })
+        .where(and(eq(batchItemsTable.batchId, 'order2'), eq(batchItemsTable.itemId, '3'))).run()
+
+      const loaded = loadBatchState(tempDir, 'order2')!
+      expect(loaded.itemOrder).toEqual(['3', '2', '1'])
+
+      // A subsequent full save must persist that order, not reset it to
+      // Object.keys (numeric) order.
+      saveBatchState(tempDir, loaded)
+      expect(loadBatchState(tempDir, 'order2')!.itemOrder).toEqual(['3', '2', '1'])
+    })
+
+    it('appendBatchItems should keep itemOrder in sync', () => {
+      const state = createInitialBatchState('order3', ['2', '10'])
+      saveBatchState(tempDir, state)
+
+      state.items['1'] = { status: 'pending', retryCount: 0 }
+      state.totalItems++
+      appendBatchItems(tempDir, state, ['1'])
+
+      expect(state.itemOrder).toEqual(['2', '10', '1'])
+      expect(loadBatchState(tempDir, 'order3')!.itemOrder).toEqual(['2', '10', '1'])
     })
   })
 
