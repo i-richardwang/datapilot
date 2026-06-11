@@ -8,6 +8,10 @@
  */
 
 import { SignJWT, jwtVerify } from 'jose'
+import { randomBytes, scrypt, timingSafeEqual } from 'node:crypto'
+import { promisify } from 'node:util'
+
+const scryptAsync = promisify(scrypt)
 
 // ---------------------------------------------------------------------------
 // JWT helpers (via jose library)
@@ -89,26 +93,35 @@ export function extractSessionCookie(cookieHeader: string | null): string | null
 }
 
 // ---------------------------------------------------------------------------
-// Password verification (argon2id via Bun.password)
+// Password verification (scrypt via node:crypto — works under Node and Bun)
+//
+// Previously argon2id via Bun.password, which is Bun-only; the Docker
+// deployment runs the server main process under Node (see Dockerfile.server).
+// The hash lives only in this process's memory (computed at startup from the
+// configured password, never persisted), so the algorithm swap has no
+// migration impact.
 // ---------------------------------------------------------------------------
 
-let hashedPassword: string | null = null
+let passwordSalt: Buffer | null = null
+let passwordHash: Buffer | null = null
 
 /**
  * Hash the login password at startup. Must be called before any auth requests.
  * The hash is stored in memory — the raw password is not retained.
  */
 export async function initPasswordHash(plaintext: string): Promise<void> {
-  hashedPassword = await Bun.password.hash(plaintext, { algorithm: 'argon2id' })
+  passwordSalt = randomBytes(16)
+  passwordHash = (await scryptAsync(plaintext, passwordSalt, 64)) as Buffer
 }
 
 /**
  * Verify a user-supplied password against the pre-hashed password.
- * Uses Bun's built-in argon2id verification (constant-time).
+ * Constant-time comparison via crypto.timingSafeEqual.
  */
 export async function verifyPassword(input: string): Promise<boolean> {
-  if (!hashedPassword) return false
-  return Bun.password.verify(input, hashedPassword)
+  if (!passwordSalt || !passwordHash) return false
+  const candidate = (await scryptAsync(input, passwordSalt, 64)) as Buffer
+  return timingSafeEqual(candidate, passwordHash)
 }
 
 // ---------------------------------------------------------------------------

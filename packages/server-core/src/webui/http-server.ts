@@ -12,6 +12,8 @@
 
 import { join, extname, normalize, sep, basename, dirname, isAbsolute } from 'node:path'
 import { realpath } from 'node:fs/promises'
+import { readFileSync, createReadStream, statSync } from 'node:fs'
+import { Readable } from 'node:stream'
 import { createSessionZipResponse } from './session-zip'
 import {
   RateLimiter,
@@ -28,6 +30,25 @@ import type { PlatformServices } from '../runtime/platform'
 // ---------------------------------------------------------------------------
 // MIME types for static file serving
 // ---------------------------------------------------------------------------
+
+/**
+ * Read a small static file into a web Response, or null if it doesn't exist.
+ * Uses node:fs (works under both Node and Bun) — Bun.file is Bun-only and the
+ * Docker deployment runs the server main process under Node (see
+ * Dockerfile.server / scripts/build-server-node.ts).
+ */
+function staticFileResponse(filePath: string, contentType: string): Response | null {
+  // stat + isFile (not existsSync): directories must fall through to the SPA
+  // fallback like Bun.file().exists() did, not crash readFileSync with EISDIR.
+  try {
+    if (!statSync(filePath).isFile()) return null
+    return new Response(readFileSync(filePath), {
+      headers: { 'Content-Type': contentType },
+    })
+  } catch {
+    return null
+  }
+}
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -230,24 +251,18 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
 
     // ── Login page (no auth) ──
     if (path === '/login' || path === '/login/') {
-      const loginFile = Bun.file(join(webuiDir, 'login.html'))
-      if (await loginFile.exists()) {
-        return new Response(loginFile, {
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        })
-      }
-      return new Response('Login page not found', { status: 404 })
+      return (
+        staticFileResponse(join(webuiDir, 'login.html'), 'text/html; charset=utf-8') ??
+        new Response('Login page not found', { status: 404 })
+      )
     }
 
     // ── Static assets that login page needs (no auth) ──
     if (path === '/favicon.ico' || path.startsWith('/login-assets/')) {
-      const file = Bun.file(join(webuiDir, path))
-      if (await file.exists()) {
-        return new Response(file, {
-          headers: { 'Content-Type': getMimeType(path) },
-        })
-      }
-      return new Response('Not Found', { status: 404 })
+      return (
+        staticFileResponse(join(webuiDir, path), getMimeType(path)) ??
+        new Response('Not Found', { status: 404 })
+      )
     }
 
     // ── Auth endpoint ──
@@ -459,8 +474,15 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
         return Response.json({ error: 'Forbidden' }, { status: 403 })
       }
 
-      const file = Bun.file(realTarget)
-      if (!await file.exists()) {
+      // Stream (not buffer) — session files can be large
+      let fileSize: number
+      try {
+        const st = statSync(realTarget)
+        if (!st.isFile()) {
+          return Response.json({ error: 'File not found' }, { status: 404 })
+        }
+        fileSize = st.size
+      } catch {
         return Response.json({ error: 'File not found' }, { status: 404 })
       }
 
@@ -471,11 +493,11 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
       const encoded = encodeURIComponent(name)
       const contentDisposition = `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encoded}`
 
-      return new Response(file, {
+      return new Response(Readable.toWeb(createReadStream(realTarget)) as ReadableStream, {
         headers: {
           'Content-Type': 'application/octet-stream',
           'Content-Disposition': contentDisposition,
-          'Content-Length': String(file.size),
+          'Content-Length': String(fileSize),
           // Disable caching — session files change as the agent writes to them
           'Cache-Control': 'no-store',
         },
@@ -514,23 +536,15 @@ export function createWebuiHandler(options: WebuiHandlerOptions): WebuiHandler {
 
     // ── Serve SPA static files ──
     if (path !== '/') {
-      const file = Bun.file(join(webuiDir, path))
-      if (await file.exists()) {
-        return new Response(file, {
-          headers: { 'Content-Type': getMimeType(path) },
-        })
-      }
+      const fileRes = staticFileResponse(join(webuiDir, path), getMimeType(path))
+      if (fileRes) return fileRes
     }
 
     // SPA fallback — serve index.html for all non-file routes
-    const indexFile = Bun.file(join(webuiDir, 'index.html'))
-    if (await indexFile.exists()) {
-      return new Response(indexFile, {
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
-      })
-    }
-
-    return new Response('Not Found', { status: 404 })
+    return (
+      staticFileResponse(join(webuiDir, 'index.html'), 'text/html; charset=utf-8') ??
+      new Response('Not Found', { status: 404 })
+    )
   }
 
   return {

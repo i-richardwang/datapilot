@@ -23,7 +23,10 @@
 #     datapilot-server
 # =============================================================================
 
-FROM nikolaik/python-nodejs:python3.12-nodejs20-slim
+# Node 22 (not 20): the server main process runs under Node (see CMD) and
+# better-sqlite3 ships no prebuilt binding for Node 20 (EOL since 2026-04);
+# Node 22 also matches the Electron-embedded runtime (Electron 39 = Node 22.x).
+FROM nikolaik/python-nodejs:python3.12-nodejs22-slim
 
 # Reset SHELL to default — nikolaik image sets bash -euo pipefail which breaks some commands
 SHELL ["/bin/sh", "-c"]
@@ -122,12 +125,21 @@ COPY apps/viewer/package.json apps/viewer/
 COPY apps/viewer-server/package.json apps/viewer-server/
 COPY apps/webui/package.json apps/webui/
 
-# Skip better-sqlite3 native build — Docker runs on Bun which uses built-in bun:sqlite
 # When NPM_REGISTRY is set, write it to .npmrc so bun install routes through the mirror.
 RUN if [ -n "$NPM_REGISTRY" ]; then echo "registry=$NPM_REGISTRY" > /root/.npmrc; fi
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile --ignore-scripts || \
     (rm -rf /root/.bun/install/cache/* && bun install --frozen-lockfile --ignore-scripts)
+
+# The server main process runs under Node (see CMD), which uses the
+# better-sqlite3 native driver. --ignore-scripts above skipped its install
+# script, so fetch the prebuilt binding explicitly (downloads from GitHub
+# releases for the image's Node ABI; no compiler toolchain in this image, so
+# a download failure fails the build loudly rather than falling back).
+RUN cd node_modules/better-sqlite3 && \
+    PATH=/app/node_modules/.bin:$PATH prebuild-install && \
+    node -e "require('/app/node_modules/better-sqlite3')" && \
+    echo "better-sqlite3 binding OK"
 
 # Copy source
 COPY . .
@@ -140,6 +152,12 @@ RUN bun build packages/session-mcp-server/src/index.ts \
 
 # Build the WhatsApp worker bundle (CJS, Node target — Bun cannot run it).
 RUN bun run scripts/build-wa-worker.ts
+
+# Bundle the server entry for Node. The main process runs under Node so the
+# real `ws` package (with working permessage-deflate compression) is used —
+# Bun's ws shim silently ignores perMessageDeflate. Bun stays in the image
+# for subprocesses (Pi agent, sandbox tools, bunx).
+RUN bun run scripts/build-server-node.ts
 
 # Build web UI assets (served by the server on the RPC port)
 # Granular feature flags — set to "1" to disable/enable the corresponding feature.
@@ -217,4 +235,5 @@ USER datapilot
 # --allow-insecure-bind: safe inside Docker — the container network is isolated;
 # external TLS should be handled by a reverse proxy (nginx, Caddy, etc.)
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["bun", "run", "packages/server/src/index.ts", "--allow-insecure-bind"]
+# Node (not Bun) so ws permessage-deflate works — see build-server-node.ts.
+CMD ["node", "packages/server/dist/index.node.mjs", "--allow-insecure-bind"]

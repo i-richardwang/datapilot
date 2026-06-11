@@ -459,28 +459,25 @@ export async function startHealthHttpServer(options: HealthHttpServerOptions): P
 
   const depsLike = { sessionManager: options.deps.sessionManager } as any
 
-  // Use Bun.serve if available, otherwise skip (Node.js/Electron doesn't need HTTP health)
-  if (typeof globalThis.Bun !== 'undefined') {
-    const server = Bun.serve({
-      port: options.port,
-      fetch(req: Request) {
-        const path = new URL(req.url).pathname
-        if (path === '/health') {
-          const health = getHealthCheck(depsLike)
-          return Response.json(health, {
-            status: health.status === 'ok' ? 200 : 503,
-          })
-        }
-        return new Response('Not Found', { status: 404 })
-      },
-    })
-
-    options.platform.logger.info(`[bootstrap] Health endpoint listening on http://0.0.0.0:${options.port}/health`)
-
-    return {
-      stop: () => server.stop(),
+  // node:http works under both Node and Bun. Previously Bun.serve (Bun-only),
+  // which left the Docker healthcheck dead when the server runs under Node.
+  const { createServer } = await import('node:http')
+  const server = createServer((req, res) => {
+    const path = new URL(req.url ?? '/', 'http://localhost').pathname
+    if (path === '/health') {
+      const health = getHealthCheck(depsLike)
+      res.writeHead(health.status === 'ok' ? 200 : 503, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify(health))
+      return
     }
-  }
+    res.writeHead(404, { 'Content-Type': 'text/plain' })
+    res.end('Not Found')
+  })
+  server.listen(options.port)
 
-  return null
+  options.platform.logger.info(`[bootstrap] Health endpoint listening on http://0.0.0.0:${options.port}/health`)
+
+  return {
+    stop: () => server.close(),
+  }
 }
