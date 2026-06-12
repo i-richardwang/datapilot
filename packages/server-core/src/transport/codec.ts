@@ -147,6 +147,18 @@ export function serializeEnvelope(envelope: MessageEnvelope): string {
   return JSON.stringify(encodeWireValue(envelope))
 }
 
+/**
+ * Serialize an envelope missing its per-client fields (id/seq). The caller
+ * splices those in as a string prefix (see WsRpcServer.push) so the expensive
+ * encodeWireValue walk over large args runs once per event instead of once
+ * per client. The result must stay byte-compatible with serializeEnvelope
+ * output modulo key order — deserializeEnvelope only does JSON.parse + shape
+ * validation and does not care about key order.
+ */
+export function serializeEnvelopeBody(body: Omit<MessageEnvelope, 'id' | 'seq'>): string {
+  return JSON.stringify(encodeWireValue(body))
+}
+
 export function deserializeEnvelope(raw: string): MessageEnvelope {
   const parsed = decodeWireValue(JSON.parse(raw))
   if (!validateEnvelopeShape(parsed)) {

@@ -170,3 +170,16 @@ export const DISCONNECTED_CLIENT_TTL_MS = 60_000
 
 /** Client sends a sequence_ack every N ms. */
 export const SEQUENCE_ACK_INTERVAL_MS = 5_000
+
+/**
+ * Backpressure: a client whose ws send buffer stays above this threshold for
+ * longer than BACKPRESSURE_GRACE_MS is terminated. Termination is a safe
+ * degradation, not data loss — the event buffer is retained and the client
+ * reconnects and resumes via seq replay (or a stale full refresh).
+ *
+ * The grace period exists because large responses (a multi-MB getSessions)
+ * legitimately push bufferedAmount past the threshold on healthy clients for
+ * a few seconds while they drain.
+ */
+export const BACKPRESSURE_THRESHOLD_BYTES = 8 * 1024 * 1024
+export const BACKPRESSURE_GRACE_MS = 15_000

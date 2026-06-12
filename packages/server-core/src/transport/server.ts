@@ -18,13 +18,15 @@ import {
   EVENT_BUFFER_MAX_SIZE,
   EVENT_BUFFER_TTL_MS,
   DISCONNECTED_CLIENT_TTL_MS,
+  BACKPRESSURE_THRESHOLD_BYTES,
+  BACKPRESSURE_GRACE_MS,
   isErrorCode,
   type MessageEnvelope,
   type PushTarget,
   type ErrorCode,
 } from '@craft-agent/shared/protocol'
 import type { RpcServer, HandlerFn, RequestContext } from './types'
-import { serializeEnvelope, deserializeEnvelope } from './codec'
+import { serializeEnvelope, serializeEnvelopeBody, deserializeEnvelope } from './codec'
 import { createLogger } from '@craft-agent/shared/utils'
 
 // ---------------------------------------------------------------------------
@@ -40,12 +42,11 @@ import { createLogger } from '@craft-agent/shared/utils'
  * deployment's client count. Small frames (heartbeats, deltas) stay
  * uncompressed via the threshold.
  *
- * Runtime caveat (verified 2026-06): this only takes effect when the server
- * runs under Node (Electron-embedded, local dev). Bun replaces the `ws`
- * package with its native shim, which silently ignores `perMessageDeflate`
- * (the 101 response carries no Sec-WebSocket-Extensions header), so the
- * Docker deployment (`bun run`) is NOT compressed by this option. Shrinking
- * that payload needs app-layer compression or list pagination instead.
+ * Runtime caveat: this only takes effect when the server runs under Node
+ * (Docker — see Dockerfile.server CMD — and Electron-embedded). Bun replaces
+ * the `ws` package with its native shim, which silently ignores
+ * `perMessageDeflate` (the 101 response carries no Sec-WebSocket-Extensions
+ * header), so standalone `bun run server:dev` is NOT compressed.
  */
 const PER_MESSAGE_DEFLATE = {
   threshold: 8 * 1024,
@@ -76,6 +77,8 @@ interface ClientConnection {
   lastAckedSeq: number
   /** Highest per-client seq assigned to this client. */
   lastSentSeq: number
+  /** When the ws send buffer first exceeded the backpressure threshold; null while healthy. */
+  backpressureSince: number | null
 }
 
 interface PendingInvoke {
@@ -123,6 +126,10 @@ export interface WsRpcServerOptions {
   serverVersion?: string
   /** Maximum concurrent clients. 0 = unlimited. Default: 50 */
   maxClients?: number
+  /** Backpressure: send-buffer bytes above which a client counts as congested. Default: BACKPRESSURE_THRESHOLD_BYTES */
+  backpressureThresholdBytes?: number
+  /** Backpressure: how long a client may stay congested before termination. Default: BACKPRESSURE_GRACE_MS */
+  backpressureGraceMs?: number
   /** Called when a client completes handshake. */
   onClientConnected?: (info: { clientId: string; webContentsId: number | null; workspaceId: string | null; capabilities: string[] }) => void
   /** Called when a client disconnects. */
@@ -166,6 +173,8 @@ export class WsRpcServer implements RpcServer {
   private readonly tlsOptions: WsRpcTlsOptions | null
   private readonly serverVersion: string
   private readonly maxClients: number
+  private readonly backpressureThresholdBytes: number
+  private readonly backpressureGraceMs: number
   private readonly onClientConnected: WsRpcServerOptions['onClientConnected']
   private readonly onClientDisconnected: WsRpcServerOptions['onClientDisconnected']
   private readonly httpHandler: WsRpcServerOptions['httpHandler']
@@ -180,6 +189,8 @@ export class WsRpcServer implements RpcServer {
     this.serverVersion = opts?.serverVersion ?? ''
     this.tlsOptions = opts?.tls ?? null
     this.maxClients = opts?.maxClients ?? 50
+    this.backpressureThresholdBytes = opts?.backpressureThresholdBytes ?? BACKPRESSURE_THRESHOLD_BYTES
+    this.backpressureGraceMs = opts?.backpressureGraceMs ?? BACKPRESSURE_GRACE_MS
     this.onClientConnected = opts?.onClientConnected
     this.onClientDisconnected = opts?.onClientDisconnected
     this.httpHandler = opts?.httpHandler
@@ -214,14 +225,27 @@ export class WsRpcServer implements RpcServer {
   push(channel: string, target: PushTarget, ...args: any[]): void {
     const timestamp = Date.now()
 
+    // Serialize the envelope body once for all recipients — the recursive
+    // encodeWireValue walk over args is the expensive part for large payloads.
+    // Only id/seq differ per client: nothing consumes a per-client event id
+    // (clients read only seq), so a shared id is safe, and seq is spliced in
+    // as a string prefix per client (see bufferAndMaybeSendEvent).
+    const bodyJson = serializeEnvelopeBody({
+      type: 'event',
+      channel,
+      args,
+      serverId: this.serverId,
+    })
+    const sharedId = randomUUID()
+
     for (const client of this.clients.values()) {
       if (!this.matchesTarget(client, target)) continue
-      this.bufferAndMaybeSendEvent(client, channel, args, timestamp, true)
+      this.bufferAndMaybeSendEvent(client, sharedId, bodyJson, timestamp, true)
     }
 
     for (const { client } of this.disconnectedClients.values()) {
       if (!this.matchesTarget(client, target)) continue
-      this.bufferAndMaybeSendEvent(client, channel, args, timestamp, false)
+      this.bufferAndMaybeSendEvent(client, sharedId, bodyJson, timestamp, false)
     }
   }
 
@@ -496,6 +520,7 @@ export class WsRpcServer implements RpcServer {
               prevClient.ws = ws
               prevClient.alive = true
               prevClient.missedPongs = 0
+              prevClient.backpressureSince = null
               handshakeCompleted = true
 
               // Determine replay vs stale using the per-client delivery sequence.
@@ -592,6 +617,7 @@ export class WsRpcServer implements RpcServer {
           eventBuffer: [],
           lastAckedSeq: 0,
           lastSentSeq: 0,
+          backpressureSince: null,
         }
         this.clients.set(clientId, client)
         handshakeCompleted = true
@@ -717,6 +743,10 @@ export class WsRpcServer implements RpcServer {
         // Skip sockets that are already closing/closed (e.g. terminated on a previous tick)
         if (client.ws.readyState !== client.ws.OPEN) continue
 
+        // Backpressure sweep: catches clients whose backlog isn't draining even
+        // when no new events arrive (the send-path check never fires for them).
+        if (!this.checkBackpressure(client)) continue
+
         if (!client.alive) {
           client.missedPongs++
           if (client.missedPongs >= HEARTBEAT_MAX_MISSED) {
@@ -768,33 +798,68 @@ export class WsRpcServer implements RpcServer {
     })
   }
 
-  /** Assign a per-client seq, retain the event for replay, and optionally send it immediately. */
+  /**
+   * Assign a per-client seq, retain the event for replay, and optionally send
+   * it immediately. `bodyJson` is the shared serialized envelope body from
+   * push(); the per-client id/seq prefix is spliced in here. uuid characters
+   * and integers never need JSON escaping, so plain interpolation is safe.
+   */
   private bufferAndMaybeSendEvent(
     client: ClientConnection,
-    channel: string,
-    args: any[],
+    sharedId: string,
+    bodyJson: string,
     timestamp: number,
     shouldSend: boolean,
   ): void {
     client.lastSentSeq += 1
     const seq = client.lastSentSeq
 
-    const envelope: MessageEnvelope = {
-      id: randomUUID(),
-      type: 'event',
-      channel,
-      args,
-      serverId: this.serverId,
-      seq,
-    }
-
-    const data = serializeEnvelope(envelope)
+    const data = `{"id":"${sharedId}","seq":${seq},` + bodyJson.slice(1)
     client.eventBuffer.push({ seq, data, timestamp })
     this.evictBuffer(client)
 
     if (shouldSend) {
+      // A congested client gets terminated instead of sent to; the event is
+      // already in its buffer, so reconnect replay delivers it later.
+      if (!this.checkBackpressure(client)) return
       this.safeSend(client.ws, data)
     }
+  }
+
+  /**
+   * Backpressure gate: returns false when the client was terminated because
+   * its ws send buffer stayed above the threshold past the grace period.
+   *
+   * Termination (not close()) on purpose: a close frame would have to queue
+   * behind the very backlog that triggered this. The close handler retains the
+   * event buffer, so the client reconnects and resumes via seq replay — a safe
+   * bounded degradation instead of unbounded server-side memory growth.
+   */
+  private checkBackpressure(client: ClientConnection): boolean {
+    const buffered = (client.ws as { bufferedAmount?: unknown }).bufferedAmount
+    // Bun's ws shim exposes bufferedAmount today, but it is not a contract
+    // API — if it ever disappears, degrade to no backpressure handling rather
+    // than terminating healthy clients on undefined.
+    if (typeof buffered !== 'number') return true
+
+    if (buffered <= this.backpressureThresholdBytes) {
+      client.backpressureSince = null
+      return true
+    }
+    if (client.backpressureSince === null) {
+      client.backpressureSince = Date.now()
+      return true
+    }
+    if (Date.now() - client.backpressureSince >= this.backpressureGraceMs) {
+      transportLog.warn('Terminating client over send backpressure', {
+        clientId: client.id,
+        bufferedAmount: buffered,
+        congestedForMs: Date.now() - client.backpressureSince,
+      })
+      client.ws.terminate()
+      return false
+    }
+    return true
   }
 
   /** Evict stale/oversized entries from a client's event buffer via batch splice. */
