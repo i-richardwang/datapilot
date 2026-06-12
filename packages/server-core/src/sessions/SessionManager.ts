@@ -806,6 +806,14 @@ interface ManagedSession {
   /** Set when user requests stop - allows event loop to drain before clearing isProcessing */
   stopRequested?: boolean
   lastMessageAt: number
+  /**
+   * Runtime-only (not persisted): last user-visible activity — message send,
+   * turn completion, or the user opening the session. Drives the idle
+   * hibernation sweep. lastMessageAt alone is not enough: it stamps when the
+   * user *sent* a message, so a long-running turn would look "idle" the moment
+   * it finishes.
+   */
+  lastActivityAt?: number
   streamingText: string
   // Incremented each time a new message starts processing.
   // Used to detect if a follow-up message has superseded the current one (stale-request guard).
@@ -1142,6 +1150,12 @@ function managedToSession(m: ManagedSession, overrides?: Partial<Session>): Sess
 // Performance: Batch IPC delta events to reduce renderer load
 const DELTA_BATCH_INTERVAL_MS = 50  // Flush batched deltas every 50ms
 
+// Idle hibernation sweep: interactive sessions left loaded after completion are
+// hibernated once idle past the threshold. Batch/automation/mini sessions don't
+// need this — they hibernate eagerly on completion (shouldHibernateOnComplete).
+const IDLE_HIBERNATE_THRESHOLD_MS = 30 * 60_000
+const IDLE_SWEEP_INTERVAL_MS = 5 * 60_000
+
 interface PendingDelta {
   delta: string
   turnId?: string
@@ -1182,6 +1196,8 @@ export class SessionManager implements ISessionManager {
    * marked as unread when assistant completes - if user is viewing it, don't mark unread.
    */
   private activeViewingSession: Map<string, string> = new Map()
+  /** Periodic sweep that hibernates idle interactive sessions (see sweepIdleSessions). */
+  private idleSweepTimer: ReturnType<typeof setInterval> | null = null
   /** Coordinates startup initialization waiters from IPC handlers. */
   private initGate = new InitGate()
   // O(1) index: taskId → sessionId for background task output lookup (avoids O(n) session scan)
@@ -2003,6 +2019,11 @@ export class SessionManager implements ISessionManager {
       for (const workspace of getWorkspaces()) {
         this.setupConfigWatcher(workspace.rootPath, workspace.id!)
       }
+
+      // Periodically hibernate idle interactive sessions. unref() so the timer
+      // never holds the process open during shutdown.
+      this.idleSweepTimer = setInterval(() => this.sweepIdleSessions(), IDLE_SWEEP_INTERVAL_MS)
+      this.idleSweepTimer.unref()
 
       // Signal that initialization is complete — IPC handlers waiting on initGate will proceed
       this.initGate.markReady()
@@ -5509,6 +5530,10 @@ export class SessionManager implements ISessionManager {
       this.activeViewingSession.set(workspaceId, sessionId)
       // When user starts viewing a session that's not processing, clear unread
       const managed = this.sessions.get(sessionId)
+      if (managed) {
+        // Opening a session counts as activity for the idle hibernation sweep.
+        managed.lastActivityAt = Date.now()
+      }
       if (managed && !managed.isProcessing && managed.hasUnread) {
         this.markSessionRead(sessionId)
       }
@@ -6245,6 +6270,14 @@ export class SessionManager implements ISessionManager {
     }
     this.pendingDeltas.delete(sessionId)
 
+    // Cancel any pending source-activation auto-retry — its callback would
+    // re-send the message against the disposed agent.
+    if (managed.autoRetryTimer) {
+      clearTimeout(managed.autoRetryTimer)
+      managed.autoRetryTimer = undefined
+    }
+    managed.autoRetryPending = undefined
+
     // Clean up permission caches
     this.clearAdminRememberApprovalsForSession(sessionId)
     this.clearPendingPermissionRequestsForSession(sessionId)
@@ -6271,7 +6304,54 @@ export class SessionManager implements ISessionManager {
     managed.agentReady = undefined
     managed.agentReadyResolve = undefined
 
-    sessionLog.info(`Hibernated batch session ${sessionId} — released agent, pool server, and ${messageCount} messages`)
+    sessionLog.info(`Hibernated session ${sessionId} — released agent, pool server, and ${messageCount} messages`)
+  }
+
+  /**
+   * Safety gate for the idle sweep, on top of isHibernationSafe(): interactive
+   * sessions carry user-facing runtime state that eager-hibernate types never
+   * accumulate.
+   *
+   * MAINTENANCE: any new agent-held, non-persisted runtime state added to
+   * ManagedSession must either be persisted or guarded here — hibernation
+   * silently drops it.
+   */
+  private isIdleHibernationSafe(managed: ManagedSession): boolean {
+    if (!this.isHibernationSafe(managed)) return false
+    // The user is looking at this session right now.
+    if (this.isSessionBeingViewed(managed.id, managed.workspace.id)) return false
+    // Title generation / share flows hold ephemeral state.
+    if (managed.isAsyncOperationOngoing) return false
+    // A source-activation auto-retry is about to re-send a message.
+    if (managed.autoRetryTimer || managed.autoRetryPending) return false
+    // Hibernation kills the agent subprocess — background shells (e.g. a dev
+    // server the agent started for the user) would die with it.
+    if (managed.backgroundShellCommands.size > 0) return false
+    if (managed.backgroundTaskOutputs.size > 0) return false
+    return true
+  }
+
+  /**
+   * Periodic reclamation for interactive sessions: hibernate any session that
+   * has been idle past IDLE_HIBERNATE_THRESHOLD_MS. This is the "periodic idle
+   * sweep" that eager hibernation (shouldHibernateOnComplete) defers to for
+   * interactive sessions. Waking up is the ordinary lazy-load path — identical
+   * to a session opened after app restart.
+   */
+  private sweepIdleSessions(): void {
+    const now = Date.now()
+    for (const managed of this.sessions.values()) {
+      // Already cold — nothing to release.
+      if (!managed.agent && !managed.messagesLoaded) continue
+      // Eager-hibernate types are handled at completion time.
+      if (this.shouldHibernateOnComplete(managed)) continue
+      const idleSince = Math.max(managed.lastActivityAt ?? 0, managed.lastMessageAt)
+      if (now - idleSince < IDLE_HIBERNATE_THRESHOLD_MS) continue
+      if (!this.isIdleHibernationSafe(managed)) continue
+      this.hibernateSession(managed.id).catch(err => {
+        sessionLog.error(`Idle sweep failed to hibernate session ${managed.id}:`, err)
+      })
+    }
   }
 
   async sendMessage(
@@ -6494,6 +6574,7 @@ export class SessionManager implements ISessionManager {
     }
 
     managed.lastMessageAt = Date.now()
+    managed.lastActivityAt = Date.now()
     this.setProcessing(managed, true)
     managed.streamingText = ''
     managed.processingGeneration++
@@ -7079,6 +7160,8 @@ export class SessionManager implements ISessionManager {
     // 1. Cleanup state
     this.setProcessing(managed, false)
     managed.stopRequested = false  // Reset for next turn
+    // Turn completion resets the idle clock — the user is likely reading the result.
+    managed.lastActivityAt = Date.now()
 
     const turnStartFinalMessageId = managed.turnStartFinalMessageId
     managed.turnStartFinalMessageId = undefined
@@ -7162,7 +7245,7 @@ export class SessionManager implements ISessionManager {
     // Applies to batch sessions, automation-triggered sessions (the main
     // source of memory growth in headless deployments), and mini-agent
     // sessions. Interactive sessions stay loaded for user follow-up and
-    // rely on the periodic idle sweep (future work) for reclamation.
+    // are reclaimed by the periodic idle sweep (sweepIdleSessions).
     if (this.shouldHibernateOnComplete(managed) && this.isHibernationSafe(managed)) {
       this.hibernateSession(sessionId).catch(err => {
         sessionLog.error(`Failed to hibernate session ${sessionId}:`, err)
@@ -9057,6 +9140,12 @@ export class SessionManager implements ISessionManager {
       }
     }
     this.batchProcessors.clear()
+
+    // Stop the idle hibernation sweep
+    if (this.idleSweepTimer) {
+      clearInterval(this.idleSweepTimer)
+      this.idleSweepTimer = null
+    }
 
     // Clear all pending delta flush timers
     for (const [sessionId, timer] of this.deltaFlushTimers) {
