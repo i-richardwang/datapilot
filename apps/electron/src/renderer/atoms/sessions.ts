@@ -175,17 +175,29 @@ export const activeSessionIdAtom = atom<string | null>(null)
 /**
  * Action atom: update a single session
  * Only triggers re-render in components subscribed to this specific session
+ *
+ * `syncMeta: false` skips the sessionMetaMapAtom write. Every meta write
+ * clones the full map and re-renders every whole-map subscriber (shell,
+ * navigation, session list filtering), so high-frequency callers — the
+ * streaming event path runs per delta/tool event — must pass false and
+ * coalesce meta updates instead (see scheduleSessionMetaUpdate in App.tsx).
  */
 export const updateSessionAtom = atom(
   null,
-  (get, set, sessionId: string, updater: (prev: Session | null) => Session | null) => {
+  (
+    get,
+    set,
+    sessionId: string,
+    updater: (prev: Session | null) => Session | null,
+    options?: { syncMeta?: boolean }
+  ) => {
     const sessionAtom = sessionAtomFamily(sessionId)
     const currentSession = get(sessionAtom)
     const newSession = updater(currentSession)
     set(sessionAtom, newSession)
 
     // Also update metadata if session exists
-    if (newSession) {
+    if (newSession && options?.syncMeta !== false) {
       const metaMap = get(sessionMetaMapAtom)
       const newMetaMap = new Map(metaMap)
       newMetaMap.set(sessionId, extractSessionMeta(newSession))
