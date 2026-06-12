@@ -23,6 +23,10 @@ import { useEscapeInterrupt } from '@/context/EscapeInterruptContext'
 import { ChatDisplay } from '../app-shell/ChatDisplay'
 
 /** Rotating placeholder keys for compact mode input - short, action-oriented */
+// Stable fallback for optional callbacks — an inline `() => {}` would be a new
+// reference every render and defeat the markdown block memoization downstream.
+const noop = () => {}
+
 const COMPACT_PLACEHOLDER_KEYS = [
   'editPopover.placeholder1',
   'editPopover.placeholder2',
@@ -1070,8 +1074,8 @@ export function EditPopover({
                 <ChatDisplay
                   session={displaySession}
                   onSendMessage={inlineExecution ? handleInlineSendMessage : handleLegacySendMessage}
-                  onOpenFile={onOpenFile || (() => {})}
-                  onOpenUrl={onOpenUrl || (() => {})}
+                  onOpenFile={onOpenFile || noop}
+                  onOpenUrl={onOpenUrl || noop}
                   currentModel={currentModel}
                   onModelChange={setCurrentModel}
                   pendingPermission={pendingPermission}

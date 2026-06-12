@@ -95,6 +95,24 @@ describe('splitMarkdownIntoBlocks', () => {
     expect(joined(blocks)).toBe(md)
   })
 
+  test('falls back on empty list items (marked splits the list, remark keeps one)', () => {
+    // marked.lexer terminates a list after an empty leading item, so without
+    // the guard these split into two list blocks that render as two <ul>s
+    // while the whole-document parse renders one.
+    expect(splitMarkdownIntoBlocks('- \n- b')).toBeNull()
+    expect(splitMarkdownIntoBlocks('Plan:\n\n- \n- step two\n- step three')).toBeNull()
+    expect(splitMarkdownIntoBlocks('- \n\n- b')).toBeNull()
+    expect(splitMarkdownIntoBlocks('1. \n2. x')).toBeNull()
+    expect(splitMarkdownIntoBlocks('intro\n\n1.\n2. x')).toBeNull()
+  })
+
+  test('does NOT fall back on adjacent lists with different markers (two lists in both parsers)', () => {
+    const md = '- a\n\n* b'
+    const blocks = splitMarkdownIntoBlocks(md)
+    expect(blocks).not.toBeNull()
+    expect(joined(blocks)).toBe(md)
+  })
+
   test('blockquotes and nested lists stay intact across blank lines', () => {
     const md = '> quote line one\n> quote line two\n\n1. first\n   - nested\n2. second\n\nend.'
     const blocks = splitMarkdownIntoBlocks(md)

@@ -722,7 +722,6 @@ export function saveSessionMessageUpdate(session: StoredSession, changedMessageI
  */
 export function saveSessionTurnReconcile(session: StoredSession, recentlyChangedMessageIds: string[]): void {
   const db = getWorkspaceDb(session.workspaceRootPath);
-  const sessionDir = getSessionPath(session.workspaceRootPath, session.id);
 
   const dbRows = db.select({ id: messagesTable.id, position: messagesTable.position })
     .from(messagesTable)

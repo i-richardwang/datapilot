@@ -48,13 +48,17 @@ function countLines(text: string): number {
  * - ```` ```mermaid ```` participates in positional first-mermaid handling
  * - footnotes and link reference definitions resolve document-wide
  * - raw HTML (block or inline) may open/close tags across blocks (rehype-raw)
+ * - empty list items: marked terminates a list after an empty leading item
+ *   ("- \n- b" lexes as two list tokens) while remark parses one list, so the
+ *   split would render two <ul>s where the whole-document parse renders one
  */
 export function splitMarkdownIntoBlocks(markdown: string): MarkdownBlock[] | null {
   if (
     markdown.includes('$$') ||
     markdown.includes('```mermaid') ||
     markdown.includes('[^') ||
-    /^ {0,3}\[[^\]]+\]:/m.test(markdown)
+    /^ {0,3}\[[^\]]+\]:/m.test(markdown) ||
+    /^ {0,3}(?:[-*+]|\d{1,9}[.)])[ \t]*$/m.test(markdown)
   ) {
     return null
   }

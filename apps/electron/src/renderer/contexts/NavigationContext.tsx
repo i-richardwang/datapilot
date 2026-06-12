@@ -71,7 +71,7 @@ import {
   isBatchesNavigation,
   DEFAULT_NAVIGATION_STATE,
 } from '../../shared/types'
-import { sessionAtomFamily, sessionMetaMapAtom, updateSessionMetaAtom, type SessionMeta } from '@/atoms/sessions'
+import { sessionAtomFamily, sessionMetaMapAtom, updateSessionMetaAtom, extractSessionMeta, type SessionMeta } from '@/atoms/sessions'
 import { sourcesAtom } from '@/atoms/sources'
 import { skillsAtom } from '@/atoms/skills'
 import {
@@ -491,13 +491,17 @@ export function NavigationProvider({
     if (onAutoDeleteEmptySession && prevVisibleSessionIdsRef.current.size > 0) {
       for (const prevId of prevVisibleSessionIdsRef.current) {
         if (!currentIds.has(prevId)) {
-          const meta = store.get(sessionMetaMapAtom).get(prevId)
           // The session atom is the source of truth during streaming — meta
           // lags it by up to one coalescing window (150ms), so a session whose
-          // processing started via the event path (remote/CLI-injected message,
-          // batch sub-session) can look idle in meta while actively running.
-          const atomProcessing = store.get(sessionAtomFamily(prevId))?.isProcessing === true
-          const isEmpty = meta && !meta.lastFinalMessageId && !meta.name && !meta.isProcessing && !atomProcessing
+          // turn started OR completed via the event path (remote/CLI-injected
+          // message, batch sub-session, an instant first reply) can look
+          // idle/empty in meta while the atom already holds content. Derive
+          // the emptiness check from the atom whenever it exists.
+          const atomSession = store.get(sessionAtomFamily(prevId))
+          const meta = atomSession
+            ? extractSessionMeta(atomSession)
+            : store.get(sessionMetaMapAtom).get(prevId)
+          const isEmpty = meta && !meta.lastFinalMessageId && !meta.name && !meta.isProcessing
           const hasDraft = getDraft?.(prevId)?.trim()
           if (isEmpty && !hasDraft) {
             onAutoDeleteEmptySession(prevId)

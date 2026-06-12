@@ -87,7 +87,7 @@ import { useFocusContext } from "@/context/FocusContext"
 import { getSessionTitle } from "@/utils/session"
 import { useSetAtom } from "jotai"
 import type { Session, Workspace, FileAttachment, PermissionRequest, LoadedSource, LoadedSkill, PermissionMode, SourceFilter, AutomationFilter, BatchFilter } from "../../../shared/types"
-import { sessionMetaMapAtom, sendToWorkspaceAtom, type SessionMeta } from "@/atoms/sessions"
+import { sessionMetaMapAtom, sessionAtomFamily, sendToWorkspaceAtom, type SessionMeta } from "@/atoms/sessions"
 import { sourcesAtom } from "@/atoms/sources"
 import { skillsAtom } from "@/atoms/skills"
 import { panelStackAtom, panelCountAtom, focusedPanelIdAtom, focusedSessionIdAtom, focusNextPanelAtom, focusPrevPanelAtom, parseSessionIdFromRoute } from "@/atoms/panel-stack"
@@ -2497,11 +2497,20 @@ function AppShellContent({
                         onMarkAllRead: () => {
                           if (!activeWorkspaceId) return
                           // Optimistic: clear hasUnread on all workspace session metas
+                          // AND their loaded session atoms — the event coalescer
+                          // re-extracts meta from the atom at flush time, so a
+                          // meta-only write would be reverted for any session
+                          // with a buffered update (e.g. a turn that just
+                          // completed, which is exactly what set hasUnread).
                           setSessionMetaMap(prev => {
                             const next = new Map(prev)
                             for (const [id, meta] of next) {
                               if (meta.workspaceId === activeWorkspaceId && meta.hasUnread) {
                                 next.set(id, { ...meta, hasUnread: false })
+                                const session = store.get(sessionAtomFamily(id))
+                                if (session?.hasUnread) {
+                                  store.set(sessionAtomFamily(id), { ...session, hasUnread: false })
+                                }
                               }
                             }
                             return next

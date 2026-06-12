@@ -1143,6 +1143,13 @@ export class ConfigWatcher {
    * In DB mode: loads session from DB and constructs a SessionHeader.
    */
   private handleSessionMetadataChange(sessionId: string): void {
+    // Watchers without this callback (every per-agent ConfigWatcher created
+    // through ConfigWatcherManager) must not pay the header read: in DB mode
+    // this handler runs synchronously inside every 'session:saved' emit, so
+    // with N live agents a persist would otherwise cost N+1 selects.
+    if (!this.callbacks.onSessionMetadataChange) {
+      return;
+    }
     if (this.useDbMode) {
       // This listener runs synchronously inside every dbEvents 'session:saved'
       // emit — i.e. inside each message persist on the streaming hot path.

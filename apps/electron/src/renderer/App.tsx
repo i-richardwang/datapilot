@@ -1218,8 +1218,13 @@ export default function App() {
       // Check if session has any messages using session metadata from Jotai store
       // We use store.get() instead of closing over sessions to prevent memory leaks
       // (closures would retain the full sessions array with all messages)
-      const metaMap = store.get(sessionMetaMapAtom)
-      const meta = metaMap.get(sessionId)
+      // Prefer the live session atom: meta lags it by up to one event-coalescing
+      // window (150ms), so a first reply that just landed could otherwise look
+      // like an empty session and skip the confirmation prompt.
+      const atomSession = store.get(sessionAtomFamily(sessionId))
+      const meta = atomSession
+        ? extractSessionMeta(atomSession)
+        : store.get(sessionMetaMapAtom).get(sessionId)
       // Session is empty if it has no lastFinalMessageId (no assistant responses) and no name (set on first user message)
       const isEmpty = !meta || (!meta.lastFinalMessageId && !meta.name)
 
