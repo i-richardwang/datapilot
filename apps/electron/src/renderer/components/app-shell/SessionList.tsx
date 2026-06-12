@@ -468,10 +468,14 @@ export function SessionList({
   // through a ref instead of a closed-over snapshot.
   const flatRowsRef = useRef(flatRows)
   const rowIndexMapRef = useRef(rowIndexMap)
+  // navigateToSession closes over navigationState (filter routing context); a
+  // memoized row's retained onSelect must not navigate with a stale filter.
+  const navigateToSessionRef = useRef(navigateToSession)
   useEffect(() => {
     flatRowsRef.current = flatRows
     rowIndexMapRef.current = rowIndexMap
-  }, [flatRows, rowIndexMap])
+    navigateToSessionRef.current = navigateToSession
+  }, [flatRows, rowIndexMap, navigateToSession])
 
   // --- Action handlers with toast feedback ---
   const {
@@ -547,8 +551,8 @@ export function SessionList({
   // --- Click handlers ---
   const handleSelectSession = useCallback((row: SessionListRow, index: number) => {
     selectSession(row.item.id, index)
-    navigateToSession(row.item.id)
-  }, [selectSession, navigateToSession])
+    navigateToSessionRef.current(row.item.id)
+  }, [selectSession])
 
   const handleSelectSessionById = useCallback((sessionId: string) => {
     const index = rowIndexMapRef.current.get(sessionId) ?? -1
@@ -557,8 +561,8 @@ export function SessionList({
     } else {
       selectSession(sessionId, 0)
     }
-    navigateToSession(sessionId)
-  }, [selectSession, navigateToSession])
+    navigateToSessionRef.current(sessionId)
+  }, [selectSession])
 
   const handleToggleSelect = useCallback((row: SessionListRow, index: number) => {
     focusZone('navigator', { intent: 'click', moveFocus: false })

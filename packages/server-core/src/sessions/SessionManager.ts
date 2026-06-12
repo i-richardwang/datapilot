@@ -6241,6 +6241,13 @@ export class SessionManager implements ISessionManager {
     // flush must complete while the flag is still true.
     await sessionPersistenceQueue.flush(sessionId)
 
+    // Re-check the gates after the await: in file-mode the flush is real disk
+    // IO, and a message can arrive in that window. Tearing down the agent
+    // mid-send would drop the turn. (DB-mode flush is a no-op today, which
+    // makes this unreachable — keep it so file-mode or future IO in the send
+    // path can't silently reintroduce the race.)
+    if (managed.isProcessing || !this.isHibernationSafe(managed)) return
+
     // Dispose agent (stops ConfigWatcher, clears permissions, disconnects MCP pool)
     if (managed.agent) {
       managed.agent.dispose()

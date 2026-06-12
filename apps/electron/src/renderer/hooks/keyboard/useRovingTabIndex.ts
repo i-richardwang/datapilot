@@ -116,7 +116,17 @@ export function useRovingTabIndex<T>({
     }
   }, [activeIndex, items, getId])
 
+  // Latest-value ref for everything the key handler reads. Rows memoized on
+  // their own props (e.g. SessionItem) keep the onKeyDown closure from the
+  // render in which they last changed — after a list reorder that closure
+  // would otherwise navigate against a stale items snapshot and select the
+  // wrong row. Reading through this ref keeps any retained handler operating
+  // on current data and callbacks.
+  const latest = useRef({ items, activeIndex, getId, orientation, wrap, onNavigate, onActivate, onDelete, onContextMenu, moveFocus, onExtendSelection, enabled })
+  latest.current = { items, activeIndex, getId, orientation, wrap, onNavigate, onActivate, onDelete, onContextMenu, moveFocus, onExtendSelection, enabled }
+
   const navigateToIndex = useCallback((nextIndex: number) => {
+    const { items, activeIndex, getId, onNavigate, moveFocus } = latest.current
     if (nextIndex >= 0 && nextIndex < items.length && nextIndex !== activeIndex) {
       setActiveIndexState(nextIndex)
       onNavigate?.(items[nextIndex], nextIndex)
@@ -128,9 +138,10 @@ export function useRovingTabIndex<T>({
         })
       }
     }
-  }, [items, activeIndex, getId, onNavigate, moveFocus])
+  }, [])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const { items, activeIndex, getId, orientation, wrap, onActivate, onDelete, onContextMenu, moveFocus, onExtendSelection, enabled } = latest.current
     if (!enabled || items.length === 0) return
 
     const isVertical = orientation === 'vertical' || orientation === 'both'
@@ -249,7 +260,7 @@ export function useRovingTabIndex<T>({
         }
       }
     }
-  }, [enabled, items, activeIndex, orientation, wrap, onActivate, onDelete, onContextMenu, getId, navigateToIndex, onExtendSelection, moveFocus])
+  }, [navigateToIndex])
 
   const getItemProps = useCallback((item: T, index: number) => {
     const id = getId(item, index)
