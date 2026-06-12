@@ -6,6 +6,7 @@ import { autoRegisterDriver } from '../db/driver.ts'
 import { BatchProcessor } from './batch-processor.ts'
 import { createInitialBatchState, loadBatchState, saveBatchState } from './batch-state-manager.db.ts'
 import {
+  BATCH_PROGRESS_THROTTLE_MS,
   BATCH_STATE_FILE_PREFIX,
   DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS,
   GLOBAL_MAX_CONCURRENT_SESSIONS_ENV,
@@ -380,7 +381,7 @@ describe('BatchProcessor', () => {
       expect(setup.processor.onSessionComplete('unknown-session', 'complete')).toBe(false)
     })
 
-    it('should send progress updates', async () => {
+    it('should send progress updates within the throttle window', async () => {
       setup.processor.start('test-batch')
       await tick()
       setup.progressUpdates.length = 0
@@ -388,9 +389,56 @@ describe('BatchProcessor', () => {
       const sessionId = setup.createdSessions[0]!.sessionId
       setup.processor.onSessionComplete(sessionId, 'complete')
 
+      // Machine-driven progress is throttled (leading + trailing) — the
+      // completion may land in a window opened by the start-time dispatch
+      // round, so the guarantee is "emitted within the window", not "sync".
+      await tick(BATCH_PROGRESS_THROTTLE_MS + 50)
+
       expect(setup.progressUpdates.length).toBeGreaterThanOrEqual(1)
       const completionUpdate = setup.progressUpdates.find(p => p.completedItems === 1)
       expect(completionUpdate).toBeDefined()
+    })
+  })
+
+  // =========================================================================
+  // Progress Throttling
+  // =========================================================================
+
+  describe('progress throttling', () => {
+    it('coalesces a burst of completions into leading + trailing emissions', async () => {
+      setup.processor.start('test-batch')
+      await tick(BATCH_PROGRESS_THROTTLE_MS + 50) // drain the start-time window
+      setup.progressUpdates.length = 0
+
+      // Two completions back-to-back: only the first emits immediately.
+      setup.processor.onSessionComplete(setup.createdSessions[0]!.sessionId, 'complete')
+      setup.processor.onSessionComplete(setup.createdSessions[1]!.sessionId, 'complete')
+      expect(setup.progressUpdates).toHaveLength(1)
+      expect(setup.progressUpdates[0]!.completedItems).toBe(1)
+
+      // Trailing emission carries the freshest state — both completions plus
+      // the item the freed slots re-dispatched in between.
+      await tick(BATCH_PROGRESS_THROTTLE_MS + 100)
+      const last = setup.progressUpdates[setup.progressUpdates.length - 1]!
+      expect(last.completedItems).toBe(2)
+      expect(last.runningItems).toBe(1)
+      expect(setup.progressUpdates.length).toBeLessThanOrEqual(3)
+    })
+
+    it('emits terminal progress immediately, bypassing the throttle', async () => {
+      setup.processor.start('test-batch')
+      await tick()
+      setup.processor.onSessionComplete(setup.createdSessions[0]!.sessionId, 'complete')
+      await tick()
+      setup.processor.onSessionComplete(setup.createdSessions[1]!.sessionId, 'complete')
+      await tick()
+
+      setup.progressUpdates.length = 0
+      setup.processor.onSessionComplete(setup.createdSessions[2]!.sessionId, 'complete')
+
+      // completeBatch() must broadcast the final state synchronously — a
+      // stale trailing emit must never shadow or delay the terminal status.
+      expect(setup.progressUpdates.some(p => p.status === 'completed')).toBe(true)
     })
   })
 
@@ -695,6 +743,68 @@ describe('BatchProcessor', () => {
       expect(state.items.beta!.sessionId).toBeUndefined()  // dead session cleared
       expect(state.items.acme!.status).toBe('completed')   // finished work preserved
       expect(state.items.gamma!.status).toBe('pending')    // pending untouched
+
+      rebooted.dispose()
+    })
+
+    it('re-pends stale running items of a batch that crashed (or disposed) while paused', () => {
+      // Two ways to get here: pause → crash before the items finished, or a
+      // graceful dispose() whose deliberately meta-only write left the rows
+      // behind. Either way the owning process is gone, so the rows are stale.
+      const pausedWithStale: BatchState = {
+        batchId: 'test-batch',
+        status: 'paused',
+        totalItems: 3,
+        items: {
+          acme: { status: 'completed', retryCount: 0, completedAt: 1500 },
+          beta: { status: 'running', retryCount: 0, startedAt: 1200, sessionId: 'dead-session' },
+          gamma: { status: 'pending', retryCount: 0 },
+        },
+      }
+      saveBatchState(setup.tempDir, pausedWithStale)
+
+      const rebooted = reboot()
+      expect(rebooted.reconcileCrashedBatches()).toEqual(['test-batch'])
+
+      const state = loadBatchState(setup.tempDir, 'test-batch')!
+      expect(state.status).toBe('paused')                  // already paused — only items healed
+      expect(state.items.beta!.status).toBe('pending')     // stale running row re-pended
+      expect(state.items.beta!.sessionId).toBeUndefined()  // dead session cleared
+      expect(state.items.acme!.status).toBe('completed')   // finished work preserved
+
+      rebooted.dispose()
+    })
+
+    it('keeps a stale running item retryable after retryItem() activates the batch early', async () => {
+      // Regression guard for the resume() trap: retryItem() loads the batch
+      // into activeStates via ensureActive(), after which resume() skips its
+      // cold-restart re-pend. Without boot reconcile healing the stale row
+      // first, the item would stay `running` forever (its session died with
+      // the previous server, so onSessionComplete can never fire).
+      const pausedWithStale: BatchState = {
+        batchId: 'test-batch',
+        status: 'paused',
+        totalItems: 3,
+        items: {
+          acme: { status: 'failed', retryCount: 0, completedAt: 1500, error: 'error' },
+          beta: { status: 'running', retryCount: 0, startedAt: 1200, sessionId: 'dead-session' },
+          gamma: { status: 'completed', retryCount: 0, completedAt: 1600 },
+        },
+      }
+      saveBatchState(setup.tempDir, pausedWithStale)
+
+      const rebooted = reboot()
+      rebooted.reconcileCrashedBatches()
+
+      rebooted.retryItem('test-batch', 'acme') // activates the batch in memory
+      const progress = rebooted.resume('test-batch')
+      await tick()
+
+      expect(progress.status).toBe('running')
+      const state = rebooted.getState('test-batch')!
+      // Both the retried item and the healed stale item get re-dispatched.
+      expect(state.items.beta!.status).toBe('running')
+      expect(state.items.beta!.sessionId).not.toBe('dead-session')
 
       rebooted.dispose()
     })

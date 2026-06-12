@@ -198,6 +198,10 @@ File watcher for live config updates:
 - Callbacks: `onConfigChange`, `onThemeChange`, `onWorkspacePermissionsChange`, `onSourcePermissionsChange`
 - **DB-mode watch scope invariant:** in DB mode the workspace watcher must never recursively watch the workspace root (and especially not `sessions/`) — on Linux a recursive `fs.watch` registers inotify per subdirectory, so 30k+ session dirs cost tens of seconds at startup for events the sessions branch discards anyway (DB events cover them). Watch the root non-recursively plus only the subtrees that genuinely need filesystem events (`sources/`, `skills/`, `statuses/`). A new file-watched subtree must be added to `watchWorkspaceDir`'s subtree list, not by widening the watch back to the root.
 
+### Batch progress & boot invariants (`src/batches/`)
+- **Progress emission is two-tier:** machine-driven paths (session completions, dispatch rounds, timeout sweeps) go through `emitProgressThrottled` (leading + trailing, `BATCH_PROGRESS_THROTTLE_MS`); user-initiated transitions (start/pause/retry) and terminal transitions go through `emitProgressNow`. New emission sites must pick the right tier — a throttled terminal emit can be shadowed by a stale trailing one, and an unthrottled machine emit re-creates the N-sessions × N-broadcasts storm.
+- **Boot invariant:** no batch item may be `running` when the server boots. `reconcileCrashedBatches()` enforces it for both `running` batches (crash leftovers → paused + re-pend) and `paused` batches (dispose()'s meta-only write and pause→crash windows leave stale running rows). Don't "optimize away" the paused-batch sweep: a stale running row loaded via `retryItem()`/`ensureActive()` makes `resume()` skip its cold-restart re-pend and strands the item forever.
+
 ### Batch item ordering (`src/batches/`)
 Processing/persistence order is `BatchState.itemOrder` (mirrors `batch_items.position`; rebuilt from row order on every load, never persisted in the meta blob). **Never derive order from `Object.keys/entries(state.items)`** — item ids come from the data source's `idField` and are often integer-like strings, which JS objects iterate in ascending numeric order regardless of insertion order. Dispatch (`dispatchNext`) and full saves (`replaceItemRows`) must go through `itemOrder`; reordering `batch_items.position` externally (e.g. shuffling pending items) is a supported operation and must survive load → full save round-trips.
 
@@ -225,6 +229,7 @@ cd packages/shared && bun run tsc --noEmit
 
 ## Notes
 - `ClaudeAgent` is the primary class in `src/agent/claude-agent.ts`.
+- Pi subprocess spawns set `NODE_COMPILE_CACHE` (→ `~/.datapilot/cache/node-compile-cache`) via `resolveNodeCompileCacheEnv()` in `pi-agent.ts` so V8 compile artifacts persist across spawns — batch runs spawn one subprocess per item, each otherwise re-parsing the ~27MB pi-agent-server bundle. Requires Node ≥ 22.1; other runtimes ignore the variable. An explicit `NODE_COMPILE_CACHE` or `NODE_DISABLE_COMPILE_CACHE=1` in the parent env takes precedence.
 - Claude SDK subprocess env is sanitized to strip Claude-specific Bedrock routing vars (`CLAUDE_CODE_USE_BEDROCK`, `AWS_BEARER_TOKEN_BEDROCK`, `ANTHROPIC_BEDROCK_BASE_URL`). Pi Bedrock uses its own AWS env path instead.
 - Backward alias export (`CraftAgent`) exists for compatibility.
 - Prefer routing new model vendors through the existing Pi path (`providerType: 'pi'` + `piAuthProvider`) unless they truly need a distinct runtime/backend. The Pi provider catalog and display metadata live in `src/config/models-pi.ts`.

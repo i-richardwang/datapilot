@@ -31,6 +31,15 @@ export function resolveGlobalMaxConcurrentSessions(): number {
   return DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS
 }
 
+/**
+ * Throttle window for machine-driven progress emissions (item completions,
+ * dispatch rounds, timeout sweeps). The first event in a quiet period emits
+ * immediately; the rest of the burst coalesces into one trailing emission.
+ * User-initiated transitions (start/pause/retry) and terminal transitions
+ * bypass the throttle entirely.
+ */
+export const BATCH_PROGRESS_THROTTLE_MS = 200
+
 /** Default maximum retry attempts per item */
 export const DEFAULT_MAX_RETRIES = 2
 

@@ -18,6 +18,7 @@ import { createInterface, type Interface as ReadlineInterface } from 'node:readl
 import type { AgentEvent } from '@craft-agent/core/types';
 import type { FileAttachment } from '../utils/files.ts';
 import { getProxyEnvVars } from '../config/proxy-env.ts';
+import { CONFIG_DIR } from '../config/paths.ts';
 
 import type {
   BackendConfig,
@@ -104,6 +105,22 @@ import { extractWorkspaceSlug } from '../utils/workspace.ts';
 import { LLM_QUERY_TIMEOUT_MS, type LLMQueryRequest, type LLMQueryResult } from './llm-tool.ts';
 import { executeBrowserToolCommand } from './browser-tool-runtime.ts';
 import { saveBinaryResponse } from '../utils/binary-detection.ts';
+
+/**
+ * Compile-cache env for the pi-agent-server subprocess. The bundled server is
+ * ~27MB of JS that V8 re-parses on every spawn — and batch runs spawn one
+ * subprocess per item. NODE_COMPILE_CACHE (Node >= 22.1) persists the compiled
+ * bytecode across spawns; other runtimes ignore the variable, and Node treats
+ * an unusable cache dir as a soft failure (falls back to plain compilation).
+ *
+ * Returns {} when the caller's environment already takes a position —
+ * NODE_COMPILE_CACHE inherits through the env spread, and
+ * NODE_DISABLE_COMPILE_CACHE=1 is the official opt-out.
+ */
+export function resolveNodeCompileCacheEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  if (env.NODE_COMPILE_CACHE || env.NODE_DISABLE_COMPILE_CACHE) return {};
+  return { NODE_COMPILE_CACHE: join(CONFIG_DIR, 'cache', 'node-compile-cache') };
+}
 
 // ============================================================
 // PiAgent Implementation
@@ -459,6 +476,10 @@ export class PiAgent extends BaseAgent {
         ...awsEnv,
         // Pass session dir for cross-process toolMetadataStore
         ...(sessionDir ? { CRAFT_SESSION_DIR: sessionDir } : {}),
+        // Persist V8 compile artifacts across spawns (no-op on non-Node runtimes).
+        // Check the merged env, not just process.env — a per-connection
+        // envOverrides entry taking a position on the compile cache must win.
+        ...resolveNodeCompileCacheEnv({ ...process.env, ...this.config.envOverrides }),
         // Propagate debug mode
         DATAPILOT_DEBUG: (process.argv.includes('--debug') || process.env.DATAPILOT_DEBUG === '1') ? '1' : '0',
       },

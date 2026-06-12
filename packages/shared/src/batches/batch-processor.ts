@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { createLogger } from '../utils/debug.ts'
-import { BATCHES_CONFIG_FILE, DEFAULT_MAX_CONCURRENCY, DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS, DEFAULT_MAX_RETRIES, BATCH_ITEM_ENV_PREFIX, DEFAULT_ITEM_TIMEOUT_MS } from './constants.ts'
+import { BATCHES_CONFIG_FILE, BATCH_PROGRESS_THROTTLE_MS, DEFAULT_MAX_CONCURRENCY, DEFAULT_GLOBAL_MAX_CONCURRENT_SESSIONS, DEFAULT_MAX_RETRIES, BATCH_ITEM_ENV_PREFIX, DEFAULT_ITEM_TIMEOUT_MS } from './constants.ts'
 import { BatchesFileConfigSchema } from './schemas.ts'
 import { loadBatchItems } from './data-source.ts'
 import {
@@ -57,6 +57,12 @@ export class BatchProcessor {
 
   /** Interval handle for periodic timeout checks */
   private timeoutCheckInterval: ReturnType<typeof setInterval> | null = null
+
+  /** Open throttle windows for machine-driven progress emissions, keyed by batchId */
+  private progressEmitTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+
+  /** Batches that received progress events inside an open throttle window */
+  private progressEmitDirty: Set<string> = new Set()
 
   constructor(options: BatchSystemOptions) {
     this.options = options
@@ -202,9 +208,7 @@ export class BatchProcessor {
 
     log.info(`[BatchProcessor] Paused batch "${batchId}"`)
 
-    const progress = computeProgress(state)
-    this.options.onProgress?.(progress)
-    return progress
+    return this.emitProgressNow(state)
   }
 
   /**
@@ -273,29 +277,47 @@ export class BatchProcessor {
    * shows as active in the UI forever, pollutes status aggregates, and cannot be
    * paused via the normal API (it is not in `activeStates`).
    *
-   * This is dispose()'s boot-time counterpart: it scans every persisted batch
-   * state and, for any still `running`, flips it to `paused` and re-pends its
-   * in-flight items so a later resume() re-dispatches them. Because the owning
-   * process is gone, every disk-only `running` is by definition a crash
-   * leftover. Idempotent; intended to run once per workspace when its
-   * BatchProcessor is first initialised (before any batch is activated).
+   * This is dispose()'s boot-time counterpart, enforcing one invariant: no
+   * item may be `running` when the server boots — the processes that owned
+   * them died with the previous server. It scans every persisted batch state:
+   *
+   * - `running` batches are crash leftovers (graceful dispose flips them to
+   *   paused) — flip to `paused` and re-pend their in-flight items.
+   * - `paused` batches can still carry stale `running` items: dispose()'s
+   *   deliberately meta-only write leaves them behind on every graceful
+   *   shutdown, and a pause → crash window does too. Re-pend those items.
+   *   Beyond being cosmetically wrong in the UI, a stale running row is a
+   *   trap: retryItem()/retryFailedItems() load the batch into activeStates
+   *   via ensureActive(), after which resume() skips its own cold-restart
+   *   re-pend (the batch no longer looks recovered-from-disk) and the item
+   *   would stay `running` forever.
+   *
+   * Idempotent; intended to run once per workspace when its BatchProcessor is
+   * first initialised (before any batch is activated).
    *
    * Returns the IDs of the batches it reconciled (empty on a clean boot).
    */
   reconcileCrashedBatches(): string[] {
     const reconciled: string[] = []
     for (const state of loadAllBatchStates(this.options.workspaceRootPath)) {
-      if (state.status !== 'running') continue
+      if (state.status !== 'running' && state.status !== 'paused') continue
       // A genuinely active batch is tracked in memory; never touch one. At init
       // time activeStates is empty, so this only guards against misuse.
       if (this.activeStates.has(state.batchId)) continue
 
-      state.status = 'paused'
+      const wasRunning = state.status === 'running'
       const rePended = this.resetRunningItems(state)
-      saveBatchMeta(this.options.workspaceRootPath, state)
-      saveBatchItemStates(this.options.workspaceRootPath, state, rePended)
+      if (!wasRunning && rePended.length === 0) continue
+
+      if (wasRunning) {
+        state.status = 'paused'
+        saveBatchMeta(this.options.workspaceRootPath, state)
+      }
+      if (rePended.length > 0) {
+        saveBatchItemStates(this.options.workspaceRootPath, state, rePended)
+      }
       reconciled.push(state.batchId)
-      log.info(`[BatchProcessor] Reconciled crashed batch "${state.batchId}": running → paused, re-pended in-flight items`)
+      log.info(`[BatchProcessor] Reconciled crashed batch "${state.batchId}": ${wasRunning ? 'running → paused, ' : ''}re-pended ${rePended.length} in-flight item(s)`)
     }
     return reconciled
   }
@@ -349,9 +371,7 @@ export class BatchProcessor {
 
     log.info(`[BatchProcessor] Retrying item "${itemId}" in batch "${batchId}" (batch status: ${state.status})`)
 
-    const progress = computeProgress(state)
-    this.options.onProgress?.(progress)
-    return progress
+    return this.emitProgressNow(state)
   }
 
   /**
@@ -407,9 +427,7 @@ export class BatchProcessor {
 
     log.info(`[BatchProcessor] Retrying ${failedIds.length} failed items in batch "${batchId}" (batch status: ${state.status})`)
 
-    const progress = computeProgress(state)
-    this.options.onProgress?.(progress)
-    return progress
+    return this.emitProgressNow(state)
   }
 
   /**
@@ -438,6 +456,68 @@ export class BatchProcessor {
     const state = this.activeStates.get(batchId) ?? loadBatchState(this.options.workspaceRootPath, batchId)
     if (!state) return null
     return getBatchItemsPage(state, offset, limit, filterStatus)
+  }
+
+  // ============================================================================
+  // Internal: Progress Emission
+  // ============================================================================
+
+  /**
+   * Emit progress immediately, cancelling any open throttle window so the
+   * caller's snapshot is the freshest one observers see. For user-initiated
+   * transitions (start/pause/retry) and terminal transitions (completeBatch),
+   * which must never appear delayed or be shadowed by a stale trailing emit.
+   */
+  private emitProgressNow(state: BatchState): BatchProgress {
+    const timer = this.progressEmitTimers.get(state.batchId)
+    if (timer) {
+      clearTimeout(timer)
+      this.progressEmitTimers.delete(state.batchId)
+    }
+    this.progressEmitDirty.delete(state.batchId)
+
+    const progress = computeProgress(state)
+    this.options.onProgress?.(progress)
+    return progress
+  }
+
+  /**
+   * Emit progress for machine-driven paths (session completions, dispatch
+   * rounds, timeout sweeps): leading edge fires immediately, then everything
+   * else inside the window coalesces into one trailing emission. N parallel
+   * sessions completing in a burst would otherwise fan out N near-identical
+   * broadcasts, each costing an O(items) computeProgress() scan here plus a
+   * per-client serialization downstream.
+   */
+  private emitProgressThrottled(batchId: string): void {
+    if (this.progressEmitTimers.has(batchId)) {
+      this.progressEmitDirty.add(batchId)
+      return
+    }
+
+    const state = this.activeStates.get(batchId)
+    if (!state) return
+    this.options.onProgress?.(computeProgress(state))
+
+    const timer = setTimeout(() => {
+      this.progressEmitTimers.delete(batchId)
+      if (!this.progressEmitDirty.delete(batchId)) return
+      // Re-fetch: the batch may have been stopped/disposed inside the window
+      const current = this.activeStates.get(batchId)
+      if (!current) return
+      this.options.onProgress?.(computeProgress(current))
+    }, BATCH_PROGRESS_THROTTLE_MS)
+    this.progressEmitTimers.set(batchId, timer)
+  }
+
+  /** Cancel any open throttle window for a batch without emitting. */
+  private cancelProgressThrottle(batchId: string): void {
+    const timer = this.progressEmitTimers.get(batchId)
+    if (timer) {
+      clearTimeout(timer)
+      this.progressEmitTimers.delete(batchId)
+    }
+    this.progressEmitDirty.delete(batchId)
   }
 
   // ============================================================================
@@ -497,19 +577,18 @@ export class BatchProcessor {
     this.sessionToItem.delete(sessionId)
     saveBatchItemStates(this.options.workspaceRootPath, state, [itemId])
 
-    // Check completion
+    // Check completion — completeBatch() emits the terminal progress itself,
+    // so the throttled emit only covers the still-running case.
     if (isBatchDone(state)) {
       this.completeBatch(batchId)
+    } else {
+      this.emitProgressThrottled(batchId)
     }
 
     // Wake every running batch — the slot that just freed may be claimed by a
     // different batch than the one whose session ended. Without this, batches
     // queued behind the global cap would stay stuck even after slots open.
     this.dispatchAllRunning()
-
-    // Notify progress
-    const progress = computeProgress(state)
-    this.options.onProgress?.(progress)
 
     return true
   }
@@ -571,8 +650,7 @@ export class BatchProcessor {
    * Returns the progress snapshot for the caller.
    */
   private beginDispatching(batchId: string, state: BatchState): BatchProgress {
-    const progress = computeProgress(state)
-    this.options.onProgress?.(progress)
+    const progress = this.emitProgressNow(state)
 
     this.dispatchNext(batchId).catch((error) => {
       log.error(`[BatchProcessor] Failed to dispatch items for batch "${batchId}":`, error)
@@ -635,10 +713,10 @@ export class BatchProcessor {
 
       if (timedOut.length > 0) {
         saveBatchItemStates(this.options.workspaceRootPath, state, timedOut)
-        this.options.onProgress?.(computeProgress(state))
         if (isBatchDone(state)) {
           this.completeBatch(batchId)
         } else {
+          this.emitProgressThrottled(batchId)
           this.dispatchAllRunning()
         }
       }
@@ -725,15 +803,17 @@ export class BatchProcessor {
       toDispatch.map((itemId) => this.dispatchItem(batchId, itemId, config))
     )
 
-    // Notify progress after dispatch round so UI sees item state transitions
-    if (toDispatch.length > 0 && this.activeStates.has(batchId)) {
-      this.options.onProgress?.(computeProgress(state))
-    }
-
     // Check if all items finished during dispatch (e.g. all session creations failed)
     if (isBatchDone(state)) {
       this.completeBatch(batchId)
       return
+    }
+
+    // Notify progress after dispatch round so UI sees item state transitions.
+    // emitProgressThrottled re-checks activeStates internally — the batch may
+    // have been stopped while dispatchItem awaited session creation.
+    if (toDispatch.length > 0) {
+      this.emitProgressThrottled(batchId)
     }
 
     // If items failed during dispatch (no session created), remaining pending
@@ -882,7 +962,7 @@ export class BatchProcessor {
 
     this.stopTimeoutCheck()
     this.options.onBatchComplete?.(batchId, state.status, progress)
-    this.options.onProgress?.(computeProgress(state))
+    this.emitProgressNow(state)
   }
 
   /**
@@ -891,6 +971,7 @@ export class BatchProcessor {
    * and session completions will no longer write state back to disk.
    */
   stop(batchId: string): void {
+    this.cancelProgressThrottle(batchId)
     this.activeStates.delete(batchId)
     this.batchItems.delete(batchId)
 
@@ -912,6 +993,12 @@ export class BatchProcessor {
       clearInterval(this.timeoutCheckInterval)
       this.timeoutCheckInterval = null
     }
+
+    for (const timer of this.progressEmitTimers.values()) {
+      clearTimeout(timer)
+    }
+    this.progressEmitTimers.clear()
+    this.progressEmitDirty.clear()
 
     for (const [batchId, state] of this.activeStates) {
       if (state.status === 'running') {

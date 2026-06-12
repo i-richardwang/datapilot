@@ -1749,7 +1749,7 @@ export class SessionManager implements ISessionManager {
     try {
       const reconciled = batchProcessor.reconcileCrashedBatches()
       if (reconciled.length > 0) {
-        sessionLog.warn(`[Batch] Reconciled ${reconciled.length} crashed batch(es) for workspace ${workspaceId} (running → paused): ${reconciled.join(', ')}`)
+        sessionLog.warn(`[Batch] Reconciled ${reconciled.length} crashed batch(es) for workspace ${workspaceId} (stale running state healed): ${reconciled.join(', ')}`)
       }
     } catch (error) {
       sessionLog.error(`[Batch] Failed to reconcile crashed batches for workspace ${workspaceId}:`, error)
