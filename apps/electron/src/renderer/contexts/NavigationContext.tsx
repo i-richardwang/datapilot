@@ -71,7 +71,7 @@ import {
   isBatchesNavigation,
   DEFAULT_NAVIGATION_STATE,
 } from '../../shared/types'
-import { sessionMetaMapAtom, updateSessionMetaAtom, type SessionMeta } from '@/atoms/sessions'
+import { sessionAtomFamily, sessionMetaMapAtom, updateSessionMetaAtom, type SessionMeta } from '@/atoms/sessions'
 import { sourcesAtom } from '@/atoms/sources'
 import { skillsAtom } from '@/atoms/skills'
 import {
@@ -492,7 +492,12 @@ export function NavigationProvider({
       for (const prevId of prevVisibleSessionIdsRef.current) {
         if (!currentIds.has(prevId)) {
           const meta = store.get(sessionMetaMapAtom).get(prevId)
-          const isEmpty = meta && !meta.lastFinalMessageId && !meta.name && !meta.isProcessing
+          // The session atom is the source of truth during streaming — meta
+          // lags it by up to one coalescing window (150ms), so a session whose
+          // processing started via the event path (remote/CLI-injected message,
+          // batch sub-session) can look idle in meta while actively running.
+          const atomProcessing = store.get(sessionAtomFamily(prevId))?.isProcessing === true
+          const isEmpty = meta && !meta.lastFinalMessageId && !meta.name && !meta.isProcessing && !atomProcessing
           const hasDraft = getDraft?.(prevId)?.trim()
           if (isEmpty && !hasDraft) {
             onAutoDeleteEmptySession(prevId)

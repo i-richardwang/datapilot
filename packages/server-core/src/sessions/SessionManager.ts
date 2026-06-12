@@ -824,6 +824,13 @@ interface ManagedSession {
    * a stale leftover would only cause harmless extra row upserts.
    */
   turnChangedMessageIds?: Set<string>
+  /**
+   * Runtime-only: set when a full persist threw (and was swallowed). Forces
+   * the next turn-end persist down the full-rewrite path — a failed full
+   * persist can leave stale content behind an id+position-aligned prefix,
+   * which the reconcile's drift check cannot see.
+   */
+  needsFullPersistReconcile?: boolean
   streamingText: string
   // Incremented each time a new message starts processing.
   // Used to detect if a follow-up message has superseded the current one (stale-request guard).
@@ -2129,9 +2136,18 @@ export class SessionManager implements ISessionManager {
     if (!managed.messagesLoaded) {
       this.hydrateMessagesForColdPersist(managed)
     }
-    this.enqueuePersist(managed)
-    // Full rewrite asserts every row — nothing left to reconcile at turn end.
-    managed.turnChangedMessageIds = undefined
+    if (this.enqueuePersist(managed)) {
+      // Full rewrite asserted every row — nothing left to reconcile at turn end.
+      managed.turnChangedMessageIds = undefined
+      managed.needsFullPersistReconcile = false
+    } else {
+      // The write threw (SQLITE_BUSY/IO/...). Full-persist callers don't record
+      // which rows they mutated, so the changed-id set alone cannot heal this —
+      // force the next turn-end persist down the full-rewrite path instead of
+      // trusting the id+position prefix check (content may be stale behind a
+      // perfectly aligned prefix).
+      managed.needsFullPersistReconcile = true
+    }
   }
 
   // Turn-end persist: reconciles this turn's rows against the DB instead of
@@ -2141,7 +2157,7 @@ export class SessionManager implements ISessionManager {
   // id+position select and falls back to the full rewrite on any drift, so
   // this keeps the reconciliation-anchor role of the old "always full persist".
   private persistSessionTurnEnd(managed: ManagedSession): void {
-    if (!managed.messagesLoaded) {
+    if (!managed.messagesLoaded || managed.needsFullPersistReconcile) {
       this.persistSession(managed)
       return
     }
@@ -2277,7 +2293,8 @@ export class SessionManager implements ISessionManager {
 
   // Build the StoredSession snapshot and hand it to the persistence queue.
   // Caller must ensure `managed.messagesLoaded` is true.
-  private enqueuePersist(managed: ManagedSession): void {
+  /** @returns true when the write was handed off/committed without throwing. */
+  private enqueuePersist(managed: ManagedSession): boolean {
     try {
       // Filter out transient status messages (progress indicators like "Compacting...")
       // Error messages are now persisted with rich fields for diagnostics
@@ -2296,8 +2313,10 @@ export class SessionManager implements ISessionManager {
 
       // Queue for async persistence with debouncing
       sessionPersistenceQueue.enqueue(storedSession)
+      return true
     } catch (error) {
       sessionLog.error(`Failed to queue session ${managed.id} for persistence:`, error)
+      return false
     }
   }
 
@@ -4304,6 +4323,10 @@ export class SessionManager implements ISessionManager {
             submitPlanMsg.toolStatus = 'completed'
             submitPlanMsg.content = 'Plan submitted for review'
             submitPlanMsg.toolResult = 'Plan submitted for review'
+            // Persist immediately: the full persist below is gated on
+            // isProcessing, and if the force-cleanup timeout already stopped
+            // the turn, nothing else would reassert this in-place mutation.
+            this.persistSessionMessages(managed, [submitPlanMsg.id])
           }
 
           // Create a plan message
@@ -7051,9 +7074,9 @@ export class SessionManager implements ISessionManager {
     // Remove queued user messages from the persisted messages array
     if (queuedMessageIds.size > 0) {
       managed.messages = managed.messages.filter(m => !queuedMessageIds.has(m.id))
-      // Full save now: targeted message writes can't delete rows, so without
-      // this the removed isQueued rows survive until the turn-end full persist
-      // — a crash in that window would re-queue messages the user canceled.
+      // Full save now: targeted message writes can't delete rows. The turn-end
+      // reconcile would detect the removal as drift and full-rewrite anyway,
+      // but a crash before turn end would re-queue messages the user canceled.
       this.persistSession(managed)
     }
 
@@ -8022,6 +8045,12 @@ export class SessionManager implements ISessionManager {
           if (event.displayName && !existingStartMsg.toolDisplayName) {
             existingStartMsg.toolDisplayName = event.displayName
           }
+          // Persist the in-place update. If the row already reached the DB
+          // (result-before-start ordering + a mid-turn full persist clearing
+          // turnChangedMessageIds), the turn-end reconcile would see a clean
+          // id+position prefix and never reassert this content. Once per tool,
+          // not a hot path.
+          this.persistSessionMessages(managed, [existingStartMsg.id])
         } else {
           // Add tool message immediately (will be updated on tool_result)
           // This ensures tool calls are persisted even if they don't complete

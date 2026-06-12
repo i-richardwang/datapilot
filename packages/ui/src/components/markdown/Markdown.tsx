@@ -134,6 +134,7 @@ function createComponents(
   firstMermaidCodeRef?: React.RefObject<string | null>,
   hideFirstMermaidExpand: boolean = true,
   disablePreviewBlocks?: ReadonlySet<DisablablePreviewBlock>,
+  lineOffsetRef?: React.RefObject<number>,
 ): Partial<Components> {
   const isPreviewEnabled = (name: DisablablePreviewBlock) => !disablePreviewBlocks?.has(name)
   let blockIndex = 0
@@ -144,10 +145,15 @@ function createComponents(
     nodePosition?: { start?: { line?: number }; end?: { line?: number } },
   ) => {
     blockIndex += 1
+    // Block-split rendering (MemoizedMarkdown) parses each block separately,
+    // so node positions are block-relative; the offset restores the
+    // whole-document line numbers persisted block annotations were anchored
+    // to. A ref keeps it out of the components memo deps (no remounts).
+    const lineBase = lineOffsetRef?.current ?? 0
     const startLine = nodePosition?.start?.line
     const endLine = nodePosition?.end?.line
     const path = startLine && endLine
-      ? `line:${startLine}-${endLine}`
+      ? `line:${startLine + lineBase}-${endLine + lineBase}`
       : `idx:${blockIndex}`
     const blockId = `blk-${stableHash(`${blockType}|${path}|${content.slice(0, 240)}`)}`
 
@@ -568,7 +574,11 @@ function MarkdownContent({
   collapsible = false,
   hideFirstMermaidExpand = true,
   disablePreviewBlocks,
-}: Omit<MarkdownProps, 'className' | 'id'>) {
+  lineOffset = 0,
+}: Omit<MarkdownProps, 'className' | 'id'> & {
+  /** Source lines preceding this content when it is one block of a split document. */
+  lineOffset?: number
+}) {
   // Get collapsible context if enabled
   const collapsibleContext = useCollapsibleMarkdown()
 
@@ -585,8 +595,13 @@ function MarkdownContent({
     firstMermaidCodeRef.current = null
   }
 
+  // Ref (not memo dep) for the same reason as firstMermaidCodeRef: the value
+  // may change with content, and content must not remount the components.
+  const lineOffsetRef = React.useRef(lineOffset)
+  lineOffsetRef.current = lineOffset
+
   const components = React.useMemo(
-    () => wrapWithSafeProxy(createComponents(mode, onUrlClick, onFileClick, collapsible ? collapsibleContext : null, firstMermaidCodeRef, hideFirstMermaidExpand, disablePreviewBlocks)),
+    () => wrapWithSafeProxy(createComponents(mode, onUrlClick, onFileClick, collapsible ? collapsibleContext : null, firstMermaidCodeRef, hideFirstMermaidExpand, disablePreviewBlocks, lineOffsetRef)),
     [mode, onUrlClick, onFileClick, collapsible, collapsibleContext, hideFirstMermaidExpand, disablePreviewBlocks]
   )
 
@@ -674,9 +689,16 @@ export const MemoizedMarkdown = React.memo(function MemoizedMarkdown(props: Mark
   return (
     <div className={cn('markdown-content', className)}>
       {blocks.map((block, index) => (
-        <MemoizedMarkdownBlock key={`${id ?? 'md'}-block_${index}`} {...blockProps}>
-          {block}
-        </MemoizedMarkdownBlock>
+        <React.Fragment key={`${id ?? 'md'}-block_${index}`}>
+          {/* A whole-document parse renders a "\n" text node between
+              top-level blocks (mdast→hast adds them); reproduce it so the
+              DOM canonical text — which text annotations are anchored to as
+              character offsets — stays byte-identical to unsplit rendering. */}
+          {index > 0 ? '\n' : null}
+          <MemoizedMarkdownBlock {...blockProps} lineOffset={block.lineOffset}>
+            {block.raw}
+          </MemoizedMarkdownBlock>
+        </React.Fragment>
       ))}
     </div>
   )
