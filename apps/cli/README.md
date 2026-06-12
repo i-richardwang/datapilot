@@ -5,8 +5,10 @@ Thin CLI client for a running [DataPilot](https://github.com/i-richardwang/datap
 ## Install
 
 ```bash
-npm install -g datapilot
+npm install -g dtpilot
 ```
+
+The npm package is published as **`dtpilot`**; it installs a command named **`datapilot`**.
 
 Requires **Node.js ≥ 22** (for native `WebSocket` and `crypto.randomUUID`). No runtime dependencies are pulled in.
 
