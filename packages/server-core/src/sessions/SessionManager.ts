@@ -110,6 +110,7 @@ import { loadStatusConfig } from '@craft-agent/shared/statuses/storage'
 import { AutomationSystem, createPromptHistoryEntry, appendAutomationHistoryEntry, type AutomationSystemMetadataSnapshot } from '@craft-agent/shared/automations'
 import { BatchProcessor, resolveGlobalMaxConcurrentSessions } from '@craft-agent/shared/batches'
 import { buildBackendRuntimeSignature, buildRestartRequiredSignature, filterAttachmentsForModelInput } from './runtime-config'
+import { headerMetadataDiffers } from './header-metadata'
 
 // Import from server-core domain utilities
 import { sanitizeForTitle, shouldActivateBrowserOverlay, normalizeBrowserToolName, rollbackFailedBranchCreation, releaseBrowserOwnershipOnForcedStop } from '@craft-agent/server-core/domain'
@@ -1629,7 +1630,16 @@ export class SessionManager implements ISessionManager {
         // For external writes: sync in-memory state + emit UI events.
         // Skip for self-writes to avoid feedback loops (especially on Windows
         // where fs.watch fires aggressively: unlink + rename = 2+ events).
-        if (!isSelfWrite) {
+        //
+        // In DB mode there are no write signatures (getLastWrittenSignature
+        // returns undefined), so isSelfWrite is always false and every
+        // persist — including our own turn-end writes — echoes back here.
+        // Drop echoes whose header matches the in-memory state on every
+        // field applyExternalSessionMetadata would apply: deferring such a
+        // no-op into pendingExternalMetadata during the 5s write-guard
+        // window after set_session_status/labels blocks hibernation forever
+        // when no later turn runs to clear it (stuck-subprocess leak).
+        if (!isSelfWrite && headerMetadataDiffers(managed, header)) {
           // Defer external metadata application when:
           // 1. Session is actively processing (agent running), OR
           // 2. Session was just written programmatically (set_session_status/labels tool)
@@ -6424,6 +6434,21 @@ export class SessionManager implements ISessionManager {
   private sweepIdleSessions(): void {
     const now = Date.now()
     for (const managed of this.sessions.values()) {
+      // A deferred external metadata edit is normally flushed at the next
+      // turn end (onProcessingStopped step 4) — the only other clearing
+      // site. If no later turn ever runs, it would both never apply and
+      // block hibernation forever, so apply it here once the session is
+      // idle and the post-programmatic-write guard window has expired.
+      if (
+        managed.pendingExternalMetadata &&
+        !managed.isProcessing &&
+        !(managed._metadataWriteGuardUntil && now < managed._metadataWriteGuardUntil)
+      ) {
+        const pendingHeader = managed.pendingExternalMetadata
+        managed.pendingExternalMetadata = undefined
+        sessionLog.info(`Applying stale deferred external metadata for session ${managed.id} during idle sweep`)
+        this.applyExternalSessionMetadata(managed, pendingHeader)
+      }
       // Already cold — nothing to release.
       if (!managed.agent && !managed.messagesLoaded) continue
       // Eager-hibernate types (batch/automation/mini) are normally handled at
