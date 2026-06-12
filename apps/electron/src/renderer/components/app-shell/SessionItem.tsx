@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react"
 import { formatDistanceToNowStrict } from "date-fns"
 import type { Locale } from "date-fns"
 import { Flag, ShieldAlert } from "lucide-react"
@@ -17,8 +18,10 @@ import { useSessionListContext } from "@/context/SessionListContext"
 import { useAppShellContext } from "@/context/AppShellContext"
 import { navigate, routes } from "@/lib/navigate"
 import type { SessionMeta } from "@/atoms/sessions"
-import { messagingBindingsBySessionAtom } from "@/atoms/messaging"
+import { messagingBindingsBySessionAtom, type MessagingBinding } from "@/atoms/messaging"
+import { minuteTickAtom } from "@/atoms/clock"
 import { useAtomValue } from "jotai"
+import { selectAtom } from "jotai/utils"
 import { extractLabelId } from "@craft-agent/shared/labels"
 
 const PLATFORM_PILL: Record<'telegram' | 'whatsapp', { label: string; colorClass: string }> = {
@@ -39,17 +42,42 @@ export interface SessionItemProps {
   isSelected: boolean
   isFirstInGroup: boolean
   isInMultiSelect: boolean
+  // High-frequency data arrives as per-row scalars (not via context) so the
+  // memo comparator below can compare values instead of rebuilt containers.
+  searchQuery?: string
+  /** Resolved match count for this row (active-session logical count already preferred over ripgrep count by the caller) */
+  chatMatchCount?: number
+  hasPendingPrompt?: boolean
   onSelect: () => void
   onToggleSelect?: () => void
   onRangeSelect?: () => void
 }
 
-export function SessionItem({
+const NO_BINDINGS: MessagingBinding[] = []
+
+/**
+ * The by-session bindings map is rebuilt (fresh arrays) on every bindings
+ * push, so selectAtom needs a content comparison; only compare the fields
+ * this row actually renders (key + platform pill).
+ */
+function areBindingListsEqual(a: MessagingBinding[], b: MessagingBinding[]): boolean {
+  if (a === b) return true
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i]?.id !== b[i]?.id || a[i]?.platform !== b[i]?.platform) return false
+  }
+  return true
+}
+
+function SessionItemImpl({
   item,
   itemProps,
   isSelected,
   isFirstInGroup,
   isInMultiSelect,
+  searchQuery,
+  chatMatchCount,
+  hasPendingPrompt = false,
   onSelect,
   onToggleSelect,
   onRangeSelect,
@@ -60,21 +88,24 @@ export function SessionItem({
   const { hotkey: nextHotkey } = useActionLabel('chat.nextSearchMatch')
   const { hotkey: prevHotkey } = useActionLabel('chat.prevSearchMatch')
   const title = getSessionTitle(item)
-  // For the active session, prefer logical match count over ripgrep count
-  const activeMatch = ctx.activeChatMatchInfo
-  const isActiveSession = isSelected && activeMatch?.sessionId === item.id
-  const ripgrepMatchCount = ctx.contentSearchResults.get(item.id)?.matchCount
-  const chatMatchCount = isActiveSession ? activeMatch!.count : ripgrepMatchCount
   const hasMatch = chatMatchCount != null && chatMatchCount > 0
   const hasLabels = !!(item.labels && item.labels.length > 0 && ctx.flatLabels.length > 0 && item.labels.some(entry => {
     const labelId = extractLabelId(entry)
     return ctx.flatLabels.some(l => l.id === labelId)
   }))
-  const hasPendingPrompt = ctx.hasPendingPrompt?.(item.id) ?? false
   const previewText = isCompactMode ? getSessionPreviewText(item) : null
-  const messagingBindingsBySession = useAtomValue(messagingBindingsBySessionAtom)
-  const sessionBindings = messagingBindingsBySession.get(item.id) ?? []
+  // Per-row binding subscription: a binding change for one session must not
+  // re-render every row. The selectAtom instance is memoized by session id so
+  // it isn't recreated (and resubscribed) on each render.
+  const sessionBindingsAtom = useMemo(
+    () => selectAtom(messagingBindingsBySessionAtom, (map) => map.get(item.id) ?? NO_BINDINGS, areBindingListsEqual),
+    [item.id],
+  )
+  const sessionBindings = useAtomValue(sessionBindingsAtom)
   const hasMessagingBinding = sessionBindings.length > 0
+  // Re-render once per minute so the relative timestamp below stays fresh:
+  // the memoized row no longer piggybacks on frequent parent re-renders.
+  useAtomValue(minuteTickAtom)
 
   const handleClick = (e: React.MouseEvent) => {
     ctx.onFocusZone()
@@ -190,7 +221,7 @@ export function SessionItem({
           </div>
         </>
       }
-      title={ctx.searchQuery ? highlightMatch(title, ctx.searchQuery) : title}
+      title={searchQuery ? highlightMatch(title, searchQuery) : title}
       titleClassName={cn("text-[13px]", item.isAsyncOperationOngoing && "animate-shimmer-text")}
       subtitle={previewText}
       titleSuffix={
@@ -241,3 +272,30 @@ export function SessionItem({
     />
   )
 }
+
+// Scalar buttonProps fields that affect rendering. tabIndex must participate:
+// roving tabindex moves 0/-1 between rows during keyboard navigation, and a
+// stale tabIndex would break Tab/arrow-key focus.
+const ITEM_PROPS_SCALAR_KEYS = ['id', 'tabIndex', 'role', 'aria-selected'] as const
+
+function areSessionItemPropsEqual(prev: SessionItemProps, next: SessionItemProps): boolean {
+  if (prev.item !== next.item) return false
+  // index participates so row callbacks/refs capturing the flat index are
+  // refreshed when the list order shifts around an otherwise-unchanged row.
+  if (prev.index !== next.index) return false
+  if (prev.isSelected !== next.isSelected) return false
+  if (prev.isFirstInGroup !== next.isFirstInGroup) return false
+  if (prev.isInMultiSelect !== next.isInMultiSelect) return false
+  if (prev.searchQuery !== next.searchQuery) return false
+  if (prev.chatMatchCount !== next.chatMatchCount) return false
+  if (prev.hasPendingPrompt !== next.hasPendingPrompt) return false
+  // itemProps is a fresh object on every parent render; compare its scalar
+  // fields. Function/ref fields (onKeyDown/onFocus/ref) are semantically tied
+  // to item + index — both compared above — and are intentionally ignored.
+  for (const key of ITEM_PROPS_SCALAR_KEYS) {
+    if (prev.itemProps[key] !== next.itemProps[key]) return false
+  }
+  return true
+}
+
+export const SessionItem = memo(SessionItemImpl, areSessionItemPropsEqual)

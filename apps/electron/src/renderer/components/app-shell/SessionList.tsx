@@ -462,6 +462,17 @@ export function SessionList({
     return map
   }, [flatRows])
 
+  // Latest-value refs so the row callbacks below stay referentially stable
+  // across list changes. Memoized SessionItem rows skip re-rendering when a
+  // sibling changes, so any handler they capture must read current list data
+  // through a ref instead of a closed-over snapshot.
+  const flatRowsRef = useRef(flatRows)
+  const rowIndexMapRef = useRef(rowIndexMap)
+  useEffect(() => {
+    flatRowsRef.current = flatRows
+    rowIndexMapRef.current = rowIndexMap
+  }, [flatRows, rowIndexMap])
+
   // --- Action handlers with toast feedback ---
   const {
     handleFlagWithToast,
@@ -540,14 +551,14 @@ export function SessionList({
   }, [selectSession, navigateToSession])
 
   const handleSelectSessionById = useCallback((sessionId: string) => {
-    const index = rowIndexMap.get(sessionId) ?? -1
+    const index = rowIndexMapRef.current.get(sessionId) ?? -1
     if (index >= 0) {
       selectSession(sessionId, index)
     } else {
       selectSession(sessionId, 0)
     }
     navigateToSession(sessionId)
-  }, [rowIndexMap, selectSession, navigateToSession])
+  }, [selectSession, navigateToSession])
 
   const handleToggleSelect = useCallback((row: SessionListRow, index: number) => {
     focusZone('navigator', { intent: 'click', moveFocus: false })
@@ -556,9 +567,9 @@ export function SessionList({
 
   const handleRangeSelect = useCallback((toIndex: number) => {
     focusZone('navigator', { intent: 'click', moveFocus: false })
-    const allIds = flatRows.map(row => row.item.id)
+    const allIds = flatRowsRef.current.map(row => row.item.id)
     selectRange(toIndex, allIds)
-  }, [focusZone, flatRows, selectRange])
+  }, [focusZone, selectRange])
 
   // Arrow key shortcuts for zone navigation (left → sidebar, right → chat)
   const handleKeyDown = useCallback((e: React.KeyboardEvent, _item: SessionMeta) => {
@@ -609,8 +620,13 @@ export function SessionList({
   }, [searchInputRef, onFocusChatInput, interactions.searchInputProps, selectionStore.state.selected])
 
   // --- Context value (shared across all SessionItems) ---
+  // Only stable callbacks and low-frequency config belong here: every context
+  // value change re-renders all rows. High-frequency data (resolved search
+  // query, content search results, active chat match info, pending prompts)
+  // is passed per-row as scalar props in renderItem below.
   const handleFocusZone = useCallback(() => focusZone('navigator', { intent: 'click', moveFocus: false }), [focusZone])
   const handleOpenInNewWindow = useCallback((item: SessionMeta) => onOpenInNewWindow?.(item), [onOpenInNewWindow])
+  const handleSendToWorkspace = useCallback((ids: string[]) => setSendToWorkspace(ids), [setSendToWorkspace])
   const resolvedSearchQuery = isSearchMode ? highlightQuery : searchQuery
 
   const listContext = useMemo((): SessionListContextValue => ({
@@ -625,28 +641,20 @@ export function SessionList({
     onLabelsChange,
     onSelectSessionById: handleSelectSessionById,
     onOpenInNewWindow: handleOpenInNewWindow,
-    onSendToWorkspace: (ids: string[]) => setSendToWorkspace(ids),
+    onSendToWorkspace: handleSendToWorkspace,
     onFocusZone: handleFocusZone,
     onKeyDown: handleKeyDown,
     sessionStatuses,
     flatLabels,
     labels,
-    searchQuery: resolvedSearchQuery,
-    selectedSessionId: focusedSessionId !== undefined ? focusedSessionId : selectionStore.state.selected,
     isMultiSelectActive,
-    sessionOptions,
-    contentSearchResults,
-    activeChatMatchInfo,
-    hasPendingPrompt,
   }), [
     handleRenameClick, onSessionStatusChange,
     onFlag, handleFlagWithToast, onUnflag, handleUnflagWithToast,
     onArchive, handleArchiveWithToast, onUnarchive, handleUnarchiveWithToast,
     onMarkUnread, handleDeleteWithToast, onLabelsChange,
-    handleSelectSessionById, handleOpenInNewWindow, setSendToWorkspace, handleFocusZone, handleKeyDown,
-    sessionStatuses, flatLabels, labels, resolvedSearchQuery,
-    focusedSessionId, selectionStore.state.selected, isMultiSelectActive,
-    sessionOptions, contentSearchResults, activeChatMatchInfo, hasPendingPrompt,
+    handleSelectSessionById, handleOpenInNewWindow, handleSendToWorkspace, handleFocusZone, handleKeyDown,
+    sessionStatuses, flatLabels, labels, isMultiSelectActive,
   ])
 
   // --- Empty state (non-search) — render before EntityList ---
@@ -706,6 +714,12 @@ export function SessionList({
         renderItem={(row, _indexInGroup, isFirstInGroup) => {
           const flatIndex = rowIndexMap.get(row.item.id) ?? 0
           const rowProps = interactions.getRowProps(row, flatIndex)
+          // High-frequency lookups resolved to per-row scalars here, so the
+          // SessionItem memo comparator only sees this row's values.
+          // For the active session, prefer logical match count over ripgrep count.
+          const chatMatchCount = activeChatMatchInfo && rowProps.isSelected && activeChatMatchInfo.sessionId === row.item.id
+            ? activeChatMatchInfo.count
+            : contentSearchResults.get(row.item.id)?.matchCount
           return (
             <SessionItem
               item={row.item}
@@ -714,6 +728,9 @@ export function SessionList({
               isSelected={rowProps.isSelected}
               isFirstInGroup={isFirstInGroup}
               isInMultiSelect={rowProps.isInMultiSelect ?? false}
+              searchQuery={resolvedSearchQuery}
+              chatMatchCount={chatMatchCount}
+              hasPendingPrompt={hasPendingPrompt?.(row.item.id) ?? false}
               onSelect={() => handleSelectSession(row, flatIndex)}
               onToggleSelect={() => handleToggleSelect(row, flatIndex)}
               onRangeSelect={() => handleRangeSelect(flatIndex)}

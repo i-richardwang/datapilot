@@ -2,9 +2,17 @@ import { createContext, useContext } from "react"
 import type { LabelConfig } from "@craft-agent/shared/labels"
 import type { SessionStatusId, SessionStatus } from "@/config/session-status-config"
 import type { SessionMeta } from "@/atoms/sessions"
-import type { SessionOptions } from "@/hooks/useSessionOptions"
-import type { ContentSearchResult } from "@/hooks/useSessionSearch"
 
+/**
+ * Shared, low-frequency state for SessionItem rows.
+ *
+ * Keep this context limited to stable callbacks and rarely-changing config:
+ * every value change re-renders ALL rows (context consumers bypass
+ * React.memo). High-frequency data — search query, content search results,
+ * active chat match info, pending-prompt state — is passed to each
+ * SessionItem as per-row scalar props (searchQuery / chatMatchCount /
+ * hasPendingPrompt) so the row memo comparator can compare scalars.
+ */
 export interface SessionListContextValue {
   // Session action callbacks (shared across all items)
   onRenameClick: (sessionId: string, currentName: string) => void
@@ -26,17 +34,7 @@ export interface SessionListContextValue {
   sessionStatuses: SessionStatus[]
   flatLabels: LabelConfig[]
   labels: LabelConfig[]
-  searchQuery?: string
-  selectedSessionId?: string | null
   isMultiSelectActive: boolean
-
-  // Per-session lookup maps
-  sessionOptions?: Map<string, SessionOptions>
-  contentSearchResults: Map<string, ContentSearchResult>
-  /** DOM-verified match info for the active session (count, highlighting state) */
-  activeChatMatchInfo?: { sessionId: string | null; count: number; isHighlighting?: boolean }
-  /** Whether a session currently has a pending permission/admin prompt */
-  hasPendingPrompt?: (sessionId: string) => boolean
 }
 
 const SessionListContext = createContext<SessionListContextValue | null>(null)

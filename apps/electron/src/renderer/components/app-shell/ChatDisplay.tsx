@@ -49,6 +49,7 @@ import {
   TurnCard,
   UserMessageBubble,
   groupMessagesByTurn,
+  areTurnsRenderEqual,
   formatTurnAsMarkdown,
   formatActivityAsMarkdown,
   getAssistantTurnUiKey,
@@ -1383,11 +1384,39 @@ export const ChatDisplay = React.forwardRef<ChatDisplayHandle, ChatDisplayProps>
     return undefined
   }, [pendingPermission, pendingCredential])
 
+  // Turn identity cache: groupMessagesByTurn() rebuilds every turn object (and
+  // its activities array) on each message event, which defeats TurnCard's
+  // reference-based memo comparator for already-completed turns — every
+  // streaming delta would re-render all visible TurnCards. Reuse the previous
+  // turn object whenever the regrouped turn renders identically
+  // (areTurnsRenderEqual compares every renderable field, so reuse can never
+  // hide a real update). Streaming/incomplete turns are never reused.
+  const turnCacheRef = React.useRef<{ sessionId: string | null; turns: Map<string, Turn> }>({
+    sessionId: null,
+    turns: new Map(),
+  })
+
   // Memoize turn grouping - avoids O(n) iteration on every render/keystroke
   const allTurns = React.useMemo(() => {
     if (!session) return []
-    return groupMessagesByTurn(session.messages, { isSessionProcessing: session.isProcessing })
-  }, [session?.messages, session?.isProcessing])
+    const grouped = groupMessagesByTurn(session.messages, { isSessionProcessing: session.isProcessing })
+    const cache = turnCacheRef.current
+    // Clear on session switch so turn objects can't leak across sessions.
+    if (cache.sessionId !== session.id) {
+      cache.sessionId = session.id
+      cache.turns = new Map()
+    }
+    const nextTurns = new Map<string, Turn>()
+    const stabilized = grouped.map((turn) => {
+      const key = getTurnKey(turn)
+      const cached = cache.turns.get(key)
+      const result = cached && areTurnsRenderEqual(cached, turn) ? cached : turn
+      nextTurns.set(key, result)
+      return result
+    })
+    cache.turns = nextTurns
+    return stabilized
+  }, [session?.id, session?.messages, session?.isProcessing])
 
   // Keep ref in sync for scroll handler
   totalTurnCountRef.current = allTurns.length

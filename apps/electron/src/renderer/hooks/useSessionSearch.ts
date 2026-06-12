@@ -415,11 +415,19 @@ export function useSessionSearch({
       )
     }
 
-    return sortedItems
-      .filter(item => contentSearchResults.has(item.id))
+    const matched = sortedItems.filter(item => contentSearchResults.has(item.id))
+
+    // Precompute scores once per item — the sort comparator runs O(n log n)
+    // times and fuzzyScore is too expensive to recompute on every comparison.
+    const scoreById = new Map<string, number>()
+    for (const item of matched) {
+      scoreById.set(item.id, fuzzyScore(getSessionTitle(item), searchQuery))
+    }
+
+    return matched
       .sort((a, b) => {
-        const aScore = fuzzyScore(getSessionTitle(a), searchQuery)
-        const bScore = fuzzyScore(getSessionTitle(b), searchQuery)
+        const aScore = scoreById.get(a.id) ?? 0
+        const bScore = scoreById.get(b.id) ?? 0
 
         if (aScore > 0 && bScore === 0) return -1
         if (aScore === 0 && bScore > 0) return 1

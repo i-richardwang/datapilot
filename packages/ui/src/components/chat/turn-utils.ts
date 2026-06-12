@@ -666,6 +666,81 @@ export function groupMessagesByTurn(messages: Message[], options: GroupTurnsOpti
   return turns
 }
 
+// ============================================================================
+// Turn Identity Reuse
+// ============================================================================
+
+/**
+ * Shallow field-by-field equality over two same-shaped plain objects.
+ * Nested object fields compare by reference, which is sound for turn data
+ * because the renderer updates messages immutably (an unchanged message keeps
+ * its object references for toolInput / annotations / toolDisplayMeta etc.).
+ */
+function shallowFieldsEqual<T extends object>(a: T, b: T): boolean {
+  if (a === b) return true
+  const aKeys = Object.keys(a) as (keyof T)[]
+  if (aKeys.length !== Object.keys(b).length) return false
+  for (const key of aKeys) {
+    if (a[key] !== b[key]) return false
+  }
+  return true
+}
+
+/**
+ * Decide whether a freshly regrouped turn renders identically to a previously
+ * built turn object, so callers can keep reusing the previous object reference.
+ *
+ * groupMessagesByTurn() rebuilds every turn (and its activities array) on each
+ * call, which defeats reference-based React.memo comparators downstream
+ * (TurnCard checks `prev.activities !== next.activities`). Callers cache the
+ * turns they returned last time and swap the cached object back in when this
+ * returns true.
+ *
+ * Constraints:
+ * - Streaming / incomplete assistant turns are never reusable — they must
+ *   rebuild (and re-render) on every event.
+ * - The comparison must cover every field a renderer can read from the turn;
+ *   missing a mutable field here would freeze the UI on stale data. All
+ *   activity / response / todo fields are compared shallowly rather than via
+ *   a partial signature for exactly that reason.
+ */
+export function areTurnsRenderEqual(prev: Turn, next: Turn): boolean {
+  if (next.type === 'assistant') {
+    if (prev.type !== 'assistant') return false
+    if (prev.isStreaming || next.isStreaming) return false
+    if (!prev.isComplete || !next.isComplete) return false
+    if (prev.turnId !== next.turnId) return false
+    if (prev.timestamp !== next.timestamp) return false
+    if (prev.intent !== next.intent) return false
+
+    if (prev.activities.length !== next.activities.length) return false
+    for (let i = 0; i < next.activities.length; i++) {
+      const a = prev.activities[i]
+      const b = next.activities[i]
+      if (!a || !b || !shallowFieldsEqual(a, b)) return false
+    }
+
+    if ((prev.response === undefined) !== (next.response === undefined)) return false
+    if (prev.response && next.response && !shallowFieldsEqual(prev.response, next.response)) return false
+
+    if ((prev.todos === undefined) !== (next.todos === undefined)) return false
+    if (prev.todos && next.todos) {
+      if (prev.todos.length !== next.todos.length) return false
+      for (let i = 0; i < next.todos.length; i++) {
+        const a = prev.todos[i]
+        const b = next.todos[i]
+        if (!a || !b || !shallowFieldsEqual(a, b)) return false
+      }
+    }
+    return true
+  }
+
+  if (prev.type === 'assistant' || prev.type !== next.type) return false
+  // user/system/auth-request turns wrap a single message object; immutable
+  // per-message updates make reference equality a complete content check.
+  return prev.message === next.message && prev.timestamp === next.timestamp
+}
+
 /**
  * Get the primary intent for a turn (first available intent from activities)
  */

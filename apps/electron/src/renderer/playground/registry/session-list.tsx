@@ -2,7 +2,6 @@ import * as React from 'react'
 import type { ComponentEntry } from './types'
 import type { SessionMeta } from '@/atoms/sessions'
 import type { SessionStatus } from '@/config/session-status-config'
-import type { ContentSearchResult } from '@/hooks/useSessionSearch'
 import { Circle } from 'lucide-react'
 import { SessionSearchHeader } from '@/components/app-shell/SessionSearchHeader'
 import { SessionItem } from '@/components/app-shell/SessionItem'
@@ -96,7 +95,6 @@ function createMockContext(overrides: Partial<SessionListContextValue> = {}): Se
     flatLabels: [],
     labels: [],
     isMultiSelectActive: false,
-    contentSearchResults: new Map(),
     ...overrides,
   }
 }
@@ -142,17 +140,7 @@ function SessionListSearchPreview({
 
   const selectedSessionId = filteredSessions[selectedIndex]?.id ?? null
 
-  // Build content search results for match badge
-  const contentSearchResults = new Map<string, ContentSearchResult>()
-  if (chatMatchCount && selectedSessionId) {
-    contentSearchResults.set(selectedSessionId, { matchCount: chatMatchCount, snippet: '' })
-  }
-
-  const ctx = createMockContext({
-    searchQuery,
-    selectedSessionId,
-    contentSearchResults,
-  })
+  const ctx = createMockContext()
 
   const displayCount = resultCount ?? filteredSessions.length
 
@@ -200,6 +188,8 @@ function SessionListSearchPreview({
                     isSelected={session.id === selectedSessionId}
                     isFirstInGroup={index === 0}
                     isInMultiSelect={false}
+                    searchQuery={searchQuery}
+                    chatMatchCount={chatMatchCount && session.id === selectedSessionId ? chatMatchCount : undefined}
                     onSelect={() => {}}
                   />
                 ))}
@@ -243,16 +233,7 @@ function SessionItemPreview({
     return base
   }, [item, state, flagged])
 
-  const contentSearchResults = new Map<string, ContentSearchResult>()
-  if (chatMatchCount && resolvedItem) {
-    contentSearchResults.set(resolvedItem.id, { matchCount: chatMatchCount, snippet: '' })
-  }
-
-  const ctx = createMockContext({
-    searchQuery,
-    selectedSessionId: isSelected ? resolvedItem.id : null,
-    contentSearchResults,
-  })
+  const ctx = createMockContext()
 
   return (
     <ActionRegistryProvider>
@@ -264,6 +245,8 @@ function SessionItemPreview({
           isSelected={isSelected}
           isFirstInGroup
           isInMultiSelect={false}
+          searchQuery={searchQuery}
+          chatMatchCount={chatMatchCount || undefined}
           onSelect={() => {}}
         />
       </SessionListProvider>
