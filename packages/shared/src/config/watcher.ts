@@ -1144,49 +1144,15 @@ export class ConfigWatcher {
    */
   private handleSessionMetadataChange(sessionId: string): void {
     if (this.useDbMode) {
-      // Load session metadata from DB and construct a SessionHeader-compatible object
-      const { loadSession } = require('../sessions/storage.db.ts');
-      const session = loadSession(this.workspaceDir, sessionId);
-      if (session) {
-        const header: SessionHeader = {
-          id: session.id,
-          workspaceRootPath: session.workspaceRootPath,
-          sdkSessionId: session.sdkSessionId,
-          name: session.name,
-          createdAt: session.createdAt,
-          lastUsedAt: session.lastUsedAt,
-          lastMessageAt: session.lastMessageAt,
-          isFlagged: session.isFlagged,
-          permissionMode: session.permissionMode,
-          previousPermissionMode: session.previousPermissionMode,
-          sessionStatus: session.sessionStatus,
-          labels: session.labels,
-          lastReadMessageId: session.lastReadMessageId,
-          hasUnread: session.hasUnread,
-          enabledSourceSlugs: session.enabledSourceSlugs,
-          workingDirectory: session.workingDirectory,
-          sdkCwd: session.sdkCwd,
-          sharedUrl: session.sharedUrl,
-          sharedId: session.sharedId,
-          model: session.model,
-          llmConnection: session.llmConnection,
-          connectionLocked: session.connectionLocked,
-          thinkingLevel: session.thinkingLevel,
-          pendingPlanExecution: session.pendingPlanExecution,
-          hidden: session.hidden,
-          isBatch: session.isBatch,
-          isArchived: session.isArchived,
-          archivedAt: session.archivedAt,
-          transferredSessionSummary: session.transferredSessionSummary,
-          transferredSessionSummaryApplied: session.transferredSessionSummaryApplied,
-          triggeredBy: session.triggeredBy,
-          messageCount: session.messages.length,
-          lastMessageRole: session.messages.length > 0
-            ? (session.messages[session.messages.length - 1]?.type as SessionHeader['lastMessageRole'])
-            : undefined,
-          preview: session.messages.find((m: { type: string }) => m.type === 'user')?.content?.slice(0, 150),
-          tokenUsage: session.tokenUsage,
-        };
+      // This listener runs synchronously inside every dbEvents 'session:saved'
+      // emit — i.e. inside each message persist on the streaming hot path.
+      // It must stay a single sessions-row select: loading the full session
+      // here costs O(history) per persisted message (full message-table read
+      // + JSON round-trips) and blocks the event loop for all sessions. The
+      // message-derived header fields come from the denormalized columns.
+      const { loadSessionHeader } = require('../sessions/storage.db.ts');
+      const header: SessionHeader | null = loadSessionHeader(this.workspaceDir, sessionId);
+      if (header) {
         this.callbacks.onSessionMetadataChange?.(sessionId, header);
       }
       return;

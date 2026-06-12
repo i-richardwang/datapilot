@@ -32,6 +32,7 @@ import type {
   SessionConfig,
   StoredSession,
   SessionMetadata,
+  SessionHeader,
   SessionTokenUsage,
   SessionStatus,
   StoredMessage,
@@ -147,11 +148,14 @@ export function getSessionDownloadsPath(workspaceRootPath: string, sessionId: st
 // ============================================================
 
 /**
- * Get existing session IDs from DB for collision detection
+ * Get existing session IDs from DB for collision detection.
+ * id-only select — a full-row select hydrates ~50 columns (6 of them JSON)
+ * per row, which costs hundreds of ms of synchronous work at 30k+ sessions
+ * and runs on every session creation.
  */
 function getExistingSessionIds(workspaceRootPath: string): Set<string> {
   const db = getWorkspaceDb(workspaceRootPath);
-  const rows = db.select().from(sessionsTable).all();
+  const rows = db.select({ id: sessionsTable.id }).from(sessionsTable).all();
   return new Set(rows.map(r => r.id));
 }
 
@@ -703,6 +707,88 @@ export function saveSessionMessageUpdate(session: StoredSession, changedMessageI
   });
 
   dbEvents.emit('session:saved', session.id);
+}
+
+/**
+ * Turn-end reconcile — the cheap replacement for saveSession's delete-all +
+ * reinsert-all when nothing was removed (the overwhelmingly common case:
+ * turns only append messages and update the ones they appended).
+ *
+ * Verifies with an id+position-only select (no content) that the DB rows are
+ * an exact positional prefix of the in-memory array. If they are, only the
+ * rows in `recentlyChangedMessageIds` plus the new tail rows are upserted.
+ * Any drift — removals, reorders, position gaps — falls back to the full
+ * saveSession rewrite, preserving its reconciliation-anchor role.
+ */
+export function saveSessionTurnReconcile(session: StoredSession, recentlyChangedMessageIds: string[]): void {
+  const db = getWorkspaceDb(session.workspaceRootPath);
+  const sessionDir = getSessionPath(session.workspaceRootPath, session.id);
+
+  const dbRows = db.select({ id: messagesTable.id, position: messagesTable.position })
+    .from(messagesTable)
+    .where(eq(messagesTable.sessionId, session.id))
+    .orderBy(messagesTable.position)
+    .all();
+
+  let drift = dbRows.length > session.messages.length;
+  if (!drift) {
+    for (let i = 0; i < dbRows.length; i++) {
+      if (dbRows[i]!.id !== session.messages[i]!.id || dbRows[i]!.position !== i) {
+        drift = true;
+        break;
+      }
+    }
+  }
+
+  if (drift) {
+    console.warn(
+      `[saveSessionTurnReconcile] Message rows drifted from memory for session ${session.id} ` +
+      `(db=${dbRows.length}, mem=${session.messages.length}) — falling back to full rewrite`
+    );
+    saveSession(session);
+    return;
+  }
+
+  const upsert = new Set(recentlyChangedMessageIds);
+  // New tail rows may never have hit a targeted write (e.g. a turn
+  // interrupted mid-stream) — always write them.
+  for (let i = dbRows.length; i < session.messages.length; i++) {
+    upsert.add(session.messages[i]!.id);
+  }
+
+  saveSessionMessageUpdate(session, [...upsert]);
+}
+
+/**
+ * Load a session's header (metadata only) — a single sessions-row select.
+ * Message-derived fields (messageCount, lastMessageRole, preview, tokenUsage)
+ * come from the denormalized columns; the messages table is never touched.
+ *
+ * This exists for the config watcher's DB-mode `session:saved` listener,
+ * which runs synchronously inside every message persist on the streaming hot
+ * path — loading the full session there costs O(history) per persisted
+ * message and blocks the event loop for all sessions.
+ */
+export function loadSessionHeader(workspaceRootPath: string, sessionId: string): SessionHeader | null {
+  const db = getWorkspaceDb(workspaceRootPath);
+
+  const row = db.select().from(sessionsTable).where(eq(sessionsTable.id, sessionId)).get();
+  if (!row) return null;
+
+  const config = rowToSessionConfig(row, workspaceRootPath);
+  return {
+    ...config,
+    messageCount: row.messageCount ?? 0,
+    lastMessageRole: (row.lastMessageRole ?? undefined) as SessionHeader['lastMessageRole'],
+    preview: row.preview ?? undefined,
+    tokenUsage: (row.tokenUsage as SessionTokenUsage | null) ?? {
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      contextTokens: 0,
+      costUsd: 0,
+    },
+  };
 }
 
 /**

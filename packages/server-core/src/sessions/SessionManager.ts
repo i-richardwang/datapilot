@@ -81,6 +81,7 @@ import {
   pickSessionFields,
   saveSessionMeta,
   saveSessionMessageUpdate,
+  saveSessionTurnReconcile,
   saveTurnUsage,
 } from '@craft-agent/shared/sessions'
 import { loadWorkspaceSources, loadAllSources, getSourcesBySlugs, isSourceUsable, type LoadedSource, type McpServerConfig, getSourcesNeedingAuth, getSourceCredentialManager, getSourceServerBuilder, type SourceWithCredential, isApiOAuthProvider, hasRenewEndpoint, SERVER_BUILD_ERRORS, TokenRefreshManager, createTokenGetter } from '@craft-agent/shared/sources'
@@ -814,6 +815,15 @@ interface ManagedSession {
    * it finishes.
    */
   lastActivityAt?: number
+  /**
+   * Runtime-only (not persisted): message ids written via targeted persists
+   * since the last full/reconcile persist. Consumed by the turn-end reconcile
+   * (persistSessionTurnEnd) to reassert exactly the rows this turn touched
+   * instead of rewriting the whole history. Safe to drop on hibernation:
+   * hibernation only runs between turns, after the set has been consumed —
+   * a stale leftover would only cause harmless extra row upserts.
+   */
+  turnChangedMessageIds?: Set<string>
   streamingText: string
   // Incremented each time a new message starts processing.
   // Used to detect if a follow-up message has superseded the current one (stale-request guard).
@@ -2120,6 +2130,41 @@ export class SessionManager implements ISessionManager {
       this.hydrateMessagesForColdPersist(managed)
     }
     this.enqueuePersist(managed)
+    // Full rewrite asserts every row — nothing left to reconcile at turn end.
+    managed.turnChangedMessageIds = undefined
+  }
+
+  // Turn-end persist: reconciles this turn's rows against the DB instead of
+  // rewriting the whole history (saveSession's delete-all + reinsert-all costs
+  // O(history) of synchronous SQLite writes + JSON serialization per turn).
+  // saveSessionTurnReconcile verifies positional integrity with a cheap
+  // id+position select and falls back to the full rewrite on any drift, so
+  // this keeps the reconciliation-anchor role of the old "always full persist".
+  private persistSessionTurnEnd(managed: ManagedSession): void {
+    if (!managed.messagesLoaded) {
+      this.persistSession(managed)
+      return
+    }
+    try {
+      const persistableMessages = managed.messages.filter(m =>
+        m.role !== 'status'
+      )
+
+      const storedSession: StoredSession = {
+        ...pickSessionFields(managed),
+        workspaceRootPath: managed.workspace.rootPath,
+        createdAt: managed.createdAt ?? Date.now(),
+        lastUsedAt: Date.now(),
+        messages: persistableMessages.map(messageToStored),
+        tokenUsage: managed.tokenUsage ?? DEFAULT_TOKEN_USAGE,
+      } as StoredSession
+
+      saveSessionTurnReconcile(storedSession, [...(managed.turnChangedMessageIds ?? [])])
+      managed.turnChangedMessageIds = undefined
+    } catch (error) {
+      sessionLog.error(`Turn-end persist failed for session ${managed.id}, falling back to full persist:`, error)
+      this.persistSession(managed)
+    }
   }
 
   // Metadata-only persist: writes the sessions row without touching message
@@ -2167,6 +2212,14 @@ export class SessionManager implements ISessionManager {
         messages: persistableMessages.map(messageToStored),
         tokenUsage: managed.tokenUsage ?? DEFAULT_TOKEN_USAGE,
       } as StoredSession
+
+      // Track for the turn-end reconcile (persistSessionTurnEnd) BEFORE the
+      // write attempt — if the targeted write fails, the reconcile reasserts
+      // these rows, matching the healing the full-rewrite anchor used to give.
+      managed.turnChangedMessageIds ??= new Set()
+      for (const id of changedMessageIds) {
+        managed.turnChangedMessageIds.add(id)
+      }
 
       saveSessionMessageUpdate(storedSession, changedMessageIds)
     } catch (error) {
@@ -7246,8 +7299,8 @@ export class SessionManager implements ISessionManager {
       }
     }
 
-    // 6. Always persist
-    this.persistSession(managed)
+    // 6. Always persist (turn-end reconcile — full rewrite only on drift)
+    this.persistSessionTurnEnd(managed)
 
     // 7. Hibernate completed background sessions to release heavy resources.
     // The session metadata stays in the Map for UI visibility; messages
