@@ -162,12 +162,40 @@ export function setSessionRuntimeHooks(hooks: Partial<SessionRuntimeHooks>): voi
   }
 }
 
+/**
+ * Pi subprocess runtime overrides for headless deployments.
+ *
+ * The runtime resolver's non-packaged path prefers the interceptor's
+ * TypeScript source, which forces the Pi subprocess onto Bun (only Bun can
+ * `--require` TS). The Docker image ships a Node-target Pi bundle plus a
+ * prebuilt interceptor.cjs and declares both via these env vars so the
+ * subprocess runs under Node instead (see Dockerfile.server). A set-but-
+ * missing path throws instead of silently falling back to the Bun/TS path.
+ */
+export function resolvePiRuntimeOverrides(
+  env: NodeJS.ProcessEnv = process.env,
+): Pick<BackendHostRuntimeContext, 'nodeRuntimePath' | 'interceptorBundlePath'> {
+  const overrides: Pick<BackendHostRuntimeContext, 'nodeRuntimePath' | 'interceptorBundlePath'> = {}
+  const nodeBin = env.DATAPILOT_PI_NODE_BIN
+  if (nodeBin) {
+    if (!existsSync(nodeBin)) throw new Error(`DATAPILOT_PI_NODE_BIN points to a missing file: ${nodeBin}`)
+    overrides.nodeRuntimePath = nodeBin
+  }
+  const interceptor = env.DATAPILOT_PI_INTERCEPTOR
+  if (interceptor) {
+    if (!existsSync(interceptor)) throw new Error(`DATAPILOT_PI_INTERCEPTOR points to a missing file: ${interceptor}`)
+    overrides.interceptorBundlePath = interceptor
+  }
+  return overrides
+}
+
 function buildBackendHostRuntimeContext(): BackendHostRuntimeContext {
   if (!_platform) throw new Error('setSessionPlatform() must be called before session creation')
   return {
     appRootPath: _platform.appRootPath,
     resourcesPath: _platform.resourcesPath,
     isPackaged: _platform.isPackaged,
+    ...resolvePiRuntimeOverrides(),
   }
 }
 

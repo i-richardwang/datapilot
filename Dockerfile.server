@@ -144,11 +144,28 @@ RUN cd node_modules/better-sqlite3 && \
 # Copy source
 COPY . .
 
-# Build MCP helper servers (bundled CJS — required by runtime-resolver.ts)
+# Build MCP helper servers (bundled CJS — required by runtime-resolver.ts).
+# interceptor.cjs: prebuilt so the Pi subprocess can run under Node — the
+# non-packaged resolver path otherwise preloads the interceptor's TS source,
+# which only Bun can `--require` (see DATAPILOT_PI_NODE_BIN below).
+# The Pi bundle MUST be --format esm: bun's CJS output keeps `import.meta`
+# (fine under Bun, SyntaxError in Node's CJS loader), so ESM is the only
+# format Node can execute; the package's `"type": "module"` makes index.js
+# an ESM main.
 RUN bun build packages/session-mcp-server/src/index.ts \
       --outfile packages/session-mcp-server/dist/index.js --target node --format cjs && \
     bun build packages/pi-agent-server/src/index.ts \
-      --outfile packages/pi-agent-server/dist/index.js --target node --format cjs
+      --outfile packages/pi-agent-server/dist/index.js --target node --format esm && \
+    bun build packages/shared/src/unified-network-interceptor.ts \
+      --outfile packages/shared/dist/interceptor.cjs --target node --format cjs
+
+# Boot the Pi bundle as a *main module* under Node — exactly how pi-agent.ts
+# spawns it (a `require()`-wrapped load masks main-module-only failures) —
+# and fail the build if the startup banner never appears.
+RUN out=$(printf '' | timeout 15 node --require /app/packages/shared/dist/interceptor.cjs \
+      /app/packages/pi-agent-server/dist/index.js 2>&1 | head -5); \
+    echo "$out" | grep -q 'Pi agent server starting' || \
+    { echo "Pi bundle failed to boot under Node:"; echo "$out"; exit 1; }
 
 # Build the WhatsApp worker bundle (CJS, Node target — Bun cannot run it).
 RUN bun run scripts/build-wa-worker.ts
@@ -219,6 +236,12 @@ ENV DATAPILOT_SCRIPTS=/app/apps/electron/resources/scripts
 # to /app.
 ENV DATAPILOT_MESSAGING_WA_WORKER=/app/packages/messaging-whatsapp-worker/dist/worker.cjs
 ENV DATAPILOT_MESSAGING_NODE_BIN=node
+# Pi subprocess runtime: the image's Pi bundle is Node-target (built above) and
+# the interceptor is prebuilt CJS, so run the subprocess under Node — Bun
+# re-parses the ~27MB bundle in ~2.1s on every spawn (one spawn per batch
+# item), Node with NODE_COMPILE_CACHE loads it in ~535ms.
+ENV DATAPILOT_PI_NODE_BIN=/usr/local/bin/node
+ENV DATAPILOT_PI_INTERCEPTOR=/app/packages/shared/dist/interceptor.cjs
 ENV PATH="/opt/datapilot-py/bin:/app/apps/electron/resources/bin:${PATH}"
 
 EXPOSE 9100
