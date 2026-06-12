@@ -127,13 +127,16 @@ describe('idle hibernation sweep', () => {
     expect(managed.messagesLoaded).toBe(true)
   })
 
-  it('leaves eager-hibernate types to the completion path', async () => {
+  it('sweeps idle batch sessions whose completion-time hibernate was blocked', async () => {
+    // A batch session left warm means its eager hibernate hit a safety gate at
+    // completion; the gate has since cleared and nothing else retries — the
+    // sweep must pick it up.
     const managed = seedWarmSession('s_batch', { isBatch: true })
 
     await runSweep()
 
-    // Not swept here — batch sessions hibernate on completion instead.
-    expect(managed.agent).not.toBeNull()
+    expect(managed.agent).toBeNull()
+    expect(managed.messagesLoaded).toBe(false)
   })
 
   it('ignores already-cold sessions', async () => {

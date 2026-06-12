@@ -6343,8 +6343,12 @@ export class SessionManager implements ISessionManager {
     for (const managed of this.sessions.values()) {
       // Already cold — nothing to release.
       if (!managed.agent && !managed.messagesLoaded) continue
-      // Eager-hibernate types are handled at completion time.
-      if (this.shouldHibernateOnComplete(managed)) continue
+      // Eager-hibernate types (batch/automation/mini) are normally handled at
+      // completion time — but when a safety gate blocks that one-shot attempt
+      // (pending permission, interrupted turn, queued message), nothing ever
+      // retries it. The sweep is the universal janitor: it covers them too
+      // once they age past the idle threshold. (Observed in production:
+      // 15 leftover subprocesses from one batch run, ~3GB.)
       const idleSince = Math.max(managed.lastActivityAt ?? 0, managed.lastMessageAt)
       if (now - idleSince < IDLE_HIBERNATE_THRESHOLD_MS) continue
       if (!this.isIdleHibernationSafe(managed)) continue
