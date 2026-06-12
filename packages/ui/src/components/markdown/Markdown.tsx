@@ -23,6 +23,7 @@ import remarkCollapsibleSections from './remarkCollapsibleSections'
 import { CollapsibleSection } from './CollapsibleSection'
 import { useCollapsibleMarkdown } from './CollapsibleMarkdownContext'
 import { wrapWithSafeProxy } from './safe-components'
+import { splitMarkdownIntoBlocks } from './split-markdown-blocks'
 import { MARKDOWN_MATH_OPTIONS } from './math-options'
 import { markdownUrlTransform } from './url-transform'
 
@@ -554,26 +555,20 @@ function createComponents(
 }
 
 /**
- * Markdown - Customizable markdown renderer with multiple render modes
- *
- * Features:
- * - Three render modes: terminal, minimal, full
- * - Syntax highlighting via Shiki
- * - GFM support (tables, task lists, strikethrough)
- * - Clickable links and file paths
- * - Memoization for streaming performance
+ * MarkdownContent - The parse + render core, without the `.markdown-content`
+ * wrapper div. Kept wrapper-free so MemoizedMarkdown can render several
+ * independently-memoized blocks as direct siblings inside a single wrapper,
+ * producing the same DOM as one whole-document parse.
  */
-export function Markdown({
+function MarkdownContent({
   children,
   mode = 'minimal',
-  className,
-  id,
   onUrlClick,
   onFileClick,
   collapsible = false,
   hideFirstMermaidExpand = true,
   disablePreviewBlocks,
-}: MarkdownProps) {
+}: Omit<MarkdownProps, 'className' | 'id'>) {
   // Get collapsible context if enabled
   const collapsibleContext = useCollapsibleMarkdown()
 
@@ -618,45 +613,74 @@ export function Markdown({
   )
 
   return (
-    <div className={cn('markdown-content', className)}>
-      <ReactMarkdown
-        remarkPlugins={remarkPlugins}
-        rehypePlugins={[rehypeKatex, rehypeRaw]}
-        components={components}
-        urlTransform={markdownUrlTransform}
-      >
-        {processedContent}
-      </ReactMarkdown>
-    </div>
+    <ReactMarkdown
+      remarkPlugins={remarkPlugins}
+      rehypePlugins={[rehypeKatex, rehypeRaw]}
+      components={components}
+      urlTransform={markdownUrlTransform}
+    >
+      {processedContent}
+    </ReactMarkdown>
   )
 }
 
 /**
+ * Markdown - Customizable markdown renderer with multiple render modes
+ *
+ * Features:
+ * - Three render modes: terminal, minimal, full
+ * - Syntax highlighting via Shiki
+ * - GFM support (tables, task lists, strikethrough)
+ * - Clickable links and file paths
+ * - Memoization for streaming performance (see MemoizedMarkdown)
+ */
+export function Markdown({ className, id: _id, ...rest }: MarkdownProps) {
+  return (
+    <div className={cn('markdown-content', className)}>
+      <MarkdownContent {...rest} />
+    </div>
+  )
+}
+
+const MemoizedMarkdownBlock = React.memo(MarkdownContent)
+MemoizedMarkdownBlock.displayName = 'MemoizedMarkdownBlock'
+
+/**
  * MemoizedMarkdown - Optimized for streaming scenarios
  *
- * Splits content into blocks and memoizes each block separately,
- * so only new/changed blocks re-render during streaming.
+ * Follows the block-memoization pattern for streaming markdown (see the
+ * Vercel AI SDK "Markdown Chatbot with Memoization" cookbook): content is
+ * split into top-level blocks, each rendered through a memoized component,
+ * so during streaming only the trailing in-progress block re-parses.
+ * Content that cannot be split safely falls back to a whole-document parse
+ * that is itself memoized on props.
+ *
+ * Memo effectiveness requires referentially stable callback props
+ * (onUrlClick/onFileClick) — pass useCallback-stable handlers.
  */
-export const MemoizedMarkdown = React.memo(
-  Markdown,
-  (prevProps, nextProps) => {
-    // If id is provided, use it for memoization
-    if (prevProps.id && nextProps.id) {
-      return (
-        prevProps.id === nextProps.id &&
-        prevProps.children === nextProps.children &&
-        prevProps.mode === nextProps.mode &&
-        prevProps.disablePreviewBlocks === nextProps.disablePreviewBlocks
-      )
-    }
-    // Otherwise compare content and mode
-    return (
-      prevProps.children === nextProps.children &&
-      prevProps.mode === nextProps.mode &&
-      prevProps.disablePreviewBlocks === nextProps.disablePreviewBlocks
-    )
+export const MemoizedMarkdown = React.memo(function MemoizedMarkdown(props: MarkdownProps) {
+  const { className, id, children, collapsible, ...blockProps } = props
+
+  // Collapsible sections span multiple blocks — never split them.
+  const blocks = React.useMemo(
+    () => (collapsible ? null : splitMarkdownIntoBlocks(children)),
+    [collapsible, children]
+  )
+
+  if (!blocks) {
+    return <Markdown {...props} />
   }
-)
+
+  return (
+    <div className={cn('markdown-content', className)}>
+      {blocks.map((block, index) => (
+        <MemoizedMarkdownBlock key={`${id ?? 'md'}-block_${index}`} {...blockProps}>
+          {block}
+        </MemoizedMarkdownBlock>
+      ))}
+    </div>
+  )
+})
 MemoizedMarkdown.displayName = 'MemoizedMarkdown'
 
 // Re-export for convenience

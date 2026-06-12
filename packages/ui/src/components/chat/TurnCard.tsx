@@ -25,7 +25,7 @@ import {
   GitBranch,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
-import { Markdown } from '../markdown'
+import { MemoizedMarkdown } from '../markdown'
 import { Spinner } from '../ui/LoadingIndicator'
 import { type IslandTransitionConfig } from '../ui'
 import { AnnotationIslandMenu } from '../annotations/AnnotationIslandMenu'
@@ -2494,13 +2494,14 @@ export function ResponseCard({
             // }}
           >
             <div ref={contentLayerRef} className="relative">
-              <Markdown
+              <MemoizedMarkdown
                 mode="minimal"
+                id={messageId}
                 onUrlClick={onOpenUrl}
                 onFileClick={onOpenFile}
               >
                 {text}
-              </Markdown>
+              </MemoizedMarkdown>
               {annotationOverlayLayer}
             </div>
           </div>
@@ -2639,13 +2640,14 @@ export function ResponseCard({
           // }}
         >
           <div ref={contentLayerRef} className="relative">
-            <Markdown
+            <MemoizedMarkdown
               mode="minimal"
+              id={messageId}
               onUrlClick={onOpenUrl}
               onFileClick={onOpenFile}
             >
               {displayedText}
-            </Markdown>
+            </MemoizedMarkdown>
             {annotationOverlayLayer}
           </div>
         </div>
