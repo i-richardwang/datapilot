@@ -7,7 +7,7 @@
 
 ## Overview
 
-Our fork adds 10 categories of changes:
+Our fork adds 11 categories of changes:
 
 1. **DataPilot Branding** — Agent 身份从 "Craft Agent" 改为 "DataPilot"。涉及系统提示词、数据目录（`~/.craft-agent/` → `~/.datapilot/`）、环境变量（`CRAFT_*` → `DATAPILOT_*`）、CLI 二进制名（`craft-cli` → `datapilot-cli`）、UI 全面品牌文本（40+ 文件）、构建产物名（`DataPilot.app`）。**故意不改的项**见 §5a "Intentionally Unchanged"。
 
@@ -28,6 +28,13 @@ Our fork adds 10 categories of changes:
 9. **Docker Compose Deployment** — `docker-compose.example.yml` 提供通用 server (9100) + viewer (9101) 编排示例。host-specific 部署清单（含 Work / skillshub / agent-workspace 等本机挂载、自定义 build context）放在仓外的 `~/Documents/docker/datapilot-deploy/`，避免把个人路径 commit 进开源仓。
 
 10. **Pi SDK Resource Loader Integration** — `pi-agent-server` 给 Pi session 装了 `PiDefaultResourceLoader`,用三个 override 把 DataPilot 的能力接进去:`additionalSkillPaths` 走三层 skill 发现(`~/.agents/skills` / `{workspace}/skills` / `{cwd}/.agents/skills`)、`agentsFilesOverride` 走 monorepo-aware 的 AGENTS.md/CLAUDE.md 行走(`findAllProjectContextFiles`)、`systemPromptOverride` 把 DataPilot 的 `getSystemPrompt()` 输出喂给 Pi 的 `customPrompt` slot。**`systemPromptOverride` 是关键约束**:Pi SDK 一旦装了 resourceLoader,它的 `_rebuildSystemPrompt` 会在每个 turn / tool change 时覆盖 `agent.state.systemPrompt`;不走 `customPrompt` slot 注入,DataPilot 的 prompt body 就会被 SDK 默认前言(`"You are an expert coding assistant operating inside pi..."`)取代。
+
+11. **Performance / Runtime Hardening** (2026-06) — fork 在 upstream 基础上加了一层运行时性能改造。涉及的 upstream 文件多数是 upstream 频繁改的核心区(transport、SessionManager、Markdown、watcher、Dockerfile.server),merge 时会成冲突点。**踩坑级运行时不变量(持久化分层纪律、hibernation/idle-sweep、persistence-echo、selective watch、batch 排序、Node-runtime 约束)已就近记在 `packages/server-core/CLAUDE.md` 和 `packages/shared/CLAUDE.md`——本指南只登记"哪些文件被改了、冲突触发条件、合并取舍",`why` 一律去那两个 CLAUDE.md 读,不在此重复。** 五个子面:
+    - **Tiered session persistence** — `storage.db.ts` 四档写(meta / targeted-message / turn-reconcile / full),`SessionManager` 走 O(changed-rows) 流式持久化 + turn-end reconcile(`header-metadata.ts`)。
+    - **Transport hardening** — `transport/server.ts`+`codec.ts` 加慢客户端背压、共享事件序列化(一次 body 序列化广播给全部接收方)、permessage-deflate(仅 Node runtime 生效)。
+    - **Renderer memoization** — `Markdown.tsx` 块级 memo(`split-markdown-blocks.ts`)、session list / turn 的 memo 边界、meta map 合并写、共享 clock atom(`atoms/clock.ts`)。
+    - **Node runtime in Docker** — `Dockerfile.server` 主进程切 Node 22(原 Bun),Pi 子进程经 `DATAPILOT_PI_NODE_BIN`/`DATAPILOT_PI_INTERCEPTOR` 切 Node;打包走 `scripts/build-server-node.ts`。webui 改 Node-compat(`Response.redirect` 需绝对 URL)。
+    - **Idle containment** — periodic idle-hibernate sweep + DB-mode selective `fs.watch`(不再递归 watch `sessions/`)。
 
 ---
 
@@ -83,6 +90,15 @@ Won't conflict unless upstream adds similarly-named features.
 |----------|---------|
 | `packages/ui/src/components/overlay/HtmlSharePasswordDialog.tsx` | Set / change / clear the password on a shared HTML artifact. Mirrors the session-level `SharePasswordDialog` (kept in `apps/electron/`) so the two share flows stay symmetric. Lives in `packages/ui/` because `HTMLPreviewOverlay` is cross-platform; backend interaction goes through `PlatformActions` (`onShareHtml` with optional password, `onSetHtmlSharePassword`) instead of `window.electronAPI` directly. |
 
+### Performance / Runtime (`[Perf]`)
+
+| Location | Purpose |
+|----------|---------|
+| `scripts/build-server-node.ts` | esbuild bundle of the server main process for the Node runtime (Docker). Pairs with `scripts/build/bun-sqlite-stub.cjs` (stubs `bun:sqlite` out of the Node bundle — Node uses `better-sqlite3`). |
+| `packages/server-core/src/sessions/header-metadata.ts` | `loadSessionHeader` (single sessions-row select for the hot persistence-echo path) + `headerMetadataDiffers` (drops no-op echoes before they defer into `pendingExternalMetadata`). See server-core CLAUDE.md persistence-echo invariant. |
+| `packages/ui/src/components/markdown/split-markdown-blocks.ts` | Splits streaming markdown into block-level chunks so `Markdown.tsx` can memo per-block instead of re-parsing the whole document each token. |
+| `apps/electron/src/renderer/atoms/clock.ts` | Shared coarse-grained clock atom — one interval drives all relative-time (`time-ago`) displays instead of one timer per row. |
+
 ---
 
 ## Modified Upstream Files (Conflict Zone)
@@ -99,15 +115,17 @@ Won't conflict unless upstream adds similarly-named features.
 
 **Conflict trigger:** 上游频繁修改系统提示词。任何段落重写/重排都可能破坏我们的条件包裹。
 
-#### `packages/server-core/src/sessions/SessionManager.ts` `[Batch]`
+#### `packages/server-core/src/sessions/SessionManager.ts` `[Batch + Perf]`
 
 - `batchProcessors: Map<string, BatchProcessor>` with per-workspace init, callbacks, config watcher, broadcasting
 - `executePromptAutomation(input: ExecutePromptAutomationInput)`: options-object form (post-v0.8.13). Fork-extended keys: `isBatch`, `batchContext` (with `toolProfile`), `workingDirectory`, `onSessionCreated`. Both AutomationSystem and BatchProcessor callback sites pass these via the input object.
 - `ensureBatchProcessor()` / `ensureAutomationSystem()` public idempotent methods
 - `notifyBatchesChanged()` / `notifyAutomationsChanged()` for explicit mutation broadcasting
-- `hibernateSession()` family (`shouldHibernateOnComplete`, `isHibernationSafe`, `hasPendingPermissionRequestsForSession`) for headless memory containment.
+- **`[Perf]` Hibernation + idle containment:** `hibernateSession()` family (`shouldHibernateOnComplete`, `isHibernationSafe`, `isIdleHibernationSafe`, `hasPendingPermissionRequestsForSession`) + the periodic idle-hibernate sweep (every 5min, >30min idle). See server-core CLAUDE.md **session hibernation** + **persistence-echo** invariants — any new runtime-only `ManagedSession` field must be persisted or guarded in `isHibernationSafe`/`isIdleHibernationSafe` or the sweep silently drops it.
+- **`[Perf]` Streaming persistence:** O(changed-rows) persist path — tracks `turnChangedMessageIds` through `persistSessionMessages`, calls `saveSessionMessageUpdate` on the hot path and `persistSessionTurnEnd` → `saveSessionTurnReconcile` at turn end. See shared CLAUDE.md Session-Persistence tier discipline — in-place edits to existing messages MUST flow through `persistSessionMessages` or they never reach disk.
+- **`[Perf]` Pi runtime overrides:** `resolvePiRuntimeOverrides()` reads `DATAPILOT_PI_NODE_BIN`/`DATAPILOT_PI_INTERCEPTOR` (Docker-only, set in `Dockerfile.server`) to run the Pi subprocess under Node. Set-but-missing path throws (no silent fallback).
 
-**Conflict trigger:** upstream changes workspace init, session completion, dispose lifecycle, or evolves `ExecutePromptAutomationInput` shape.
+**Conflict trigger:** upstream changes workspace init, session completion, dispose lifecycle, evolves `ExecutePromptAutomationInput` shape, or touches the persist/save call sites or session-creation env wiring (re-thread the fork's streaming-persist + pi-runtime-override hooks).
 
 #### `apps/electron/src/renderer/components/app-shell/AppShell.tsx` `[Batch + Lite UI]`
 
@@ -184,9 +202,11 @@ Fork 删除了三个 session 自管理 MCP tool 及其 handler:`list_sessions`�
 
 Batch context reading → `batchOutputSchema` passed to `buildContextParts()`.
 
-#### `packages/shared/src/agent/pi-agent.ts` `[Batch]`
+#### `packages/shared/src/agent/pi-agent.ts` `[Batch + Perf]`
 
-`setupTools()` passes `includeBatchOutput` and `batchMode`; `createSessionToolContext()` passes `batchContext`.
+`setupTools()` passes `includeBatchOutput` and `batchMode`; `createSessionToolContext()` passes `batchContext`. **`[Perf]`** Pi subprocess spawns merge `resolveNodeCompileCacheEnv()` into the env (sets `NODE_COMPILE_CACHE` so V8 compile artifacts persist across the per-item batch spawns; Node ≥22.1 only, parent-env value wins). See shared CLAUDE.md Notes.
+
+**Conflict trigger:** upstream changes the Pi subprocess spawn/env wiring → re-thread the compile-cache env merge.
 
 #### `packages/shared/src/agent/claude-context.ts` `[Batch]`
 
@@ -250,6 +270,30 @@ Passes `disableOauth/Browser/Validation/Templates` to `createSessionTools()` and
 
 Re-exports now point to `storage.db.ts`.
 
+#### `packages/server-core/src/transport/server.ts` + `transport/codec.ts` `[Perf]`
+
+`server.ts`: slow-client backpressure (`backpressureThresholdBytes`/`backpressureGraceMs`, terminate after grace window on a congested `bufferedAmount`); shared event serialization (`serializeEnvelopeBody` once, broadcast the same buffer to all recipients); `perMessageDeflate: PER_MESSAGE_DEFLATE` on every `WebSocketServer`. `codec.ts`: added `serializeEnvelopeBody`. **`perMessageDeflate` only takes effect under Node** — Bun's ws shim silently ignores it (this is *why* the Docker server runs Node; see server-core CLAUDE.md).
+
+**Conflict trigger:** upstream refactors the transport server, the broadcast/serialization path, or the `WebSocketServer` construction — re-apply backpressure + shared-serialization + deflate. Upstream actively evolves transport (v0.10.0 extended `RpcServer`); inspect manually.
+
+#### `packages/ui/src/components/markdown/Markdown.tsx` `[Perf]`
+
+Block-level memoization via `split-markdown-blocks.ts` — streaming markdown is split into block chunks each memoized independently, so a new token only re-parses its trailing block instead of the whole document. Cross-platform UI file; upstream owns it.
+
+**Conflict trigger:** upstream rewrites the markdown renderer or its prop shape → re-thread block splitting + memo boundaries.
+
+#### `Dockerfile.server` + `packages/server-core/src/webui/{http-server,auth,node-adapter}.ts` `[Perf / Runtime]`
+
+`Dockerfile.server`: base image Node 20 → **Node 22** (`better-sqlite3` prebuild + Electron ABI match); main process `CMD` runs under **Node, not Bun** (real `ws` package → permessage-deflate); `better-sqlite3` prebuild-install step; Pi bundle built `--format esm` (Node CJS loader chokes on Bun's `import.meta`); `DATAPILOT_PI_NODE_BIN`/`DATAPILOT_PI_INTERCEPTOR` env for the Node Pi subprocess. webui made Node-compatible: `http-server.ts` login redirect built manually (302 + `Location`, not `Response.redirect` — undici rejects a relative URL there); `auth.ts` password hashing swapped `Bun.password` argon2id → `node:crypto` scrypt (the hash lives only in process memory, so no migration impact). Production traffic goes through `createWebuiHandler` + `node-adapter.ts`, not the Bun-only `startWebuiHttpServer`.
+
+**Conflict trigger:** upstream changes `Dockerfile.server` runtime/CMD, the webui server entry, or assumes a Bun-only API in a request handler. **Don't "simplify" the Docker CMD back to `bun run`** — it silently drops ws compression and the Node Pi-subprocess speedup. Runtime-neutrality rule + the why are in server-core CLAUDE.md.
+
+#### `packages/server-core/src/bootstrap/headless-start.ts` `[Perf]`
+
+Wires the periodic idle-hibernate sweep into headless server startup.
+
+**Conflict trigger:** upstream restructures headless bootstrap → re-attach the sweep registration.
+
 ### LOW Risk — Additive / Mechanical Changes
 
 | File | Category | Change |
@@ -264,7 +308,7 @@ Re-exports now point to `storage.db.ts`.
 | `packages/shared/src/protocol/dto.ts` | Batch | `batch_progress`, `batch_complete` events; `isBatch` field |
 | `packages/shared/src/protocol/events.ts` | Batch | `batches.CHANGED` |
 | `packages/shared/src/config/validators.ts` | Batch | `validateBatches`, `'batch-config'` detection |
-| `packages/shared/src/config/watcher.ts` | Batch | `onBatchesConfigChange` callback |
+| `packages/shared/src/config/watcher.ts` | Batch + Perf | `onBatchesConfigChange` callback; **`[Perf]`** DB-mode selective `fs.watch` — non-recursive root + only `sources/`/`skills/`/`statuses/` subtrees, never recursive over `sessions/` (see shared CLAUDE.md DB-mode watch-scope invariant). New file-watched subtree → add to `watchWorkspaceDir`'s list, don't widen back to root. |
 | `packages/session-tools-core/src/context.ts` | Batch | `validateBatches()`, `BatchContext`, `batchContext?` |
 | `packages/session-tools-core/src/handlers/config-validate.ts` | Batch | `'batches'` target |
 | `apps/electron/src/transport/channel-map.ts` | Batch | 10 batch + `listAutomations` mappings |
@@ -337,6 +381,11 @@ For each conflicting file, look it up in the "Modified Upstream Files" section a
 | Automations config format | Update `apps/cli/src/datapilot/commands/automation.ts` parsing |
 | `packages/session-tools-core/tsconfig.json` | Don't blindly take upstream — fork's tsconfig is self-contained (`target/lib: ESNext`, all options inline). Upstream extends `../../tsconfig.base.json` which doesn't exist in their repo, masking their own tsc errors (e.g. v0.9.1: regex `/es6/` flag, `Set` iteration without `downlevelIteration`). Adopting upstream's version would inherit those errors. |
 | `RpcServer` interface (`packages/server-core/src/transport/types.ts`) | Every fake/mock `RpcServer` in test files (grep `RpcServer = {` or `createMockServer`) needs the new method. Fork's `updateClientWorkspace` stays required — upstream periodically redeclares it as optional, discard. v0.10.0 added `hasClientCapability` + `findClientsWithCapability` to 8 mocks. |
+| `transport/server.ts` or `codec.ts` `[Perf]` | Backpressure guard + shared `serializeEnvelopeBody` broadcast + `perMessageDeflate` preserved on every `WebSocketServer` |
+| `Dockerfile.server` or webui server entry `[Perf]` | CMD still runs under Node (not `bun run`); `better-sqlite3` prebuild step + Node-22 base intact; Pi bundle still `--format esm`; no Bun-only API leaked into a request handler |
+| `Markdown.tsx` `[Perf]` | Block-split + per-block memo re-threaded onto upstream's renderer |
+| Session persist/save call sites or `ManagedSession` shape `[Perf]` | Streaming-persist tier discipline holds (in-place edits flow through `persistSessionMessages`); new runtime-only fields persisted or guarded in `isHibernationSafe`/`isIdleHibernationSafe` |
+| `config/watcher.ts` watch wiring `[Perf]` | DB-mode watch stays non-recursive (no recursive `sessions/` watch) |
 | New config/i18n **test files** upstream adds (spawn-subprocess pattern) | They hard-code `CRAFT_CONFIG_DIR` to isolate the tmpdir; fork's `paths.ts` reads `DATAPILOT_CONFIG_DIR`. A wrong env var = test silently uses the real `~/.datapilot` and fails. After merge, grep new `*.test.ts` for `CRAFT_CONFIG_DIR` → rename to `DATAPILOT_CONFIG_DIR`. v0.10.1 hit this in `preferences-ui-language.test.ts` + `i18n-bootstrap.test.ts`. |
 | Fork-only dependency **pins** in root `package.json` `overrides`/`resolutions` | These go **stale silently** when upstream reverts a version. tsc/tests won't catch it — only an `esbuild` bundle (`electron:build:main`) does. After every merge, run `bun install && bun run electron:build:main` and diff fork-vs-upstream `@sentry`/SDK versions. v0.10.1: fork's `@sentry/core@10.50.0` pin (added v0.9.1 for upstream's then-7.13.0) was stranded above upstream's reverted `@sentry/electron@7.7.0`/core 10.36.0 → `_INTERNAL_getSpanForToolCallId` missing → bundle broke. Pin removed to track upstream. |
 
@@ -458,6 +507,11 @@ cd apps/electron && bun run build
 
 # Or at minimum, type check
 bun run tsc --noEmit
+
+# Node server bundle (Docker runtime) — catches Bun-only API leaks the
+# Electron/Bun build won't, e.g. an upstream handler calling Bun.* on the
+# request path. Must bundle clean for the Node CMD to boot.
+bun run scripts/build-server-node.ts
 ```
 
 ---
@@ -500,5 +554,5 @@ bun run tsc --noEmit
 | v0.9.5 | 2026-05-23 | 12 | Compact model picker + working-directory selector; Pi turn-anchor sidecar for branch-of-branch; source activation drain; MCP validation refactor; `AcceptPlanDropdown` switched to Radix `DropdownMenu`. Upstream's new `groupConnectionsByProvider` helper adopted in `model-picker-helpers.ts` but fork's inline `FreeFormInput` grouping kept (uses `isAnthropicProvider` for `anthropic_compat`). |
 | v0.9.6 | 2026-05-26 | 7 | Ported orphan-credential cleanup from upstream's `storage.ts` into fork's `storage.db.ts`; adapted its test for SQLite driver. |
 | v0.10.0 | 2026-05-27 | 13 | Remote `browser_tool` bridging — upstream extended `RpcServer` with `hasClientCapability` / `findClientsWithCapability`; every fork test mocking `RpcServer` (8 files) needs both new methods AND fork's `updateClientWorkspace`. Conflict in `transport/types.ts`: upstream redeclared `updateClientWorkspace` as optional — keep fork's required form. `pi-agent.ts`: fork's batch tool-defs gating and upstream's `getBrowserToolEnabled()` filter combine sequentially on `sessionToolDefs`. |
-| v0.10.3 | 2026-06-10 | 11 | Upstream split per-turn context into volatile/stable builders for prompt caching (#862); fork's batch-output block re-threaded through `buildStableContextParts` (now takes optional `options`). `link` label valueType + Fable model + duplicate-Anthropic-account badge adopted as-is (locales arrived pre-translated). |
 | v0.10.1 | 2026-06-05 | 16 | **Upstream absorbed the fork's cross-process UI-language persistence** — reimplemented as a canonical internal `uiLanguage` field + `getPersistedUiLanguage`/`setPersistedUiLanguage` helpers (legacy free-text `language` field removed, scrubbed on read). Took upstream's helpers/hydration (`main/index.ts`, `main.tsx`) wholesale; rebased fork's two standing decisions onto them — (a) `formatPreferencesForPrompt` still omits the language hint when no authoritative source (headless server never inits i18n), now reading `getPersistedUiLanguage()`; (b) `SessionManager` title-gen still passes no language (content auto-detect). `validators.ts`: kept fork's `.nullable()` clear-semantics, dropped `language`, added upstream's `uiLanguage` enum. `factory.ts` `resolveModelForProvider`: merged fork's tier-hint resolution + custom-endpoint guard-skip with upstream's `normalizeDeprecatedModelId` + `connectionDefault`. `update_user_preferences` removal recurred (see risk entry). |
+| v0.10.2+v0.10.3 | 2026-06-10 | 11 | Merged together in one commit. Upstream split per-turn context into volatile/stable builders for prompt caching (#862); fork's batch-output block re-threaded through `buildStableContextParts` (now takes optional `options`). `link` label valueType + Fable model + duplicate-Anthropic-account badge adopted as-is (locales arrived pre-translated). |
