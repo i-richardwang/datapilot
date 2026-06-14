@@ -219,7 +219,8 @@ export default function AppSettingsPage() {
                 </SettingsCard>
               </SettingsSection>
 
-              {/* Power */}
+              {/* Power — powerSaveBlocker is Electron-only; hide in WebUI where it no-ops */}
+              {isElectron && (
               <SettingsSection title={t("settings.power.title")}>
                 <SettingsCard>
                   <SettingsToggle
@@ -230,6 +231,7 @@ export default function AppSettingsPage() {
                   />
                 </SettingsCard>
               </SettingsSection>
+              )}
 
               {/* Tools */}
               {!FEATURE_FLAGS.disableBrowser && (
