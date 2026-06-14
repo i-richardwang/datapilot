@@ -10,7 +10,7 @@
  */
 
 import * as React from 'react'
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Info_Page,
@@ -26,7 +26,7 @@ import { BatchMenu } from './BatchMenu'
 import { BatchItemTimeline } from './BatchItemTimeline'
 import { BATCH_STATUS_DISPLAY_KEY, BATCH_STATUS_BADGE_COLOR, getPermissionModeKey } from './types'
 import type { BatchListItem } from './types'
-import type { BatchStatus, BatchItemState, BatchItemStatus, BatchItemsPage } from '@craft-agent/shared/batches'
+import type { BatchStatus, BatchItemStatus, BatchItemsPage } from '@craft-agent/shared/batches'
 
 // ============================================================================
 // Constants
@@ -123,11 +123,10 @@ export function BatchInfoPage({
 
   const itemCount = itemsPage?.total ?? batch.progress?.totalItems ?? 0
 
-  // Convert page items to Record for BatchItemTimeline
-  const pageItemsRecord = useMemo<Record<string, BatchItemState>>(() => {
-    if (!itemsPage) return {}
-    return Object.fromEntries(itemsPage.items.map(({ id, state }) => [id, state]))
-  }, [itemsPage])
+  // itemsPage.items is already in display order (mirrors batch_items.position).
+  // Pass it straight through — do NOT round-trip via a Record, which would
+  // re-sort integer-like ids ("10".."28") ahead of zero-padded ("01".."09").
+  const pageItems = itemsPage?.items ?? []
 
   // ---------------------------------------------------------------------------
   // Pagination helpers
@@ -343,7 +342,7 @@ export function BatchInfoPage({
           title={t('batches.sectionItems')}
           description={itemCount > 0 ? t('batches.itemsInBatch', { count: itemCount }) : undefined}
         >
-          <BatchItemTimeline items={pageItemsRecord} batchId={batch.id} onRetryItem={onRetryItem} />
+          <BatchItemTimeline items={pageItems} batchId={batch.id} onRetryItem={onRetryItem} />
           {itemsPage && itemsPage.total > PAGE_SIZE && (
             <div className="flex items-center justify-between px-4 py-2 text-xs text-muted-foreground border-t border-border/30">
               <span>

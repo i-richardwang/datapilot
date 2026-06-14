@@ -33,7 +33,12 @@ const statusConfig: Record<BatchItemStatus, { icon: React.ElementType; classes: 
 // ============================================================================
 
 export interface BatchItemTimelineProps {
-  items: Record<string, BatchItemState>
+  /**
+   * Items in display order. An ordered array, NOT a Record — a plain object
+   * re-sorts integer-like ids ("10".."28") ahead of zero-padded ones
+   * ("01".."09"), so order must be carried as an array end-to-end.
+   */
+  items: Array<{ id: string; state: BatchItemState }>
   /**
    * Owning batch ID. "Open Session" navigates into the per-batch
    * sidebar view (filter.kind='batchInstance') so the user keeps context for
@@ -47,9 +52,8 @@ export interface BatchItemTimelineProps {
 export function BatchItemTimeline({ items, batchId, onRetryItem, className }: BatchItemTimelineProps) {
   const { t } = useTranslation()
   const { navigate, navigateToSession } = useNavigation()
-  const entries = Object.entries(items)
 
-  if (entries.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="px-4 py-6 text-center text-sm text-muted-foreground">
         {t('batches.noItemsProcessed')}
@@ -59,7 +63,7 @@ export function BatchItemTimeline({ items, batchId, onRetryItem, className }: Ba
 
   return (
     <div className={cn('divide-y divide-border/30', className)}>
-      {entries.map(([itemId, item]) => {
+      {items.map(({ id: itemId, state: item }) => {
         const config = statusConfig[item.status] ?? statusConfig.pending
         const StatusIcon = config.icon
 

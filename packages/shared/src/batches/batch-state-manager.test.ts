@@ -18,6 +18,7 @@ import {
   updateItemState,
   computeProgress,
   isBatchDone,
+  getBatchItemsPage,
 } from './batch-state-manager.db.ts'
 import type { BatchState } from './types.ts'
 
@@ -316,6 +317,17 @@ describe('batch-state-manager', () => {
       const loaded = loadBatchState(tempDir, 'batch1')!
       expect(Object.keys(loaded.items)).toEqual(['a', 'b', 'c'])
       expect(loaded.totalItems).toBe(3)
+    })
+
+    // Regression: getBatchItemsPage must page in itemOrder, not Object.entries.
+    // Zero-padded ids mix "integer-like" keys ("10".."28", reordered numerically
+    // by JS objects) with string keys ("01".."09", kept in insertion order), so
+    // Object.entries would render "10".."28" ahead of "01".."09".
+    it('getBatchItemsPage pages in itemOrder for zero-padded ids', () => {
+      const ids = ['01', '02', '10', '11']
+      const state = createInitialBatchState('batchPad', ids)
+      const page = getBatchItemsPage(state, 0, 50)
+      expect(page.items.map((i) => i.id)).toEqual(['01', '02', '10', '11'])
     })
   })
 })

@@ -435,7 +435,12 @@ export function getBatchItemsPage(
   limit: number,
   filterStatus?: BatchItemStatus,
 ): BatchItemsPage {
-  const allEntries = Object.entries(state.items)
+  // Order by itemOrder (mirrors batch_items.position), never Object.entries —
+  // item ids from the data source's idField are often integer-like strings,
+  // which JS objects iterate in ascending numeric order regardless of
+  // insertion order (e.g. "10".."28" before "01".."09").
+  const order = state.itemOrder ?? Object.keys(state.items)
+  const allEntries = order.map((id): [string, BatchItemState] => [id, state.items[id]!])
   const entries = filterStatus
     ? allEntries.filter(([, item]) => item.status === filterStatus)
     : allEntries
