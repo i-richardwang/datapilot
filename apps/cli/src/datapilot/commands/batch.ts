@@ -21,15 +21,17 @@ export const BATCH_SPEC: EntitySpec = {
   actions: [
     {
       name: 'list',
-      description: 'List all batches in the workspace',
+      description: 'List batches (overview only — full config via `batch get`); paged, returns {total,returned,truncated}',
       flags: [
         {
           name: 'status',
           type: 'string',
           description: 'Filter by status (comma-separated: pending,running,paused,completed,failed)',
         },
+        { name: 'offset', type: 'int', description: 'Pagination offset', default: 0 },
+        { name: 'limit', type: 'int', description: 'Page size', default: 100 },
       ],
-      example: 'datapilot batch list --status running,paused,pending',
+      example: 'datapilot batch list --status paused --limit 100',
     },
     {
       name: 'get',
@@ -127,31 +129,78 @@ export async function routeBatch(
   switch (action) {
     case 'list': {
       rejectActionFlags(flags, specOf('list'))
-      // Slim the list payload: `action.prompt` is the bulk of each entry
-      // (~70%) and the full config repeats it verbatim per batch, which blows
-      // the output past the non-TTY size cap on workspaces with many batches.
-      // Drop the prompt body here (keep the rest of `action`, expose a
-      // `promptChars` hint so callers know one exists); fetch full text via
-      // `batch get <id>`, which returns the complete config.
+      // `batch list` returns an OVERVIEW projection only: identity + status +
+      // per-item progress counts. The bulky per-batch config (`source`,
+      // `execution`, `action`/prompt, `output`) is dropped — fetch it via
+      // `batch get <id>`. Combined with the `{ total, returned, truncated }`
+      // envelope and a default `--limit`, a consumer can always tell whether
+      // it holds the full set instead of silently acting on a dump that some
+      // downstream stdout cap truncated. Mirrors the bounded-list pattern in
+      // `sessions.ts` (count + slice + truncated) and `BatchItemsPage`.
       const list = (await client.invoke('batches:list', ws)) as Array<Record<string, unknown>>
-      const slim = list.map((b) => {
+      const overview = list.map((b) => {
+        const progress = b.progress as
+          | {
+              status?: string
+              totalItems?: number
+              completedItems?: number
+              failedItems?: number
+              runningItems?: number
+              pendingItems?: number
+              skippedItems?: number
+            }
+          | undefined
         const action = b.action as { prompt?: string } | undefined
-        if (!action || typeof action.prompt !== 'string') return b
-        const { prompt, ...rest } = action
-        return { ...b, action: { ...rest, promptChars: prompt.length } }
+        return {
+          id: b.id,
+          name: b.name,
+          createdAt: b.createdAt,
+          labels: b.labels,
+          // A batch that never ran has no progress — its status is 'pending'.
+          status: progress?.status ?? 'pending',
+          // Signal a prompt exists (and how long) without shipping its body.
+          promptChars: typeof action?.prompt === 'string' ? action.prompt.length : undefined,
+          progress: progress
+            ? {
+                totalItems: progress.totalItems,
+                completedItems: progress.completedItems,
+                failedItems: progress.failedItems,
+                runningItems: progress.runningItems,
+                pendingItems: progress.pendingItems,
+                skippedItems: progress.skippedItems,
+              }
+            : undefined,
+        }
       })
+
+      let filtered = overview
       const statusArg = strFlag(flags, 'status')
-      if (!statusArg) ok(slim)
-      const wanted = statusArg.split(',').map((s) => s.trim()).filter(Boolean)
-      const invalid = wanted.filter((s) => !BATCH_STATUSES.has(s))
-      if (invalid.length > 0) {
-        fail('USAGE_ERROR', `Invalid status: ${invalid.join(', ')}`, {
-          suggestion: `Valid statuses: ${[...BATCH_STATUSES].join(', ')}`,
-        })
+      if (statusArg) {
+        const wanted = statusArg.split(',').map((s) => s.trim()).filter(Boolean)
+        const invalid = wanted.filter((s) => !BATCH_STATUSES.has(s))
+        if (invalid.length > 0) {
+          fail('USAGE_ERROR', `Invalid status: ${invalid.join(', ')}`, {
+            suggestion: `Valid statuses: ${[...BATCH_STATUSES].join(', ')}`,
+          })
+        }
+        const want = new Set(wanted)
+        filtered = overview.filter((b) => want.has(b.status))
       }
-      const want = new Set(wanted)
-      // A batch that never ran has no progress — its status is 'pending'.
-      ok(slim.filter((b) => want.has(((b.progress as { status?: string } | undefined)?.status) ?? 'pending')))
+
+      const offset = Math.max(0, intFlag(flags, 'offset') ?? 0)
+      const limit = Math.max(0, intFlag(flags, 'limit') ?? 100)
+      const page = filtered.slice(offset, offset + limit)
+      // `total` is the count AFTER `--status` filtering; `truncated` is true
+      // when this page stops short of the end — narrow with `--status` or page
+      // with `--offset`. Never read `batches` as complete without checking it.
+      ok({
+        total: filtered.length,
+        returned: page.length,
+        offset,
+        limit,
+        truncated: offset + page.length < filtered.length,
+        batches: page,
+      })
     }
 
     case 'get': {

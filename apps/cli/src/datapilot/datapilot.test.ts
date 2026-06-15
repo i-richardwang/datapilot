@@ -656,7 +656,7 @@ describe('datapilot CLI', () => {
     expect(server.requests.find((req) => req.channel === 'batches:getStatus')).toBeDefined()
   })
 
-  it('batch list omits action.prompt and reports promptChars', async () => {
+  it('batch list returns overview only (promptChars, no config bodies) in a paged envelope', async () => {
     server = startMockServer({
       handlers: {
         'workspaces:get': () => [{ id: 'ws-1' }],
@@ -665,7 +665,11 @@ describe('datapilot CLI', () => {
           {
             id: 'batch-1',
             name: 'Test Batch',
+            source: { kind: 'csv', rows: 1000 },
+            execution: { maxConcurrency: 4 },
+            output: { schema: {} },
             action: { type: 'prompt', prompt: 'Summarize $BATCH_ITEM_NAME', labels: ['x'] },
+            progress: { status: 'running', totalItems: 10, completedItems: 3 },
           },
         ],
       },
@@ -676,12 +680,30 @@ describe('datapilot CLI', () => {
     ])
     expect(r.exitCode).toBe(0)
     expect(r.envelope?.ok).toBe(true)
-    const data = r.envelope?.data as Array<Record<string, unknown>>
-    const action = data[0].action as Record<string, unknown>
-    expect(action.prompt).toBeUndefined()
-    expect(action.promptChars).toBe('Summarize $BATCH_ITEM_NAME'.length)
-    expect(action.type).toBe('prompt')
-    expect(action.labels).toEqual(['x'])
+    const data = r.envelope?.data as { total: number; returned: number; offset: number; limit: number; truncated: boolean; batches: Array<Record<string, unknown>> }
+    expect(data.total).toBe(1)
+    expect(data.returned).toBe(1)
+    expect(data.offset).toBe(0)
+    expect(data.limit).toBe(100)
+    expect(data.truncated).toBe(false)
+    const b = data.batches[0]!
+    expect(b.id).toBe('batch-1')
+    expect(b.name).toBe('Test Batch')
+    expect(b.status).toBe('running')
+    expect(b.promptChars).toBe('Summarize $BATCH_ITEM_NAME'.length)
+    // Overview drops all the bulky config bodies.
+    expect(b.action).toBeUndefined()
+    expect(b.source).toBeUndefined()
+    expect(b.execution).toBeUndefined()
+    expect(b.output).toBeUndefined()
+    expect(b.progress).toEqual({
+      totalItems: 10,
+      completedItems: 3,
+      failedItems: undefined,
+      runningItems: undefined,
+      pendingItems: undefined,
+      skippedItems: undefined,
+    })
   })
 
   it('batch list --status filters by progress.status (never-run = pending)', async () => {
@@ -702,8 +724,38 @@ describe('datapilot CLI', () => {
     ])
     expect(r.exitCode).toBe(0)
     expect(r.envelope?.ok).toBe(true)
-    const data = r.envelope?.data as Array<Record<string, unknown>>
-    expect(data.map((b) => b.id).sort()).toEqual(['n', 'r'])
+    const data = r.envelope?.data as { total: number; batches: Array<Record<string, unknown>> }
+    // total reflects the post-filter count, not the unfiltered list.
+    expect(data.total).toBe(2)
+    expect(data.batches.map((b) => b.id).sort()).toEqual(['n', 'r'])
+  })
+
+  it('batch list paginates with --offset/--limit and reports truncated', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'batches:list': () =>
+          Array.from({ length: 5 }, (_, i) => ({
+            id: `b${i}`,
+            name: `Batch ${i}`,
+            progress: { status: 'paused' },
+          })),
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'batch', 'list', '--offset', '1', '--limit', '2',
+    ])
+    expect(r.exitCode).toBe(0)
+    const data = r.envelope?.data as { total: number; returned: number; offset: number; limit: number; truncated: boolean; batches: Array<Record<string, unknown>> }
+    expect(data.total).toBe(5)
+    expect(data.returned).toBe(2)
+    expect(data.offset).toBe(1)
+    expect(data.limit).toBe(2)
+    // offset 1 + 2 returned = 3 < 5 → more remain.
+    expect(data.truncated).toBe(true)
+    expect(data.batches.map((b) => b.id)).toEqual(['b1', 'b2'])
   })
 
   it('batch list --status rejects invalid status', async () => {

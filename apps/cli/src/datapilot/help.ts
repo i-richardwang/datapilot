@@ -115,7 +115,13 @@ export function printEntityHelp(entity: string): never {
     entity: spec.name,
     description: spec.description,
     usage: `datapilot ${spec.name} <action> [positionals...] [flags...]`,
-    actions: spec.actions.map((a) => ({ name: a.name, description: a.description })),
+    actions: spec.actions.map((a) => ({
+      name: a.name,
+      description: a.description,
+      // Surface flag names at the entity level so callers discover filters
+      // like `list --status` without first drilling into action-level help.
+      flags: a.flags.map((f) => f.name),
+    })),
   }
   ok(data, { human: () => renderEntityHelpHuman(spec) })
 }
@@ -199,7 +205,8 @@ function renderEntityHelpHuman(spec: EntitySpec): string {
   lines.push('Actions:')
   const w = Math.max(...spec.actions.map((a) => a.name.length))
   for (const a of spec.actions) {
-    lines.push(`  ${a.name.padEnd(w)}  ${a.description}`)
+    const flagHint = a.flags.length ? `  [${a.flags.map((f) => `--${f.name}`).join(', ')}]` : ''
+    lines.push(`  ${a.name.padEnd(w)}  ${a.description}${flagHint}`)
   }
   lines.push('')
   lines.push(`Run 'datapilot ${spec.name} <action> --help' for action details.`)

@@ -133,12 +133,23 @@ describe('CLI --help integration', () => {
     const r = await runCli(['batch', '--help'])
     expect(r.exitCode).toBe(0)
     expect(r.envelope?.ok).toBe(true)
-    const data = r.envelope?.data as { entity: string; actions: Array<{ name: string; description: string }> }
+    const data = r.envelope?.data as {
+      entity: string
+      actions: Array<{ name: string; description: string; flags: string[] }>
+    }
     expect(data.entity).toBe('batch')
     const names = data.actions.map((a) => a.name)
     expect(names).toContain('create')
     expect(names).toContain('start')
     expect(names).toContain('retry-item')
+    // Entity-level help surfaces flag names so `--status` is discoverable
+    // without drilling into `batch list --help`.
+    const listAction = data.actions.find((a) => a.name === 'list')!
+    expect(listAction.flags).toContain('status')
+    expect(listAction.flags).toContain('limit')
+    expect(listAction.flags).toContain('offset')
+    // A flagless action reports an empty list, not a missing field.
+    expect(data.actions.find((a) => a.name === 'start')!.flags).toEqual([])
   })
 
   it('action --help returns usage + flags + example', async () => {
@@ -164,9 +175,10 @@ describe('CLI --help integration', () => {
   it('action --help on action without input does not advertise --input', async () => {
     const r = await runCli(['batch', 'list', '--help'])
     expect(r.exitCode).toBe(0)
-    const data = r.envelope?.data as { takesInput: boolean; flags: unknown[] }
+    const data = r.envelope?.data as { takesInput: boolean; flags: Array<{ name: string }> }
     expect(data.takesInput).toBe(false)
-    expect(data.flags).toEqual([])
+    // list has query flags (status/offset/limit) but takes no --input.
+    expect(data.flags.map((f) => f.name).sort()).toEqual(['limit', 'offset', 'status'])
   })
 
   it('action --help fails with USAGE_ERROR for unknown action', async () => {

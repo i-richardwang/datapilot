@@ -220,8 +220,8 @@ datapilot automation delete abc123
 Manage batch processing jobs stored in `batches.json`.
 
 ### Commands
-- `datapilot batch list [--status <s>]` — omits `action.prompt`; each entry carries `action.promptChars` instead. `--status` filters by comma-separated status (`pending,running,paused,completed,failed`)
-- `datapilot batch get <id>` — returns batch with `progress` (and the full `action.prompt`)
+- `datapilot batch list [--status <s>] [--offset <n>] [--limit <n>]` — paged **overview** envelope `{total, returned, offset, limit, truncated, batches}`. Each entry is identity + `status` + `progress` counts + `promptChars` only — the bulky config (`source`, `execution`, `action`/prompt, `output`) is dropped. `--status` filters by comma-separated status (`pending,running,paused,completed,failed`); default `--limit 100`
+- `datapilot batch get <id>` — returns the **full** batch config with `progress` (including the complete `action.prompt`)
 - `datapilot batch create --name "<name>" [--input '<json>']`
 - `datapilot batch update <id> --input '<json>'`
 - `datapilot batch delete <id>`
@@ -234,9 +234,11 @@ Manage batch processing jobs stored in `batches.json`.
 ### Examples
 
 ```bash
-datapilot batch list
+datapilot batch list                                   # first 100, overview only
+datapilot batch list --status paused                   # count via `total`; page with --offset if truncated
 datapilot batch list --status running,paused,pending   # only active/unstarted batches
-datapilot batch get abc123
+datapilot batch list --offset 100 --limit 100          # next page
+datapilot batch get abc123                             # full config for one batch
 
 # Create — `source` and `action` are nested objects (see batches.md for full schema)
 datapilot batch create --name "User Analysis" \
@@ -259,7 +261,8 @@ datapilot batch delete abc123
 ```
 
 ### Notes
-- `list` omits each batch's `action.prompt` body (it dominates the payload and repeats per entry) — it reports `action.promptChars` instead. Use `batch get <id>` to read the full prompt. To find active/unstarted batches in a large workspace, filter with `--status running,paused,pending` rather than listing all and scanning.
+- `list` returns an **overview envelope** `{total, returned, offset, limit, truncated, batches}`, not a bare array. Each `batches[]` entry is identity (`id`, `name`, `createdAt`, `labels`) + `status` + `progress` item counts + `promptChars` — the full `source`/`execution`/`action`/`output` config is dropped. Use `batch get <id>` for the complete config and prompt.
+- **Always read `total` and `truncated` before concluding.** `total` is the count *after* `--status` filtering — to answer "how many paused" call `batch list --status paused` and read `total` (do not count the `batches` array, which is capped at `--limit`). `truncated: true` means this page stops short of the end; raise `--limit` or page with `--offset`. Acting on `batches` as if complete when `truncated` is true yields wrong counts.
 - A batch that has never run reports no `progress` block; `--status` treats it as `pending`.
 - `items` only returns per-item state; for overall progress call `batch get`.
 - Top-level `labels` tags the batch itself; `action.labels` tags the child sessions it creates — they're independent.
