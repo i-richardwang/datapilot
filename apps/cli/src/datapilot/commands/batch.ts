@@ -12,6 +12,9 @@ import { strFlag, intFlag, parseInput, type Flags } from '../args.ts'
 import type { RouteCtx } from '../router.ts'
 import { rejectActionFlags, type ActionSpec, type EntitySpec } from '../help.ts'
 
+/** Valid `BatchStatus` values (mirrors BatchStatus in @craft-agent/shared/batches). */
+const BATCH_STATUSES = new Set(['pending', 'running', 'paused', 'completed', 'failed'])
+
 export const BATCH_SPEC: EntitySpec = {
   name: 'batch',
   description: 'Batch processing jobs (CSV/JSON ingest, prompt fan-out, structured output)',
@@ -19,8 +22,14 @@ export const BATCH_SPEC: EntitySpec = {
     {
       name: 'list',
       description: 'List all batches in the workspace',
-      flags: [],
-      example: 'datapilot batch list',
+      flags: [
+        {
+          name: 'status',
+          type: 'string',
+          description: 'Filter by status (comma-separated: pending,running,paused,completed,failed)',
+        },
+      ],
+      example: 'datapilot batch list --status running,paused,pending',
     },
     {
       name: 'get',
@@ -116,9 +125,34 @@ export async function routeBatch(
   const client = await ctx.getClient()
 
   switch (action) {
-    case 'list':
+    case 'list': {
       rejectActionFlags(flags, specOf('list'))
-      ok(await client.invoke('batches:list', ws))
+      // Slim the list payload: `action.prompt` is the bulk of each entry
+      // (~70%) and the full config repeats it verbatim per batch, which blows
+      // the output past the non-TTY size cap on workspaces with many batches.
+      // Drop the prompt body here (keep the rest of `action`, expose a
+      // `promptChars` hint so callers know one exists); fetch full text via
+      // `batch get <id>`, which returns the complete config.
+      const list = (await client.invoke('batches:list', ws)) as Array<Record<string, unknown>>
+      const slim = list.map((b) => {
+        const action = b.action as { prompt?: string } | undefined
+        if (!action || typeof action.prompt !== 'string') return b
+        const { prompt, ...rest } = action
+        return { ...b, action: { ...rest, promptChars: prompt.length } }
+      })
+      const statusArg = strFlag(flags, 'status')
+      if (!statusArg) ok(slim)
+      const wanted = statusArg.split(',').map((s) => s.trim()).filter(Boolean)
+      const invalid = wanted.filter((s) => !BATCH_STATUSES.has(s))
+      if (invalid.length > 0) {
+        fail('USAGE_ERROR', `Invalid status: ${invalid.join(', ')}`, {
+          suggestion: `Valid statuses: ${[...BATCH_STATUSES].join(', ')}`,
+        })
+      }
+      const want = new Set(wanted)
+      // A batch that never ran has no progress — its status is 'pending'.
+      ok(slim.filter((b) => want.has(((b.progress as { status?: string } | undefined)?.status) ?? 'pending')))
+    }
 
     case 'get': {
       rejectActionFlags(flags, specOf('get'))

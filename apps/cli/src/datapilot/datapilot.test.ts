@@ -656,6 +656,73 @@ describe('datapilot CLI', () => {
     expect(server.requests.find((req) => req.channel === 'batches:getStatus')).toBeDefined()
   })
 
+  it('batch list omits action.prompt and reports promptChars', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'batches:list': () => [
+          {
+            id: 'batch-1',
+            name: 'Test Batch',
+            action: { type: 'prompt', prompt: 'Summarize $BATCH_ITEM_NAME', labels: ['x'] },
+          },
+        ],
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'batch', 'list',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    const data = r.envelope?.data as Array<Record<string, unknown>>
+    const action = data[0].action as Record<string, unknown>
+    expect(action.prompt).toBeUndefined()
+    expect(action.promptChars).toBe('Summarize $BATCH_ITEM_NAME'.length)
+    expect(action.type).toBe('prompt')
+    expect(action.labels).toEqual(['x'])
+  })
+
+  it('batch list --status filters by progress.status (never-run = pending)', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'batches:list': () => [
+          { id: 'r', name: 'Running', action: { type: 'prompt', prompt: 'p' }, progress: { status: 'running' } },
+          { id: 'c', name: 'Completed', action: { type: 'prompt', prompt: 'p' }, progress: { status: 'completed' } },
+          { id: 'n', name: 'NeverRan', action: { type: 'prompt', prompt: 'p' } },
+        ],
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'batch', 'list', '--status', 'running,pending',
+    ])
+    expect(r.exitCode).toBe(0)
+    expect(r.envelope?.ok).toBe(true)
+    const data = r.envelope?.data as Array<Record<string, unknown>>
+    expect(data.map((b) => b.id).sort()).toEqual(['n', 'r'])
+  })
+
+  it('batch list --status rejects invalid status', async () => {
+    server = startMockServer({
+      handlers: {
+        'workspaces:get': () => [{ id: 'ws-1' }],
+        'window:switchWorkspace': () => undefined,
+        'batches:list': () => [],
+      },
+    })
+    const r = await runCli([
+      '--url', server.url, '--token', 't', '--json',
+      'batch', 'list', '--status', 'bogus',
+    ])
+    expect(r.exitCode).toBe(2)
+    expect(r.envelope?.ok).toBe(false)
+    expect(r.envelope?.error?.code).toBe('USAGE_ERROR')
+  })
+
   it('batch status returns USAGE_ERROR', async () => {
     server = startMockServer({
       handlers: {

@@ -220,8 +220,8 @@ datapilot automation delete abc123
 Manage batch processing jobs stored in `batches.json`.
 
 ### Commands
-- `datapilot batch list`
-- `datapilot batch get <id>` — returns batch with `progress`
+- `datapilot batch list [--status <s>]` — omits `action.prompt`; each entry carries `action.promptChars` instead. `--status` filters by comma-separated status (`pending,running,paused,completed,failed`)
+- `datapilot batch get <id>` — returns batch with `progress` (and the full `action.prompt`)
 - `datapilot batch create --name "<name>" [--input '<json>']`
 - `datapilot batch update <id> --input '<json>'`
 - `datapilot batch delete <id>`
@@ -235,6 +235,7 @@ Manage batch processing jobs stored in `batches.json`.
 
 ```bash
 datapilot batch list
+datapilot batch list --status running,paused,pending   # only active/unstarted batches
 datapilot batch get abc123
 
 # Create — `source` and `action` are nested objects (see batches.md for full schema)
@@ -258,6 +259,8 @@ datapilot batch delete abc123
 ```
 
 ### Notes
+- `list` omits each batch's `action.prompt` body (it dominates the payload and repeats per entry) — it reports `action.promptChars` instead. Use `batch get <id>` to read the full prompt. To find active/unstarted batches in a large workspace, filter with `--status running,paused,pending` rather than listing all and scanning.
+- A batch that has never run reports no `progress` block; `--status` treats it as `pending`.
 - `items` only returns per-item state; for overall progress call `batch get`.
 - Top-level `labels` tags the batch itself; `action.labels` tags the child sessions it creates — they're independent.
 <!-- cli:batch:end -->
