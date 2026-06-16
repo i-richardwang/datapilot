@@ -507,7 +507,7 @@ export class PiEventAdapter extends BaseEventAdapter {
         // Use accumulated output from partial results if available
         const accumulatedOutput = this.consumeOutput(toolCallId);
 
-        const isError = event.isError;
+        let isError = event.isError;
         let result: string;
 
         if (accumulatedOutput) {
@@ -516,6 +516,17 @@ export class PiEventAdapter extends BaseEventAdapter {
           result = blockReason;
         } else {
           result = this.extractToolResult(event.result, isError);
+        }
+
+        // A Bash command that produced no output and merely exited non-zero
+        // (grep/find/test with "no match", `false`, etc.) is a negative query
+        // result, not a tool failure — the Pi SDK's bash tool throws on ANY
+        // non-zero exit, which surfaces here as isError. Downgrade so it isn't
+        // shown/recorded as an error. We only touch the classification flag,
+        // never `result`, and this never reaches the model (Pi owns its own
+        // history); it only affects DataPilot's display + persisted toolStatus.
+        if (isError && this.isNoOutputNonZeroExit(resolvedToolName, result)) {
+          isError = false;
         }
 
         // After tool completion, the assistant may generate new text
@@ -768,6 +779,27 @@ export class PiEventAdapter extends BaseEventAdapter {
     }
 
     return null;
+  }
+
+  /**
+   * Detect a Bash result that is only "errored" because the command exited
+   * non-zero while producing no output — e.g. `grep`/`find`/`test` with no
+   * match, or `false`. The Pi SDK bash tool throws on any non-zero exit and
+   * formats empty output as "(no output)", arriving here as:
+   *
+   *   "(no output)\n\nCommand exited with code <N>"
+   *
+   * Aborts and timeouts use distinct messages ("Command aborted", "Command
+   * timed out after Ns") and are intentionally NOT matched — they stay errors.
+   * Any command that wrote diagnostics to stdout/stderr also won't match
+   * (its body isn't empty), so genuine failures keep their error status.
+   */
+  private isNoOutputNonZeroExit(toolName: string, result: string): boolean {
+    if (toolName !== 'Bash') return false;
+    const m = result.match(/^([\s\S]*?)\s*Command exited with code \d+\s*$/);
+    if (!m) return false;
+    const body = m[1]!.trim();
+    return body === '' || body === '(no output)';
   }
 
   /**
