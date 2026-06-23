@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import type { Session } from '@craft-agent/shared/protocol'
+import type { Session, SessionListOptions } from '@craft-agent/shared/protocol'
 import type { ISessionManager } from '@craft-agent/server-core/handlers'
 import { BindingStore } from '../binding-store'
 import { Commands } from '../commands'
@@ -25,6 +25,25 @@ function makeSession(id: string, name: string, lastMessageAt: number): Session {
 function makeSessionManager(sessions: Session[]): ISessionManager {
   return {
     getSessions: () => sessions,
+    getSessionList: (_workspaceId: string, options?: SessionListOptions) => {
+      const filtered = sessions
+        .filter((session) => options?.archived === undefined || session.isArchived === options.archived)
+        .sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0))
+      const offset = options?.offset ?? 0
+      const limit = options?.limit ?? filtered.length
+      const page = filtered.slice(offset, offset + limit)
+      return {
+        total: filtered.length,
+        returned: page.length,
+        sessions: page.map((session) => ({
+          id: session.id,
+          name: session.name ?? session.id,
+          labels: session.labels ?? [],
+          status: session.sessionStatus ?? 'todo',
+          createdAt: session.createdAt ?? 0,
+        })),
+      }
+    },
     getSession: async (sessionId: string) => sessions.find((session) => session.id === sessionId) ?? null,
     createSession: async () => { throw new Error('not implemented') },
     sendMessage: async () => {},

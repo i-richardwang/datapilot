@@ -22,7 +22,7 @@ import {
   unlinkSync,
 } from 'fs';
 import { join, basename } from 'path';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, asc, inArray, sql, type SQL } from 'drizzle-orm';
 import { getWorkspaceSessionsPath } from '../workspaces/storage.ts';
 import { generateUniqueSessionId } from './slug-generator.ts';
 import { toPortablePath, expandPath, normalizePath } from '../utils/paths.ts';
@@ -45,6 +45,56 @@ import { getStatusCategory } from '../statuses/storage.db.ts';
 
 // Re-export types for convenience
 export type { SessionConfig } from './types.ts';
+
+export interface SessionMetadataQueryFilter {
+  archived?: boolean;
+  flagged?: boolean;
+  batch?: boolean;
+  batchId?: string;
+  hasLabels?: boolean;
+  statusInclude?: string[];
+  statusExclude?: string[];
+  labelIncludeGroups?: string[][];
+  labelExclude?: string[];
+  search?: string;
+}
+
+export interface SessionMetadataQueryOptions {
+  filter?: SessionMetadataQueryFilter;
+  sortBy?: 'recent' | 'name' | 'status';
+  offset?: number;
+  limit?: number;
+  postFilter?: (metadata: SessionMetadata) => boolean;
+}
+
+export interface SessionMetadataPage {
+  rows: SessionMetadata[];
+  total: number;
+}
+
+export interface SessionCountRow {
+  id: string;
+  sessionStatus: SessionStatus;
+  labels?: string[];
+  isArchived?: boolean;
+  isBatch?: boolean;
+  isFlagged?: boolean;
+  hasUnread?: boolean;
+}
+
+export interface SessionSidebarScalarCounts {
+  total: number;
+  flagged: number;
+  archived: number;
+  batch: number;
+  unread: number;
+  byStatus: Record<string, number>;
+}
+
+export interface SessionLabelCountRow {
+  id: string;
+  labels?: string[];
+}
 
 // ============================================================
 // Session Path Portability (for message content)
@@ -366,6 +416,74 @@ function rowToMetadata(
     archivedAt: row.archivedAt ?? undefined,
     branchFromMessageId: row.branchFromMessageId ?? undefined,
   };
+}
+
+function sqlValueList(values: string[]): SQL {
+  return sql.join(values.map(value => sql`${value}`), sql`, `);
+}
+
+function labelMatchesSql(labelId: string): SQL {
+  // Labels may be stored either as a bare id or as "id::value".
+  return sql`EXISTS (
+    SELECT 1 FROM json_each(${sessionsTable.labels})
+    WHERE json_each.value = ${labelId}
+       OR json_each.value LIKE ${`${labelId}::%`}
+  )`;
+}
+
+function anyLabelMatchesSql(labelIds: string[]): SQL | undefined {
+  const clauses = labelIds.map(labelMatchesSql);
+  if (clauses.length === 0) return undefined;
+  return clauses.length === 1 ? clauses[0] : sql`(${sql.join(clauses, sql` OR `)})`;
+}
+
+function sessionWhereClause(filter?: SessionMetadataQueryFilter): SQL | undefined {
+  const conditions: SQL[] = [eq(sessionsTable.hidden, false)];
+
+  if (filter?.archived !== undefined) conditions.push(eq(sessionsTable.isArchived, filter.archived));
+  if (filter?.flagged !== undefined) conditions.push(eq(sessionsTable.isFlagged, filter.flagged));
+  if (filter?.batch !== undefined) conditions.push(eq(sessionsTable.isBatch, filter.batch));
+  if (filter?.batchId !== undefined) conditions.push(eq(sessionsTable.batchId, filter.batchId));
+  if (filter?.hasLabels === true) {
+    conditions.push(sql`json_array_length(COALESCE(${sessionsTable.labels}, '[]')) > 0`);
+  }
+
+  if (filter?.statusInclude && filter.statusInclude.length > 0) {
+    conditions.push(sql`COALESCE(${sessionsTable.sessionStatus}, 'todo') IN (${sqlValueList(filter.statusInclude)})`);
+  }
+  if (filter?.statusExclude && filter.statusExclude.length > 0) {
+    conditions.push(sql`COALESCE(${sessionsTable.sessionStatus}, 'todo') NOT IN (${sqlValueList(filter.statusExclude)})`);
+  }
+  if (filter?.search) {
+    conditions.push(sql`LOWER(COALESCE(${sessionsTable.name}, '')) LIKE ${`%${filter.search.toLowerCase()}%`}`);
+  }
+  if (filter?.labelIncludeGroups && filter.labelIncludeGroups.length > 0) {
+    for (const group of filter.labelIncludeGroups) {
+      const clause = anyLabelMatchesSql(group);
+      if (clause) conditions.push(clause);
+    }
+  }
+  if (filter?.labelExclude && filter.labelExclude.length > 0) {
+    const clause = anyLabelMatchesSql(filter.labelExclude);
+    if (clause) conditions.push(sql`NOT ${clause}`);
+  }
+
+  return conditions.length === 1 ? conditions[0] : and(...conditions);
+}
+
+function sessionOrderBy(sortBy?: SessionMetadataQueryOptions['sortBy']): SQL[] {
+  const recent = sql<number>`COALESCE(${sessionsTable.lastMessageAt}, ${sessionsTable.lastUsedAt}, 0)`;
+  if (sortBy === 'name') {
+    return [asc(sql<string>`LOWER(COALESCE(${sessionsTable.name}, ''))`), desc(recent)];
+  }
+  if (sortBy === 'status') {
+    return [asc(sql<string>`COALESCE(${sessionsTable.sessionStatus}, 'todo')`), desc(recent)];
+  }
+  return [desc(recent)];
+}
+
+function needsMetadataPostFilter(options?: SessionMetadataQueryOptions): boolean {
+  return Boolean(options?.postFilter);
 }
 
 // ============================================================
@@ -848,6 +966,263 @@ export function listSessions(workspaceRootPath: string): SessionMetadata[] {
     .all();
 
   return rows.map(row => rowToMetadata(row, workspaceRootPath, validStatusIds));
+}
+
+/**
+ * Windowed session metadata query backed by SQLite.
+ *
+ * Common predicates (hidden/archive/flagged/batch/status/search) are pushed
+ * into SQL. Label predicates and caller-supplied dynamic predicates run over
+ * lightweight metadata rows so arbitrary UI semantics do not force persistent
+ * ManagedSession hydration.
+ */
+export function listSessionMetadataPage(
+  workspaceRootPath: string,
+  options: SessionMetadataQueryOptions = {}
+): SessionMetadataPage {
+  const db = getWorkspaceDb(workspaceRootPath);
+  const validStatusIds = new Set(listStatuses(workspaceRootPath).map(s => s.id));
+  const where = sessionWhereClause(options.filter);
+  const orderBy = sessionOrderBy(options.sortBy);
+  const offset = Math.max(options.offset ?? 0, 0);
+  const limit = options.limit === undefined ? undefined : Math.max(options.limit, 0);
+
+  if (!needsMetadataPostFilter(options)) {
+    const countRow = db.select({ count: sql<number>`COUNT(*)` })
+      .from(sessionsTable)
+      .where(where)
+      .get();
+
+    if (limit === 0) {
+      return { rows: [], total: Number(countRow?.count ?? 0) };
+    }
+
+    let query = db.select()
+      .from(sessionsTable)
+      .where(where)
+      .orderBy(...orderBy);
+
+    if (limit !== undefined) {
+      query = query.limit(limit).offset(offset) as typeof query;
+    }
+
+    const rows = query.all();
+    return {
+      rows: rows.map(row => rowToMetadata(row, workspaceRootPath, validStatusIds)),
+      total: Number(countRow?.count ?? 0),
+    };
+  }
+
+  const allRows = db.select()
+    .from(sessionsTable)
+    .where(where)
+    .orderBy(...orderBy)
+    .all()
+    .map(row => rowToMetadata(row, workspaceRootPath, validStatusIds))
+    .filter(metadata => options.postFilter ? options.postFilter(metadata) : true);
+
+  return {
+    rows: limit === undefined ? allRows.slice(offset) : allRows.slice(offset, offset + limit),
+    total: allRows.length,
+  };
+}
+
+/**
+ * Load lightweight metadata for specific session ids. Hidden sessions are
+ * excluded to match list semantics.
+ */
+export function listSessionMetadataByIds(workspaceRootPath: string, ids: string[]): SessionMetadata[] {
+  if (ids.length === 0) return [];
+  const db = getWorkspaceDb(workspaceRootPath);
+  const validStatusIds = new Set(listStatuses(workspaceRootPath).map(s => s.id));
+  const rows = db.select()
+    .from(sessionsTable)
+    .where(and(eq(sessionsTable.hidden, false), inArray(sessionsTable.id, ids)))
+    .all();
+  return rows.map(row => rowToMetadata(row, workspaceRootPath, validStatusIds));
+}
+
+/**
+ * Minimal rows for sidebar aggregation. This intentionally avoids the full
+ * SessionMetadata shape and never touches message rows or session folders.
+ */
+export function listSessionCountRows(workspaceRootPath: string): SessionCountRow[] {
+  const db = getWorkspaceDb(workspaceRootPath);
+  const validStatusIds = new Set(listStatuses(workspaceRootPath).map(s => s.id));
+  const rows = db.select({
+    id: sessionsTable.id,
+    sessionStatus: sessionsTable.sessionStatus,
+    labels: sessionsTable.labels,
+    isArchived: sessionsTable.isArchived,
+    isBatch: sessionsTable.isBatch,
+    isFlagged: sessionsTable.isFlagged,
+    hasUnread: sessionsTable.hasUnread,
+  })
+    .from(sessionsTable)
+    .where(eq(sessionsTable.hidden, false))
+    .all();
+
+  return rows.map(row => {
+    const status = row.sessionStatus && validStatusIds.has(row.sessionStatus)
+      ? row.sessionStatus
+      : 'todo';
+    return {
+      id: row.id,
+      sessionStatus: status,
+      labels: (row.labels as string[] | null) ?? undefined,
+      isArchived: row.isArchived ?? undefined,
+      isBatch: row.isBatch ?? undefined,
+      isFlagged: row.isFlagged ?? undefined,
+      hasUnread: row.hasUnread ?? undefined,
+    };
+  });
+}
+
+export function listSessionCountRowsByIds(workspaceRootPath: string, ids: string[]): SessionCountRow[] {
+  if (ids.length === 0) return [];
+  const db = getWorkspaceDb(workspaceRootPath);
+  const validStatusIds = new Set(listStatuses(workspaceRootPath).map(s => s.id));
+  const rows = db.select({
+    id: sessionsTable.id,
+    sessionStatus: sessionsTable.sessionStatus,
+    labels: sessionsTable.labels,
+    isArchived: sessionsTable.isArchived,
+    isBatch: sessionsTable.isBatch,
+    isFlagged: sessionsTable.isFlagged,
+    hasUnread: sessionsTable.hasUnread,
+  })
+    .from(sessionsTable)
+    .where(and(eq(sessionsTable.hidden, false), inArray(sessionsTable.id, ids)))
+    .all();
+
+  return rows.map(row => {
+    const status = row.sessionStatus && validStatusIds.has(row.sessionStatus)
+      ? row.sessionStatus
+      : 'todo';
+    return {
+      id: row.id,
+      sessionStatus: status,
+      labels: (row.labels as string[] | null) ?? undefined,
+      isArchived: row.isArchived ?? undefined,
+      isBatch: row.isBatch ?? undefined,
+      isFlagged: row.isFlagged ?? undefined,
+      hasUnread: row.hasUnread ?? undefined,
+    };
+  });
+}
+
+export function getSessionSidebarScalarCounts(workspaceRootPath: string): SessionSidebarScalarCounts {
+  const db = getWorkspaceDb(workspaceRootPath);
+  const validStatusIds = new Set(listStatuses(workspaceRootPath).map(s => s.id));
+  const countWhere = (where: SQL | undefined): number => {
+    const row = db.select({ count: sql<number>`COUNT(*)` })
+      .from(sessionsTable)
+      .where(where)
+      .get();
+    return Number(row?.count ?? 0);
+  };
+  const active = and(
+    eq(sessionsTable.hidden, false),
+    eq(sessionsTable.isArchived, false),
+    eq(sessionsTable.isBatch, false),
+  );
+
+  const statusRows = db.select({
+    sessionStatus: sessionsTable.sessionStatus,
+    count: sql<number>`COUNT(*)`,
+  })
+    .from(sessionsTable)
+    .where(active)
+    .groupBy(sessionsTable.sessionStatus)
+    .all();
+
+  const byStatus: Record<string, number> = {};
+  for (const row of statusRows) {
+    const status = row.sessionStatus && validStatusIds.has(row.sessionStatus)
+      ? row.sessionStatus
+      : 'todo';
+    byStatus[status] = (byStatus[status] ?? 0) + Number(row.count ?? 0);
+  }
+
+  return {
+    total: countWhere(eq(sessionsTable.hidden, false)),
+    archived: countWhere(and(eq(sessionsTable.hidden, false), eq(sessionsTable.isArchived, true))),
+    batch: countWhere(and(eq(sessionsTable.hidden, false), eq(sessionsTable.isBatch, true))),
+    flagged: countWhere(and(active, eq(sessionsTable.isFlagged, true))),
+    unread: countWhere(and(active, eq(sessionsTable.hasUnread, true))),
+    byStatus,
+  };
+}
+
+export function listSessionLabelCountRows(workspaceRootPath: string): SessionLabelCountRow[] {
+  const db = getWorkspaceDb(workspaceRootPath);
+  const rows = db.select({
+    id: sessionsTable.id,
+    labels: sessionsTable.labels,
+  })
+    .from(sessionsTable)
+    .where(and(
+      eq(sessionsTable.hidden, false),
+      eq(sessionsTable.isArchived, false),
+      sql`json_array_length(COALESCE(${sessionsTable.labels}, '[]')) > 0`,
+    ))
+    .all();
+
+  return rows.map(row => ({
+    id: row.id,
+    labels: (row.labels as string[] | null) ?? undefined,
+  }));
+}
+
+export function countUnreadSessions(workspaceRootPath: string): number {
+  const db = getWorkspaceDb(workspaceRootPath);
+  const row = db.select({ count: sql<number>`COUNT(*)` })
+    .from(sessionsTable)
+    .where(and(
+      eq(sessionsTable.hidden, false),
+      eq(sessionsTable.isArchived, false),
+      eq(sessionsTable.isBatch, false),
+      eq(sessionsTable.hasUnread, true),
+    ))
+    .get();
+  return Number(row?.count ?? 0);
+}
+
+export function markWorkspaceSessionsRead(
+  workspaceRootPath: string,
+  options: { excludeSessionIds?: string[] } = {}
+): void {
+  const db = getWorkspaceDb(workspaceRootPath);
+  const conditions: SQL[] = [
+    eq(sessionsTable.hidden, false),
+    eq(sessionsTable.isArchived, false),
+    eq(sessionsTable.isBatch, false),
+    eq(sessionsTable.hasUnread, true),
+  ];
+  if (options.excludeSessionIds && options.excludeSessionIds.length > 0) {
+    conditions.push(sql`${sessionsTable.id} NOT IN (${sqlValueList(options.excludeSessionIds)})`);
+  }
+
+  db.update(sessionsTable)
+    .set({ hasUnread: false })
+    .where(and(...conditions))
+    .run();
+}
+
+export function getSessionVisibility(workspaceRootPath: string, sessionId: string): { hidden: boolean; isBatch: boolean } | null {
+  const db = getWorkspaceDb(workspaceRootPath);
+  const row = db.select({
+    hidden: sessionsTable.hidden,
+    isBatch: sessionsTable.isBatch,
+  })
+    .from(sessionsTable)
+    .where(eq(sessionsTable.id, sessionId))
+    .get();
+  if (!row) return null;
+  return {
+    hidden: row.hidden === true,
+    isBatch: row.isBatch === true,
+  };
 }
 
 /**

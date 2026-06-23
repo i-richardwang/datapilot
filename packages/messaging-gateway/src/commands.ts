@@ -36,6 +36,11 @@ const NOOP_LOGGER: MessagingLogger = {
   child: () => NOOP_LOGGER,
 }
 
+type RecentSession = {
+  id: string
+  name?: string
+}
+
 /**
  * Result of consuming a pairing code. The `kind` discriminator tells the
  * caller which downstream flow to run (bind a session, or register the
@@ -660,21 +665,23 @@ export class Commands {
     )
   }
 
-  private getRecentSessions(): ReturnType<ISessionManager['getSessions']> {
-    return this.sessionManager.getSessions(this.workspaceId)
-      .filter((s) => !s.isArchived)
-      .sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0))
-      .slice(0, 10)
+  private getRecentSessions(): RecentSession[] {
+    return this.sessionManager.getSessionList(this.workspaceId, {
+      archived: false,
+      sortBy: 'recent',
+      limit: 10,
+    }).sessions
   }
 
   private async resolveBindTarget(
     bindArg: string,
-    recent: ReturnType<ISessionManager['getSessions']>,
+    recent: RecentSession[],
   ): Promise<Awaited<ReturnType<ISessionManager['getSession']>> | undefined> {
     if (/^\d+$/.test(bindArg)) {
       const index = Number(bindArg)
       if (index >= 1 && index <= recent.length) {
-        return recent[index - 1]
+        const target = recent[index - 1]
+        return target ? this.sessionManager.getSession(target.id) : undefined
       }
     }
     return this.sessionManager.getSession(bindArg)

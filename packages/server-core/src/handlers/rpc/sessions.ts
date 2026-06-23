@@ -140,8 +140,8 @@ export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): 
   const { sessionManager, platform } = deps
   const log = platform.logger
 
-  // Get all sessions for the calling window's workspace
-  // Waits for initialization to complete so sessions are never returned empty during startup
+  // Legacy bounded session snapshot for the calling window's workspace.
+  // New list UIs should use sessions:listPage for complete pagination.
   server.handle(RPC_CHANNELS.sessions.GET, async (ctx) => {
     try {
       await sessionManager.waitForInit()
@@ -522,7 +522,7 @@ export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): 
     // O(results) lookups against the in-memory map — never materialize the whole
     // workspace list here (getSessions() builds every Session row and was the
     // O(all-sessions) stall on large workspaces).
-    const filteredResults = results.filter(r => !sessionManager.isHiddenOrBatch(r.sessionId))
+    const filteredResults = results.filter(r => !sessionManager.isHiddenOrBatch(r.sessionId, workspaceId))
 
     log.info('[search]','ipc:response', { searchId: id, resultCount: filteredResults.length, totalFound: results.length })
     return filteredResults

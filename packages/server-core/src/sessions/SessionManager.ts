@@ -48,12 +48,20 @@ import type { ActiveSessionInfo, SessionProcessingStatus } from '@craft-agent/co
 import { loadWorkspaceConfig } from '@craft-agent/shared/workspaces'
 import {
   // Session persistence functions
-  listSessions as listStoredSessions,
   loadSession as loadStoredSession,
+  loadSessionHeader,
   saveSession as saveStoredSession,
   createSession as createStoredSession,
   deleteSession as deleteStoredSession,
   updateSessionMetadata,
+  listSessionMetadataPage,
+  listSessionMetadataByIds,
+  listSessionCountRowsByIds,
+  getSessionSidebarScalarCounts,
+  listSessionLabelCountRows,
+  countUnreadSessions,
+  markWorkspaceSessionsRead,
+  getSessionVisibility,
   canUpdateSdkCwd,
   setPendingPlanExecution as setStoredPendingPlanExecution,
   markCompactionComplete as markStoredCompactionComplete,
@@ -75,6 +83,7 @@ import {
   type StoredSession,
   type StoredMessage,
   type SessionMetadata,
+  type SessionCountRow,
   type SessionStatus,
   type SessionHeader,
   type StoredSessionMeta,
@@ -220,6 +229,7 @@ const MAX_ANNOTATION_JSON_BYTES = 32 * 1024
 // are ignored, so the watcher does not roll back the in-memory mutation we
 // just persisted. See onSessionMetadataChange.
 const METADATA_WRITE_GUARD_MS = 5000
+const LEGACY_GET_SESSIONS_LIMIT = 1000
 
 /**
  * Text sent to the session when a plan is approved from outside the desktop
@@ -1168,12 +1178,29 @@ function managedToSession(m: ManagedSession, overrides?: Partial<Session>): Sess
   } as Session
 }
 
-type ManagedViewPredicate = (m: ManagedSession) => boolean
+type SessionViewSource = {
+  name?: string
+  preview?: string
+  sessionStatus?: string
+  permissionMode?: PermissionMode
+  model?: string
+  lastMessageRole?: string
+  lastMessageAt?: number
+  createdAt?: number
+  messageCount?: number
+  isFlagged?: boolean
+  hasUnread?: boolean
+  isProcessing?: boolean
+  labels?: string[]
+  tokenUsage?: Session['tokenUsage']
+}
 
-const managedViewPredicateCache = new Map<string, ManagedViewPredicate>()
+type SessionViewPredicate<T extends SessionViewSource = SessionViewSource> = (m: T) => boolean
+
+const managedViewPredicateCache = new Map<string, SessionViewPredicate>()
 dbEvents.on('view:config', () => managedViewPredicateCache.clear())
 
-function buildManagedViewContext(m: ManagedSession) {
+function buildSessionViewContext(m: SessionViewSource) {
   return buildViewContext({
     name: m.name,
     preview: m.preview,
@@ -1192,21 +1219,21 @@ function buildManagedViewContext(m: ManagedSession) {
   })
 }
 
-function buildCompiledViewPredicate(compiled: CompiledView): ManagedViewPredicate {
-  return (m: ManagedSession): boolean => {
+function buildCompiledViewPredicate(compiled: CompiledView): SessionViewPredicate {
+  return (m: SessionViewSource): boolean => {
     try {
-      return !!compiled.evaluate(buildManagedViewContext(m))
+      return !!compiled.evaluate(buildSessionViewContext(m))
     } catch {
       return false
     }
   }
 }
 
-function buildAnyCompiledViewPredicate(compiled: CompiledView[]): ManagedViewPredicate {
+function buildAnyCompiledViewPredicate(compiled: CompiledView[]): SessionViewPredicate {
   if (compiled.length === 0) return () => false
 
-  return (m: ManagedSession): boolean => {
-    const context = buildManagedViewContext(m)
+  return (m: SessionViewSource): boolean => {
+    const context = buildSessionViewContext(m)
     for (const view of compiled) {
       try {
         if (view.evaluate(context)) return true
@@ -1218,7 +1245,7 @@ function buildAnyCompiledViewPredicate(compiled: CompiledView[]): ManagedViewPre
   }
 }
 
-function buildManagedViewPredicate(workspaceRootPath: string, viewId: string): ManagedViewPredicate {
+function buildManagedViewPredicate(workspaceRootPath: string, viewId: string): SessionViewPredicate {
   const cacheKey = `${workspaceRootPath}\u0000${viewId}`
   const cached = managedViewPredicateCache.get(cacheKey)
   if (cached) return cached
@@ -1242,7 +1269,7 @@ function buildManagedViewPredicate(workspaceRootPath: string, viewId: string): M
  * Mirrors the renderer's filter semantics exactly (see SessionListPageFilter);
  * the renderer pre-translates every UI filter kind into this predicate.
  */
-function managedMatchesPageFilter(m: ManagedSession, f: SessionListPageFilter, viewPredicate?: ManagedViewPredicate): boolean {
+function managedMatchesPageFilter(m: ManagedSession, f: SessionListPageFilter, viewPredicate?: SessionViewPredicate<ManagedSession>): boolean {
   if (f.archived === true && m.isArchived !== true) return false
   if (f.archived === false && m.isArchived === true) return false
   if (f.flagged === true && m.isFlagged !== true) return false
@@ -1376,6 +1403,97 @@ export class SessionManager implements ISessionManager {
    *  Resolves immediately if already initialized. */
   waitForInit(): Promise<void> {
     return this.initGate.wait()
+  }
+
+  private findStoredSessionHeader(
+    sessionId: string,
+    workspaceId?: string,
+  ): { workspace: Workspace; header: SessionHeader } | null {
+    const candidates = workspaceId
+      ? [this.resolveWorkspace(workspaceId)].filter((workspace): workspace is Workspace => !!workspace)
+      : getWorkspaces()
+
+    for (const workspace of candidates) {
+      const header = loadSessionHeader(workspace.rootPath, sessionId)
+      if (header) return { workspace, header }
+    }
+    return null
+  }
+
+  private createManagedSessionFromHeader(header: SessionHeader, workspace: Workspace): ManagedSession {
+    const wsConfig = loadWorkspaceConfig(workspace.rootPath)
+    const managed = createManagedSession(header, workspace, {
+      workingDirectory: header.workingDirectory ?? wsConfig?.defaults?.workingDirectory,
+    })
+
+    if (managed.llmConnection) {
+      const conn = resolveSessionConnection(managed.llmConnection, undefined)
+      if (!conn) {
+        sessionLog.warn(`Session ${header.id} has orphaned llmConnection "${managed.llmConnection}", clearing`)
+        managed.llmConnection = undefined
+        managed.connectionLocked = false
+      }
+    }
+
+    setPermissionMode(header.id, managed.permissionMode ?? 'ask', { changedBy: 'restore' })
+    if (managed.previousPermissionMode) {
+      hydratePreviousPermissionMode(header.id, managed.previousPermissionMode)
+    }
+
+    this.sessions.set(header.id, managed)
+
+    const automationSystem = this.automationSystems.get(workspace.rootPath)
+    if (automationSystem && !automationSystem.getSessionMetadata(header.id)) {
+      automationSystem.setInitialSessionMetadata(header.id, {
+        permissionMode: header.permissionMode,
+        labels: header.labels,
+        isFlagged: header.isFlagged,
+        sessionStatus: header.sessionStatus,
+        sessionName: header.name,
+      })
+    }
+
+    return managed
+  }
+
+  private getOrLoadManagedSession(sessionId: string, workspaceId?: string): ManagedSession | null {
+    const existing = this.sessions.get(sessionId)
+    if (existing && (!workspaceId || existing.workspace.id === workspaceId)) return existing
+
+    const found = this.findStoredSessionHeader(sessionId, workspaceId)
+    if (!found) return null
+    return this.createManagedSessionFromHeader(found.header, found.workspace)
+  }
+
+  private resolveWorkspace(workspaceId: string): Workspace | null {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (workspace) return workspace
+    for (const managed of this.sessions.values()) {
+      if (managed.workspace.id === workspaceId) return managed.workspace
+    }
+    return null
+  }
+
+  private sessionFromMetadata(metadata: SessionMetadata, workspace: Workspace): Session {
+    const loaded = this.sessions.get(metadata.id)
+    if (loaded && loaded.workspace.id === workspace.id) {
+      return managedToSession(loaded, {
+        permissionModeState: this.getSessionPermissionModeState(loaded.id) ?? undefined,
+      })
+    }
+
+    const transient = createManagedSession(metadata, workspace)
+    return managedToSession(transient)
+  }
+
+  private viewSourceFromMetadata(metadata: SessionMetadata): SessionViewSource {
+    const loaded = this.sessions.get(metadata.id)
+    if (loaded) return loaded
+    return {
+      ...metadata,
+      lastMessageAt: metadata.lastMessageAt ?? metadata.lastUsedAt,
+      isProcessing: false,
+    }
   }
 
   /**
@@ -1729,8 +1847,25 @@ export class SessionManager implements ISessionManager {
       // Detects changes from both internal writes (self) and external sources
       // (other instances, scripts, manual edits).
       onSessionMetadataChange: (sessionId, header) => {
+        const notifyAutomation = (workspaceRootPath: string) => {
+          const automationSystem = this.automationSystems.get(workspaceRootPath)
+          if (!automationSystem) return
+          automationSystem.updateSessionMetadata(sessionId, {
+            permissionMode: header.permissionMode,
+            labels: header.labels,
+            isFlagged: header.isFlagged,
+            sessionStatus: header.sessionStatus,
+            sessionName: header.name,
+          }).catch((error) => {
+            sessionLog.error(`[Automations] Failed to update session metadata:`, error)
+          })
+        }
+
         const managed = this.sessions.get(sessionId)
-        if (!managed) return
+        if (!managed) {
+          notifyAutomation(workspaceRootPath)
+          return
+        }
 
         // Check if this is our own write echoing back via fs.watch().
         // Self-writes don't need in-memory sync (already up to date), but
@@ -1771,18 +1906,7 @@ export class SessionManager implements ISessionManager {
 
         // Always notify automation system — it does its own diffing and needs
         // to see both self-writes and external changes for event matching.
-        const automationSystem = this.automationSystems.get(managed.workspace.rootPath)
-        if (automationSystem) {
-          automationSystem.updateSessionMetadata(sessionId, {
-            permissionMode: header.permissionMode,
-            labels: header.labels,
-            isFlagged: header.isFlagged,
-            sessionStatus: header.sessionStatus,
-            sessionName: header.name,
-          }).catch((error) => {
-            sessionLog.error(`[Automations] Failed to update session metadata:`, error)
-          })
-        }
+        notifyAutomation(managed.workspace.rootPath)
       },
     }
 
@@ -2147,8 +2271,7 @@ export class SessionManager implements ISessionManager {
         this.setupConfigWatcher(workspace.rootPath, workspace.id)
       }
 
-      // Load existing sessions from disk
-      this.loadSessionsFromDisk()
+      sessionLog.info('Session metadata will be loaded lazily from SQLite on demand')
 
       // Eagerly set up ConfigWatcher, AutomationSystem, and BatchProcessor for
       // every workspace so they are available immediately (not just after the UI
@@ -2169,70 +2292,6 @@ export class SessionManager implements ISessionManager {
     } catch (error) {
       this.initGate.markFailed(error)
       throw error
-    }
-  }
-
-  // Load all existing sessions from disk into memory (metadata only - messages are lazy-loaded)
-  private loadSessionsFromDisk(): void {
-    try {
-      const workspaces = getWorkspaces()
-      let totalSessions = 0
-
-      // Iterate over each workspace and load its sessions
-      for (const workspace of workspaces) {
-        const workspaceRootPath = workspace.rootPath
-        const sessionMetadata = listStoredSessions(workspaceRootPath)
-        // Load workspace config once per workspace for default working directory
-        const wsConfig = loadWorkspaceConfig(workspaceRootPath)
-        const wsDefaultWorkingDir = wsConfig?.defaults?.workingDirectory
-
-        for (const meta of sessionMetadata) {
-          // Create managed session from metadata only (messages lazy-loaded on demand)
-          // This dramatically reduces memory usage at startup - messages are loaded
-          // when getSession() is called for a specific session
-          const managed = createManagedSession(meta, workspace, {
-            enabledSourceSlugs: undefined,  // Loaded with messages
-            workingDirectory: meta.workingDirectory ?? wsDefaultWorkingDir,
-          })
-
-          // Migration: clear orphaned llmConnection references (e.g., after connection was deleted)
-          if (managed.llmConnection) {
-            const conn = resolveSessionConnection(managed.llmConnection, undefined)
-            if (!conn) {
-              sessionLog.warn(`Session ${meta.id} has orphaned llmConnection "${managed.llmConnection}", clearing`)
-              managed.llmConnection = undefined
-              managed.connectionLocked = false
-            }
-          }
-
-          // Initialize mode-manager state for restored sessions even before agent creation.
-          // This keeps diagnostics/effective mode aligned with persisted session metadata.
-          setPermissionMode(meta.id, managed.permissionMode ?? 'ask', { changedBy: 'restore' })
-          if (managed.previousPermissionMode) {
-            hydratePreviousPermissionMode(meta.id, managed.previousPermissionMode)
-          }
-
-          this.sessions.set(meta.id, managed)
-
-          // Initialize session metadata in AutomationSystem for diffing
-          const automationSystem = this.automationSystems.get(workspaceRootPath)
-          if (automationSystem) {
-            automationSystem.setInitialSessionMetadata(meta.id, {
-              permissionMode: meta.permissionMode,
-              labels: meta.labels,
-              isFlagged: meta.isFlagged,
-              sessionStatus: meta.sessionStatus,
-              sessionName: managed.name,
-            })
-          }
-
-          totalSessions++
-        }
-      }
-
-      sessionLog.info(`Loaded ${totalSessions} sessions from disk (metadata only)`)
-    } catch (error) {
-      sessionLog.error('Failed to load sessions from disk:', error)
     }
   }
 
@@ -2680,7 +2739,7 @@ export class SessionManager implements ISessionManager {
   }
 
   getWorkspaceAutomationSummary(workspaceId: string): { automationCount: number; schedulerRunning: boolean } {
-    const workspace = getWorkspaceByNameOrId(workspaceId)
+    const workspace = this.resolveWorkspace(workspaceId)
     if (!workspace) return { automationCount: 0, schedulerRunning: false }
 
     const automationSystem = this.automationSystems.get(workspace.rootPath)
@@ -2724,31 +2783,26 @@ export class SessionManager implements ISessionManager {
     return result
   }
 
-  /**
-   * Reload all sessions from disk.
-   * Used after importing sessions to refresh the in-memory session list.
-   */
-  reloadSessions(): void {
-    this.loadSessionsFromDisk()
-  }
-
   getSessions(workspaceId?: string): Session[] {
-    // Returns session metadata only - messages are NOT included to save memory
-    // Use getSession(id) to load messages for a specific session
-    let sessions = Array.from(this.sessions.values())
+    const workspaces = workspaceId
+      ? [this.resolveWorkspace(workspaceId)].filter((workspace): workspace is Workspace => !!workspace)
+      : getWorkspaces()
 
-    // Filter by workspace if specified (used when switching workspaces)
-    if (workspaceId) {
-      sessions = sessions.filter(m => m.workspace.id === workspaceId)
+    const rows: Session[] = []
+    for (const workspace of workspaces) {
+      const page = listSessionMetadataPage(workspace.rootPath, {
+        sortBy: 'recent',
+        offset: 0,
+        limit: LEGACY_GET_SESSIONS_LIMIT,
+      })
+      for (const metadata of page.rows) {
+        rows.push(this.sessionFromMetadata(metadata, workspace))
+      }
     }
 
-    return sessions
-      .map(m => managedToSession(m, {
-        // Bundle the authoritative mode snapshot so clients don't need a
-        // per-session getSessionPermissionModeState RPC after list loads.
-        permissionModeState: this.getSessionPermissionModeState(m.id) ?? undefined,
-      }))
+    return rows
       .sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0))
+      .slice(0, LEGACY_GET_SESSIONS_LIMIT)
   }
 
   /**
@@ -2757,7 +2811,7 @@ export class SessionManager implements ISessionManager {
    * persistent record.
    */
   getSessionInfo(sessionId: string): SessionInfo | null {
-    const session = this.sessions.get(sessionId)
+    const session = this.getOrLoadManagedSession(sessionId)
     if (!session) return null
     return {
       id: session.id,
@@ -2784,35 +2838,27 @@ export class SessionManager implements ISessionManager {
     const limit = Math.min(options?.limit ?? DEFAULT_LIMIT, MAX_LIMIT)
     const offset = options?.offset ?? 0
 
-    let sessions = this.getSessions(workspaceId)
-
-    if (options?.status) {
-      sessions = sessions.filter(s => s.sessionStatus === options.status)
-    }
-    if (options?.label) {
-      sessions = sessions.filter(s => s.labels?.includes(options.label!))
-    }
-    if (options?.search) {
-      const needle = options.search.toLowerCase()
-      sessions = sessions.filter(s => s.name?.toLowerCase().includes(needle))
+    const workspace = this.resolveWorkspace(workspaceId)
+    if (!workspace) {
+      return { total: 0, returned: 0, sessions: [] }
     }
 
-    const sortBy = options?.sortBy ?? 'recent'
-    if (sortBy === 'recent') {
-      sessions.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
-    } else if (sortBy === 'name') {
-      sessions.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
-    } else if (sortBy === 'status') {
-      sessions.sort((a, b) => (a.sessionStatus ?? '').localeCompare(b.sessionStatus ?? ''))
-    }
-
-    const total = sessions.length
-    const page = sessions.slice(offset, offset + limit)
+    const page = listSessionMetadataPage(workspace.rootPath, {
+      filter: {
+        archived: options?.archived,
+        statusInclude: options?.status ? [options.status] : undefined,
+        labelIncludeGroups: options?.label ? [[options.label]] : undefined,
+        search: options?.search,
+      },
+      sortBy: options?.sortBy ?? 'recent',
+      offset,
+      limit,
+    })
 
     return {
-      total,
-      returned: page.length,
-      sessions: page.map(s => ({
+      total: page.total,
+      returned: page.rows.length,
+      sessions: page.rows.map(s => ({
         id: s.id,
         name: s.name ?? s.id,
         labels: s.labels ?? [],
@@ -2837,40 +2883,33 @@ export class SessionManager implements ISessionManager {
     const offset = Math.max(options?.offset ?? 0, 0)
     const limit = Math.min(Math.max(options?.limit ?? 50, 0), 1000)
     const filter = options?.filter
+    const workspace = this.resolveWorkspace(workspaceId)
+    if (!workspace) return { rows: [], total: 0 }
 
-    let managed = Array.from(this.sessions.values()).filter(
-      m => m.workspace.id === workspaceId && !m.hidden
-    )
-    const workspaceRootPath = filter?.viewId !== undefined
-      ? managed[0]?.workspace.rootPath
+    const storageFilter = filter ? { ...filter, viewId: undefined } : undefined
+    const viewPredicate = filter?.viewId !== undefined
+      ? buildManagedViewPredicate(workspace.rootPath, filter.viewId)
       : undefined
-    const viewPredicate = filter?.viewId !== undefined && workspaceRootPath
-      ? buildManagedViewPredicate(workspaceRootPath, filter.viewId)
-      : undefined
-    if (filter) {
-      managed = managed.filter(m => managedMatchesPageFilter(m, filter, viewPredicate))
-    }
 
-    if (sortBy === 'name') {
-      managed.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
-    } else if (sortBy === 'status') {
-      managed.sort((a, b) => (a.sessionStatus ?? '').localeCompare(b.sessionStatus ?? ''))
-    } else {
-      // 'recent' — newest activity first, matching the renderer's list ordering.
-      managed.sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0))
-    }
+    const page = listSessionMetadataPage(workspace.rootPath, {
+      filter: storageFilter,
+      sortBy,
+      offset,
+      limit,
+      postFilter: viewPredicate
+        ? metadata => viewPredicate(this.viewSourceFromMetadata(metadata))
+        : undefined,
+    })
 
-    const total = managed.length
-    const page = managed.slice(offset, offset + limit)
-    const rows = page.map(m => managedToSession(m, {
-      permissionModeState: this.getSessionPermissionModeState(m.id) ?? undefined,
-    }))
-    return { rows, total }
+    return {
+      rows: page.rows.map(metadata => this.sessionFromMetadata(metadata, workspace)),
+      total: page.total,
+    }
   }
 
   /**
-   * Sidebar aggregate counts over the in-memory map for one workspace. Lets the
-   * renderer render filter badges without holding every session. Predicate
+   * Sidebar aggregate counts for one workspace. Scalar buckets use SQL
+   * COUNT/GROUP BY; label rollups read only taggable label rows. Predicate
    * buckets mirror the renderer's metas exactly (see SidebarCounts):
    * - total/flagged/archived/batch  → workspace (non-hidden)
    * - byStatus + hasUnread          → active (non-hidden, non-archived, non-batch)
@@ -2878,12 +2917,13 @@ export class SessionManager implements ISessionManager {
    *                                 → taggable (non-hidden, non-archived; batch kept)
    */
   getSidebarCounts(workspaceId: string): SidebarCounts {
-    let total = 0
-    let flagged = 0
-    let archived = 0
-    let batch = 0
-    let hasUnread = false
-    const byStatus: Record<string, number> = {}
+    const ws = this.resolveWorkspace(workspaceId)
+    if (!ws) {
+      return { total: 0, flagged: 0, archived: 0, batch: 0, hasUnread: false, byStatus: {}, byLabel: {} }
+    }
+
+    const scalar = getSessionSidebarScalarCounts(ws.rootPath)
+    const byStatus: Record<string, number> = { ...scalar.byStatus }
     const byLabel: Record<string, number> = {}
 
     // Precompute each label's ancestor chain (self + parents) from the workspace
@@ -2893,47 +2933,77 @@ export class SessionManager implements ISessionManager {
     // over-count the renderer used to sum).
     interface LabelNode { id: string; children?: LabelNode[] }
     const ancestorChain = new Map<string, string[]>()
-    const ws = getWorkspaces().find(w => w.id === workspaceId)
-    if (ws) {
-      const walk = (nodes: LabelNode[], parents: string[]): void => {
-        for (const n of nodes) {
-          const chain = [n.id, ...parents]
-          ancestorChain.set(n.id, chain)
-          if (n.children && n.children.length > 0) walk(n.children, chain)
-        }
+    const walk = (nodes: LabelNode[], parents: string[]): void => {
+      for (const n of nodes) {
+        const chain = [n.id, ...parents]
+        ancestorChain.set(n.id, chain)
+        if (n.children && n.children.length > 0) walk(n.children, chain)
       }
-      walk(loadLabelConfig(ws.rootPath).labels as LabelNode[], [])
     }
+    walk(loadLabelConfig(ws.rootPath).labels as LabelNode[], [])
 
+    const loadedRows = new Map<string, SessionCountRow>()
     for (const m of this.sessions.values()) {
       if (m.workspace.id !== workspaceId || m.hidden) continue
-      total++
-      if (m.isArchived) archived++
-      if (m.isBatch) batch++
-      if (m.isFlagged && !m.isArchived && !m.isBatch) flagged++
+      loadedRows.set(m.id, {
+        id: m.id,
+        sessionStatus: m.sessionStatus ?? 'todo',
+        labels: m.labels,
+        isArchived: m.isArchived,
+        isBatch: m.isBatch,
+        isFlagged: m.isFlagged,
+        hasUnread: m.hasUnread,
+      })
+    }
 
-      const active = !m.isArchived && !m.isBatch
+    const applyScalarDelta = (row: SessionCountRow, delta: 1 | -1): void => {
+      scalar.total += delta
+      if (row.isArchived) scalar.archived += delta
+      if (row.isBatch) scalar.batch += delta
+      if (row.isFlagged && !row.isArchived && !row.isBatch) scalar.flagged += delta
+      const active = !row.isArchived && !row.isBatch
       if (active) {
-        if (m.hasUnread) hasUnread = true
-        const status = m.sessionStatus ?? 'todo'
-        byStatus[status] = (byStatus[status] ?? 0) + 1
-      }
-
-      // taggable: non-archived (batch kept). Count each label AND its ancestors
-      // once per session (dedup across sibling sub-labels sharing an ancestor).
-      if (!m.isArchived && m.labels && m.labels.length > 0) {
-        const covered = new Set<string>()
-        for (const entry of m.labels) {
-          const id = extractLabelId(entry)
-          const chain = ancestorChain.get(id)
-          if (chain) for (const ancId of chain) covered.add(ancId)
-          else covered.add(id) // orphan label not in the tree — count under itself
-        }
-        for (const id of covered) byLabel[id] = (byLabel[id] ?? 0) + 1
+        if (row.hasUnread) scalar.unread += delta
+        const status = row.sessionStatus ?? 'todo'
+        const next = (byStatus[status] ?? 0) + delta
+        if (next > 0) byStatus[status] = next
+        else delete byStatus[status]
       }
     }
 
-    return { total, flagged, archived, batch, hasUnread, byStatus, byLabel }
+    const persistedLoadedRows = listSessionCountRowsByIds(ws.rootPath, [...loadedRows.keys()])
+    for (const row of persistedLoadedRows) applyScalarDelta(row, -1)
+    for (const row of loadedRows.values()) applyScalarDelta(row, 1)
+
+    const labelRows = new Map(listSessionLabelCountRows(ws.rootPath).map(row => [row.id, row]))
+    for (const row of loadedRows.values()) {
+      if (!row.isArchived && row.labels && row.labels.length > 0) {
+        labelRows.set(row.id, { id: row.id, labels: row.labels })
+      } else {
+        labelRows.delete(row.id)
+      }
+    }
+
+    for (const row of labelRows.values()) {
+      const covered = new Set<string>()
+      for (const entry of row.labels ?? []) {
+        const id = extractLabelId(entry)
+        const chain = ancestorChain.get(id)
+        if (chain) for (const ancId of chain) covered.add(ancId)
+        else covered.add(id) // orphan label not in the tree — count under itself
+      }
+      for (const id of covered) byLabel[id] = (byLabel[id] ?? 0) + 1
+    }
+
+    return {
+      total: scalar.total,
+      flagged: scalar.flagged,
+      archived: scalar.archived,
+      batch: scalar.batch,
+      hasUnread: scalar.unread > 0,
+      byStatus,
+      byLabel,
+    }
   }
 
   /**
@@ -2944,13 +3014,24 @@ export class SessionManager implements ISessionManager {
    * (caller re-orders by its own ranking).
    */
   getSessionMetasByIds(workspaceId: string, ids: string[]): Session[] {
+    const workspace = this.resolveWorkspace(workspaceId)
+    if (!workspace || ids.length === 0) return []
+
+    const metadataById = new Map(
+      listSessionMetadataByIds(workspace.rootPath, ids).map(metadata => [metadata.id, metadata])
+    )
     const rows: Session[] = []
     for (const id of ids) {
-      const m = this.sessions.get(id)
-      if (!m || m.workspace.id !== workspaceId || m.hidden) continue
-      rows.push(managedToSession(m, {
-        permissionModeState: this.getSessionPermissionModeState(m.id) ?? undefined,
-      }))
+      const loaded = this.sessions.get(id)
+      if (loaded && loaded.workspace.id === workspaceId && !loaded.hidden) {
+        rows.push(managedToSession(loaded, {
+          permissionModeState: this.getSessionPermissionModeState(loaded.id) ?? undefined,
+        }))
+        continue
+      }
+
+      const metadata = metadataById.get(id)
+      if (metadata) rows.push(this.sessionFromMetadata(metadata, workspace))
     }
     return rows
   }
@@ -2960,9 +3041,20 @@ export class SessionManager implements ISessionManager {
    * drop hidden (mini/edit) and batch sub-sessions from results without
    * materializing the whole workspace session list.
    */
-  isHiddenOrBatch(sessionId: string): boolean {
+  isHiddenOrBatch(sessionId: string, workspaceId?: string): boolean {
     const m = this.sessions.get(sessionId)
-    return !!m && (!!m.hidden || !!m.isBatch)
+    if (m && (!workspaceId || m.workspace.id === workspaceId)) {
+      return !!m.hidden || !!m.isBatch
+    }
+
+    const workspaces = workspaceId
+      ? [getWorkspaceByNameOrId(workspaceId)].filter((workspace): workspace is Workspace => !!workspace)
+      : getWorkspaces()
+    for (const workspace of workspaces) {
+      const visibility = getSessionVisibility(workspace.rootPath, sessionId)
+      if (visibility) return visibility.hidden || visibility.isBatch
+    }
+    return false
   }
 
   /**
@@ -2978,13 +3070,10 @@ export class SessionManager implements ISessionManager {
       hasUnreadByWorkspace[workspace.id] = false
     }
 
-    for (const session of this.sessions.values()) {
-      if (session.hidden || session.isArchived || session.isBatch) continue
-      if (!session.hasUnread) continue
-
-      const workspaceId = session.workspace.id
-      byWorkspace[workspaceId] = (byWorkspace[workspaceId] ?? 0) + 1
-      hasUnreadByWorkspace[workspaceId] = true
+    for (const workspace of getWorkspaces()) {
+      const count = countUnreadSessions(workspace.rootPath)
+      byWorkspace[workspace.id] = count
+      hasUnreadByWorkspace[workspace.id] = count > 0
     }
 
     const totalUnreadSessions = Object.values(byWorkspace).reduce((sum, count) => sum + count, 0)
@@ -3027,7 +3116,7 @@ export class SessionManager implements ISessionManager {
    * Messages are loaded from disk on first access to reduce memory usage.
    */
   async getSession(sessionId: string): Promise<Session | null> {
-    const m = this.sessions.get(sessionId)
+    const m = this.getOrLoadManagedSession(sessionId)
     if (!m) return null
 
     // Lazy-load messages from disk if not yet loaded
@@ -3122,12 +3211,15 @@ export class SessionManager implements ISessionManager {
    */
   getSessionPath(sessionId: string): string | null {
     const managed = this.sessions.get(sessionId)
-    if (!managed) return null
-    return getSessionStoragePath(managed.workspace.rootPath, sessionId)
+    if (managed) return getSessionStoragePath(managed.workspace.rootPath, sessionId)
+
+    const found = this.findStoredSessionHeader(sessionId)
+    if (!found) return null
+    return getSessionStoragePath(found.workspace.rootPath, sessionId)
   }
 
   async createSession(workspaceId: string, options?: import('@craft-agent/shared/protocol').CreateSessionOptions): Promise<Session> {
-    const workspace = getWorkspaceByNameOrId(workspaceId)
+    const workspace = this.resolveWorkspace(workspaceId)
     if (!workspace) {
       throw new Error(`Workspace ${workspaceId} not found`)
     }
@@ -3228,7 +3320,7 @@ export class SessionManager implements ISessionManager {
         throw new Error('Invalid branch request: both branchFromSessionId and branchFromMessageId are required')
       }
 
-      const sourceManaged = this.sessions.get(options.branchFromSessionId)
+      const sourceManaged = this.getOrLoadManagedSession(options.branchFromSessionId, workspaceId)
       if (sourceManaged) {
         if (sourceManaged.workspace.rootPath !== workspaceRootPath) {
           sessionLog.warn('Branch validation failed: source session belongs to different workspace', {
@@ -4974,7 +5066,7 @@ export class SessionManager implements ISessionManager {
   }
 
   async flagSession(sessionId: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       managed.isFlagged = true
       // Persist in-memory state directly to avoid race with pending queue writes
@@ -4991,7 +5083,7 @@ export class SessionManager implements ISessionManager {
   }
 
   async unflagSession(sessionId: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       managed.isFlagged = false
       // Persist in-memory state directly to avoid race with pending queue writes
@@ -5008,7 +5100,7 @@ export class SessionManager implements ISessionManager {
   }
 
   async archiveSession(sessionId: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       managed.isArchived = true
       managed.archivedAt = Date.now()
@@ -5022,7 +5114,7 @@ export class SessionManager implements ISessionManager {
   }
 
   async unarchiveSession(sessionId: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       managed.isArchived = false
       managed.archivedAt = undefined
@@ -5036,7 +5128,7 @@ export class SessionManager implements ISessionManager {
   }
 
   async setSessionStatus(sessionId: string, sessionStatus: SessionStatus): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       managed.sessionStatus = sessionStatus
       this.setMetadataWriteGuard(managed)
@@ -5059,11 +5151,13 @@ export class SessionManager implements ISessionManager {
    * This determines which LLM provider/backend will be used for this session.
    */
   async setSessionConnection(sessionId: string, connectionSlug: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       sessionLog.warn(`setSessionConnection: session ${sessionId} not found`)
       throw new Error(`Session ${sessionId} not found`)
     }
+
+    await this.ensureMessagesLoaded(managed)
 
     // Only allow changing connection before first message (session hasn't started)
     if (managed.messages && managed.messages.length > 0) {
@@ -5104,7 +5198,7 @@ export class SessionManager implements ISessionManager {
    * so execution can resume after compaction (even if page reloads).
    */
   async setPendingPlanExecution(sessionId: string, planPath: string, draftInputSnapshot?: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       await setStoredPendingPlanExecution(managed.workspace.rootPath, sessionId, planPath, draftInputSnapshot)
       sessionLog.info(`Session ${sessionId}: set pending plan execution for ${planPath}`)
@@ -5117,7 +5211,7 @@ export class SessionManager implements ISessionManager {
    * to know that compaction finished and plan can be executed.
    */
   async markCompactionComplete(sessionId: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       await markStoredCompactionComplete(managed.workspace.rootPath, sessionId)
       sessionLog.info(`Session ${sessionId}: compaction marked complete for pending plan`)
@@ -5130,7 +5224,7 @@ export class SessionManager implements ISessionManager {
    * sending succeeded but cleanup failed due a reconnect/disconnect.
    */
   async markPendingPlanExecutionDispatched(sessionId: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       await markStoredPendingPlanExecutionDispatched(managed.workspace.rootPath, sessionId)
       sessionLog.info(`Session ${sessionId}: marked pending plan execution as dispatched`)
@@ -5143,7 +5237,7 @@ export class SessionManager implements ISessionManager {
    * or when the pending execution is no longer relevant.
    */
   async clearPendingPlanExecution(sessionId: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       await clearStoredPendingPlanExecution(managed.workspace.rootPath, sessionId)
       sessionLog.info(`Session ${sessionId}: cleared pending plan execution`)
@@ -5156,8 +5250,11 @@ export class SessionManager implements ISessionManager {
    */
   getPendingPlanExecution(sessionId: string): { planPath: string; draftInputSnapshot?: string; awaitingCompaction: boolean; executionDispatched: boolean } | null {
     const managed = this.sessions.get(sessionId)
-    if (!managed) return null
-    return getStoredPendingPlanExecution(managed.workspace.rootPath, sessionId)
+    if (managed) return getStoredPendingPlanExecution(managed.workspace.rootPath, sessionId)
+
+    const found = this.findStoredSessionHeader(sessionId)
+    if (!found) return null
+    return getStoredPendingPlanExecution(found.workspace.rootPath, sessionId)
   }
 
   /**
@@ -5168,7 +5265,7 @@ export class SessionManager implements ISessionManager {
    * path.
    */
   async acceptPlan(sessionId: string, _planPath?: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       sessionLog.warn(`acceptPlan: session ${sessionId} not found`)
       return
@@ -5194,7 +5291,7 @@ export class SessionManager implements ISessionManager {
    * gated with the same password so the full session round-trips uniformly.
    */
   async shareToViewer(sessionId: string, password?: string | null): Promise<import('@craft-agent/shared/protocol').ShareResult> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       return { success: false, error: 'Session not found' }
     }
@@ -5282,7 +5379,7 @@ export class SessionManager implements ISessionManager {
    * 401 back as `{ success: false, error: 'password_required' | 'password_invalid' }`.
    */
   async updateShare(sessionId: string, password?: string | null): Promise<import('@craft-agent/shared/protocol').ShareResult> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       return { success: false, error: 'Session not found' }
     }
@@ -5379,7 +5476,7 @@ export class SessionManager implements ISessionManager {
    * or wrong password is surfaced so the UI can reprompt.
    */
   async revokeShare(sessionId: string, password?: string | null): Promise<import('@craft-agent/shared/protocol').ShareResult> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       return { success: false, error: 'Session not found' }
     }
@@ -5475,7 +5572,7 @@ export class SessionManager implements ISessionManager {
     currentPassword: string | null | undefined,
     newPassword: string | null,
   ): Promise<import('@craft-agent/shared/protocol').ShareResult> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       return { success: false, error: 'Session not found' }
     }
@@ -5535,7 +5632,7 @@ export class SessionManager implements ISessionManager {
    * can offer 'change/remove' paths without re-querying the server.
    */
   async shareHtml(sessionId: string, html: string, password?: string | null): Promise<import('@craft-agent/shared/protocol').ShareHtmlResult> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       return { success: false, error: 'Session not found' }
     }
@@ -5601,7 +5698,7 @@ export class SessionManager implements ISessionManager {
    * accepts the PUT.
    */
   async updateHtml(sessionId: string, sharedId: string, html: string, password?: string | null): Promise<import('@craft-agent/shared/protocol').ShareHtmlResult> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       return { success: false, error: 'Session not found' }
     }
@@ -5660,7 +5757,7 @@ export class SessionManager implements ISessionManager {
 
   /** Revoke a previously shared HTML artifact. */
   async revokeHtml(sessionId: string, sharedId: string, password?: string | null): Promise<import('@craft-agent/shared/protocol').RevokeHtmlResult> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       return { success: false, error: 'Session not found' }
     }
@@ -5712,7 +5809,7 @@ export class SessionManager implements ISessionManager {
     currentPassword: string | null | undefined,
     newPassword: string | null,
   ): Promise<import('@craft-agent/shared/protocol').ShareHtmlResult> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       return { success: false, error: 'Session not found' }
     }
@@ -5772,7 +5869,7 @@ export class SessionManager implements ISessionManager {
    * Otherwise, servers will be built fresh on next message.
    */
   async setSessionSources(sessionId: string, sourceSlugs: string[]): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       throw new Error(`Session not found: ${sessionId}`)
     }
@@ -5839,7 +5936,7 @@ export class SessionManager implements ISessionManager {
    * Get the enabled source slugs for a session
    */
   getSessionSources(sessionId: string): string[] {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     return managed?.enabledSourceSlugs ?? []
   }
 
@@ -5870,7 +5967,7 @@ export class SessionManager implements ISessionManager {
     if (sessionId) {
       this.activeViewingSession.set(workspaceId, sessionId)
       // When user starts viewing a session that's not processing, clear unread
-      const managed = this.sessions.get(sessionId)
+      const managed = this.getOrLoadManagedSession(sessionId, workspaceId)
       if (managed) {
         // Opening a session counts as activity for the idle hibernation sweep.
         managed.lastActivityAt = Date.now()
@@ -5903,7 +6000,7 @@ export class SessionManager implements ISessionManager {
    * Called when user navigates to a session (and it's not processing).
    */
   async markSessionRead(sessionId: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) return
 
     // Only mark as read if not currently processing
@@ -5914,13 +6011,17 @@ export class SessionManager implements ISessionManager {
     const updates: { lastReadMessageId?: string; hasUnread?: boolean } = {}
 
     // Update lastReadMessageId for legacy/manual unread functionality
-    if (managed.messages.length > 0) {
+    if (managed.messagesLoaded && managed.messages.length > 0) {
       const lastFinalId = this.getLastFinalAssistantMessageId(managed.messages)
       if (lastFinalId && managed.lastReadMessageId !== lastFinalId) {
         managed.lastReadMessageId = lastFinalId
         updates.lastReadMessageId = lastFinalId
         needsPersist = true
       }
+    } else if (managed.lastFinalMessageId && managed.lastReadMessageId !== managed.lastFinalMessageId) {
+      managed.lastReadMessageId = managed.lastFinalMessageId
+      updates.lastReadMessageId = managed.lastFinalMessageId
+      needsPersist = true
     }
 
     // Clear hasUnread flag (primary source of truth for NEW badge)
@@ -5943,7 +6044,7 @@ export class SessionManager implements ISessionManager {
    * Called when user manually marks a session as unread via context menu.
    */
   async markSessionUnread(sessionId: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       managed.hasUnread = true
       managed.lastReadMessageId = undefined
@@ -5959,25 +6060,36 @@ export class SessionManager implements ISessionManager {
    * Called from "Mark All Read" context menu on "All Sessions".
    */
   async markAllSessionsRead(workspaceId: string): Promise<void> {
-    const updates: Promise<void>[] = []
+    const workspace = this.resolveWorkspace(workspaceId)
+    if (!workspace) return
+
+    const unreadBefore = countUnreadSessions(workspace.rootPath)
+    const processingSessionIds = Array.from(this.sessions.values())
+      .filter(managed =>
+        managed.workspace.id === workspaceId &&
+        !managed.hidden &&
+        !managed.isArchived &&
+        !managed.isBatch &&
+        managed.isProcessing
+      )
+      .map(managed => managed.id)
+
+    markWorkspaceSessionsRead(workspace.rootPath, { excludeSessionIds: processingSessionIds })
+
     for (const managed of this.sessions.values()) {
       if (managed.workspace.id !== workspaceId) continue
       if (managed.hidden || managed.isArchived || managed.isBatch) continue
       if (managed.isProcessing) continue
       if (!managed.hasUnread) continue
       managed.hasUnread = false
-      updates.push(
-        updateSessionMetadata(managed.workspace.rootPath, managed.id, { hasUnread: false })
-      )
     }
-    if (updates.length > 0) {
-      await Promise.all(updates)
+    if (unreadBefore > 0) {
       this.emitUnreadSummaryChanged()
     }
   }
 
   async renameSession(sessionId: string, name: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       managed.name = name
       this.persistSessionMeta(managed)
@@ -5998,7 +6110,7 @@ export class SessionManager implements ISessionManager {
    */
   async refreshTitle(sessionId: string): Promise<{ success: boolean; title?: string; error?: string }> {
     sessionLog.info(`refreshTitle called for session ${sessionId}`)
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       sessionLog.warn(`refreshTitle: Session ${sessionId} not found`)
       return { success: false, error: 'Session not found' }
@@ -6118,7 +6230,7 @@ export class SessionManager implements ISessionManager {
    * changes the working directory before their first message.
    */
   updateWorkingDirectory(sessionId: string, path: string): void {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       const validation = isValidWorkingDirectory(path)
       if (!validation.valid) {
@@ -6172,7 +6284,7 @@ export class SessionManager implements ISessionManager {
    */
   async updateSessionModel(sessionId: string, workspaceId: string, model: string | null, connection?: string): Promise<void> {
     sessionLog.info(`[updateSessionModel] sessionId=${sessionId}, model=${model}, connection=${connection}`)
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId, workspaceId)
     if (managed) {
       managed.model = model ?? undefined
       // Also update connection if provided and not already locked
@@ -6207,7 +6319,7 @@ export class SessionManager implements ISessionManager {
    * Used by preview window to save edited content back to the original message
    */
   async updateMessageContent(sessionId: string, messageId: string, content: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       sessionLog.warn(`Cannot update message: session ${sessionId} not found`)
       return
@@ -6233,7 +6345,7 @@ export class SessionManager implements ISessionManager {
    * Add an annotation to a message and persist the session.
    */
   async addMessageAnnotation(sessionId: string, messageId: string, annotation: NonNullable<Message['annotations']>[number]): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       sessionLog.warn(`Cannot add annotation: session ${sessionId} not found`)
       return
@@ -6302,7 +6414,7 @@ export class SessionManager implements ISessionManager {
     annotationId: string,
     patch: Partial<NonNullable<Message['annotations']>[number]>
   ): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       sessionLog.warn(`Cannot update annotation: session ${sessionId} not found`)
       return
@@ -6379,7 +6491,7 @@ export class SessionManager implements ISessionManager {
    * Remove an annotation from a message and persist the session.
    */
   async removeMessageAnnotation(sessionId: string, messageId: string, annotationId: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       sessionLog.warn(`Cannot remove annotation: session ${sessionId} not found`)
       return
@@ -6406,7 +6518,7 @@ export class SessionManager implements ISessionManager {
   }
 
   async deleteSession(sessionId: string): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       sessionLog.warn(`Cannot delete session: ${sessionId} not found`)
       return
@@ -6566,7 +6678,7 @@ export class SessionManager implements ISessionManager {
    * MCP pool, pool server, messages, tool caches) while keeping the lightweight
    * metadata in `this.sessions` for UI visibility.
    *
-   * This reuses the same lazy-load pattern that `loadSessionsFromDisk()` relies on:
+   * This reuses the standard lazy-load pattern:
    * - `messagesLoaded: false` → `ensureMessagesLoaded()` reloads from disk on demand
    * - `agent: null` → `getOrCreateAgent()` recreates from scratch on demand
    *
@@ -6745,7 +6857,7 @@ export class SessionManager implements ISessionManager {
      */
     rpcContext?: { callerClientId?: string },
   ): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) {
       throw new Error(`Session ${sessionId} not found`)
     }
@@ -7900,7 +8012,7 @@ export class SessionManager implements ISessionManager {
    * Set the permission mode for a session ('safe', 'ask', 'allow-all')
    */
   setSessionPermissionMode(sessionId: string, mode: PermissionMode): void {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       const previousManagedMode = managed.permissionMode ?? 'ask'
       const diagnosticsBefore = getPermissionModeDiagnostics(sessionId)
@@ -7974,7 +8086,7 @@ export class SessionManager implements ISessionManager {
     changedAt: string
     changedBy: 'user' | 'system' | 'restore' | 'automation' | 'unknown'
   } | null {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (!managed) return null
 
     let diagnostics = getPermissionModeDiagnostics(sessionId)
@@ -8019,7 +8131,7 @@ export class SessionManager implements ISessionManager {
    * Labels are IDs referencing workspace labels/config.json.
    */
   async setSessionLabels(sessionId: string, labels: string[]): Promise<void> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       managed.labels = labels
       this.setMetadataWriteGuard(managed)
@@ -8045,7 +8157,7 @@ export class SessionManager implements ISessionManager {
    * This is sticky and persisted across messages.
    */
   setSessionThinkingLevel(sessionId: string, level: ThinkingLevel): void {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId)
     if (managed) {
       // Update thinking level in managed session
       managed.thinkingLevel = level
@@ -9161,7 +9273,7 @@ export class SessionManager implements ISessionManager {
   }
 
   async exportRemoteSessionTransfer(sessionId: string, workspaceId: string): Promise<RemoteSessionTransferPayload | null> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId, workspaceId)
     if (!managed) {
       sessionLog.warn(`[dispatch] Cannot export remote transfer: ${sessionId} not found`)
       return null
@@ -9177,6 +9289,7 @@ export class SessionManager implements ISessionManager {
       return null
     }
 
+    await this.ensureMessagesLoaded(managed)
     this.persistSession(managed)
     await sessionPersistenceQueue.flush(sessionId)
 
@@ -9234,7 +9347,7 @@ export class SessionManager implements ISessionManager {
    * 4. Serialize session directory into a bundle
    */
   async exportSession(sessionId: string, workspaceId: string): Promise<SessionBundle | null> {
-    const managed = this.sessions.get(sessionId)
+    const managed = this.getOrLoadManagedSession(sessionId, workspaceId)
     if (!managed) {
       sessionLog.warn(`[dispatch] Cannot export session: ${sessionId} not found`)
       return null
@@ -9250,7 +9363,8 @@ export class SessionManager implements ISessionManager {
       return null
     }
 
-    // Flush pending writes to ensure JSONL is up to date
+    // Flush pending writes to ensure the persistent snapshot is up to date.
+    await this.ensureMessagesLoaded(managed)
     this.persistSession(managed)
     await sessionPersistenceQueue.flush(sessionId)
 
@@ -9285,7 +9399,7 @@ export class SessionManager implements ISessionManager {
       throw new Error('Invalid session bundle')
     }
 
-    const workspace = getWorkspaceByNameOrId(workspaceId)
+    const workspace = this.resolveWorkspace(workspaceId)
     if (!workspace) {
       throw new Error(`Workspace ${workspaceId} not found`)
     }
@@ -9301,7 +9415,7 @@ export class SessionManager implements ISessionManager {
       : generateSessionId(workspaceRootPath)
 
     // Check for ID collision on move
-    if (mode === 'move' && this.sessions.has(sessionId)) {
+    if (mode === 'move' && getSessionVisibility(workspaceRootPath, sessionId) !== null) {
       throw new Error(`Session ${sessionId} already exists in target workspace`)
     }
 

@@ -157,6 +157,7 @@ export interface SessionListOptions {
   status?: string
   label?: string
   search?: string
+  archived?: boolean
   sortBy?: 'recent' | 'name' | 'status'
   limit?: number
   offset?: number

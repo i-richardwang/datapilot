@@ -1,13 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs'
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
+import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
-import { dirname, join } from 'path'
+import { join } from 'path'
 import {
-  getSessionFilePath,
+  loadSessionHeader,
   loadSession,
-  writeSessionJsonl,
+  saveSession,
+  type SessionBundle,
   type StoredSession,
 } from '@craft-agent/shared/sessions'
+import { autoRegisterDriver, closeWorkspaceDb } from '@craft-agent/shared/db'
 import type { StoredMessage } from '@craft-agent/core/types'
 import { SessionManager, createManagedSession } from './SessionManager.ts'
 
@@ -28,12 +30,17 @@ describe('cold-session metadata persistence', () => {
   let tmpRoot: string
   let sm: SessionManager
 
+  beforeAll(async () => {
+    await autoRegisterDriver()
+  })
+
   beforeEach(() => {
     tmpRoot = mkdtempSync(join(tmpdir(), 'sm-cold-meta-'))
     sm = new SessionManager()
   })
 
   afterEach(() => {
+    closeWorkspaceDb(tmpRoot)
     rmSync(tmpRoot, { recursive: true, force: true })
   })
 
@@ -56,10 +63,9 @@ describe('cold-session metadata persistence', () => {
       sessionStatus?: string
       labels?: string[]
       messages?: StoredMessage[]
+      registerInManager?: boolean
     } = {},
   ) {
-    const filePath = getSessionFilePath(tmpRoot, sessionId)
-    mkdirSync(dirname(filePath), { recursive: true })
     const stored: StoredSession = {
       id: sessionId,
       workspaceRootPath: tmpRoot,
@@ -69,8 +75,17 @@ describe('cold-session metadata persistence', () => {
       createdAt: Date.now(),
       lastUsedAt: Date.now(),
       messages: opts.messages ?? [],
+      tokenUsage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        contextTokens: 0,
+        costUsd: 0,
+      },
     } as StoredSession
-    writeSessionJsonl(filePath, stored)
+    saveSession(stored)
+
+    if (opts.registerInManager === false) return
 
     const managed = createManagedSession(
       {
@@ -87,20 +102,40 @@ describe('cold-session metadata persistence', () => {
   }
 
   function readDiskHeader(sessionId: string): Record<string, unknown> {
-    const path = getSessionFilePath(tmpRoot, sessionId)
-    const firstLine = readFileSync(path, 'utf-8').split('\n')[0]
-    return JSON.parse(firstLine)
+    return loadSessionHeader(tmpRoot, sessionId) as unknown as Record<string, unknown>
   }
 
   function readDiskMessageIds(sessionId: string): string[] {
-    const path = getSessionFilePath(tmpRoot, sessionId)
-    if (!existsSync(path)) return []
-    const lines = readFileSync(path, 'utf-8').trim().split('\n').slice(1)
-    return lines.map(l => JSON.parse(l)).map(m => m.id as string)
+    return loadSession(tmpRoot, sessionId)?.messages.map(m => m.id) ?? []
   }
 
   function makeUserMessage(id: string, content: string): StoredMessage {
     return { id, type: 'user', content, timestamp: Date.now() } as StoredMessage
+  }
+
+  function makeBundle(sessionId: string): SessionBundle {
+    return {
+      version: 1,
+      session: {
+        header: {
+          id: sessionId,
+          workspaceRootPath: tmpRoot,
+          name: sessionId,
+          createdAt: Date.now(),
+          lastUsedAt: Date.now(),
+          messageCount: 0,
+          tokenUsage: {
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            contextTokens: 0,
+            costUsd: 0,
+          },
+        },
+        messages: [],
+      },
+      files: [],
+    } as SessionBundle
   }
 
   it('setSessionStatus on a cold session is on disk after flushSession resolves', async () => {
@@ -180,14 +215,7 @@ describe('cold-session metadata persistence', () => {
     // Disk header has the last value.
     expect(readDiskHeader(sessionId).sessionStatus).toBe('done')
 
-    // JSONL is well-formed: every line parses, none is empty.
-    const lines = readFileSync(getSessionFilePath(tmpRoot, sessionId), 'utf-8')
-      .trim()
-      .split('\n')
-    for (const line of lines) {
-      expect(line.length).toBeGreaterThan(0)
-      expect(() => JSON.parse(line)).not.toThrow()
-    }
+    expect(loadSession(tmpRoot, sessionId)).toBeTruthy()
   })
 
   it('flushSession on a cold session returns only after the disk write lands', async () => {
@@ -205,5 +233,32 @@ describe('cold-session metadata persistence', () => {
     await sm.flushSession(sessionId)
 
     expect(readDiskHeader(sessionId).sessionStatus).toBe('cancelled')
+  })
+
+  it('exports a persisted session that has not been loaded into memory', async () => {
+    seedColdSession('workspace-anchor')
+    const sessionId = 'cold-export'
+    seedColdSession(sessionId, {
+      messages: [makeUserMessage('m1', 'export me')],
+      registerInManager: false,
+    })
+    expect((sm as unknown as { sessions: Map<string, unknown> }).sessions.has(sessionId)).toBe(false)
+
+    const bundle = await sm.exportSession(sessionId, 'ws_test')
+
+    expect(bundle?.session.header.id).toBe(sessionId)
+    expect(bundle?.session.messages.map(message => message.id)).toEqual(['m1'])
+    expect((sm as unknown as { sessions: Map<string, unknown> }).sessions.has(sessionId)).toBe(true)
+  })
+
+  it('rejects move import when the target session id exists only in storage', async () => {
+    seedColdSession('workspace-anchor')
+    const sessionId = 'existing-cold'
+    seedColdSession(sessionId, { registerInManager: false })
+    expect((sm as unknown as { sessions: Map<string, unknown> }).sessions.has(sessionId)).toBe(false)
+
+    await expect(sm.importSession('ws_test', makeBundle(sessionId), 'move'))
+      .rejects
+      .toThrow(`Session ${sessionId} already exists in target workspace`)
   })
 })

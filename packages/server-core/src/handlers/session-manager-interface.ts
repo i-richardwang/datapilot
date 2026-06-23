@@ -48,6 +48,11 @@ export interface ISessionManager {
   // Session CRUD
   // ---------------------------------------------------------------------------
 
+  /**
+   * Legacy compatibility snapshot for older renderer/RPC callers.
+   * Bounded to a recent window; use listSessionsPage/getSessionList for
+   * complete pagination over large workspaces.
+   */
   getSessions(workspaceId?: string): Session[]
   getSession(sessionId: string): Promise<Session | null>
 
@@ -76,7 +81,7 @@ export interface ISessionManager {
   getSessionMetasByIds(workspaceId: string, ids: string[]): Session[]
 
   /** O(1) hidden/batch check — lets content search drop them without the full list. */
-  isHiddenOrBatch(sessionId: string): boolean
+  isHiddenOrBatch(sessionId: string, workspaceId?: string): boolean
   createSession(workspaceId: string, options?: CreateSessionOptions): Promise<Session>
   deleteSession(sessionId: string): Promise<void>
 

@@ -11,7 +11,7 @@ import { existsSync, readFileSync } from 'fs'
 import type { SessionHeader, StoredMessage, SessionConfig } from './types.ts'
 import type { StoredSession } from './types.ts'
 import { readSessionJsonl } from './jsonl.ts'
-import { getSessionPath, getSessionFilePath } from './storage.db.ts'
+import { getSessionPath, getSessionFilePath, loadSession } from './storage.db.ts'
 import { debug } from '../utils/debug.ts'
 import {
   type BundleFile,
@@ -73,6 +73,34 @@ export interface SessionBundle {
   branchInfo?: BundleBranchInfo
 }
 
+function bundleFromStoredSession(
+  workspaceRootPath: string,
+  sessionId: string,
+  stored: StoredSession,
+  header: SessionHeader,
+): SessionBundle | null {
+  const sessionDir = getSessionPath(workspaceRootPath, sessionId)
+  const files = collectDirectoryFiles(sessionDir, {
+    skipDirs: SKIP_DIRS,
+    skipFiles: SKIP_SESSION_FILES,
+  })
+
+  const totalSize = files.reduce((sum, f) => sum + f.size, 0)
+  if (totalSize > MAX_BUNDLE_SIZE_BYTES) {
+    debug(`[bundle] Session exceeds max bundle size: ${totalSize} bytes > ${MAX_BUNDLE_SIZE_BYTES} bytes`)
+    return null
+  }
+
+  return {
+    version: 1,
+    session: {
+      header,
+      messages: stored.messages,
+    },
+    files,
+  }
+}
+
 /**
  * Serialize a session directory into a SessionBundle.
  *
@@ -87,8 +115,13 @@ export function serializeSession(
   workspaceRootPath: string,
   sessionId: string,
 ): SessionBundle | null {
-  const sessionDir = getSessionPath(workspaceRootPath, sessionId)
   const sessionFile = getSessionFilePath(workspaceRootPath, sessionId)
+
+  const dbStored = loadSession(workspaceRootPath, sessionId)
+  if (dbStored) {
+    const { messages: _messages, ...header } = dbStored
+    return bundleFromStoredSession(workspaceRootPath, sessionId, dbStored, header as SessionHeader)
+  }
 
   if (!existsSync(sessionFile)) {
     debug('[bundle] Session file not found:', sessionFile)
@@ -99,19 +132,6 @@ export function serializeSession(
   const stored = readSessionJsonl(sessionFile)
   if (!stored) {
     debug('[bundle] Failed to parse session JSONL:', sessionFile)
-    return null
-  }
-
-  // Collect all files from session directory (except session.jsonl and tmp/)
-  const files = collectDirectoryFiles(sessionDir, {
-    skipDirs: SKIP_DIRS,
-    skipFiles: SKIP_SESSION_FILES,
-  })
-
-  // Validate total bundle size
-  const totalSize = files.reduce((sum, f) => sum + f.size, 0)
-  if (totalSize > MAX_BUNDLE_SIZE_BYTES) {
-    debug(`[bundle] Session exceeds max bundle size: ${totalSize} bytes > ${MAX_BUNDLE_SIZE_BYTES} bytes`)
     return null
   }
 
@@ -127,14 +147,7 @@ export function serializeSession(
     // workspaceRootPath will be set by the importing server
   }
 
-  return {
-    version: 1,
-    session: {
-      header,
-      messages: stored.messages,
-    },
-    files,
-  }
+  return bundleFromStoredSession(workspaceRootPath, sessionId, stored, header)
 }
 
 /**
