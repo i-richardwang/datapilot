@@ -231,6 +231,9 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   // sessions — core session runtime
   RPC_CHANNELS.sessions.GET,
   RPC_CHANNELS.sessions.LIST,
+  RPC_CHANNELS.sessions.LIST_PAGE,
+  RPC_CHANNELS.sessions.SIDEBAR_COUNTS,
+  RPC_CHANNELS.sessions.GET_METAS,
   RPC_CHANNELS.sessions.GET_INFO,
   RPC_CHANNELS.sessions.GET_UNREAD_SUMMARY,
   RPC_CHANNELS.sessions.MARK_ALL_READ,
@@ -461,6 +464,7 @@ export const REMOTE_ELIGIBLE_CHANNELS = new Set<string>([
   RPC_CHANNELS.batches.DELETE,
   RPC_CHANNELS.batches.VALIDATE,
   RPC_CHANNELS.batches.RETRY_ITEM,
+  RPC_CHANNELS.batches.RETRY_FAILED,
   RPC_CHANNELS.batches.CHANGED,
 
   // git — workspace filesystem

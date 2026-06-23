@@ -16,6 +16,8 @@ import type {
   SessionInfo,
   SessionListOptions,
   SessionListResult,
+  SessionListPageOptions,
+  SidebarCounts,
   SessionStatus,
   CreateSessionOptions,
   FileAttachment,
@@ -60,6 +62,21 @@ export interface ISessionManager {
    * Returns `{ total, returned, sessions: SessionListItem[] }` (5 fields per row).
    */
   getSessionList(workspaceId: string, options?: SessionListOptions): SessionListResult
+
+  /**
+   * Renderer-facing windowed list — full Session rows for one page plus the
+   * pre-pagination total. O(page) wire/memory; filter/sort over the in-memory map.
+   */
+  listSessionsPage(workspaceId: string, options?: SessionListPageOptions): { rows: Session[]; total: number }
+
+  /** Sidebar aggregate counts over the in-memory map for one workspace. */
+  getSidebarCounts(workspaceId: string): SidebarCounts
+
+  /** Hydrate full Session rows for specific ids (search hits / off-window lookups). */
+  getSessionMetasByIds(workspaceId: string, ids: string[]): Session[]
+
+  /** O(1) hidden/batch check — lets content search drop them without the full list. */
+  isHiddenOrBatch(sessionId: string): boolean
   createSession(workspaceId: string, options?: CreateSessionOptions): Promise<Session>
   deleteSession(sessionId: string): Promise<void>
 

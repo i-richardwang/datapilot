@@ -41,6 +41,10 @@ export type ChatGroupingMode = 'date' | 'status' | 'unread'
 
 interface SessionListProps {
   items: SessionMeta[]
+  /** Fetch the next server page when scrolling near the bottom (browse mode). */
+  onLoadMore?: () => void
+  /** Whether the server has more pages beyond the loaded window (browse mode). */
+  hasMoreServerPages?: boolean
   onDelete: (sessionId: string, skipConfirmation?: boolean) => Promise<boolean>
   onFlag?: (sessionId: string) => void
   onUnflag?: (sessionId: string) => void
@@ -114,6 +118,8 @@ function formatDateGroupLabel(date: Date, t: (key: string) => string, lang: stri
  */
 export function SessionList({
   items,
+  onLoadMore,
+  hasMoreServerPages,
   onDelete,
   onFlag,
   onUnflag,
@@ -256,6 +262,8 @@ export function SessionList({
     collapsedGroups,
     groupingMode,
     scrollViewportRef,
+    onLoadMore,
+    hasMoreServerPages,
   })
 
   const rowData = useMemo(() => {

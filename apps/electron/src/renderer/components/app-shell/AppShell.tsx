@@ -87,7 +87,9 @@ import { useFocusContext } from "@/context/FocusContext"
 import { getSessionTitle } from "@/utils/session"
 import { useSetAtom } from "jotai"
 import type { Session, Workspace, FileAttachment, PermissionRequest, LoadedSource, LoadedSkill, PermissionMode, SourceFilter, AutomationFilter, BatchFilter } from "../../../shared/types"
-import { sessionMetaMapAtom, sessionAtomFamily, sendToWorkspaceAtom, type SessionMeta } from "@/atoms/sessions"
+import { sessionMetaMapAtom, sessionAtomFamily, sendToWorkspaceAtom, sessionIdsAtom, sessionListTotalAtom, sidebarCountsAtom, type SessionMeta } from "@/atoms/sessions"
+import { useSessionListLoader, SESSION_PAGE_SIZE, type SessionListRequest } from "@/hooks/useSessionListLoader"
+import { buildSessionListFilter, sessionListRequestKey } from "@/lib/session-list-filter"
 import { sourcesAtom } from "@/atoms/sources"
 import { skillsAtom } from "@/atoms/skills"
 import { panelStackAtom, panelCountAtom, focusedPanelIdAtom, focusedSessionIdAtom, focusNextPanelAtom, focusPrevPanelAtom, parseSessionIdFromRoute } from "@/atoms/panel-stack"
@@ -100,7 +102,7 @@ import { LabelIcon, LabelValueTypeIcon } from "@/components/ui/label-icon"
 import { filterSessionStatuses as filterLabelMenuStates } from "@/components/ui/label-menu"
 import { createLabelMenuItems, filterItems as filterLabelMenuItems, type LabelMenuItem } from "@/components/ui/label-menu-utils"
 import { FEATURE_FLAGS } from "@craft-agent/shared/feature-flags"
-import { buildLabelTree, getDescendantIds, getLabelDisplayName, flattenLabels, extractLabelId, findLabelById, sortLabelsForDisplay } from "@craft-agent/shared/labels"
+import { buildLabelTree, getLabelDisplayName, flattenLabels, findLabelById, sortLabelsForDisplay } from "@craft-agent/shared/labels"
 import type { LabelConfig, LabelTreeNode } from "@craft-agent/shared/labels"
 import { resolveEntityColor } from "@craft-agent/shared/colors"
 import * as storage from "@/lib/local-storage"
@@ -1431,31 +1433,42 @@ function AppShellContent({
     })
   }, [activeWorkspaceId, activeSessionWorkingDirectory])
 
-  // Filter session metadata by active workspace
-  // Also exclude hidden sessions (mini-agent sessions) from all counts and lists
-  // For remote workspaces, sessions have the remote workspace ID (not the local one),
-  // so we match against both the local and remote workspace IDs.
-  const remoteWorkspaceId = activeWorkspace?.remoteServer?.remoteWorkspaceId
-  const workspaceSessionMetas = useMemo(() => {
-    const metas = Array.from(sessionMetaMap.values())
-    if (!activeWorkspaceId) return metas.filter(s => !s.hidden)
-    return metas.filter(s =>
-      !s.hidden && (s.workspaceId === activeWorkspaceId || (remoteWorkspaceId && s.workspaceId === remoteWorkspaceId))
-    )
-  }, [sessionMetaMap, activeWorkspaceId, remoteWorkspaceId])
+  // ── Server-paginated session list window ──────────────────────────────────
+  // The visible list is a server-ordered/filtered WINDOW (sessionIdsAtom),
+  // not the whole workspace; sidebar counts come from the server
+  // (sidebarCountsAtom). All sidebar filter kinds, including dynamic views, are
+  // translated into server-side predicates and remain O(page) in the renderer.
+  const windowIds = useAtomValue(sessionIdsAtom)
+  const windowTotal = useAtomValue(sessionListTotalAtom)
+  const sidebarCounts = useAtomValue(sidebarCountsAtom)
+  const { loadWindow, loadMore, reloadWindow } = useSessionListLoader()
 
-  // Active sessions exclude archived and batch - use this for all counts and filters except archived/batch views
-  const activeSessionMetas = useMemo(() => {
-    return workspaceSessionMetas.filter(s => !s.isArchived && !s.isBatch)
-  }, [workspaceSessionMetas])
+  const windowMetas = useMemo(() => {
+    const out: SessionMeta[] = []
+    for (const id of windowIds) {
+      const m = sessionMetaMap.get(id)
+      if (m) out.push(m)
+    }
+    return out
+  }, [windowIds, sessionMetaMap])
 
-  // Like activeSessionMetas but keeps batch sub-sessions. Used for explicit
-  // user-tag filters (label, view) where the user opted into the bucket by
-  // tagging — including batch sessions matches the user's intent. Aggregate
-  // views (allSessions, flagged, state) keep using activeSessionMetas.
-  const taggableSessionMetas = useMemo(() => {
-    return workspaceSessionMetas.filter(s => !s.isArchived)
-  }, [workspaceSessionMetas])
+  // The structured server request for the current (kind + secondary chips) filter.
+  const listRequest = useMemo<SessionListRequest>(() => ({
+    filter: buildSessionListFilter(sessionFilter, listFilter, labelFilter, labelConfigs),
+    sortBy: 'recent',
+  }), [sessionFilter, listFilter, labelFilter, labelConfigs])
+  const activeViewRequestKey = useMemo(() => {
+    if (sessionFilter?.kind !== 'view') return ''
+    if (sessionFilter.viewId === '__all__') {
+      return viewConfigs.map(v => `${v.id}:${v.expression}`).join('\u001f')
+    }
+    const view = viewConfigs.find(v => v.id === sessionFilter.viewId)
+    return view ? `${view.id}:${view.expression}` : '__missing__'
+  }, [sessionFilter, viewConfigs])
+  const listRequestKey = useMemo(
+    () => `${sessionListRequestKey(listRequest.filter ?? {}, listRequest.sortBy)}|view:${activeViewRequestKey}`,
+    [listRequest, activeViewRequestKey],
+  )
 
   const refreshWorkspaceUnreadMap = useCallback(async () => {
     try {
@@ -1477,12 +1490,11 @@ function AppShellContent({
     void refreshWorkspaceUnreadMap()
   }, [refreshWorkspaceUnreadMap])
 
-  // Keep active workspace unread indicator in sync with live metadata updates
+  // Keep active workspace unread indicator in sync with server-computed counts
   useEffect(() => {
     if (!activeWorkspaceId) return
-    const activeHasUnread = activeSessionMetas.some((session) => !!session.hasUnread)
-    setWorkspaceUnreadMap((prev) => ({ ...prev, [activeWorkspaceId]: activeHasUnread }))
-  }, [activeWorkspaceId, activeSessionMetas])
+    setWorkspaceUnreadMap((prev) => ({ ...prev, [activeWorkspaceId]: !!sidebarCounts?.hasUnread }))
+  }, [activeWorkspaceId, sidebarCounts?.hasUnread])
 
   // Keep cross-workspace indicators in sync with global unread updates from main process
   useEffect(() => {
@@ -1497,91 +1509,38 @@ function AppShellContent({
     return cleanup
   }, [workspaces])
 
-  // Count sessions by todo state (scoped to workspace)
-  const isMetaDone = (s: SessionMeta) => s.sessionStatus === 'done' || s.sessionStatus === 'cancelled'
-  // Single memoized pass — these previously ran as three unmemoized .filter()
-  // scans on every render, which at 30k+ sessions burned ~100k comparisons per
-  // sidebar render. flaggedCount intentionally matches activeSessionMetas
-  // semantics (excludes archived and batch sessions).
-  const { flaggedCount, archivedCount, batchSessionCount } = useMemo(() => {
-    let flagged = 0
-    let archived = 0
-    let batch = 0
-    for (const s of workspaceSessionMetas) {
-      if (s.isArchived) archived++
-      if (s.isBatch) batch++
-      if (s.isFlagged && !s.isArchived && !s.isBatch) flagged++
-    }
-    return { flaggedCount: flagged, archivedCount: archived, batchSessionCount: batch }
-  }, [workspaceSessionMetas])
+  // Sidebar counts now come from the server (getSidebarCounts over its in-memory
+  // map) instead of scanning a full in-memory list. Predicate buckets match the
+  // old metas semantics exactly (see SidebarCounts).
+  const flaggedCount = sidebarCounts?.flagged ?? 0
+  const archivedCount = sidebarCounts?.archived ?? 0
+  const batchSessionCount = sidebarCounts?.batch ?? 0
 
-  // Compute session counts per label (cumulative: parent includes descendants).
-  // Flatten the tree for iteration, use the tree for descendant lookups.
-  // Uses taggableSessionMetas so batch sub-sessions tagged with a user label
-  // are reflected in the count (matches what the label filter view shows).
+  // Per-label counts come pre-rolled-up from the server: `byLabel[id]` already
+  // sums self + descendants, deduped per session (a session with two sibling
+  // sub-labels counts the shared ancestor ONCE — exact, not the old over-count).
   const labelCounts = useMemo(() => {
-    const allLabels = flattenLabels(labelConfigs)
-
-    // Invert the descendant relation once (tree-sized, no session scan):
-    // ancestorsOf[childId] = every label whose descendant set contains childId.
-    const ancestorsOf = new Map<string, string[]>()
-    for (const label of allLabels) {
-      for (const descId of getDescendantIds(labelConfigs, label.id)) {
-        const list = ancestorsOf.get(descId)
-        if (list) list.push(label.id)
-        else ancestorsOf.set(descId, [label.id])
-      }
-    }
-
-    // Single pass over sessions. Per label: a session contributes 1 to the
-    // direct count when it carries the label itself, and 1 to the descendant
-    // count when it carries at least one descendant label (deduped per
-    // session, matching the previous .some() semantics). Total = direct +
-    // descendant, same as the previous per-label scans.
-    const directCounts = new Map<string, number>()
-    const descendantHitCounts = new Map<string, number>()
-    for (const s of taggableSessionMetas) {
-      if (!s.labels?.length) continue
-      const labelIds = new Set<string>()
-      for (const l of s.labels) {
-        labelIds.add(extractLabelId(l))
-      }
-      const ancestorHits = new Set<string>()
-      for (const id of labelIds) {
-        directCounts.set(id, (directCounts.get(id) || 0) + 1)
-        const ancestors = ancestorsOf.get(id)
-        if (ancestors) {
-          for (const anc of ancestors) ancestorHits.add(anc)
-        }
-      }
-      for (const anc of ancestorHits) {
-        descendantHitCounts.set(anc, (descendantHitCounts.get(anc) || 0) + 1)
-      }
-    }
-
+    const byLabel = sidebarCounts?.byLabel ?? {}
     const counts: Record<string, number> = {}
-    for (const label of allLabels) {
-      counts[label.id] = (directCounts.get(label.id) || 0) + (descendantHitCounts.get(label.id) || 0)
+    for (const label of flattenLabels(labelConfigs)) {
+      counts[label.id] = byLabel[label.id] ?? 0
     }
     return counts
-  }, [taggableSessionMetas, labelConfigs])
+  }, [sidebarCounts, labelConfigs])
 
-  // Count sessions by individual todo state (dynamic based on effectiveSessionStatuses)
-  // Uses activeSessionMetas to exclude archived sessions from counts.
+  // Per-status counts from the server (active sessions: non-archived, non-batch).
   const sessionStatusCounts = useMemo(() => {
     const counts: Record<SessionStatusId, number> = {}
-    // Initialize counts for all dynamic statuses
     for (const state of effectiveSessionStatuses) {
-      counts[state.id] = 0
+      counts[state.id] = sidebarCounts?.byStatus?.[state.id] ?? 0
     }
-    // Count sessions
-    for (const s of activeSessionMetas) {
-      const state = (s.sessionStatus || 'todo') as SessionStatusId
-      // Increment count (initialize to 0 if status not in effectiveSessionStatuses yet)
-      counts[state] = (counts[state] || 0) + 1
+    if (sidebarCounts) {
+      for (const [id, n] of Object.entries(sidebarCounts.byStatus)) {
+        if (!(id in counts)) counts[id as SessionStatusId] = n
+      }
     }
     return counts
-  }, [activeSessionMetas, effectiveSessionStatuses])
+  }, [sidebarCounts, effectiveSessionStatuses])
 
   // Count sources by type for the Sources dropdown subcategories
   const sourceTypeCounts = useMemo(() => {
@@ -1608,116 +1567,58 @@ function AppShellContent({
 
   // Filter session metadata based on sidebar mode and chat filter
   const filteredSessionMetas = useMemo(() => {
-    // When in sources mode, return empty (no sessions to show)
-    if (!sessionFilter) {
-      return []
-    }
+    if (!sessionFilter) return []
+    // The server already filtered + sorted + paginated the window for every
+    // sidebar filter kind, including dynamic views.
+    return windowMetas
+  }, [sessionFilter, windowMetas])
 
-    let result: SessionMeta[]
-
-    switch (sessionFilter.kind) {
-      case 'allSessions':
-        // "All Sessions" - shows active (non-archived) sessions
-        result = activeSessionMetas
-        break
-      case 'flagged':
-        result = activeSessionMetas.filter(s => s.isFlagged)
-        break
-      case 'archived':
-        // Archived view shows only archived sessions
-        result = workspaceSessionMetas.filter(s => s.isArchived)
-        break
-      case 'batch':
-        // Batch view shows only batch-created sessions
-        result = workspaceSessionMetas.filter(s => s.isBatch)
-        break
-      case 'batchInstance':
-        // Per-batch view: only sub-sessions belonging to this batch
-        result = workspaceSessionMetas.filter(s => s.batchId === sessionFilter.batchId)
-        break
-      case 'state':
-        // Filter by specific todo state (excludes archived)
-        result = activeSessionMetas.filter(s => (s.sessionStatus || 'todo') === sessionFilter.stateId)
-        break
-      case 'label': {
-        if (sessionFilter.labelId === '__all__') {
-          // "Labels" header: show every tagged session (including batch sub-sessions)
-          result = taggableSessionMetas.filter(s => s.labels && s.labels.length > 0)
-        } else {
-          // Specific label: includes sessions tagged with this label or any descendant.
-          // Uses taggableSessionMetas so batch sub-sessions tagged with the label
-          // surface here — explicit tagging is treated as user intent.
-          const descendants = getDescendantIds(labelConfigs, sessionFilter.labelId)
-          const matchIds = new Set([sessionFilter.labelId, ...descendants])
-          result = taggableSessionMetas.filter(
-            s => s.labels?.some(l => matchIds.has(extractLabelId(l)))
-          )
-        }
-        break
-      }
-      case 'view': {
-        // Filter by view: __all__ shows any session matched by any view,
-        // otherwise filter to the specific view (excludes archived).
-        // Includes batch sub-sessions for the same reason as 'label' — views
-        // are user-defined, so the user's filter expression is authoritative.
-        result = taggableSessionMetas.filter(s => {
-          const matched = evaluateViews(s)
-          if (sessionFilter.viewId === '__all__') {
-            return matched.length > 0
-          }
-          return matched.some(v => v.id === sessionFilter.viewId)
-        })
-        break
-      }
-      default:
-        result = activeSessionMetas
+  // Fetch the window when workspace/filter changes (non-search). Skip
+  // the first run for the default request — App.tsx already loaded page 0 on
+  // connect — to avoid a redundant mount fetch.
+  const didInitialWindowLoad = useRef(false)
+  useEffect(() => {
+    if (searchActive || !activeWorkspaceId) return
+    if (!didInitialWindowLoad.current) {
+      didInitialWindowLoad.current = true
+      const defaultKey = `${sessionListRequestKey({ archived: false, batch: false }, 'recent')}|view:`
+      if (listRequestKey === defaultKey && windowIds.length > 0) return
     }
+    void loadWindow(activeWorkspaceId, listRequest)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkspaceId, listRequestKey, searchActive])
 
-    // Apply secondary filters (status + labels, AND-ed together) in ALL views.
-    // These layer on top of the primary sessionFilter to allow further narrowing.
-    // Each filter supports include/exclude modes:
-    //   - Includes: if any exist, only matching items pass
-    //   - Excludes: matching items are removed (applied after includes)
-    if (listFilter.size > 0) {
-      const statusIncludes = new Set<SessionStatusId>()
-      const statusExcludes = new Set<SessionStatusId>()
-      for (const [id, mode] of listFilter) {
-        if (mode === 'include') statusIncludes.add(id)
-        else statusExcludes.add(id)
-      }
-      if (statusIncludes.size > 0) {
-        result = result.filter(s => statusIncludes.has((s.sessionStatus || 'todo') as SessionStatusId))
-      }
-      if (statusExcludes.size > 0) {
-        result = result.filter(s => !statusExcludes.has((s.sessionStatus || 'todo') as SessionStatusId))
-      }
-    }
-    // Filter by labels — supports include/exclude with descendant expansion
-    if (labelFilter.size > 0) {
-      const labelIncludes = new Set<string>()
-      const labelExcludes = new Set<string>()
-      for (const [id, mode] of labelFilter) {
-        // Expand to include descendant label IDs
-        const ids = [id, ...getDescendantIds(labelConfigs, id)]
-        for (const expandedId of ids) {
-          if (mode === 'include') labelIncludes.add(expandedId)
-          else labelExcludes.add(expandedId)
-        }
-      }
-      if (labelIncludes.size > 0) {
-        result = result.filter(s =>
-          s.labels?.some(l => labelIncludes.has(extractLabelId(l)))
-        )
-      }
-      if (labelExcludes.size > 0) {
-        result = result.filter(s =>
-          !s.labels?.some(l => labelExcludes.has(extractLabelId(l)))
-        )
-      }
-    }
+  // Live reconcile: refetch the loaded window + counts (debounced) on session
+  // events that can change membership/order/badges. Streaming deltas are
+  // excluded — visible rows already patch live via their per-session atoms.
+  const listRequestRef = useRef(listRequest)
+  listRequestRef.current = listRequest
+  useEffect(() => {
+    const RECONCILE_TYPES = new Set([
+      'complete', 'error', 'interrupted', 'typed_error', 'session_status_changed',
+      'session_flagged', 'session_unflagged', 'name_changed', 'labels_changed',
+      'title_generated', 'session_created', 'session_deleted',
+    ])
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const cleanup = window.electronAPI.onSessionEvent((event: { type: string }) => {
+      if (!RECONCILE_TYPES.has(event.type)) return
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        if (searchActive || !activeWorkspaceId) return
+        // Reload the FULL loaded depth (paged) so a membership/order/badge change
+        // never truncates a scrolled-open window back to a single page.
+        const count = store.get(sessionIdsAtom).length
+        void reloadWindow(activeWorkspaceId, listRequestRef.current, Math.max(count, SESSION_PAGE_SIZE))
+      }, 1000)
+    })
+    return () => { if (timer) clearTimeout(timer); cleanup?.() }
+  }, [activeWorkspaceId, searchActive, reloadWindow, store])
 
-    return result
-  }, [workspaceSessionMetas, activeSessionMetas, taggableSessionMetas, sessionFilter, listFilter, labelFilter, labelConfigs, evaluateViews])
+  const onSessionListLoadMore = useCallback(() => {
+    if (searchActive || !activeWorkspaceId) return
+    void loadMore(activeWorkspaceId, listRequest, windowIds.length)
+  }, [searchActive, activeWorkspaceId, loadMore, listRequest, windowIds.length])
+  const hasMoreWindow = windowIds.length < windowTotal
 
   // Derive "pinned" (non-removable) filters from the current sessionFilter path.
   // These represent filters that are implicit in the current deeplink/route and
@@ -2484,7 +2385,7 @@ function AppShellContent({
                     {
                       id: "nav:allSessions",
                       title: t("sidebar.allSessions"),
-                      label: String(workspaceSessionMetas.length),
+                      label: String(sidebarCounts?.total ?? 0),
                       icon: Inbox,
                       variant: sessionFilter?.kind === 'allSessions' ? "default" : "ghost",
                       onClick: handleAllSessionsClick,
@@ -3703,7 +3604,9 @@ function AppShellContent({
                 {/* Key on sidebarMode forces full remount when switching views, skipping animations */}
                 <SessionList
                   key={sessionFilter?.kind}
-                  items={searchActive ? workspaceSessionMetas : filteredSessionMetas}
+                  items={filteredSessionMetas}
+                  onLoadMore={onSessionListLoadMore}
+                  hasMoreServerPages={hasMoreWindow}
                   onDelete={handleDeleteSession}
                   onFlag={onFlagSession}
                   onUnflag={onUnflagSession}

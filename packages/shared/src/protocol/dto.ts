@@ -180,6 +180,77 @@ export interface SessionListResult {
   sessions: SessionListItem[]
 }
 
+/**
+ * Structured predicate for `sessions:listPage` (renderer-facing window query).
+ *
+ * Deliberately generic — the renderer translates every UI filter kind
+ * (allSessions/flagged/archived/state/label/view/batch/batchInstance) plus the
+ * secondary status/label chips into this one predicate, so the server never
+ * needs to know about UI filter "kinds". Label ids here are already
+ * descendant-expanded by the renderer (which owns the label tree).
+ *
+ * Tri-state booleans: `true` = only matching, `false` = exclude matching,
+ * `undefined` = no constraint.
+ */
+export interface SessionListPageFilter {
+  archived?: boolean
+  flagged?: boolean
+  batch?: boolean
+  /** Restrict to sub-sessions of this batch (implies batch). */
+  batchId?: string
+  /** Only sessions carrying at least one label (for the "Labels" header view). */
+  hasLabels?: boolean
+  /** sessionStatus must be one of these (default 'todo' when unset on the session). */
+  statusInclude?: string[]
+  statusExclude?: string[]
+  /**
+   * AND across groups, OR within a group: the session must carry at least one
+   * label id from EVERY group. Lets the renderer combine a primary label-nav
+   * filter with a secondary label chip (two groups = both must match). Label
+   * ids are already descendant-expanded by the renderer.
+   */
+  labelIncludeGroups?: string[][]
+  /** Session must carry none of these label ids. */
+  labelExclude?: string[]
+  /** Case-insensitive substring match on session name. */
+  search?: string
+  /**
+   * Dynamic view id to evaluate server-side using the workspace's saved view
+   * expressions. "__all__" means sessions matching any configured view.
+   */
+  viewId?: string
+}
+
+/** Query options for `sessions:listPage` — windowed, filtered, sorted, server-side. */
+export interface SessionListPageOptions {
+  filter?: SessionListPageFilter
+  sortBy?: 'recent' | 'name' | 'status'
+  offset?: number
+  limit?: number
+}
+
+/**
+ * Sidebar aggregate counts from `sessions:sidebarCounts`. Computed over the
+ * server's in-memory session map so the renderer never needs the full list.
+ * `byLabel` is already rolled up over the label tree (a session counts toward
+ * each tagged label AND its ancestors, deduped per session), so the renderer
+ * reads `byLabel[id]` directly — no client-side descendant rollup.
+ *
+ * Predicate semantics mirror the renderer's metas buckets exactly:
+ * - `total/flagged/archived/batch` over workspace (non-hidden) sessions
+ * - `byStatus` + `hasUnread` over active (non-hidden, non-archived, non-batch)
+ * - `byLabel` over taggable (non-hidden, non-archived; batch included)
+ */
+export interface SidebarCounts {
+  total: number
+  flagged: number
+  archived: number
+  batch: number
+  hasUnread: boolean
+  byStatus: Record<string, number>
+  byLabel: Record<string, number>
+}
+
 export interface CreateSessionOptions {
   name?: string
   permissionMode?: PermissionMode
@@ -280,7 +351,7 @@ export type SessionEvent =
   | { type: 'session_model_changed'; sessionId: string; model: string | null }
   | { type: 'session_status_changed'; sessionId: string; sessionStatus: SessionStatus }
   | { type: 'session_deleted'; sessionId: string }
-  | { type: 'session_created'; sessionId: string }
+  | { type: 'session_created'; sessionId: string; session?: Session }
   | { type: 'session_shared'; sessionId: string; sharedUrl: string }
   | { type: 'session_unshared'; sessionId: string }
   | { type: 'session_html_shares_changed'; sessionId: string; htmlShares: Record<string, HtmlShareInfo> }

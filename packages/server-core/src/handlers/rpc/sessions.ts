@@ -104,6 +104,9 @@ async function scanSessionDirectory(dirPath: string): Promise<import('@craft-age
 export const HANDLED_CHANNELS = [
   RPC_CHANNELS.sessions.GET,
   RPC_CHANNELS.sessions.LIST,
+  RPC_CHANNELS.sessions.LIST_PAGE,
+  RPC_CHANNELS.sessions.SIDEBAR_COUNTS,
+  RPC_CHANNELS.sessions.GET_METAS,
   RPC_CHANNELS.sessions.GET_INFO,
   RPC_CHANNELS.sessions.GET_UNREAD_SUMMARY,
   RPC_CHANNELS.sessions.MARK_ALL_READ,
@@ -179,6 +182,52 @@ export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): 
       log.error('LIST_SESSIONS continuing after initialization failure:', error)
     }
     return sessionManager.getSessionList(workspaceId, options)
+  })
+
+  // Resolve a workspace id from the explicit arg, falling back to the calling
+  // window's workspace (same precedence as the GET handler) so callers that
+  // don't yet know their workspace id still get the right list.
+  const resolveWorkspaceId = (ctx: { webContentsId?: number | null; workspaceId?: string | null }, workspaceId?: string): string => {
+    if (workspaceId) return workspaceId
+    const windowWorkspaceId = ctx.webContentsId != null
+      ? deps.windowManager?.getWorkspaceForWindow(ctx.webContentsId)
+      : undefined
+    return ctx.workspaceId ?? windowWorkspaceId ?? ''
+  }
+
+  // Renderer-facing windowed session list (full rows + pre-pagination total).
+  // Keeps the renderer at O(page) instead of shipping the whole workspace.
+  server.handle(RPC_CHANNELS.sessions.LIST_PAGE, async (
+    ctx,
+    workspaceId: string,
+    options?: import('@craft-agent/shared/protocol').SessionListPageOptions,
+  ) => {
+    try {
+      await sessionManager.waitForInit()
+    } catch (error) {
+      log.error('LIST_PAGE continuing after initialization failure:', error)
+    }
+    return sessionManager.listSessionsPage(resolveWorkspaceId(ctx, workspaceId), options)
+  })
+
+  // Sidebar aggregate counts for one workspace (filter badges without the full list).
+  server.handle(RPC_CHANNELS.sessions.SIDEBAR_COUNTS, async (ctx, workspaceId: string) => {
+    try {
+      await sessionManager.waitForInit()
+    } catch (error) {
+      log.error('SIDEBAR_COUNTS continuing after initialization failure:', error)
+    }
+    return sessionManager.getSidebarCounts(resolveWorkspaceId(ctx, workspaceId))
+  })
+
+  // Hydrate full Session rows for specific ids (content-search hits / off-window lookups).
+  server.handle(RPC_CHANNELS.sessions.GET_METAS, async (ctx, workspaceId: string, ids: string[]) => {
+    try {
+      await sessionManager.waitForInit()
+    } catch (error) {
+      log.error('GET_METAS continuing after initialization failure:', error)
+    }
+    return sessionManager.getSessionMetasByIds(resolveWorkspaceId(ctx, workspaceId), ids ?? [])
   })
 
   // Curated single-session snapshot (10 fields) for agent-facing CLI/RPC.
@@ -469,12 +518,11 @@ export function registerSessionsHandlers(server: RpcServer, deps: HandlerDeps): 
       searchId: id,
     })
 
-    // Filter out hidden sessions (e.g., mini edit sessions) and batch sessions
-    const allSessions = await sessionManager.getSessions()
-    const excludedSessionIds = new Set(
-      allSessions.filter(s => s.hidden || s.isBatch).map(s => s.id)
-    )
-    const filteredResults = results.filter(r => !excludedSessionIds.has(r.sessionId))
+    // Filter out hidden sessions (e.g., mini edit sessions) and batch sessions.
+    // O(results) lookups against the in-memory map — never materialize the whole
+    // workspace list here (getSessions() builds every Session row and was the
+    // O(all-sessions) stall on large workspaces).
+    const filteredResults = results.filter(r => !sessionManager.isHiddenOrBatch(r.sessionId))
 
     log.info('[search]','ipc:response', { searchId: id, resultCount: filteredResults.length, totalFound: results.length })
     return filteredResults

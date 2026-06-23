@@ -93,7 +93,7 @@ import { isParentTaskTool } from '@craft-agent/shared/utils/toolNames'
 import { restoreFiles } from '@craft-agent/shared/utils/bundle-files'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
 import { CraftMcpClient, McpClientPool, McpPoolServer } from '@craft-agent/shared/mcp'
-import { type Session, type SessionEvent, type SessionInfo, type SessionListOptions, type SessionListResult, type FileAttachment, type SendMessageOptions, type UnreadSummary, type RemoteSessionTransferPayload, type ImportRemoteSessionTransferResult, RPC_CHANNELS, generateMessageId } from '@craft-agent/shared/protocol'
+import { type Session, type SessionEvent, type SessionInfo, type SessionListOptions, type SessionListResult, type SessionListPageOptions, type SessionListPageFilter, type SidebarCounts, type FileAttachment, type SendMessageOptions, type UnreadSummary, type RemoteSessionTransferPayload, type ImportRemoteSessionTransferResult, RPC_CHANNELS, generateMessageId } from '@craft-agent/shared/protocol'
 import { messageToStored, storedToMessage, type Message, type StoredAttachment, type ToolDisplayMeta } from '@craft-agent/core/types'
 import { formatPathsToRelative, formatToolInputPaths, perf, encodeIconToDataUrlAsync, getEmojiIcon, resetSummarizationClient, resolveToolIcon, readFileAttachment, selectSpreadMessages, normalizePath } from '@craft-agent/shared/utils'
 import { loadAllSkills, loadSkillBySlug, invalidateSkillsCache, type LoadedSkill } from '@craft-agent/shared/skills'
@@ -107,6 +107,9 @@ import { listLabels, loadLabelConfig } from '@craft-agent/shared/labels/storage'
 import { extractLabelId, resolveSessionLabels } from '@craft-agent/shared/labels'
 import { ensureLabelsExist } from '@craft-agent/shared/labels/crud'
 import { loadStatusConfig } from '@craft-agent/shared/statuses/storage'
+import { compileAllViews, compileView, buildViewContext, type CompiledView } from '@craft-agent/shared/views'
+import { dbEvents } from '@craft-agent/shared/db/events'
+import { listViews } from '@craft-agent/shared/views/storage'
 import { AutomationSystem, createPromptHistoryEntry, appendAutomationHistoryEntry, type AutomationSystemMetadataSnapshot } from '@craft-agent/shared/automations'
 import { BatchProcessor, resolveGlobalMaxConcurrentSessions } from '@craft-agent/shared/batches'
 import { buildBackendRuntimeSignature, buildRestartRequiredSignature, filterAttachmentsForModelInput } from './runtime-config'
@@ -1163,6 +1166,115 @@ function managedToSession(m: ManagedSession, overrides?: Partial<Session>): Sess
     supportsBranching: resolveSupportsBranching(m),
     ...overrides,
   } as Session
+}
+
+type ManagedViewPredicate = (m: ManagedSession) => boolean
+
+const managedViewPredicateCache = new Map<string, ManagedViewPredicate>()
+dbEvents.on('view:config', () => managedViewPredicateCache.clear())
+
+function buildManagedViewContext(m: ManagedSession) {
+  return buildViewContext({
+    name: m.name,
+    preview: m.preview,
+    sessionStatus: m.sessionStatus,
+    permissionMode: m.permissionMode,
+    model: m.model,
+    lastMessageRole: m.lastMessageRole,
+    lastMessageAt: m.lastMessageAt,
+    createdAt: m.createdAt,
+    messageCount: m.messageCount,
+    isFlagged: m.isFlagged,
+    hasUnread: m.hasUnread,
+    isProcessing: m.isProcessing,
+    labels: m.labels,
+    tokenUsage: m.tokenUsage,
+  })
+}
+
+function buildCompiledViewPredicate(compiled: CompiledView): ManagedViewPredicate {
+  return (m: ManagedSession): boolean => {
+    try {
+      return !!compiled.evaluate(buildManagedViewContext(m))
+    } catch {
+      return false
+    }
+  }
+}
+
+function buildAnyCompiledViewPredicate(compiled: CompiledView[]): ManagedViewPredicate {
+  if (compiled.length === 0) return () => false
+
+  return (m: ManagedSession): boolean => {
+    const context = buildManagedViewContext(m)
+    for (const view of compiled) {
+      try {
+        if (view.evaluate(context)) return true
+      } catch {
+        // One broken expression must not make the whole virtual "__all__" view fail.
+      }
+    }
+    return false
+  }
+}
+
+function buildManagedViewPredicate(workspaceRootPath: string, viewId: string): ManagedViewPredicate {
+  const cacheKey = `${workspaceRootPath}\u0000${viewId}`
+  const cached = managedViewPredicateCache.get(cacheKey)
+  if (cached) return cached
+
+  const views = listViews(workspaceRootPath)
+  const predicate = viewId === '__all__'
+    ? buildAnyCompiledViewPredicate(compileAllViews(views))
+    : (() => {
+        const config = views.find(v => v.id === viewId)
+        const compiled = config ? compileView(config) : null
+        return compiled ? buildCompiledViewPredicate(compiled) : () => false
+      })()
+
+  managedViewPredicateCache.set(cacheKey, predicate)
+  return predicate
+}
+
+/**
+ * Apply a renderer-supplied structured filter to a managed session.
+ * Pure, O(1) per session — runs over the in-memory map, never touches SQLite.
+ * Mirrors the renderer's filter semantics exactly (see SessionListPageFilter);
+ * the renderer pre-translates every UI filter kind into this predicate.
+ */
+function managedMatchesPageFilter(m: ManagedSession, f: SessionListPageFilter, viewPredicate?: ManagedViewPredicate): boolean {
+  if (f.archived === true && m.isArchived !== true) return false
+  if (f.archived === false && m.isArchived === true) return false
+  if (f.flagged === true && m.isFlagged !== true) return false
+  if (f.batch === true && m.isBatch !== true) return false
+  if (f.batch === false && m.isBatch === true) return false
+  if (f.batchId !== undefined && m.batchId !== f.batchId) return false
+  if (f.hasLabels === true && !(m.labels && m.labels.length > 0)) return false
+
+  const status = m.sessionStatus ?? 'todo'
+  if (f.statusInclude && f.statusInclude.length > 0 && !f.statusInclude.includes(status)) return false
+  if (f.statusExclude && f.statusExclude.length > 0 && f.statusExclude.includes(status)) return false
+
+  if (f.labelIncludeGroups && f.labelIncludeGroups.length > 0) {
+    const ids = (m.labels ?? []).map(extractLabelId)
+    // AND across groups, OR within a group.
+    for (const group of f.labelIncludeGroups) {
+      if (group.length > 0 && !ids.some(id => group.includes(id))) return false
+    }
+  }
+  if (f.labelExclude && f.labelExclude.length > 0) {
+    const ids = (m.labels ?? []).map(extractLabelId)
+    if (ids.some(id => f.labelExclude!.includes(id))) return false
+  }
+
+  if (f.search) {
+    const needle = f.search.toLowerCase()
+    if (!(m.name ?? '').toLowerCase().includes(needle)) return false
+  }
+  if (f.viewId !== undefined) {
+    if (!viewPredicate || !viewPredicate(m)) return false
+  }
+  return true
 }
 
 // Performance: Batch IPC delta events to reduce renderer load
@@ -2708,6 +2820,149 @@ export class SessionManager implements ISessionManager {
         createdAt: s.createdAt ?? 0,
       })),
     }
+  }
+
+  /**
+   * Renderer-facing windowed session list. Unlike getSessionList (agent-facing,
+   * 5 curated fields), this returns full Session rows for the list UI plus the
+   * pre-filter `total`, so the renderer holds only one page (O(page) wire +
+   * memory) instead of the whole workspace.
+   *
+   * Filter/sort run over the lightweight in-memory ManagedSession map; the
+   * expensive managedToSession build runs ONLY on the page slice. Hidden
+   * sessions (mini/edit) are always excluded — they never belong in the list.
+   */
+  listSessionsPage(workspaceId: string, options?: SessionListPageOptions): { rows: Session[]; total: number } {
+    const sortBy = options?.sortBy ?? 'recent'
+    const offset = Math.max(options?.offset ?? 0, 0)
+    const limit = Math.min(Math.max(options?.limit ?? 50, 0), 1000)
+    const filter = options?.filter
+
+    let managed = Array.from(this.sessions.values()).filter(
+      m => m.workspace.id === workspaceId && !m.hidden
+    )
+    const workspaceRootPath = filter?.viewId !== undefined
+      ? managed[0]?.workspace.rootPath
+      : undefined
+    const viewPredicate = filter?.viewId !== undefined && workspaceRootPath
+      ? buildManagedViewPredicate(workspaceRootPath, filter.viewId)
+      : undefined
+    if (filter) {
+      managed = managed.filter(m => managedMatchesPageFilter(m, filter, viewPredicate))
+    }
+
+    if (sortBy === 'name') {
+      managed.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''))
+    } else if (sortBy === 'status') {
+      managed.sort((a, b) => (a.sessionStatus ?? '').localeCompare(b.sessionStatus ?? ''))
+    } else {
+      // 'recent' — newest activity first, matching the renderer's list ordering.
+      managed.sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0))
+    }
+
+    const total = managed.length
+    const page = managed.slice(offset, offset + limit)
+    const rows = page.map(m => managedToSession(m, {
+      permissionModeState: this.getSessionPermissionModeState(m.id) ?? undefined,
+    }))
+    return { rows, total }
+  }
+
+  /**
+   * Sidebar aggregate counts over the in-memory map for one workspace. Lets the
+   * renderer render filter badges without holding every session. Predicate
+   * buckets mirror the renderer's metas exactly (see SidebarCounts):
+   * - total/flagged/archived/batch  → workspace (non-hidden)
+   * - byStatus + hasUnread          → active (non-hidden, non-archived, non-batch)
+   * - byLabel (rolled up: self + descendants, deduped per session)
+   *                                 → taggable (non-hidden, non-archived; batch kept)
+   */
+  getSidebarCounts(workspaceId: string): SidebarCounts {
+    let total = 0
+    let flagged = 0
+    let archived = 0
+    let batch = 0
+    let hasUnread = false
+    const byStatus: Record<string, number> = {}
+    const byLabel: Record<string, number> = {}
+
+    // Precompute each label's ancestor chain (self + parents) from the workspace
+    // label tree, so a session tagged with a leaf also counts toward every
+    // ancestor — deduped per session, so two sibling sub-labels under one parent
+    // count the parent ONCE (exact subtree rollup, not the old per-leaf
+    // over-count the renderer used to sum).
+    interface LabelNode { id: string; children?: LabelNode[] }
+    const ancestorChain = new Map<string, string[]>()
+    const ws = getWorkspaces().find(w => w.id === workspaceId)
+    if (ws) {
+      const walk = (nodes: LabelNode[], parents: string[]): void => {
+        for (const n of nodes) {
+          const chain = [n.id, ...parents]
+          ancestorChain.set(n.id, chain)
+          if (n.children && n.children.length > 0) walk(n.children, chain)
+        }
+      }
+      walk(loadLabelConfig(ws.rootPath).labels as LabelNode[], [])
+    }
+
+    for (const m of this.sessions.values()) {
+      if (m.workspace.id !== workspaceId || m.hidden) continue
+      total++
+      if (m.isArchived) archived++
+      if (m.isBatch) batch++
+      if (m.isFlagged && !m.isArchived && !m.isBatch) flagged++
+
+      const active = !m.isArchived && !m.isBatch
+      if (active) {
+        if (m.hasUnread) hasUnread = true
+        const status = m.sessionStatus ?? 'todo'
+        byStatus[status] = (byStatus[status] ?? 0) + 1
+      }
+
+      // taggable: non-archived (batch kept). Count each label AND its ancestors
+      // once per session (dedup across sibling sub-labels sharing an ancestor).
+      if (!m.isArchived && m.labels && m.labels.length > 0) {
+        const covered = new Set<string>()
+        for (const entry of m.labels) {
+          const id = extractLabelId(entry)
+          const chain = ancestorChain.get(id)
+          if (chain) for (const ancId of chain) covered.add(ancId)
+          else covered.add(id) // orphan label not in the tree — count under itself
+        }
+        for (const id of covered) byLabel[id] = (byLabel[id] ?? 0) + 1
+      }
+    }
+
+    return { total, flagged, archived, batch, hasUnread, byStatus, byLabel }
+  }
+
+  /**
+   * Hydrate full Session rows for a specific set of ids in one workspace.
+   * Used by the renderer to resolve sessions that aren't in the current list
+   * window — content-search hits (workspace-wide) and off-window id lookups.
+   * Unknown/foreign-workspace ids are silently skipped. Order is not guaranteed
+   * (caller re-orders by its own ranking).
+   */
+  getSessionMetasByIds(workspaceId: string, ids: string[]): Session[] {
+    const rows: Session[] = []
+    for (const id of ids) {
+      const m = this.sessions.get(id)
+      if (!m || m.workspace.id !== workspaceId || m.hidden) continue
+      rows.push(managedToSession(m, {
+        permissionModeState: this.getSessionPermissionModeState(m.id) ?? undefined,
+      }))
+    }
+    return rows
+  }
+
+  /**
+   * O(1) hidden/batch check over the in-memory map. Used by content search to
+   * drop hidden (mini/edit) and batch sub-sessions from results without
+   * materializing the whole workspace session list.
+   */
+  isHiddenOrBatch(sessionId: string): boolean {
+    const m = this.sessions.get(sessionId)
+    return !!m && (!!m.hidden || !!m.isBatch)
   }
 
   /**
@@ -4494,7 +4749,7 @@ export class SessionManager implements ISessionManager {
         // Notify renderer to hydrate full session metadata (including name)
         // before streaming events arrive. Without this, the renderer creates
         // a synthetic empty session and shows "New Chat" in the sidebar.
-        this.sendEvent({ type: 'session_created', sessionId: session.id }, managed.workspace.id)
+        this.sendEvent({ type: 'session_created', sessionId: session.id, session }, managed.workspace.id)
 
         // Fire and forget — send the message but don't await completion
         this.sendMessage(session.id, request.prompt, fileAttachments).catch(err => {
@@ -8761,7 +9016,7 @@ export class SessionManager implements ISessionManager {
     // Notify renderer to hydrate full session metadata (including title)
     // before streaming events arrive. Without this, the renderer may create
     // a synthetic empty session and temporarily show "New chat".
-    this.sendEvent({ type: 'session_created', sessionId: session.id }, workspaceId)
+    this.sendEvent({ type: 'session_created', sessionId: session.id, session }, workspaceId)
 
     // Notify caller of the sessionId before processing starts.
     // Batch processor uses this to register the session→item mapping so that
@@ -9193,7 +9448,13 @@ export class SessionManager implements ISessionManager {
     }
 
     // Emit session_created so renderer picks it up
-    this.sendEvent({ type: 'session_created', sessionId }, workspaceId)
+    this.sendEvent({
+      type: 'session_created',
+      sessionId,
+      session: managedToSession(managed, {
+        permissionModeState: this.getSessionPermissionModeState(managed.id) ?? undefined,
+      }),
+    }, workspaceId)
 
     sessionLog.info(`[import] Complete: sessionId=${sessionId}, transferredSummary=${managed.transferredSessionSummary ? `${managed.transferredSessionSummary.length} chars` : 'none'}, applied=${managed.transferredSessionSummaryApplied}, warnings=${warnings.length > 0 ? warnings.join('; ') : 'none'}`)
     return { sessionId, warnings: warnings.length > 0 ? warnings : undefined }

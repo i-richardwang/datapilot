@@ -20,6 +20,9 @@ export const RPC_CHANNELS = {
   sessions: {
     GET: 'sessions:get',
     LIST: 'sessions:list',
+    LIST_PAGE: 'sessions:listPage',
+    GET_METAS: 'sessions:getMetas',
+    SIDEBAR_COUNTS: 'sessions:sidebarCounts',
     GET_INFO: 'sessions:getInfo',
     GET_UNREAD_SUMMARY: 'sessions:getUnreadSummary',
     MARK_ALL_READ: 'sessions:markAllRead',

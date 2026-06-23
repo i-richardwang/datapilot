@@ -140,9 +140,32 @@ export const sessionAtomFamily = atomFamily(
 export const sessionMetaMapAtom = atom<Map<string, SessionMeta>>(new Map())
 
 /**
- * Derived atom: ordered list of session IDs (for list ordering)
+ * Ordered list of session IDs for the CURRENT list window.
+ *
+ * Post server-side pagination this is NO LONGER "all sessions in the workspace"
+ * — it's the server-ordered, server-filtered window the user has loaded so far
+ * (first page + any scroll-appended pages). The list renders these ids in order
+ * and resolves each id's metadata from sessionMetaMapAtom.
  */
 export const sessionIdsAtom = atom<string[]>([])
+
+/**
+ * Total number of sessions matching the current filter on the server (before
+ * pagination). Drives `hasMore` (window length < total) and the "N sessions"
+ * label. NOT the same as sessionIdsAtom.length, which is only what's loaded.
+ */
+export const sessionListTotalAtom = atom<number>(0)
+
+/** True while a list-window page fetch is in flight (initial load / filter change). */
+export const sessionListLoadingAtom = atom<boolean>(false)
+
+/**
+ * Sidebar aggregate counts for the active workspace, fetched from the server
+ * (`getSidebarCounts`) instead of derived from a full in-memory list. `null`
+ * until first load. `byLabel` is already rolled up over the label tree
+ * (self + descendants, deduped per session) — the sidebar reads it directly.
+ */
+export const sidebarCountsAtom = atom<import('@craft-agent/shared/protocol').SidebarCounts | null>(null)
 
 /**
  * Track which sessions have had their messages loaded (for lazy loading)
@@ -298,47 +321,139 @@ export const updateStreamingContentAtom = atom(
 )
 
 /**
- * Action atom: initialize sessions from loaded data
+ * Action atom: merge full Session rows into the metadata cache WITHOUT changing
+ * the window order (sessionIdsAtom). Used to hydrate content-search hits and
+ * off-window id lookups. Does NOT create per-session atoms — those stay lazy,
+ * created when a session is actually opened.
  */
-export const initializeSessionsAtom = atom(
+export const hydrateSessionMetasAtom = atom(
   null,
   (get, set, sessions: Session[]) => {
-    // Clean up stale atom family entries from previous workspace.
-    // Without this, switching workspaces leaves orphaned atoms in memory
-    // and components subscribed to old session IDs see stale/empty data.
-    const oldIds = get(sessionIdsAtom)
-    const newIdSet = new Set(sessions.map(s => s.id))
-    for (const oldId of oldIds) {
-      if (!newIdSet.has(oldId)) {
-        sessionAtomFamily.remove(oldId)
-        backgroundTasksAtomFamily.remove(oldId)
-      }
-    }
-    // Reset loaded sessions tracking — new workspace needs fresh lazy loading
-    set(loadedSessionsAtom, new Set<string>())
-
-    // Set individual session atoms
-    for (const session of sessions) {
-      set(sessionAtomFamily(session.id), session)
-    }
-
-    // Build metadata map
-    const metaMap = new Map<string, SessionMeta>()
+    if (sessions.length === 0) return
+    const metaMap = new Map(get(sessionMetaMapAtom))
     for (const session of sessions) {
       metaMap.set(session.id, extractSessionMeta(session))
     }
     set(sessionMetaMapAtom, metaMap)
+  }
+)
 
-    // Set ordered IDs (sorted by lastMessageAt desc)
-    const ids = sessions
-      .sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0))
-      .map(s => s.id)
-    set(sessionIdsAtom, ids)
+/**
+ * Action atom: replace the current list window with a freshly fetched page
+ * (initial load or filter/sort change). Sets the server-ordered window ids +
+ * total and merges the page rows into the metadata cache.
+ *
+ * Per-session atoms are deliberately NOT created here — the list renders from
+ * sessionMetaMapAtom, and full sessions load lazily on open. This is the core
+ * of the O(page) win: we hold one page of metadata, not 70k full Session
+ * objects + 70k jotai atoms.
+ */
+export const setSessionWindowAtom = atom(
+  null,
+  (get, set, payload: { rows: Session[]; total: number }) => {
+    const { rows, total } = payload
+    const newIds = rows.map(s => s.id)
+    const newIdSet = new Set(newIds)
+    const loaded = get(loadedSessionsAtom)
 
-    // NOTE: Do NOT mark sessions as loaded here
-    // Sessions from getSessions() have empty messages: [] to save memory
-    // Messages are lazy-loaded via ensureSessionMessagesLoadedAtom when session is opened
-    // This reduces initial memory usage from ~500MB to ~50MB for 300+ sessions
+    // Prune per-session atoms for rows leaving the window that aren't opened —
+    // keeps the heavier (full Session) state bounded to ~one page. Opened
+    // sessions are retained (their atom holds the loaded transcript).
+    for (const oldId of get(sessionIdsAtom)) {
+      if (!newIdSet.has(oldId) && !loaded.has(oldId)) {
+        sessionAtomFamily.remove(oldId)
+        backgroundTasksAtomFamily.remove(oldId)
+      }
+    }
+
+    // Rebuild the metadata cache pruned to (window ∪ opened) so it stays O(page)
+    // — matching the per-session atom pruning above. Without this, metas from
+    // previously-viewed filters/windows accumulate (memory creeps toward O(all
+    // browsed)). Opened (loaded) sessions are retained so an off-window open view
+    // can still read their meta.
+    const prevMeta = get(sessionMetaMapAtom)
+    const metaMap = new Map<string, SessionMeta>()
+    for (const retainedId of loaded) {
+      const meta = prevMeta.get(retainedId)
+      if (meta) metaMap.set(retainedId, meta)
+    }
+    for (const session of rows) {
+      metaMap.set(session.id, extractSessionMeta(session))
+      // Create/refresh the per-session atom for the window so live event +
+      // coalescer updates patch visible rows exactly as before the cutover.
+      // Bounded to the window (~page), not the whole workspace (~70k). Preserve
+      // an opened session's loaded transcript instead of clobbering it with [].
+      const existing = get(sessionAtomFamily(session.id))
+      if (existing && loaded.has(session.id)) {
+        set(sessionAtomFamily(session.id), { ...session, messages: existing.messages })
+      } else {
+        set(sessionAtomFamily(session.id), session)
+      }
+    }
+    set(sessionMetaMapAtom, metaMap)
+    set(sessionIdsAtom, newIds)
+    set(sessionListTotalAtom, total)
+  }
+)
+
+/**
+ * Action atom: append the next page to the window (scroll "load more").
+ * Dedups ids (a concurrent insert can overlap a page boundary) and merges the
+ * new rows into the cache.
+ */
+export const appendSessionWindowAtom = atom(
+  null,
+  (get, set, payload: { rows: Session[]; total: number }) => {
+    const { rows, total } = payload
+    const loaded = get(loadedSessionsAtom)
+    const metaMap = new Map(get(sessionMetaMapAtom))
+    for (const session of rows) {
+      metaMap.set(session.id, extractSessionMeta(session))
+      const existing = get(sessionAtomFamily(session.id))
+      if (existing && loaded.has(session.id)) {
+        set(sessionAtomFamily(session.id), { ...session, messages: existing.messages })
+      } else {
+        set(sessionAtomFamily(session.id), session)
+      }
+    }
+    set(sessionMetaMapAtom, metaMap)
+    const existing = get(sessionIdsAtom)
+    const seen = new Set(existing)
+    const merged = existing.slice()
+    for (const s of rows) {
+      if (!seen.has(s.id)) {
+        seen.add(s.id)
+        merged.push(s.id)
+      }
+    }
+    set(sessionIdsAtom, merged)
+    set(sessionListTotalAtom, total)
+  }
+)
+
+/**
+ * Action atom: full reset for a workspace switch (or initial mount before the
+ * first page loads). Clears the window, the metadata cache, counts, and every
+ * per-session atom — without this, switching workspaces leaks atoms and shows
+ * stale rows from the previous workspace.
+ */
+export const resetSessionsAtom = atom(
+  null,
+  (get, set) => {
+    for (const id of get(sessionIdsAtom)) {
+      sessionAtomFamily.remove(id)
+      backgroundTasksAtomFamily.remove(id)
+    }
+    // Also drop atoms for sessions opened outside the current window.
+    for (const id of get(loadedSessionsAtom)) {
+      sessionAtomFamily.remove(id)
+      backgroundTasksAtomFamily.remove(id)
+    }
+    set(sessionMetaMapAtom, new Map())
+    set(sessionIdsAtom, [])
+    set(sessionListTotalAtom, 0)
+    set(sidebarCountsAtom, null)
+    set(loadedSessionsAtom, new Set<string>())
   }
 )
 

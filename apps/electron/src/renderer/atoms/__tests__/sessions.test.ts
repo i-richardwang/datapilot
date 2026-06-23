@@ -9,7 +9,7 @@ import {
   ensureSessionMessagesLoadedAtom,
   forceSessionMessagesReloadAtom,
   refreshSessionsMetadataAtom,
-  initializeSessionsAtom,
+  setSessionWindowAtom,
   replaceLoadedSessionAtom,
 } from '../sessions'
 
@@ -170,11 +170,11 @@ describe('refreshSessionsMetadataAtom', () => {
   it('removes stale sessions from all atoms', () => {
     const store = createStore()
 
-    // Initialize with two sessions via initializeSessionsAtom
-    store.set(initializeSessionsAtom, [
-      makeSession({ id: 's1' }),
-      makeSession({ id: 's2' }),
-    ])
+    // Seed a window of two sessions via setSessionWindowAtom
+    store.set(setSessionWindowAtom, {
+      rows: [makeSession({ id: 's1' }), makeSession({ id: 's2' })],
+      total: 2,
+    })
     expect(store.get(sessionMetaMapAtom).size).toBe(2)
     expect(store.get(sessionIdsAtom)).toContain('s2')
 
@@ -192,10 +192,13 @@ describe('refreshSessionsMetadataAtom', () => {
   it('preserves omitted sessions when removeMissing is false', () => {
     const store = createStore()
 
-    store.set(initializeSessionsAtom, [
-      makeSession({ id: 's1', name: 'First', lastMessageAt: 200 }),
-      makeSession({ id: 's2', name: 'Second', lastMessageAt: 100 }),
-    ])
+    store.set(setSessionWindowAtom, {
+      rows: [
+        makeSession({ id: 's1', name: 'First', lastMessageAt: 200 }),
+        makeSession({ id: 's2', name: 'Second', lastMessageAt: 100 }),
+      ],
+      total: 2,
+    })
 
     const result = store.set(refreshSessionsMetadataAtom, {
       sessions: [makeSession({ id: 's1', name: 'First refreshed', lastMessageAt: 300 })],
@@ -218,10 +221,13 @@ describe('refreshSessionsMetadataAtom', () => {
     const store = createStore()
     const existingMessages = [msg('m1'), msg('m2', 'assistant')]
 
-    store.set(initializeSessionsAtom, [
-      makeSession({ id: 's1', name: 'First', messages: [] }),
-      makeSession({ id: 's2', name: 'Second', messages: [] }),
-    ])
+    store.set(setSessionWindowAtom, {
+      rows: [
+        makeSession({ id: 's1', name: 'First', messages: [] }),
+        makeSession({ id: 's2', name: 'Second', messages: [] }),
+      ],
+      total: 2,
+    })
     store.set(sessionAtomFamily('s1'), makeSession({ id: 's1', name: 'First', messages: existingMessages }))
     store.set(loadedSessionsAtom, new Set(['s1']))
 

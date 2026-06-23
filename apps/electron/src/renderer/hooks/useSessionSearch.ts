@@ -5,7 +5,7 @@ import { searchLog } from "@/lib/logger"
 import { parseLabelEntry } from "@craft-agent/shared/labels"
 import { fuzzyScore } from "@craft-agent/shared/search"
 import { getSessionTitle, getSessionStatus } from "@/utils/session"
-import type { SessionMeta } from "@/atoms/sessions"
+import { extractSessionMeta, type SessionMeta } from "@/atoms/sessions"
 import type { ViewConfig } from "@craft-agent/shared/views"
 import type { SessionFilter } from "@/contexts/NavigationContext"
 
@@ -13,8 +13,6 @@ import type { SessionFilter } from "@/contexts/NavigationContext"
 // Constants
 // ---------------------------------------------------------------------------
 
-const INITIAL_DISPLAY_LIMIT = 50
-const BATCH_SIZE = 50
 const MAX_SEARCH_RESULTS = 100
 
 // ---------------------------------------------------------------------------
@@ -56,6 +54,10 @@ export interface UseSessionSearchOptions {
   groupingMode?: 'date' | 'status' | 'unread'
   /** Ref to the ScrollArea viewport element — used for scroll-based pagination */
   scrollViewportRef?: React.RefObject<HTMLDivElement>
+  /** Fetch the next server page (browse mode). Provided by AppShell's window loader. */
+  onLoadMore?: () => void
+  /** Whether the server has more pages beyond the loaded window (browse mode). */
+  hasMoreServerPages?: boolean
 }
 
 export interface UseSessionSearchResult {
@@ -299,12 +301,13 @@ export function useSessionSearch({
   collapsedGroups,
   groupingMode,
   scrollViewportRef,
+  onLoadMore,
+  hasMoreServerPages,
 }: UseSessionSearchOptions): UseSessionSearchResult {
 
   const [contentSearchResults, setContentSearchResults] = useState<Map<string, ContentSearchResult>>(new Map())
   const [isSearchingContent, setIsSearchingContent] = useState(false)
   const [isSearchUnavailable, setIsSearchUnavailable] = useState(false)
-  const [displayLimit, setDisplayLimit] = useState(INITIAL_DISPLAY_LIMIT)
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Search mode is active when search is open AND query has 2+ characters
@@ -388,75 +391,56 @@ export function useSessionSearch({
 
   // --- Data pipeline ---
 
-  // Filter out hidden sessions before any processing.
-  // Batch sessions show up in: explicit batch views ('batch', 'batchInstance')
-  // and explicit user-tag filters ('label', 'view') where the user opted in
-  // by tagging. Aggregate views (allSessions, flagged, state) keep them out.
-  const visibleItems = useMemo(() => items.filter(item => {
-    if (item.hidden) return false
-    if (item.isBatch) {
-      const kind = currentFilter?.kind
-      return kind === 'batch' || kind === 'batchInstance' || kind === 'label' || kind === 'view'
-    }
-    return true
-  }), [items, currentFilter])
+  // Hydrate metadata for content-search hits — ids come back workspace-wide,
+  // beyond the loaded window, so fetch their metas to render rows in search mode.
+  const [searchMetas, setSearchMetas] = useState<SessionMeta[]>([])
+  useEffect(() => {
+    if (!isSearchMode || !workspaceId) { setSearchMetas([]); return }
+    const ids = Array.from(contentSearchResults.keys())
+    if (ids.length === 0) { setSearchMetas([]); return }
+    let cancelled = false
+    window.electronAPI.getSessionMetas(workspaceId, ids)
+      .then(rows => { if (!cancelled) setSearchMetas(rows.map(extractSessionMeta)) })
+      .catch((err: unknown) => {
+        if (!cancelled) { console.error('[useSessionSearch] getSessionMetas failed', err); setSearchMetas([]) }
+      })
+    return () => { cancelled = true }
+  }, [isSearchMode, workspaceId, contentSearchResults])
 
-  // Sort by most recent activity first
-  const sortedItems = useMemo(() =>
-    [...visibleItems].sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)),
-    [visibleItems]
-  )
+  // Browse mode: `items` IS the server window (already filtered + sorted +
+  // paginated). Defensive hidden filter only — no client re-filter/sort.
+  const browseItems = useMemo(() => items.filter(item => !item.hidden), [items])
 
-  // Filter items by search query or current filter
+  // Ranked result set: search → hydrated hits ordered by title fuzzy score then
+  // match count; browse → the window as-is.
   const searchFilteredItems = useMemo(() => {
-    if (!isSearchMode) {
-      return sortedItems.filter(item =>
-        sessionMatchesCurrentFilter(item, currentFilter, { evaluateViews, statusFilter, labelFilterMap })
-      )
-    }
+    if (!isSearchMode) return browseItems
 
-    const matched = sortedItems.filter(item => contentSearchResults.has(item.id))
-
-    // Precompute scores once per item — the sort comparator runs O(n log n)
-    // times and fuzzyScore is too expensive to recompute on every comparison.
+    const matched = searchMetas.filter(item => contentSearchResults.has(item.id))
     const scoreById = new Map<string, number>()
     for (const item of matched) {
       scoreById.set(item.id, fuzzyScore(getSessionTitle(item), searchQuery))
     }
+    return matched.sort((a, b) => {
+      const aScore = scoreById.get(a.id) ?? 0
+      const bScore = scoreById.get(b.id) ?? 0
+      if (aScore > 0 && bScore === 0) return -1
+      if (aScore === 0 && bScore > 0) return 1
+      if (aScore !== bScore) return bScore - aScore
+      const countA = contentSearchResults.get(a.id)?.matchCount || 0
+      const countB = contentSearchResults.get(b.id)?.matchCount || 0
+      return countB - countA
+    })
+  }, [browseItems, isSearchMode, searchMetas, searchQuery, contentSearchResults])
 
-    return matched
-      .sort((a, b) => {
-        const aScore = scoreById.get(a.id) ?? 0
-        const bScore = scoreById.get(b.id) ?? 0
-
-        if (aScore > 0 && bScore === 0) return -1
-        if (aScore === 0 && bScore > 0) return 1
-        if (aScore !== bScore) return bScore - aScore
-
-        const countA = contentSearchResults.get(a.id)?.matchCount || 0
-        const countB = contentSearchResults.get(b.id)?.matchCount || 0
-        return countB - countA
-      })
-  }, [sortedItems, isSearchMode, searchQuery, contentSearchResults, currentFilter, evaluateViews, statusFilter, labelFilterMap])
-
-  // Split search results: matching current filter vs others
+  // Split search results: matching the active filter vs others. Evaluated
+  // client-side on the hydrated search metas (the search path's server query
+  // doesn't carry the active UI filter).
   const { matchingFilterItems, otherResultItems, exceededSearchLimit } = useMemo(() => {
     const hasActiveFilters =
       (currentFilter && currentFilter.kind !== 'allSessions') ||
       (statusFilter && statusFilter.size > 0) ||
       (labelFilterMap && labelFilterMap.size > 0)
-
-    if (searchQuery.trim() && searchFilteredItems.length > 0) {
-      searchLog.info('search:grouping', {
-        searchQuery,
-        currentFilterKind: currentFilter?.kind,
-        currentFilterStateId: currentFilter?.kind === 'state' ? currentFilter.stateId : undefined,
-        hasActiveFilters,
-        statusFilterSize: statusFilter?.size ?? 0,
-        labelFilterSize: labelFilterMap?.size ?? 0,
-        itemCount: searchFilteredItems.length,
-      })
-    }
 
     const totalCount = searchFilteredItems.length
     const exceeded = totalCount > MAX_SEARCH_RESULTS
@@ -468,64 +452,41 @@ export function useSessionSearch({
 
     const matching: SessionMeta[] = []
     const others: SessionMeta[] = []
-
     for (const item of searchFilteredItems) {
       if (matching.length + others.length >= MAX_SEARCH_RESULTS) break
-
       const matches = sessionMatchesCurrentFilter(item, currentFilter, { evaluateViews, statusFilter, labelFilterMap })
-      if (matches) {
-        matching.push(item)
-      } else {
-        others.push(item)
-      }
+      if (matches) matching.push(item)
+      else others.push(item)
     }
-
-    if (searchFilteredItems.length > 0) {
-      searchLog.info('search:grouping:result', {
-        matchingCount: matching.length,
-        othersCount: others.length,
-        exceeded,
-      })
-    }
-
     return { matchingFilterItems: matching, otherResultItems: others, exceededSearchLimit: exceeded }
-  }, [searchFilteredItems, currentFilter, evaluateViews, isSearchMode, statusFilter, labelFilterMap, searchQuery])
+  }, [searchFilteredItems, currentFilter, evaluateViews, isSearchMode, statusFilter, labelFilterMap])
 
-  // --- Pagination ---
+  // --- Pagination (browse = server-driven; search = single hydrated page) ---
 
-  useEffect(() => {
-    setDisplayLimit(INITIAL_DISPLAY_LIMIT)
-  }, [searchQuery])
-
-  // Collapse-aware pagination: collapsed items are excluded entirely from
-  // paginatedItems (and therefore flatItems / keyboard nav). Their counts are
-  // returned as collapsedGroupsMeta so the renderer can show header-only groups.
+  // Collapse-aware grouping. Browse mode renders the entire loaded window (no
+  // client slice — the server paginates); collapsed groups still hide rows.
   const { paginatedItems, hasMore, collapsedGroupsMeta } = useMemo(() => {
-    return computeCollapsedPagination(searchFilteredItems, displayLimit, collapsedGroups, groupingMode)
-  }, [searchFilteredItems, displayLimit, collapsedGroups, groupingMode])
+    if (isSearchMode) {
+      return { paginatedItems: searchFilteredItems, hasMore: false, collapsedGroupsMeta: [] as CollapsedGroupMeta[] }
+    }
+    const collapsed = computeCollapsedPagination(searchFilteredItems, searchFilteredItems.length, collapsedGroups, groupingMode)
+    return { paginatedItems: collapsed.paginatedItems, hasMore: !!hasMoreServerPages, collapsedGroupsMeta: collapsed.collapsedGroupsMeta }
+  }, [isSearchMode, searchFilteredItems, collapsedGroups, groupingMode, hasMoreServerPages])
 
-  const loadMore = useCallback(() => {
-    setDisplayLimit(prev => Math.min(prev + BATCH_SIZE, searchFilteredItems.length))
-  }, [searchFilteredItems.length])
-
-  // Scroll-based pagination: listen for scroll on the actual ScrollArea viewport
-  // (IntersectionObserver with root=null doesn't detect scroll inside Radix ScrollArea)
+  // Scroll-based "load more": browse mode asks the server for the next page when
+  // the user nears the bottom of the loaded window.
   useEffect(() => {
-    if (!hasMore) return
+    if (isSearchMode || !hasMore || !onLoadMore) return
     const viewport = scrollViewportRef?.current
     if (!viewport) return
-
     const check = () => {
       const { scrollTop, scrollHeight, clientHeight } = viewport
-      if (scrollHeight - scrollTop - clientHeight < 200) {
-        loadMore()
-      }
+      if (scrollHeight - scrollTop - clientHeight < 200) onLoadMore()
     }
-
     check() // fill viewport on mount / after group expand
     viewport.addEventListener('scroll', check, { passive: true })
     return () => viewport.removeEventListener('scroll', check)
-  }, [hasMore, loadMore, displayLimit, scrollViewportRef])
+  }, [isSearchMode, hasMore, onLoadMore, scrollViewportRef, paginatedItems.length])
 
   // --- Derived render data ---
 

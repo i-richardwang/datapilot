@@ -35,16 +35,17 @@ import { formatSessionLoadFailure, shouldTreatSessionLoadFailureAsTransportFallb
 import { extractWorkspaceSlugFromPath } from '@craft-agent/shared/utils/workspace-slug'
 import { DEFAULT_THINKING_LEVEL } from '@craft-agent/shared/agent/thinking-levels'
 import { initRendererPerf } from './lib/perf'
+import { SESSION_PAGE_SIZE } from '@/hooks/useSessionListLoader'
 import {
-  initializeSessionsAtom,
+  setSessionWindowAtom,
+  resetSessionsAtom,
+  sidebarCountsAtom,
   addSessionAtom,
   removeSessionAtom,
   updateSessionAtom,
   replaceLoadedSessionAtom,
-  refreshSessionsMetadataAtom,
   sessionAtomFamily,
   sessionMetaMapAtom,
-  sessionIdsAtom,
   loadedSessionsAtom,
   forceSessionMessagesReloadAtom,
   backgroundTasksAtomFamily,
@@ -244,7 +245,9 @@ export default function App() {
   // Instead we use:
   // - sessionMetaMapAtom for lightweight listing
   // - sessionAtomFamily(id) for individual session data
-  const initializeSessions = useSetAtom(initializeSessionsAtom)
+  const setSessionWindow = useSetAtom(setSessionWindowAtom)
+  const resetSessions = useSetAtom(resetSessionsAtom)
+  const setSidebarCounts = useSetAtom(sidebarCountsAtom)
   const addSession = useSetAtom(addSessionAtom)
   const removeSession = useSetAtom(removeSessionAtom)
   const updateSessionDirect = useSetAtom(updateSessionAtom)
@@ -516,20 +519,32 @@ export default function App() {
     setSessionLoadError(null)
 
     try {
-      const loadedSessions = await window.electronAPI.getSessions()
+      // Server-side pagination: load only the first page of the default
+      // (allSessions) view + sidebar counts — O(page), not the whole workspace.
+      // AppShell refines to the route's actual filter on mount. Workspace id is
+      // resolved server-side from the window ctx when not yet known here.
+      const ws = windowWorkspaceId ?? ''
+      const [page, counts] = await Promise.all([
+        window.electronAPI.listSessionsPage(ws, {
+          filter: { archived: false, batch: false },
+          sortBy: 'recent',
+          offset: 0,
+          limit: SESSION_PAGE_SIZE,
+        }),
+        ws ? window.electronAPI.getSidebarCounts(ws) : Promise.resolve(null),
+      ])
 
-      // Initialize per-session atoms and metadata map
-      // NOTE: No sessionsAtom used - sessions are only in per-session atoms
       // Drop buffered meta updates first — a pending flush must not overwrite
       // this authoritative snapshot with older event-derived metas.
       pendingSessionMetaIdsRef.current.clear()
-      initializeSessions(loadedSessions)
+      setSessionWindow({ rows: page.rows, total: page.total })
+      if (counts) setSidebarCounts(counts)
 
-      // Initialize unified sessionOptions from session data. The payload
-      // carries each session's authoritative permission-mode snapshot, so no
-      // per-session reconcile RPC is needed here.
+      // Initialize unified sessionOptions from the page rows. Each row carries
+      // its authoritative permission-mode snapshot; deeper pages / opened
+      // sessions merge their options lazily via the existing event/open paths.
       const optionsMap = new Map<string, SessionOptions>()
-      for (const s of loadedSessions) {
+      for (const s of page.rows) {
         mergeSessionIntoOptionsMap(optionsMap, s)
       }
       setSessionOptions(optionsMap)
@@ -537,10 +552,9 @@ export default function App() {
       setSessionsLoaded(true)
 
       if (initialSessionId && windowWorkspaceId) {
-        const session = loadedSessions.find(s => s.id === initialSessionId)
-        if (session) {
-          navigate(routes.view.allSessions(session.id))
-        }
+        // The deep-linked session may be outside page 0 — navigate anyway; the
+        // chat view lazy-loads it via getSessionMessages.
+        navigate(routes.view.allSessions(initialSessionId))
       }
     } catch (err) {
       console.error('[App] Failed to load sessions:', err)
@@ -556,11 +570,10 @@ export default function App() {
       setSessionLoadError(formatSessionLoadFailure(err))
       setSessionsLoaded(true)
     }
-  }, [initializeSessions, initialSessionId, mergeSessionIntoOptionsMap, windowWorkspaceId])
+  }, [setSessionWindow, setSidebarCounts, initialSessionId, mergeSessionIntoOptionsMap, windowWorkspaceId])
 
   const refreshSessionListMetadataFromServer = useCallback(async (options: SessionListRefreshOptions = {}): Promise<Map<string, SessionMeta> | null> => {
     const {
-      removeMissing = true,
       reason = 'manual-or-authoritative',
       selectedSessionId = null,
     } = options
@@ -569,58 +582,54 @@ export default function App() {
     const transportState = await window.electronAPI.getTransportConnectionState().catch(() => null)
 
     try {
-      const sessions = await window.electronAPI.getSessions()
-      const returnedIds = new Set(sessions.map(s => s.id))
-      const missingIds = Array.from(beforeIds).filter(id => !returnedIds.has(id))
-      const addedIds = sessions.map(s => s.id).filter(id => !beforeIds.has(id))
-      const logPayload = {
+      // Refetch the first page of the default view + counts after reconnect.
+      // AppShell re-applies the route's actual filter right after. Window model:
+      // the page IS authoritative, so there is no removeMissing reconciliation.
+      const ws = windowWorkspaceId ?? ''
+      const [page, counts] = await Promise.all([
+        window.electronAPI.listSessionsPage(ws, {
+          filter: { archived: false, batch: false },
+          sortBy: 'recent',
+          offset: 0,
+          limit: SESSION_PAGE_SIZE,
+        }),
+        ws ? window.electronAPI.getSidebarCounts(ws) : Promise.resolve(null),
+      ])
+      const returnedIds = new Set(page.rows.map(s => s.id))
+      const addedIds = page.rows.map(s => s.id).filter(id => !beforeIds.has(id))
+
+      rendererLog.info('[App] Session list window refresh result', {
         reason,
-        removeMissing,
         windowWorkspaceId,
         windowRemoteWorkspaceId,
         selectedSessionId,
         beforeCount: beforeIds.size,
-        returnedCount: sessions.length,
-        beforeIds: summarizeIds(beforeIds),
+        returnedCount: page.rows.length,
+        total: page.total,
         returnedIds: summarizeIds(returnedIds),
-        missingIds: summarizeIds(missingIds),
         addedIds: summarizeIds(addedIds),
-        beforeWorkspaceIds: workspaceDistribution(beforeMetaMap.values()),
-        returnedWorkspaceIds: workspaceDistribution(sessions),
+        returnedWorkspaceIds: workspaceDistribution(page.rows),
         transportState,
-      }
+      })
 
-      rendererLog.info('[App] Session list metadata refresh result', logPayload)
-      if (!removeMissing && missingIds.length > 0) {
-        rendererLog.warn('[App] Non-destructive refresh preserved sessions omitted by getSessions(); this indicates a partial backend response or workspace-context mismatch', logPayload)
-      }
-
-      const loadedSessionIds = store.get(loadedSessionsAtom)
-
-      // Single transactional atom write — all cross-atom mutations happen
-      // inside one Jotai write function so React subscribers see one
-      // consistent update instead of intermediate states.
       // Drop buffered meta updates first — a pending flush must not overwrite
       // this authoritative refresh with older event-derived metas.
       pendingSessionMetaIdsRef.current.clear()
-      const nextMetaMap = store.set(refreshSessionsMetadataAtom, { sessions, loadedSessionIds, removeMissing })
+      setSessionWindow({ rows: page.rows, total: page.total })
+      if (counts) setSidebarCounts(counts)
 
-      // Sync app-level state (React hooks / non-atom concerns) after the atom
-      // transaction — one batched update; the payload already carries each
-      // session's authoritative permission-mode snapshot.
       setSessionOptions(prev => {
         const next = new Map(prev)
-        for (const session of sessions) {
+        for (const session of page.rows) {
           mergeSessionIntoOptionsMap(next, session)
         }
         return next
       })
 
-      return nextMetaMap
+      return store.get(sessionMetaMapAtom)
     } catch (err) {
       rendererLog.error('[App] Failed to refresh session list metadata after reconnect:', {
         reason,
-        removeMissing,
         windowWorkspaceId,
         windowRemoteWorkspaceId,
         selectedSessionId,
@@ -632,7 +641,7 @@ export default function App() {
       })
       return null
     }
-  }, [store, mergeSessionIntoOptionsMap, windowWorkspaceId, windowRemoteWorkspaceId])
+  }, [store, mergeSessionIntoOptionsMap, setSessionWindow, setSidebarCounts, windowWorkspaceId, windowRemoteWorkspaceId])
 
   // Stale session watchdog — catches stuck sessions that the reconnect protocol misses
   const { trackSessionActivity } = useStaleSessionRecovery({
@@ -825,6 +834,10 @@ export default function App() {
   // fresh as any update buffered during the window.
   const pendingSessionMetaIdsRef = useRef<Set<string>>(new Set())
   const sessionMetaFlushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Sessions created outside the current window/open set should not create
+  // renderer atoms just because background batch/automation events stream in.
+  // Once such a session appears in the window or is opened, events resume.
+  const suppressedOffWindowSessionEventsRef = useRef<Set<string>>(new Set())
 
   const flushSessionMetaUpdates = useCallback(() => {
     if (sessionMetaFlushTimerRef.current) {
@@ -992,35 +1005,80 @@ export default function App() {
 
       const sessionId = event.sessionId
       const workspaceId = windowWorkspaceId ?? ''
+      const isSessionLocallyRelevant = () =>
+        store.get(sessionMetaMapAtom).has(sessionId) ||
+        store.get(loadedSessionsAtom).has(sessionId) ||
+        sessionSelection.selected === sessionId
 
       // Session lifecycle events are handled explicitly (not by the agent event processor).
       if (event.type === 'session_created') {
-        window.electronAPI.getSessionMessages(sessionId)
-          .then((createdSession: Session | null) => {
-            if (createdSession) {
-              // Drop any stub meta buffered from pre-creation events so the
-              // flush can't overwrite this authoritative snapshot
-              pendingSessionMetaIdsRef.current.delete(sessionId)
-              const existingMeta = store.get(sessionMetaMapAtom).has(sessionId)
-              if (existingMeta) {
-                replaceLoadedSession(createdSession)
-              } else {
-                addSession(createdSession)
+        // New servers include a metadata-only Session snapshot in the event.
+        // Do not call getSessionMessages() for every created id: batch/automation
+        // runs can emit thousands of session_created events, and messages are only
+        // needed when a user opens a session.
+        const existingMeta = store.get(sessionMetaMapAtom).has(sessionId)
+        const existingSession = store.get(sessionAtomFamily(sessionId))
+        const isLoaded = store.get(loadedSessionsAtom).has(sessionId)
+        const shouldApplyLocally = existingMeta || !!existingSession || isLoaded || sessionSelection.selected === sessionId
+        const createdSession = event.session
+
+        if (createdSession && shouldApplyLocally) {
+          suppressedOffWindowSessionEventsRef.current.delete(sessionId)
+          pendingSessionMetaIdsRef.current.delete(sessionId)
+          updateSessionDirect(sessionId, (prev) => {
+            if (prev?.messages?.length) {
+              return {
+                ...createdSession,
+                messages: prev.messages,
+                isProcessing: prev.isProcessing || createdSession.isProcessing,
               }
-              syncSessionOptionsFromSession(createdSession)
-              return
             }
-            return window.electronAPI.getSessions().then(initializeSessions)
+            return createdSession
           })
-          .catch((error: unknown) => console.error('Failed to handle session_created event:', error))
+          syncSessionOptionsFromSession(createdSession)
+          return
+        }
+
+        if (!createdSession && shouldApplyLocally) {
+          // Backward compatibility for older remote servers that only send an id.
+          window.electronAPI.getSessionMessages(sessionId)
+            .then((fresh: Session | null) => {
+              if (!fresh) return
+              suppressedOffWindowSessionEventsRef.current.delete(sessionId)
+              pendingSessionMetaIdsRef.current.delete(sessionId)
+              replaceLoadedSession(fresh)
+              syncSessionOptionsFromSession(fresh)
+            })
+            .catch((error: unknown) => console.error('Failed to handle session_created event:', error))
+        } else if (createdSession) {
+          suppressedOffWindowSessionEventsRef.current.add(sessionId)
+        }
+        // Off-window created sessions are picked up by AppShell's debounced
+        // window/counts reconcile iff they match the active server-side filter.
         return
       }
 
       if (event.type === 'session_deleted') {
         // Drop any buffered meta update so the flush can't resurrect the session
+        suppressedOffWindowSessionEventsRef.current.delete(sessionId)
         pendingSessionMetaIdsRef.current.delete(sessionId)
         removeSession(sessionId)
         return
+      }
+
+      if (suppressedOffWindowSessionEventsRef.current.has(sessionId)) {
+        if (!isSessionLocallyRelevant()) {
+          if (
+            event.type === 'complete' ||
+            event.type === 'error' ||
+            event.type === 'typed_error' ||
+            event.type === 'interrupted'
+          ) {
+            suppressedOffWindowSessionEventsRef.current.delete(sessionId)
+          }
+          return
+        }
+        suppressedOffWindowSessionEventsRef.current.delete(sessionId)
       }
 
       const agentEvent = event as unknown as AgentEvent
@@ -1120,12 +1178,12 @@ export default function App() {
     replaceLoadedSession,
     showSessionNotification,
     scheduleSessionMetaUpdate,
-    initializeSessions,
     addSession,
     removeSession,
     syncSessionOptionsFromSession,
     applyPermissionModeState,
     reconcilePermissionModeState,
+    sessionSelection.selected,
   ])
 
   // Transport reconnect recovery — refresh session metadata plus active/processing
@@ -1797,7 +1855,8 @@ export default function App() {
       // Reset all state
       // Clear session atoms - initialize with empty array clears all per-session atoms
       pendingSessionMetaIdsRef.current.clear()
-      initializeSessions([])
+      suppressedOffWindowSessionEventsRef.current.clear()
+      resetSessions()
       setWorkspaces([])
       setWindowWorkspaceId(null)
       // Reset setupNeeds to force fresh onboarding start
@@ -1814,7 +1873,7 @@ export default function App() {
     } finally {
       setShowResetDialog(false)
     }
-  }, [onboarding, initializeSessions])
+  }, [onboarding, resetSessions])
 
   // Handle workspace selection
   // - Default: switch workspace in same window (in-window switching)
@@ -1861,8 +1920,8 @@ export default function App() {
       // This prevents stale session data from the previous workspace being visible.
       // Also drop buffered meta updates so a pending flush can't re-add old-workspace sessions.
       pendingSessionMetaIdsRef.current.clear()
-      store.set(sessionMetaMapAtom, new Map())
-      store.set(sessionIdsAtom, [])
+      suppressedOffWindowSessionEventsRef.current.clear()
+      store.set(resetSessionsAtom)
 
       // Note: NavigationContext detects the workspaceId change and handles
       // panel restoration from the stored workspace URL (or defaults to allSessions).

@@ -267,8 +267,23 @@ export function useSessionOptionsFor(sessionId: string): {
   isSafeModeActive: () => boolean
 } {
   const { sessionOptions, onSessionOptionsChange } = useAppShellContext()
+  const session = useAtomValue(sessionAtomFamily(sessionId))
 
-  const options = sessionOptions.get(sessionId) ?? defaultSessionOptions
+  // Prefer explicitly-stored options; otherwise derive from the session's own
+  // persisted permission mode / thinking level. The per-session atom is the
+  // authoritative snapshot and is populated for EVERY window row — including
+  // pages scrolled in after page 0 — so sessions outside the first page no longer
+  // fall back to app defaults before they're opened. (#2)
+  const options = sessionOptions.get(sessionId) ?? (session
+    ? {
+        ...defaultSessionOptions,
+        permissionMode: session.permissionModeState?.permissionMode
+          ?? session.permissionMode
+          ?? defaultSessionOptions.permissionMode,
+        permissionModeVersion: session.permissionModeState?.modeVersion,
+        thinkingLevel: session.thinkingLevel ?? defaultSessionOptions.thinkingLevel,
+      }
+    : defaultSessionOptions)
 
   const setOption = useCallback(<K extends keyof SessionOptions>(
     key: K,

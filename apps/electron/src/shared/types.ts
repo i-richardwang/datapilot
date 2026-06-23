@@ -180,6 +180,8 @@ import type { WorkspaceInfo, Workspace, SessionMetadata, StoredAttachment as Sto
 import type {
   Session,
   UnreadSummary,
+  SessionListPageOptions,
+  SidebarCounts,
   CreateSessionOptions,
   FileAttachment,
   SendMessageOptions,
@@ -216,6 +218,12 @@ import type {
 export interface ElectronAPI {
   // Session management
   getSessions(): Promise<Session[]>
+  /** Windowed session list for one workspace — full rows for one page + pre-pagination total (O(page)). */
+  listSessionsPage(workspaceId: string, options?: SessionListPageOptions): Promise<{ rows: Session[]; total: number }>
+  /** Sidebar aggregate counts for one workspace (filter badges without the full list). */
+  getSidebarCounts(workspaceId: string): Promise<SidebarCounts>
+  /** Hydrate full Session rows for specific ids (content-search hits / off-window lookups). */
+  getSessionMetas(workspaceId: string, ids: string[]): Promise<Session[]>
   getUnreadSummary(): Promise<UnreadSummary>
   markAllSessionsRead(workspaceId: string): Promise<void>
   getSessionMessages(sessionId: string): Promise<Session | null>
