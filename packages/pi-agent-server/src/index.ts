@@ -125,6 +125,8 @@ interface InitMessage {
   customEndpoint?: { api: CustomEndpointApi; supportsImages?: boolean };
   customModels?: Array<string | { id: string; contextWindow?: number; supportsImages?: boolean }>;
   piAuth?: { provider: string; credential: PiCredential };
+  /** Batch tool profile. 'minimal' narrows the built-in tool set (see ensureSession). */
+  toolProfile?: 'default' | 'minimal';
 }
 
 interface RuntimeConfigUpdateMessage {
@@ -630,19 +632,29 @@ async function ensureSession(): Promise<AgentSession> {
   //     our hooked versions take effect (permissions + large-response summarization).
   //   - Do NOT pass tool *objects* to `tools` — `allowedToolNames = new Set(options.tools)`
   //     then `.has(name)` returns false for every string lookup → zero tools active.
-  const builtinDefs = [
-    createReadToolDefinition(cwd),
-    createBashToolDefinition(cwd),
-    createEditToolDefinition(cwd),
-    createWriteToolDefinition(cwd),
-    createGrepToolDefinition(cwd),
-    createFindToolDefinition(cwd),
-    createLsToolDefinition(cwd),
-  ];
+  // Minimal batch profile narrows built-ins to read + bash, mirroring the Claude
+  // path's MINIMAL_BATCH_TOOLS (Read/Bash/WebSearch/WebFetch). The web tools below
+  // are the WebSearch/WebFetch half (Pi names: web_search/web_fetch) and stay in
+  // both profiles. Keep this set in sync with MINIMAL_BATCH_TOOLS in base-agent.ts.
+  const isMinimalBatch = initConfig.toolProfile === 'minimal';
+  const builtinDefs = isMinimalBatch
+    ? [
+        createReadToolDefinition(cwd),
+        createBashToolDefinition(cwd),
+      ]
+    : [
+        createReadToolDefinition(cwd),
+        createBashToolDefinition(cwd),
+        createEditToolDefinition(cwd),
+        createWriteToolDefinition(cwd),
+        createGrepToolDefinition(cwd),
+        createFindToolDefinition(cwd),
+        createLsToolDefinition(cwd),
+      ];
   const proxyTools = buildProxyTools();
   const wrappedAll = wrapToolsWithHooks([...builtinDefs, ...webTools, ...proxyTools]);
   const toolAllowlist = wrappedAll.map(t => t.name);
-  debugLog(`Session tools: ${builtinDefs.length} builtin + ${webTools.length} web + ${proxyTools.length} proxy = ${wrappedAll.length} total`);
+  debugLog(`Session tools (${initConfig.toolProfile ?? 'non-batch'}): ${builtinDefs.length} builtin + ${webTools.length} web + ${proxyTools.length} proxy = ${wrappedAll.length} total`);
 
   // Build session options
   const sessionOptions: CreateAgentSessionOptions = {

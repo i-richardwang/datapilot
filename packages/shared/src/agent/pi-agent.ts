@@ -547,6 +547,11 @@ export class PiAgent extends BaseAgent {
       baseUrl: runtime.baseUrl,
       customEndpoint: runtime.customEndpoint,
       customModels: runtime.customModels,
+      // Batch tool profile: lets the subprocess narrow its built-in tool set for
+      // minimal batches (see ensureSession). Undefined for non-batch sessions.
+      // Use this._sessionId (canonical id, same source the tool-registration and
+      // system-prompt batch lookups use) so all three stay consistent.
+      toolProfile: getSessionBatchContext(this._sessionId)?.toolProfile,
       // Branch params for Pi SDK session fork
       branchFromSdkSessionId: this.config.session?.branchFromSdkSessionId,
       branchFromSessionPath: this.config.session?.branchFromSessionPath,
@@ -572,10 +577,13 @@ export class PiAgent extends BaseAgent {
     this.assertBackendSessionToolParity();
     const batchCtx = getSessionBatchContext(this._sessionId);
     const isBatchSession = !!batchCtx;
+    const isMinimalBatch = batchCtx?.toolProfile === 'minimal';
     // Keep in sync with the Claude gate in session-scoped-tools.ts: only expose
     // `batch_output` when the batch actually has an output block configured.
     const includeBatchOutput = !!batchCtx?.outputPath;
-    let sessionToolDefs = getSessionToolProxyDefs({ includeBatchOutput, batchMode: isBatchSession });
+    // Minimal batch narrows the session tool surface to `batch_output` only,
+    // matching the Claude path (session-scoped-tools.ts passes minimalBatchMode).
+    let sessionToolDefs = getSessionToolProxyDefs({ includeBatchOutput, batchMode: isBatchSession, minimalBatchMode: isMinimalBatch });
 
     // Mirror Claude's gate: hide `browser_tool` when the user has disabled
     // the built-in browser tool. Without this filter, Pi would still advertise
@@ -608,6 +616,11 @@ export class PiAgent extends BaseAgent {
    */
   private registerPoolToolsWithSubprocess(): void {
     if (!this.mcpPool) return;
+    // Minimal batch mirrors the Claude path's mcpServers filter
+    // (claude-agent.ts: isMinimalBatch → MINI_AGENT_MCP_KEYS=['session']): source
+    // MCP proxy tools are not advertised, only the session server. Gate here so
+    // both call sites (initial registration + mid-session source changes) are covered.
+    if (getSessionBatchContext(this._sessionId)?.toolProfile === 'minimal') return;
     const proxyDefs = this.mcpPool.getProxyToolDefs();
     if (proxyDefs.length > 0) {
       this.send({
@@ -2020,7 +2033,11 @@ export class PiAgent extends BaseAgent {
         return;
       }
 
-      // Build system prompt
+      // Build system prompt. For batch sessions, pass the batch tool profile so
+      // the prompt is trimmed exactly as the Claude path does (claude-agent.ts):
+      // `default` drops the UI/CLI/sources sections, `minimal` drops more.
+      // Reused below for the stable batch-output context part.
+      const batchCtx = getSessionBatchContext(this._sessionId);
       const systemPrompt = getSystemPrompt(
         undefined, // pinnedPreferencesPrompt
         this.config.debugMode,
@@ -2028,7 +2045,8 @@ export class PiAgent extends BaseAgent {
         this.config.session?.workingDirectory,
         this.config.systemPromptPreset,
         'DataPilot Backend', // backendName
-        getCoAuthorPreference() // respect user's includeCoAuthoredBy preference (#576)
+        getCoAuthorPreference(), // respect user's includeCoAuthoredBy preference (#576)
+        batchCtx ? (batchCtx.toolProfile === 'minimal' ? 'minimal' : 'default') : undefined
       );
 
       // Build context from sources
@@ -2048,7 +2066,6 @@ export class PiAgent extends BaseAgent {
       // cache. buildVolatileContextParts consumes the one-shot mode-change
       // signal, so it is called exactly once. Fork: the batch output schema is
       // session-fixed, so it rides the stable (cached) prefix.
-      const batchCtx = getSessionBatchContext(this._sessionId);
       const plansFolderPath = getSessionPlansPath(this.config.workspace.rootPath, this._sessionId);
       const stableParts = this.promptBuilder.buildStableContextParts({
         batchOutputSchema: batchCtx?.outputSchema,

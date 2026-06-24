@@ -16,12 +16,13 @@ export type SessionToolProxyDef = JsonSchemaToolDef;
 
 export { SESSION_TOOL_NAMES };
 
-export function getSessionToolProxyDefs(opts?: { includeBatchOutput?: boolean; batchMode?: boolean }): SessionToolProxyDef[] {
+export function getSessionToolProxyDefs(opts?: { includeBatchOutput?: boolean; batchMode?: boolean; minimalBatchMode?: boolean }): SessionToolProxyDef[] {
   return getToolDefsAsJsonSchema({
     prefix: 'mcp__session__',
     includeDeveloperFeedback: FEATURE_FLAGS.developerFeedback,
     includeBatchOutput: opts?.includeBatchOutput,
     batchMode: opts?.batchMode,
+    minimalBatchMode: opts?.minimalBatchMode,
     disableOauth: FEATURE_FLAGS.disableOauth,
     disableBrowser: FEATURE_FLAGS.disableBrowser,
     disableValidation: FEATURE_FLAGS.disableValidation,

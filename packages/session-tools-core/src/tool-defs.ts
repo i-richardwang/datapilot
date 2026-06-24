@@ -774,6 +774,7 @@ export function getToolDefsAsJsonSchema(opts?: {
   disableSandbox?: boolean;
   disableMessaging?: boolean;
   batchMode?: boolean;
+  minimalBatchMode?: boolean;
 }): JsonSchemaToolDef[] {
   const prefix = opts?.prefix || '';
   const defs = getSessionToolDefs({
@@ -786,6 +787,7 @@ export function getToolDefsAsJsonSchema(opts?: {
     disableSandbox: opts?.disableSandbox,
     disableMessaging: opts?.disableMessaging,
     batchMode: opts?.batchMode,
+    minimalBatchMode: opts?.minimalBatchMode,
   });
 
   return defs.map(def => {
