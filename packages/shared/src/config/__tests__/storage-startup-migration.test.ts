@@ -236,6 +236,17 @@ describe('startup migration (integration)', () => {
   it('normalizes legacy unprefixed userDefined3Tier model IDs instead of resetting', () => {
     const { configDir, workspaceRoot, configPath } = setupWorkspaceConfigDir()
 
+    // Derive currently-valid OpenRouter IDs from the live Pi catalog. The migration
+    // normalizes (pi/-prefixes) known IDs and drops unknown ones, so hardcoding a
+    // specific model here makes the test brittle when models.dev drifts across Pi
+    // SDK uplifts (e.g. x-ai/grok-4 aged out by 0.79.x).
+    const openrouterIds = getPiModelsForAuthProvider('openrouter').map(m => m.id)
+    expect(openrouterIds).toContain('pi/openrouter/auto')
+    const otherPrefixed = openrouterIds.find(id => id !== 'pi/openrouter/auto')
+    if (!otherPrefixed) throw new Error('expected at least two OpenRouter models in catalog')
+    const expectedPrefixed = ['pi/openrouter/auto', otherPrefixed]
+    const legacyUnprefixed = expectedPrefixed.map(id => id.slice('pi/'.length))
+
     writeRootConfig(configPath, workspaceRoot, [
       {
         slug: 'pi-api-key',
@@ -245,8 +256,8 @@ describe('startup migration (integration)', () => {
         piAuthProvider: 'openrouter',
         modelSelectionMode: 'userDefined3Tier',
         createdAt: Date.now(),
-        models: ['x-ai/grok-4', 'openrouter/auto'],
-        defaultModel: 'x-ai/grok-4',
+        models: legacyUnprefixed,
+        defaultModel: legacyUnprefixed[0],
       },
     ])
 
@@ -256,8 +267,8 @@ describe('startup migration (integration)', () => {
     expect(connection).toBeDefined()
     expect(connection.modelSelectionMode).toBe('userDefined3Tier')
     const modelIds = getModelIds(connection)
-    expect(modelIds).toEqual(['pi/x-ai/grok-4', 'pi/openrouter/auto'])
-    expect(connection.defaultModel).toBe('pi/x-ai/grok-4')
+    expect(modelIds).toEqual(expectedPrefixed)
+    expect(connection.defaultModel).toBe(expectedPrefixed[0])
   })
 })
 

@@ -162,6 +162,82 @@ describe('preferences.uiLanguage', () => {
     });
   });
 
+  describe('resolveTitleLanguageName', () => {
+    it('returns undefined when no UI language is persisted (so titles auto-detect)', () => {
+      const { configDir } = setupDir();
+      try {
+        const r = runScript(configDir, `
+          import { resolveTitleLanguageName } from '${PREFS_MODULE}';
+          console.log(JSON.stringify({ value: resolveTitleLanguageName() ?? null }));
+        `);
+        expect(r.exitCode).toBe(0);
+        expect(JSON.parse(r.stdout)).toEqual({ value: null });
+      } finally {
+        rmSync(configDir, { recursive: true, force: true });
+      }
+    });
+
+    it('maps a persisted code to its native language name', () => {
+      const { configDir, prefsFile } = setupDir();
+      try {
+        writeRawPrefs(prefsFile, { uiLanguage: 'es' });
+        const r = runScript(configDir, `
+          import { resolveTitleLanguageName } from '${PREFS_MODULE}';
+          console.log(JSON.stringify({ value: resolveTitleLanguageName() ?? null }));
+        `);
+        expect(r.exitCode).toBe(0);
+        expect(JSON.parse(r.stdout)).toEqual({ value: 'Español' });
+      } finally {
+        rmSync(configDir, { recursive: true, force: true });
+      }
+    });
+
+    it('resolves the Chinese native name (the #885 motivating case)', () => {
+      const { configDir, prefsFile } = setupDir();
+      try {
+        writeRawPrefs(prefsFile, { uiLanguage: 'zh-Hans' });
+        const r = runScript(configDir, `
+          import { resolveTitleLanguageName } from '${PREFS_MODULE}';
+          console.log(JSON.stringify({ value: resolveTitleLanguageName() ?? null }));
+        `);
+        expect(r.exitCode).toBe(0);
+        expect(JSON.parse(r.stdout)).toEqual({ value: '简体中文' });
+      } finally {
+        rmSync(configDir, { recursive: true, force: true });
+      }
+    });
+
+    it('honors an explicit English UI language (returns "English", not auto-detect)', () => {
+      const { configDir, prefsFile } = setupDir();
+      try {
+        writeRawPrefs(prefsFile, { uiLanguage: 'en' });
+        const r = runScript(configDir, `
+          import { resolveTitleLanguageName } from '${PREFS_MODULE}';
+          console.log(JSON.stringify({ value: resolveTitleLanguageName() ?? null }));
+        `);
+        expect(r.exitCode).toBe(0);
+        expect(JSON.parse(r.stdout)).toEqual({ value: 'English' });
+      } finally {
+        rmSync(configDir, { recursive: true, force: true });
+      }
+    });
+
+    it('returns undefined for an unsupported persisted code', () => {
+      const { configDir, prefsFile } = setupDir();
+      try {
+        writeRawPrefs(prefsFile, { uiLanguage: 'xx' });
+        const r = runScript(configDir, `
+          import { resolveTitleLanguageName } from '${PREFS_MODULE}';
+          console.log(JSON.stringify({ value: resolveTitleLanguageName() ?? null }));
+        `);
+        expect(r.exitCode).toBe(0);
+        expect(JSON.parse(r.stdout)).toEqual({ value: null });
+      } finally {
+        rmSync(configDir, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe('legacy `language` field scrubbing', () => {
     it('loadPreferences strips legacy free-text language on read', () => {
       const { configDir, prefsFile } = setupDir();

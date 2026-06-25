@@ -34,7 +34,7 @@ import { bootstrapServer, startHealthHttpServer, generateServerToken } from '@cr
 import { validateSession, createWebuiHandler, nodeHttpAdapter } from '@craft-agent/server-core/webui'
 import type { WebuiHandler } from '@craft-agent/server-core/webui'
 import { getCredentialManager } from '@craft-agent/shared/credentials'
-import { getWorkspaces, loadPreferences as loadUserPreferences } from '@craft-agent/shared/config'
+import { getWorkspaces, getPersistedUiLanguage } from '@craft-agent/shared/config'
 import { setupI18n, i18n } from '@craft-agent/shared/i18n'
 import { createMessagingBootstrap, type MessagingBootstrapHandle } from '@craft-agent/messaging-gateway'
 import { FEATURE_FLAGS } from '@craft-agent/shared/feature-flags'
@@ -46,7 +46,7 @@ import { FEATURE_FLAGS } from '@craft-agent/shared/feature-flags'
 // which caused incorrect "Preferred language: English" injection.
 setupI18n()
 {
-  const persistedLang = loadUserPreferences().language
+  const persistedLang = getPersistedUiLanguage()
   if (persistedLang) {
     i18n.changeLanguage(persistedLang)
   }

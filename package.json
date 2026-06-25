@@ -1,6 +1,6 @@
 {
   "name": "datapilot",
-  "version": "0.10.3",
+  "version": "0.10.4",
   "license": "Apache-2.0",
   "description": "Claude Code-like agent for data analysis",
   "type": "module",
@@ -149,8 +149,8 @@
     "@dnd-kit/dom": "^0.4.0-beta-20260227032529",
     "@dnd-kit/helpers": "^0.4.0-beta-20260227032529",
     "@github/copilot-sdk": "^0.1.23",
-    "@mariozechner/pi-ai": "0.73.1",
-    "@mariozechner/pi-coding-agent": "0.73.1",
+    "@earendil-works/pi-ai": "0.79.9",
+    "@earendil-works/pi-coding-agent": "0.79.9",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-collapsible": "^1.1.12",

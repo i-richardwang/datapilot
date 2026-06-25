@@ -125,6 +125,22 @@ export function setPersistedUiLanguage(code: LanguageCode): void {
 }
 
 /**
+ * Native-language name to request for AI-generated session titles, or
+ * `undefined` to let the model follow the conversation's own language.
+ *
+ * Resolves from the explicitly persisted UI language (disk-backed) rather than
+ * `i18n.resolvedLanguage`, which in the main process hydrates asynchronously at
+ * startup and can still read the `'en'` fallback when an early title fires
+ * (#885). Returning `undefined` when no language was chosen lets the title
+ * prompt auto-detect the conversation language instead of being forced to
+ * English.
+ */
+export function resolveTitleLanguageName(): string | undefined {
+  const code = getPersistedUiLanguage();
+  return code ? LOCALE_REGISTRY[code]?.nativeName : undefined;
+}
+
+/**
  * Format preferences for inclusion in system prompt
  */
 export function formatPreferencesForPrompt(): string {
