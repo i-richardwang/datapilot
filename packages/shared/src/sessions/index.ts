@@ -50,7 +50,6 @@ export {
   listSessionMetadataPage,
   listSessionMetadataByIds,
   listSessionCountRows,
-  listSessionCountRowsByIds,
   getSessionSidebarScalarCounts,
   listSessionLabelCountRows,
   countUnreadSessions,

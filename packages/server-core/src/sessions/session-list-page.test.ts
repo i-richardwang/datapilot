@@ -186,7 +186,7 @@ describe('SessionManager.listSessionsPage', () => {
     }
   })
 
-  it('computes sidebar counts from SQL aggregates with loaded-session overlay', () => {
+  it('computes sidebar counts purely from SQL aggregates, ignoring unpersisted in-memory state', () => {
     const sm = new SessionManager()
     const ws = tempWorkspace()
     saveLabelConfig(ws.rootPath, {
@@ -202,6 +202,13 @@ describe('SessionManager.listSessionsPage', () => {
       ],
     })
 
+    // 'hot' is persisted as todo / [child] / unread, then mutated in memory
+    // WITHOUT persisting. Counts must reflect the PERSISTED row — there is no
+    // in-memory overlay anymore. In production every metadata mutation persists
+    // synchronously before its change event fires, so a divergent-but-unpersisted
+    // managed session never occurs; reading from SQL keeps the query O(aggregate)
+    // instead of binding every cached session id (which blew SQLite's
+    // bind-variable limit on large workspaces).
     const hot = seed(sm, 'hot', { sessionStatus: 'todo', labels: ['child'], hasUnread: true }, ws)
     hot.sessionStatus = 'done'
     hot.labels = ['other']
@@ -217,9 +224,9 @@ describe('SessionManager.listSessionsPage', () => {
     expect(counts.archived).toBe(1)
     expect(counts.batch).toBe(1)
     expect(counts.flagged).toBe(1)
-    expect(counts.hasUnread).toBe(false)
-    expect(counts.byStatus).toEqual({ done: 1, todo: 1 })
-    expect(counts.byLabel).toEqual({ other: 1, child: 1, parent: 1 })
+    expect(counts.hasUnread).toBe(true)                     // hot persisted unread; no overlay to clear it
+    expect(counts.byStatus).toEqual({ todo: 2 })            // hot(todo) + flagged(todo); the in-memory 'done' is ignored
+    expect(counts.byLabel).toEqual({ child: 2, parent: 2 }) // hot + batch carry persisted [child]; 'other' was never persisted
   })
 
   it('evaluates saved views server-side with target, __all__, missing, and cache invalidation semantics', () => {

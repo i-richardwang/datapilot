@@ -1078,39 +1078,6 @@ export function listSessionCountRows(workspaceRootPath: string): SessionCountRow
   });
 }
 
-export function listSessionCountRowsByIds(workspaceRootPath: string, ids: string[]): SessionCountRow[] {
-  if (ids.length === 0) return [];
-  const db = getWorkspaceDb(workspaceRootPath);
-  const validStatusIds = new Set(listStatuses(workspaceRootPath).map(s => s.id));
-  const rows = db.select({
-    id: sessionsTable.id,
-    sessionStatus: sessionsTable.sessionStatus,
-    labels: sessionsTable.labels,
-    isArchived: sessionsTable.isArchived,
-    isBatch: sessionsTable.isBatch,
-    isFlagged: sessionsTable.isFlagged,
-    hasUnread: sessionsTable.hasUnread,
-  })
-    .from(sessionsTable)
-    .where(and(eq(sessionsTable.hidden, false), inArray(sessionsTable.id, ids)))
-    .all();
-
-  return rows.map(row => {
-    const status = row.sessionStatus && validStatusIds.has(row.sessionStatus)
-      ? row.sessionStatus
-      : 'todo';
-    return {
-      id: row.id,
-      sessionStatus: status,
-      labels: (row.labels as string[] | null) ?? undefined,
-      isArchived: row.isArchived ?? undefined,
-      isBatch: row.isBatch ?? undefined,
-      isFlagged: row.isFlagged ?? undefined,
-      hasUnread: row.hasUnread ?? undefined,
-    };
-  });
-}
-
 export function getSessionSidebarScalarCounts(workspaceRootPath: string): SessionSidebarScalarCounts {
   const db = getWorkspaceDb(workspaceRootPath);
   const validStatusIds = new Set(listStatuses(workspaceRootPath).map(s => s.id));

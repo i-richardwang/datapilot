@@ -55,7 +55,6 @@ import {
   updateSessionMetadata,
   listSessionMetadataPage,
   listSessionMetadataByIds,
-  listSessionCountRowsByIds,
   getSessionSidebarScalarCounts,
   listSessionLabelCountRows,
   countUnreadSessions,
@@ -82,7 +81,6 @@ import {
   type StoredSession,
   type StoredMessage,
   type SessionMetadata,
-  type SessionCountRow,
   type SessionStatus,
   type SessionHeader,
   type StoredSessionMeta,
@@ -2907,13 +2905,22 @@ export class SessionManager implements ISessionManager {
   }
 
   /**
-   * Sidebar aggregate counts for one workspace. Scalar buckets use SQL
-   * COUNT/GROUP BY; label rollups read only taggable label rows. Predicate
-   * buckets mirror the renderer's metas exactly (see SidebarCounts):
+   * Sidebar aggregate counts for one workspace, read entirely from SQL
+   * aggregates over persisted state. Buckets mirror the renderer's metas
+   * exactly (see SidebarCounts):
    * - total/flagged/archived/batch  → workspace (non-hidden)
    * - byStatus + hasUnread          → active (non-hidden, non-archived, non-batch)
    * - byLabel (rolled up: self + descendants, deduped per session)
    *                                 → taggable (non-hidden, non-archived; batch kept)
+   *
+   * No in-memory overlay: DB-mode metadata writes are synchronous (every
+   * mutation — flag/archive/status/labels/read — persists via persistSessionMeta
+   * BEFORE it emits its change event, which is what triggers the renderer's
+   * refetch), so the persisted rows always reflect committed metadata by the
+   * time counts are read. Reconciling the in-memory hot cache here was therefore
+   * a no-op delta in steady state, and binding every cached session id into one
+   * `IN (…)` blew SQLite's 32766 bind-variable limit once the cache grew large
+   * (e.g. talent-graph after batch LLM runs), surfacing as "无法加载会话列表".
    */
   getSidebarCounts(workspaceId: string): SidebarCounts {
     const ws = this.resolveWorkspace(workspaceId)
@@ -2922,14 +2929,12 @@ export class SessionManager implements ISessionManager {
     }
 
     const scalar = getSessionSidebarScalarCounts(ws.rootPath)
-    const byStatus: Record<string, number> = { ...scalar.byStatus }
     const byLabel: Record<string, number> = {}
 
     // Precompute each label's ancestor chain (self + parents) from the workspace
     // label tree, so a session tagged with a leaf also counts toward every
     // ancestor — deduped per session, so two sibling sub-labels under one parent
-    // count the parent ONCE (exact subtree rollup, not the old per-leaf
-    // over-count the renderer used to sum).
+    // count the parent ONCE (exact subtree rollup, not a per-leaf over-count).
     interface LabelNode { id: string; children?: LabelNode[] }
     const ancestorChain = new Map<string, string[]>()
     const walk = (nodes: LabelNode[], parents: string[]): void => {
@@ -2941,49 +2946,7 @@ export class SessionManager implements ISessionManager {
     }
     walk(loadLabelConfig(ws.rootPath).labels as LabelNode[], [])
 
-    const loadedRows = new Map<string, SessionCountRow>()
-    for (const m of this.sessions.values()) {
-      if (m.workspace.id !== workspaceId || m.hidden) continue
-      loadedRows.set(m.id, {
-        id: m.id,
-        sessionStatus: m.sessionStatus ?? 'todo',
-        labels: m.labels,
-        isArchived: m.isArchived,
-        isBatch: m.isBatch,
-        isFlagged: m.isFlagged,
-        hasUnread: m.hasUnread,
-      })
-    }
-
-    const applyScalarDelta = (row: SessionCountRow, delta: 1 | -1): void => {
-      scalar.total += delta
-      if (row.isArchived) scalar.archived += delta
-      if (row.isBatch) scalar.batch += delta
-      if (row.isFlagged && !row.isArchived && !row.isBatch) scalar.flagged += delta
-      const active = !row.isArchived && !row.isBatch
-      if (active) {
-        if (row.hasUnread) scalar.unread += delta
-        const status = row.sessionStatus ?? 'todo'
-        const next = (byStatus[status] ?? 0) + delta
-        if (next > 0) byStatus[status] = next
-        else delete byStatus[status]
-      }
-    }
-
-    const persistedLoadedRows = listSessionCountRowsByIds(ws.rootPath, [...loadedRows.keys()])
-    for (const row of persistedLoadedRows) applyScalarDelta(row, -1)
-    for (const row of loadedRows.values()) applyScalarDelta(row, 1)
-
-    const labelRows = new Map(listSessionLabelCountRows(ws.rootPath).map(row => [row.id, row]))
-    for (const row of loadedRows.values()) {
-      if (!row.isArchived && row.labels && row.labels.length > 0) {
-        labelRows.set(row.id, { id: row.id, labels: row.labels })
-      } else {
-        labelRows.delete(row.id)
-      }
-    }
-
-    for (const row of labelRows.values()) {
+    for (const row of listSessionLabelCountRows(ws.rootPath)) {
       const covered = new Set<string>()
       for (const entry of row.labels ?? []) {
         const id = extractLabelId(entry)
@@ -3000,7 +2963,7 @@ export class SessionManager implements ISessionManager {
       archived: scalar.archived,
       batch: scalar.batch,
       hasUnread: scalar.unread > 0,
-      byStatus,
+      byStatus: { ...scalar.byStatus },
       byLabel,
     }
   }
