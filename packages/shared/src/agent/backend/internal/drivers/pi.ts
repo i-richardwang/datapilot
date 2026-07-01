@@ -296,6 +296,28 @@ async function testAnthropicCompatible(
   }
 }
 
+/**
+ * Dispatch a custom-endpoint connection test to the right lightweight direct-HTTP
+ * probe based on the user-declared protocol. Shared by BOTH the setup-time test
+ * (testConnection) and stored-connection validation (validateStoredConnection) so a
+ * custom endpoint never spawns a Pi subprocess just to check connectivity.
+ *
+ * 'anthropic-claude-sdk' endpoints route through the anthropic driver, so the only
+ * protocols reaching the Pi driver here are 'anthropic-messages' and OpenAI-compatible.
+ */
+async function testCustomEndpoint(
+  api: string,
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  timeoutMs: number,
+): Promise<{ success: boolean; error?: string }> {
+  const bareModel = model.startsWith('pi/') ? model.slice(3) : model;
+  return api === 'anthropic-messages'
+    ? testAnthropicCompatible(apiKey, baseUrl, bareModel, timeoutMs)
+    : testOpenAICompatible(apiKey, baseUrl, bareModel, timeoutMs);
+}
+
 export const piDriver: ProviderDriver = {
   provider: 'pi',
   buildRuntime: ({ context, providerOptions, resolvedPaths }) => ({
@@ -346,6 +368,17 @@ export const piDriver: ProviderDriver = {
     return { models };
   },
   testConnection: async (args: DriverTestConnectionArgs): Promise<{ success: boolean; error?: string } | null> => {
+    // Custom endpoints declare their protocol explicitly — run a lightweight
+    // direct-HTTP test instead of spawning a full Pi subprocess. The subprocess is
+    // slow to boot and, at setup time, often never issues the request before the RPC
+    // client's timeout fires (so the provider sees no call at all). Mirrors the
+    // custom-endpoint branch in validateStoredConnection.
+    const customEndpoint = args.connection?.customEndpoint;
+    const customBaseUrl = args.baseUrl?.trim();
+    if (customEndpoint && customBaseUrl) {
+      return testCustomEndpoint(customEndpoint.api, args.apiKey, customBaseUrl, args.model, args.timeoutMs);
+    }
+
     const piAuthProvider = args.connection?.piAuthProvider;
     if (!piAuthProvider) {
       // No provider hint — fall back to generic subprocess path
@@ -403,10 +436,7 @@ export const piDriver: ProviderDriver = {
       }
 
       const baseUrl = connection.baseUrl.trim();
-      if (connection.customEndpoint.api === 'anthropic-messages') {
-        return testAnthropicCompatible(apiKey, baseUrl, testModel, VALIDATE_TIMEOUT_MS);
-      }
-      return testOpenAICompatible(apiKey, baseUrl, testModel, VALIDATE_TIMEOUT_MS);
+      return testCustomEndpoint(connection.customEndpoint.api, apiKey, baseUrl, testModel, VALIDATE_TIMEOUT_MS);
     }
 
     // Standard Pi connections (Copilot, built-in providers): credential check only
