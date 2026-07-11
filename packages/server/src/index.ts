@@ -292,7 +292,10 @@ const instance = await (async () => {
 // workspaces. Remote-owned workspaces are skipped because their messaging
 // runs on the remote server.
 // ---------------------------------------------------------------------------
-if (messagingHandle !== null) {
+// DATAPILOT_DISABLE_MESSAGING lets a dev/test server share a config dir with a live app
+// without both processes fighting over the same Telegram/WhatsApp connections (409s).
+const messagingDisabled = process.env.DATAPILOT_DISABLE_MESSAGING === 'true' || process.env.DATAPILOT_DISABLE_MESSAGING === '1'
+if (messagingHandle !== null && !messagingDisabled) {
   const handle: MessagingBootstrapHandle = messagingHandle
   handle.setPublisher(instance.wsServer.push.bind(instance.wsServer))
   try {
@@ -303,6 +306,8 @@ if (messagingHandle !== null) {
   } catch (error) {
     console.error('[messaging] Workspace initialization failed:', error)
   }
+} else if (messagingDisabled) {
+  console.log('[messaging] Disabled via DATAPILOT_DISABLE_MESSAGING — skipping workspace messaging init')
 }
 
 // Wire up the lazy health check now that the session manager is ready

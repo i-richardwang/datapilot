@@ -369,6 +369,9 @@ export const mockElectronAPI = {
         { id: 'meta-llama/Llama-3.3-70B-Instruct', name: 'Llama 3.3 70B', costInput: 0.5, costOutput: 0.7, contextWindow: 131072, reasoning: false },
       ],
       'azure-openai-responses': [
+        { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', costInput: 5, costOutput: 30, contextWindow: 272000, reasoning: true },
+        { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', costInput: 2.5, costOutput: 15, contextWindow: 272000, reasoning: true },
+        { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', costInput: 1, costOutput: 6, contextWindow: 272000, reasoning: true },
         { id: 'gpt-5.2', name: 'GPT-5.2', costInput: 1.75, costOutput: 14, contextWindow: 400000, reasoning: false },
         { id: 'gpt-4o', name: 'GPT-4o', costInput: 2.5, costOutput: 10, contextWindow: 128000, reasoning: false },
         { id: 'gpt-4o-mini', name: 'GPT-4o Mini', costInput: 0.15, costOutput: 0.6, contextWindow: 128000, reasoning: false },

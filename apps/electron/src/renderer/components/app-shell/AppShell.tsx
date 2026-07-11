@@ -32,6 +32,7 @@ import {
   Bot,
   Info,
   MailOpen,
+  FolderKanban,
 } from "lucide-react"
 // SessionStatusIcons no longer used - icons come from dynamic sessionStatuses
 import { SourceAvatar } from "@/components/ui/source-avatar"
@@ -71,6 +72,7 @@ import {
 } from "@/components/ui/collapsible"
 import { SessionList, type ChatGroupingMode } from "./SessionList"
 import { MainContentPanel } from "./MainContentPanel"
+import { BoardListToggle } from "./kanban/BoardListToggle"
 import { PanelStackContainer } from "./PanelStackContainer"
 import { CompactSessionListFilter } from "./CompactSessionListFilter"
 import type { ChatDisplayHandle } from "./ChatDisplay"
@@ -102,7 +104,7 @@ import { LabelIcon, LabelValueTypeIcon } from "@/components/ui/label-icon"
 import { filterSessionStatuses as filterLabelMenuStates } from "@/components/ui/label-menu"
 import { createLabelMenuItems, filterItems as filterLabelMenuItems, type LabelMenuItem } from "@/components/ui/label-menu-utils"
 import { FEATURE_FLAGS } from "@craft-agent/shared/feature-flags"
-import { buildLabelTree, getLabelDisplayName, flattenLabels, findLabelById, sortLabelsForDisplay } from "@craft-agent/shared/labels"
+import { buildLabelTree, getDescendantIds, getLabelDisplayName, flattenLabels, extractLabelId, findLabelById, sortLabelsForDisplay, matchesLabelFilter } from "@craft-agent/shared/labels"
 import type { LabelConfig, LabelTreeNode } from "@craft-agent/shared/labels"
 import { resolveEntityColor } from "@craft-agent/shared/colors"
 import * as storage from "@/lib/local-storage"
@@ -117,22 +119,26 @@ import {
   isSkillsNavigation,
   isAutomationsNavigation,
   isBatchesNavigation,
+  isProjectsNavigation,
   type NavigationState,
 } from "@/contexts/NavigationContext"
 import type { SettingsSubpage } from "../../../shared/types"
 import { SourcesListPanel } from "./SourcesListPanel"
 import { SkillsListPanel } from "./SkillsListPanel"
 import { AutomationsListPanel } from "../automations/AutomationsListPanel"
+import { ProjectsListPanel } from "./ProjectsListPanel"
 import { APP_EVENTS, AGENT_EVENTS, type AutomationFilterKind, AUTOMATION_TYPE_TO_FILTER_KIND } from "../automations/types"
 import { useAutomations } from "@/hooks/useAutomations"
 import { BatchesListPanel } from "../batches/BatchesListPanel"
 import { BATCH_STATUS_TO_FILTER_KIND, BATCH_STATUS_ORDER, BATCH_STATUS_DISPLAY_KEY, BATCH_STATUS_COLOR, type BatchGroupingMode } from "../batches/types"
 import type { BatchStatus } from "@craft-agent/shared/batches"
 import { useBatches } from "@/hooks/useBatches"
+import { useProjects } from "@/hooks/useProjects"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { PanelHeader } from "./PanelHeader"
 import { FabNewChat } from "./FabNewChat"
 import { SendToWorkspaceDialog } from "./SendToWorkspaceDialog"
+import { CreateProjectDialog } from "../projects/CreateProjectDialog"
 import { MessagingDialogHost } from "@/components/messaging/MessagingDialogHost"
 import { EditPopover, getEditConfig, type EditContextKey } from "@/components/ui/EditPopover"
 import SettingsNavigator from "@/pages/settings/SettingsNavigator"
@@ -637,6 +643,10 @@ function AppShellContent({
 
   const sessionFilter = sessionsContext?.filter ?? null
 
+  // Board view replaces the session-list navigator with the full-width Kanban panel,
+  // so the navigator (and its resize handle) collapse to zero width while it's active.
+  const isBoardView = isSessionsNavigation(navState) && navState.viewMode === 'board'
+
   // Derive source filter from navigation state (only when in sources navigator)
   const sourceFilter: SourceFilter | null = isSourcesNavigation(navState) ? navState.filter ?? null : null
 
@@ -662,7 +672,7 @@ function AppShellContent({
   // has its own independent set of status and label filters.
   // Each filter entry stores a mode ('include' or 'exclude') for tri-state filtering.
   type FilterEntry = Record<string, FilterMode> // id → mode
-  type ViewFiltersMap = Record<string, { statuses: FilterEntry, labels: FilterEntry, groupingMode?: ChatGroupingMode }>
+  type ViewFiltersMap = Record<string, { statuses: FilterEntry, labels: FilterEntry, projects?: FilterEntry, groupingMode?: ChatGroupingMode }>
 
   // Compute a stable key for the current chat filter view
   const sessionFilterKey = useMemo(() => {
@@ -725,15 +735,28 @@ function AppShellContent({
     return new Map<string, FilterMode>(Object.entries(entry) as [string, FilterMode][])
   }, [viewFiltersMap, sessionFilterKey])
 
+  // Derive current view's project filter as a Map<projectId, FilterMode>
+  const projectFilter = useMemo(() => {
+    if (!sessionFilterKey) return new Map<string, FilterMode>()
+    const entry = viewFiltersMap[sessionFilterKey]?.projects ?? {}
+    return new Map<string, FilterMode>(Object.entries(entry) as [string, FilterMode][])
+  }, [viewFiltersMap, sessionFilterKey])
+
   // Setter for status filter — updates only the current view's entry in the map
   const setListFilter = useCallback((updater: Map<SessionStatusId, FilterMode> | ((prev: Map<SessionStatusId, FilterMode>) => Map<SessionStatusId, FilterMode>)) => {
     setViewFiltersMap(prev => {
       if (!sessionFilterKey) return prev
       const current = new Map<SessionStatusId, FilterMode>(Object.entries(prev[sessionFilterKey]?.statuses ?? {}) as [SessionStatusId, FilterMode][])
       const next = typeof updater === 'function' ? updater(current) : updater
+      const existing = prev[sessionFilterKey]
       return {
         ...prev,
-        [sessionFilterKey]: { statuses: Object.fromEntries(next), labels: prev[sessionFilterKey]?.labels ?? {} }
+        [sessionFilterKey]: {
+          statuses: Object.fromEntries(next),
+          labels: existing?.labels ?? {},
+          projects: existing?.projects ?? {},
+          groupingMode: existing?.groupingMode,
+        }
       }
     })
   }, [sessionFilterKey])
@@ -744,9 +767,15 @@ function AppShellContent({
       if (!sessionFilterKey) return prev
       const current = new Map<string, FilterMode>(Object.entries(prev[sessionFilterKey]?.labels ?? {}) as [string, FilterMode][])
       const next = typeof updater === 'function' ? updater(current) : updater
+      const existing = prev[sessionFilterKey]
       return {
         ...prev,
-        [sessionFilterKey]: { statuses: prev[sessionFilterKey]?.statuses ?? {}, labels: Object.fromEntries(next) }
+        [sessionFilterKey]: {
+          statuses: existing?.statuses ?? {},
+          labels: Object.fromEntries(next),
+          projects: existing?.projects ?? {},
+          groupingMode: existing?.groupingMode,
+        }
       }
     })
   }, [sessionFilterKey])
@@ -801,6 +830,69 @@ function AppShellContent({
       }
     })
   }, [])
+
+  // Setter for project filter — updates only the current view's entry in the map
+  const setProjectFilter = useCallback((updater: Map<string, FilterMode> | ((prev: Map<string, FilterMode>) => Map<string, FilterMode>)) => {
+    setViewFiltersMap(prev => {
+      if (!sessionFilterKey) return prev
+      const current = new Map<string, FilterMode>(Object.entries(prev[sessionFilterKey]?.projects ?? {}) as [string, FilterMode][])
+      const next = typeof updater === 'function' ? updater(current) : updater
+      const existing = prev[sessionFilterKey]
+      return {
+        ...prev,
+        [sessionFilterKey]: {
+          statuses: existing?.statuses ?? {},
+          labels: existing?.labels ?? {},
+          projects: Object.fromEntries(next),
+          groupingMode: existing?.groupingMode,
+        }
+      }
+    })
+  }, [sessionFilterKey])
+
+  // Jump to All Sessions filtered by a single project. Used by the Projects list
+  // context menu — sets the allSessions view's project filter (preserving its
+  // other filters), then navigates.
+  const handleJumpToProjectSessions = useCallback((projectId: string) => {
+    setViewFiltersMap(prev => {
+      const existing = prev['allSessions']
+      return {
+        ...prev,
+        allSessions: {
+          statuses: existing?.statuses ?? {},
+          labels: existing?.labels ?? {},
+          projects: { [projectId]: 'include' },
+          groupingMode: existing?.groupingMode,
+        }
+      }
+    })
+    navigate(routes.view.allSessions())
+  }, [])
+
+  // Jump to All Sessions scoped to a task: replace the allSessions view's label filter
+  // (and project filter, when the task is bound to one) with the task's scope, then open
+  // the session. These are the SAME user-clearable filters the list-header chips edit —
+  // clearing them afterwards works exactly like any hand-set filter. Mirrors
+  // handleJumpToProjectSessions; used by kanban tile/subtask clicks and post-create.
+  const handleJumpToTaskSessions = useCallback(
+    (sessionId: string, scope: { labelId: string; projectId?: string }) => {
+      setViewFiltersMap(prev => {
+        const existing = prev['allSessions']
+        return {
+          ...prev,
+          allSessions: {
+            statuses: existing?.statuses ?? {},
+            labels: { [scope.labelId]: 'include' },
+            projects: scope.projectId ? { [scope.projectId]: 'include' } : {},
+            groupingMode: existing?.groupingMode,
+          }
+        }
+      })
+      navigate(routes.view.allSessions(sessionId))
+    },
+    []
+  )
+
   // Search state for session list
   const [searchActive, setSearchActive] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState('')
@@ -946,6 +1038,20 @@ function AppShellContent({
       if (batchHandlersRef) batchHandlersRef.current = null
     }
   }, [batchHandlersRef, updateBatchProgress, handleBatchComplete])
+
+  const { projects } = useProjects(activeWorkspaceId)
+  const projectMenuOptions = useMemo(
+    () => projects.map(p => ({ id: p.config.id, slug: p.config.slug, name: p.config.name, color: p.config.color })),
+    [projects],
+  )
+  const handleSessionProjectChange = useCallback(async (sessionId: string, projectId: string | null) => {
+    try {
+      await window.electronAPI.sessionCommand(sessionId, { type: 'setProjectId', projectId })
+    } catch (err) {
+      console.error('[AppShell] Failed to update session project:', err)
+      toast.error(t('toast.failedToUpdateProject'))
+    }
+  }, [t])
 
   // Whether local MCP servers are enabled (affects stdio source status)
   const [localMcpEnabled, setLocalMcpEnabled] = React.useState(true)
@@ -1454,9 +1560,9 @@ function AppShellContent({
 
   // The structured server request for the current (kind + secondary chips) filter.
   const listRequest = useMemo<SessionListRequest>(() => ({
-    filter: buildSessionListFilter(sessionFilter, listFilter, labelFilter, labelConfigs),
+    filter: buildSessionListFilter(sessionFilter, listFilter, labelFilter, labelConfigs, projectFilter),
     sortBy: 'recent',
-  }), [sessionFilter, listFilter, labelFilter, labelConfigs])
+  }), [sessionFilter, listFilter, labelFilter, labelConfigs, projectFilter])
   const activeViewRequestKey = useMemo(() => {
     if (sessionFilter?.kind !== 'view') return ''
     if (sessionFilter.viewId === '__all__') {
@@ -1667,6 +1773,7 @@ function AppShellContent({
     enabledModes,
     sessionStatuses: effectiveSessionStatuses,
     onSessionSourcesChange: handleSessionSourcesChange,
+    onJumpToTaskSessions: handleJumpToTaskSessions,
     rightSidebarButton: null,
     isCompactMode: isAutoCompact,
     // Search state for ChatDisplay highlighting
@@ -1689,7 +1796,7 @@ function AppShellContent({
     onDeleteBatch: handleDeleteBatch,
     onRetryBatchItem: handleRetryBatchItem,
     onRetryFailedBatch: handleRetryFailedBatchItems,
-  }), [contextValue, handleDeleteSession, sources, skills, activeSessionWorkingDirectory, displayLabelConfigs, handleSessionLabelsChange, enabledModes, effectiveSessionStatuses, handleSessionSourcesChange, isAutoCompact, searchActive, searchQuery, handleChatMatchInfoChange, handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, automationTestResults, getAutomationHistory, handleReplayAutomation, handleStartBatch, handlePauseBatch, handleResumeBatch, getBatchItems, handleRetryBatchItem, handleRetryFailedBatchItems, handleDuplicateBatch, handleDeleteBatch])
+  }), [contextValue, handleDeleteSession, sources, skills, activeSessionWorkingDirectory, displayLabelConfigs, handleSessionLabelsChange, enabledModes, effectiveSessionStatuses, handleSessionSourcesChange, handleJumpToTaskSessions, isAutoCompact, searchActive, searchQuery, handleChatMatchInfoChange, handleTestAutomation, handleToggleAutomation, handleDuplicateAutomation, handleDeleteAutomation, automationTestResults, getAutomationHistory, handleReplayAutomation, handleStartBatch, handlePauseBatch, handleResumeBatch, getBatchItems, handleRetryBatchItem, handleRetryFailedBatchItems, handleDuplicateBatch, handleDeleteBatch])
 
   // Persist expanded folders to localStorage (workspace-scoped)
   React.useEffect(() => {
@@ -1807,6 +1914,11 @@ function AppShellContent({
     navigate(routes.view.automations())
   }, [])
 
+  // Handler for projects view
+  const handleProjectsClick = useCallback(() => {
+    navigate(routes.view.projects())
+  }, [])
+
   const handleAutomationsScheduledClick = useCallback(() => {
     navigate(routes.view.automationsScheduled())
   }, [])
@@ -1848,7 +1960,7 @@ function AppShellContent({
   // We use controlled popovers instead of deep links so the user can type
   // their request in the popover UI before opening a new chat window.
   // add-source variants: add-source (generic), add-source-api, add-source-mcp, add-source-local
-  const [editPopoverOpen, setEditPopoverOpen] = useState<'statuses' | 'labels' | 'views' | 'add-source' | 'add-source-api' | 'add-source-mcp' | 'add-source-local' | 'add-skill' | 'add-label' | 'automation-config' | null>(null)
+  const [editPopoverOpen, setEditPopoverOpen] = useState<'statuses' | 'labels' | 'views' | 'add-source' | 'add-source-api' | 'add-source-mcp' | 'add-source-local' | 'add-skill' | 'add-label' | 'automation-config' | 'add-project' | null>(null)
 
   // Stores the Y position of the last right-clicked sidebar item so the EditPopover
   // appears near it rather than at a fixed location. Updated synchronously before
@@ -1967,6 +2079,53 @@ function AppShellContent({
     setTimeout(() => setEditPopoverOpen('automation-config'), 50)
   }, [captureContextMenuPosition])
 
+  // Handler for "Add Project" context menu action — creates a project directly
+  // Open the "Create Project" dialog so the user can provide a name up front.
+  // The previous flow auto-created with the default name and produced ugly
+  // permanent slugs (new-project, new-project-1, …).
+  const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false)
+  const openAddProject = useCallback(() => {
+    if (!activeWorkspace?.id) return
+    setCreateProjectDialogOpen(true)
+  }, [activeWorkspace?.id])
+  const handleCreateProjectSubmit = useCallback(async (name: string) => {
+    if (!activeWorkspace?.id) return
+    setCreateProjectDialogOpen(false)
+    try {
+      const project = await window.electronAPI.createProject(activeWorkspace.id, { name })
+      navigate(routes.view.projects(project.slug))
+    } catch (err) {
+      console.error('[AppShell] Failed to create project:', err)
+      toast.error(t('projectsList.createFailed'))
+    }
+  }, [activeWorkspace?.id, navigate, t])
+
+  /**
+   * Resolve the "inherit sole active filter" rule: if exactly one filter value
+   * is selected across statuses + labels + projects, return it as new-session
+   * params. Otherwise return null (fall back to workspace defaults).
+   */
+  const resolveInheritedNewSessionParams = useCallback((): { status?: string; label?: string; project?: string } | null => {
+    const statusCount = listFilter.size
+    const labelCount = labelFilter.size
+    const projectCount = projectFilter.size
+    const total = statusCount + labelCount + projectCount
+    if (total !== 1) return null
+    if (statusCount === 1) {
+      const [stateId] = [...listFilter.keys()]
+      return { status: stateId }
+    }
+    if (labelCount === 1) {
+      const [labelId] = [...labelFilter.keys()]
+      return { label: labelId }
+    }
+    if (projectCount === 1) {
+      const [projectId] = [...projectFilter.keys()]
+      return { project: projectId }
+    }
+    return null
+  }, [listFilter, labelFilter, projectFilter])
+
   // Create a new chat and select it
   const handleNewChat = useCallback((newPanel: boolean = false) => {
     if (!activeWorkspace) return
@@ -1975,15 +2134,18 @@ function AppShellContent({
     setSearchActive(false)
     setSearchQuery('')
 
+    // Inherit sole-active filter into the new session when unambiguous.
+    const inherited = resolveInheritedNewSessionParams()
+
     // Delegate to NavigationContext which handles session creation
     navigate(
-      routes.action.newSession(),
+      routes.action.newSession(inherited ?? undefined),
       newPanel ? { newPanel: true, targetLaneId: 'main' } : undefined
     )
 
     // Focus the chat input after navigation completes
     setTimeout(() => focusZone('chat', { intent: 'programmatic' }), 50)
-  }, [activeWorkspace, focusZone, navigate])
+  }, [activeWorkspace, focusZone, navigate, resolveInheritedNewSessionParams])
 
   // Create a brand new dedicated browser window and focus it.
   // Intentionally unbound: this action should always create a NEW window.
@@ -2190,6 +2352,11 @@ function AppShellContent({
     // Skills navigator
     if (isSkillsNavigation(navState)) {
       return t("sidebar.allSkills")
+    }
+
+    // Projects navigator
+    if (isProjectsNavigation(navState)) {
+      return t("sidebar.allProjects")
     }
 
     // Automations navigator
@@ -2561,6 +2728,30 @@ function AppShellContent({
                       },
                     },
                     {
+                      id: "nav:projects",
+                      title: t("sidebar.projects"),
+                      label: String(projects.length),
+                      icon: FolderKanban,
+                      // Highlight only when on Projects view itself, not when a child is "active" (jumped-to filter)
+                      variant: isProjectsNavigation(navState) ? "default" : "ghost",
+                      onClick: handleProjectsClick,
+                      expandable: projects.length > 0,
+                      expanded: isExpanded('nav:projects'),
+                      onToggle: () => toggleExpanded('nav:projects'),
+                      contextMenu: {
+                        type: 'projects' as const,
+                        onAddProject: openAddProject,
+                      },
+                      items: projects.map(p => ({
+                        id: `nav:projects:${p.config.id}`,
+                        title: p.config.name,
+                        icon: FolderKanban,
+                        // Highlight when on allSessions view AND filter includes this project (the jump-to state)
+                        variant: (sessionFilter?.kind === 'allSessions' && projectFilter.get(p.config.id) === 'include') ? "default" as const : "ghost" as const,
+                        onClick: () => handleJumpToProjectSessions(p.config.id),
+                      })),
+                    },
+                    {
                       id: "nav:automations",
                       title: t("sidebar.automations"),
                       label: String(automations.length),
@@ -2668,6 +2859,16 @@ function AppShellContent({
               ) : undefined}
               actions={
                 <>
+                  {/* List ⇄ Board view switch (sessions mode, desktop widths only).
+                      In board view the navigator is collapsed, so the board hosts its own copy. */}
+                  {!isAutoCompact && isSessionsNavigation(navState) && (
+                    <BoardListToggle
+                      value="list"
+                      onChange={view => {
+                        if (view === 'board') navigate(routes.view.board())
+                      }}
+                    />
+                  )}
                   {/* Filter dropdown - available in ALL chat views.
                       Shows user-added filters (removable) and pinned filters (non-removable, derived from route).
                       Pinned filters: state views pin a status, label views pin a label, flagged pins the flag. */}
@@ -2692,8 +2893,8 @@ function AppShellContent({
                       <DropdownMenuTrigger asChild>
                         <HeaderIconButton
                           icon={<ListFilter className="h-4 w-4" />}
-                          className={(listFilter.size > 0 || labelFilter.size > 0) ? "bg-accent/5 text-accent rounded-lg shadow-tinted" : "rounded-lg"}
-                          style={(listFilter.size > 0 || labelFilter.size > 0) ? { '--shadow-color': 'var(--accent-rgb)' } as React.CSSProperties : undefined}
+                          className={(listFilter.size > 0 || labelFilter.size > 0 || projectFilter.size > 0) ? "bg-accent/5 text-accent rounded-lg shadow-tinted" : "rounded-lg"}
+                          style={(listFilter.size > 0 || labelFilter.size > 0 || projectFilter.size > 0) ? { '--shadow-color': 'var(--accent-rgb)' } as React.CSSProperties : undefined}
                         />
                       </DropdownMenuTrigger>
                       <StyledDropdownMenuContent
@@ -2720,12 +2921,13 @@ function AppShellContent({
                         {/* Header with title and clear button (only clears user-added filters, never pinned) */}
                         <div className="flex items-center justify-between px-2 py-1.5">
                           <span className="text-xs font-medium text-muted-foreground">{t("sidebar.filterChats")}</span>
-                          {(listFilter.size > 0 || labelFilter.size > 0) && (
+                          {(listFilter.size > 0 || labelFilter.size > 0 || projectFilter.size > 0) && (
                             <button
                               onClick={(e) => {
                                 e.preventDefault()
                                 setListFilter(new Map())
                                 setLabelFilter(new Map())
+                                setProjectFilter(new Map())
                               }}
                               className="text-xs text-muted-foreground hover:text-foreground"
                             >
@@ -2812,7 +3014,7 @@ function AppShellContent({
                             {/* === HIERARCHICAL MODE (default) === */}
 
                             {/* Active filter chips: pinned (non-removable) + user-added (removable) */}
-                            {(pinnedFilters.pinnedFlagged || pinnedFilters.pinnedStatusId || pinnedFilters.pinnedLabelId || listFilter.size > 0 || labelFilter.size > 0) && (
+                            {(pinnedFilters.pinnedFlagged || pinnedFilters.pinnedStatusId || pinnedFilters.pinnedLabelId || listFilter.size > 0 || labelFilter.size > 0 || projectFilter.size > 0) && (
                               <>
                                 {/* Pinned: flagged */}
                                 {pinnedFilters.pinnedFlagged && (
@@ -2920,6 +3122,37 @@ function AppShellContent({
                                     </DropdownMenuSub>
                                   )
                                 })}
+                                {/* User-added: selected projects with mode pill (include/exclude) */}
+                                {Array.from(projectFilter).map(([projectId, mode]) => {
+                                  const project = projectMenuOptions.find(p => p.id === projectId)
+                                  if (!project) return null
+                                  return (
+                                    <DropdownMenuSub key={`sel-project-${projectId}`}>
+                                      <StyledDropdownMenuSubTrigger onClick={(e) => { e.preventDefault(); setProjectFilter(prev => { const next = new Map(prev); next.delete(projectId); return next }) }}>
+                                        <FilterMenuRow
+                                          icon={<FolderKanban className="h-3.5 w-3.5" />}
+                                          label={project.name}
+                                          accessory={<FilterModeBadge mode={mode} />}
+                                        />
+                                      </StyledDropdownMenuSubTrigger>
+                                      <StyledDropdownMenuSubContent minWidth="min-w-[140px]">
+                                        <FilterModeSubMenuItems
+                                          mode={mode}
+                                          onChangeMode={(newMode) => setProjectFilter(prev => {
+                                            const next = new Map(prev)
+                                            next.set(projectId, newMode)
+                                            return next
+                                          })}
+                                          onRemove={() => setProjectFilter(prev => {
+                                            const next = new Map(prev)
+                                            next.delete(projectId)
+                                            return next
+                                          })}
+                                        />
+                                      </StyledDropdownMenuSubContent>
+                                    </DropdownMenuSub>
+                                  )
+                                })}
                                 <StyledDropdownMenuSeparator />
                               </>
                             )}
@@ -3020,6 +3253,70 @@ function AppShellContent({
                               </StyledDropdownMenuSubContent>
                             </DropdownMenuSub>
 
+                            {/* Projects submenu - flat list of workspace projects */}
+                            {projectMenuOptions.length > 0 && (
+                              <DropdownMenuSub>
+                                <StyledDropdownMenuSubTrigger>
+                                  <FolderKanban className="h-3.5 w-3.5" />
+                                  <span className="flex-1">{t("sidebar.projects")}</span>
+                                </StyledDropdownMenuSubTrigger>
+                                <StyledDropdownMenuSubContent minWidth="min-w-[180px]">
+                                  {projectMenuOptions.map(project => {
+                                    const currentMode = projectFilter.get(project.id)
+                                    const isActive = !!currentMode
+                                    if (isActive) {
+                                      return (
+                                        <DropdownMenuSub key={project.id}>
+                                          <StyledDropdownMenuSubTrigger onClick={(e) => { e.preventDefault(); setProjectFilter(prev => { const next = new Map(prev); next.delete(project.id); return next }) }}>
+                                            <FilterMenuRow
+                                              icon={<FolderKanban className="h-3.5 w-3.5" />}
+                                              label={project.name}
+                                              accessory={<FilterModeBadge mode={currentMode} />}
+                                            />
+                                          </StyledDropdownMenuSubTrigger>
+                                          <StyledDropdownMenuSubContent minWidth="min-w-[140px]">
+                                            <FilterModeSubMenuItems
+                                              mode={currentMode}
+                                              onChangeMode={(newMode) => setProjectFilter(prev => {
+                                                const next = new Map(prev)
+                                                next.set(project.id, newMode)
+                                                return next
+                                              })}
+                                              onRemove={() => setProjectFilter(prev => {
+                                                const next = new Map(prev)
+                                                next.delete(project.id)
+                                                return next
+                                              })}
+                                            />
+                                          </StyledDropdownMenuSubContent>
+                                        </DropdownMenuSub>
+                                      )
+                                    }
+                                    return (
+                                      <AltExcludeTooltip key={project.id} show={filterAltHeld}>
+                                        <StyledDropdownMenuItem
+                                          onClick={(e) => {
+                                            e.preventDefault()
+                                            setProjectFilter(prev => {
+                                              const next = new Map(prev)
+                                              if (next.has(project.id)) next.delete(project.id)
+                                              else next.set(project.id, e.altKey ? 'exclude' : 'include')
+                                              return next
+                                            })
+                                          }}
+                                        >
+                                          <FilterMenuRow
+                                            icon={<FolderKanban className="h-3.5 w-3.5" />}
+                                            label={project.name}
+                                          />
+                                        </StyledDropdownMenuItem>
+                                      </AltExcludeTooltip>
+                                    )
+                                  })}
+                                </StyledDropdownMenuSubContent>
+                              </DropdownMenuSub>
+                            )}
+
                             {/* Group by submenu - hidden in state sub-views (always date there) */}
                             {!isStateSubView && (
                               <>
@@ -3045,6 +3342,13 @@ function AppShellContent({
                                       <span className="flex-1">{t("sidebar.groupByUnread")}</span>
                                       {chatGroupingMode === 'unread' && <Check className="h-3 w-3 text-muted-foreground" />}
                                     </StyledDropdownMenuItem>
+                                    {projectMenuOptions.length > 0 && (
+                                      <StyledDropdownMenuItem onClick={() => setChatGroupingMode('project')}>
+                                        <FolderKanban className="h-3.5 w-3.5" />
+                                        <span className="flex-1">{t("sidebar.groupByProject")}</span>
+                                        {chatGroupingMode === 'project' && <Check className="h-3 w-3 text-muted-foreground" />}
+                                      </StyledDropdownMenuItem>
+                                    )}
                                   </StyledDropdownMenuSubContent>
                                 </DropdownMenuSub>
                               </>
@@ -3529,6 +3833,14 @@ function AppShellContent({
                     </DropdownMenu>
                     )
                   })()}
+                  {/* Add Project button (only for projects mode) */}
+                  {isProjectsNavigation(navState) && activeWorkspace && (
+                    <HeaderIconButton
+                      icon={<Plus className="h-4 w-4" />}
+                      tooltip={t("sidebarMenu.addProject")}
+                      onClick={openAddProject}
+                    />
+                  )}
                 </>
               }
             />
@@ -3554,6 +3866,17 @@ function AppShellContent({
                 onSkillClick={handleSkillSelect}
                 onDeleteSkill={handleDeleteSkill}
                 selectedSkillSlug={isSkillsNavigation(navState) && navState.details?.type === 'skill' ? navState.details.skillSlug : null}
+              />
+            )}
+            {isProjectsNavigation(navState) && activeWorkspaceId && (
+              /* Projects List */
+              <ProjectsListPanel
+                projects={projects}
+                workspaceId={activeWorkspaceId}
+                onProjectClick={(slug) => navigate(routes.view.projects(slug))}
+                onAddProject={openAddProject}
+                onJumpToSessions={handleJumpToProjectSessions}
+                selectedProjectSlug={isProjectsNavigation(navState) ? navState.details?.projectSlug ?? null : null}
               />
             )}
             {isAutomationsNavigation(navState) && (
@@ -3645,6 +3968,8 @@ function AppShellContent({
                   evaluateViews={evaluateViews}
                   labels={displayLabelConfigs}
                   onLabelsChange={handleSessionLabelsChange}
+                  projects={projectMenuOptions}
+                  onSetProjectId={handleSessionProjectChange}
                   groupingMode={chatGroupingMode}
                   workspaceId={activeWorkspaceId ?? undefined}
                   statusFilter={listFilter}
@@ -3664,7 +3989,7 @@ function AppShellContent({
             )}
             </div>
           }
-          navigatorWidth={isAutoCompact ? sessionListWidth : (effectiveSidebarAndNavigatorHidden ? 0 : sessionListWidth)}
+          navigatorWidth={isAutoCompact ? sessionListWidth : (effectiveSidebarAndNavigatorHidden || isBoardView ? 0 : sessionListWidth)}
           isSidebarAndNavigatorHidden={effectiveSidebarAndNavigatorHidden}
           isRightSidebarVisible={false}
           isCompact={isAutoCompact}
@@ -3704,8 +4029,8 @@ function AppShellContent({
         </div>
         )}
 
-        {/* Session List Resize Handle (absolute, hidden in focused mode) */}
-        {!effectiveSidebarAndNavigatorHidden && (
+        {/* Session List Resize Handle (absolute, hidden in focused mode and board view) */}
+        {!effectiveSidebarAndNavigatorHidden && !isBoardView && (
         <div
           ref={sessionListHandleRef}
           onMouseDown={(e) => { e.preventDefault(); setIsResizing('session-list') }}
@@ -3972,6 +4297,13 @@ function AppShellContent({
         workspaces={workspaces}
         activeWorkspaceId={activeWorkspaceId}
         onTransferComplete={handleTransferComplete}
+      />
+
+      {/* Create Project dialog — prompts for a name so slugs stay meaningful */}
+      <CreateProjectDialog
+        open={createProjectDialogOpen}
+        onCancel={() => setCreateProjectDialogOpen(false)}
+        onSubmit={handleCreateProjectSubmit}
       />
 
       {/* Messaging dialogs (pairing-code + WA connect) — driven by messagingDialogAtom.

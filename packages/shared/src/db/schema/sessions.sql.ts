@@ -85,6 +85,22 @@ export const sessions = sqliteTable('sessions', {
   // Automation origin as JSON
   triggeredBy: text('triggered_by', { mode: 'json' }),
 
+  // Project binding (workspace-scoped grouping)
+  projectId: text('project_id'),
+
+  // Kanban: task/subtask hierarchy + board column
+  parentSessionId: text('parent_session_id'),
+  kanbanColumn: text('kanban_column'),
+
+  // Tasks Conductor: link a session back to the task spec / run / DAG node that owns it
+  taskSlug: text('task_slug'),
+  taskRunId: text('task_run_id'),
+  taskNodeId: text('task_node_id'),
+  /** Total DAG node count (orchestrator only) — board progress denominator */
+  taskNodeCount: integer('task_node_count'),
+  /** Generate-time draft orchestrator, hidden from the board until adopted */
+  taskDraft: integer('task_draft', { mode: 'boolean' }),
+
   // Pre-computed fields (replaces JSONL header pre-computation)
   messageCount: integer('message_count').default(0),
   lastMessageRole: text('last_message_role'),
@@ -102,6 +118,8 @@ export const sessions = sqliteTable('sessions', {
   index('idx_sessions_flagged').on(table.isFlagged),
   index('idx_sessions_hidden').on(table.hidden),
   index('idx_sessions_batch').on(table.batchId),
+  index('idx_sessions_project').on(table.projectId),
+  index('idx_sessions_task_slug').on(table.taskSlug),
 ]);
 
 /** Session messages — one row per message, ordered by position */

@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect, useRef, useMemo } from "react"
 import { isToday, isYesterday, format, startOfDay } from "date-fns"
 
 import { searchLog } from "@/lib/logger"
-import { parseLabelEntry } from "@craft-agent/shared/labels"
+import { parseLabelEntry, matchesLabelFilter } from "@craft-agent/shared/labels"
+import type { LabelConfig } from "@craft-agent/shared/labels"
 import { fuzzyScore } from "@craft-agent/shared/search"
 import { getSessionTitle, getSessionStatus } from "@/utils/session"
 import { extractSessionMeta, type SessionMeta } from "@/atoms/sessions"
@@ -48,10 +49,12 @@ export interface UseSessionSearchOptions {
   evaluateViews?: (meta: SessionMeta) => ViewConfig[]
   statusFilter?: Map<string, FilterMode>
   labelFilterMap?: Map<string, FilterMode>
+  /** Workspace label tree — label filters match descendants through it (shared matchesLabelFilter). */
+  labelConfigs?: LabelConfig[]
   /** Collapsed group keys — collapsed items are excluded from pagination and flatItems */
   collapsedGroups?: Set<string>
   /** Grouping mode — needed to compute group keys for collapse-aware pagination */
-  groupingMode?: 'date' | 'status' | 'unread'
+  groupingMode?: 'date' | 'status' | 'unread' | 'project'
   /** Ref to the ScrollArea viewport element — used for scroll-based pagination */
   scrollViewportRef?: React.RefObject<HTMLDivElement>
   /** Fetch the next server page (browse mode). Provided by AppShell's window loader. */
@@ -121,9 +124,10 @@ function groupSessionsByDate(sessions: SessionMeta[]): DateGroup[] {
     }))
 }
 
-function getCollapseGroupKey(item: SessionMeta, groupingMode?: 'date' | 'status' | 'unread'): string {
+function getCollapseGroupKey(item: SessionMeta, groupingMode?: 'date' | 'status' | 'unread' | 'project'): string {
   if (groupingMode === 'status') return `status-${getSessionStatus(item)}`
   if (groupingMode === 'unread') return item.hasUnread ? 'unread-yes' : 'unread-no'
+  if (groupingMode === 'project') return `project-${(item as { projectId?: string }).projectId ?? '__none__'}`
   return startOfDay(new Date(item.lastMessageAt || 0)).toISOString()
 }
 
@@ -137,7 +141,7 @@ export function computeCollapsedPagination(
   items: SessionMeta[],
   displayLimit: number,
   collapsedGroups?: Set<string>,
-  groupingMode?: 'date' | 'status' | 'unread',
+  groupingMode?: 'date' | 'status' | 'unread' | 'project',
 ): CollapsedPaginationResult {
   // Fast path: no collapse state → original slice
   if (!collapsedGroups || collapsedGroups.size === 0) {
@@ -200,6 +204,7 @@ interface FilterMatchOptions {
   evaluateViews?: (meta: SessionMeta) => ViewConfig[]
   statusFilter?: Map<string, 'include' | 'exclude'>
   labelFilterMap?: Map<string, 'include' | 'exclude'>
+  labelConfigs?: LabelConfig[]
 }
 
 export function sessionMatchesCurrentFilter(
@@ -207,7 +212,7 @@ export function sessionMatchesCurrentFilter(
   currentFilter: SessionFilter | undefined,
   options: FilterMatchOptions = {}
 ): boolean {
-  const { evaluateViews, statusFilter, labelFilterMap } = options
+  const { evaluateViews, statusFilter, labelFilterMap, labelConfigs } = options
 
   const passesStatusFilter = (): boolean => {
     if (!statusFilter || statusFilter.size === 0) return true
@@ -259,11 +264,10 @@ export function sessionMatchesCurrentFilter(
       return (session.sessionStatus || 'todo') === currentFilter.stateId && session.isArchived !== true
 
     case 'label': {
-      if (!session.labels?.length) return false
       if (session.isArchived === true) return false
-      if (currentFilter.labelId === '__all__') return true
-      const labelIds = session.labels.map(l => parseLabelEntry(l).id)
-      return labelIds.includes(currentFilter.labelId)
+      // Shared predicate (descendant-aware + optional project scope) — keep in
+      // sync with AppShell's filtered set by construction, not by copy.
+      return matchesLabelFilter(session, currentFilter, labelConfigs ?? [])
     }
 
     case 'view':
@@ -298,6 +302,7 @@ export function useSessionSearch({
   evaluateViews,
   statusFilter,
   labelFilterMap,
+  labelConfigs,
   collapsedGroups,
   groupingMode,
   scrollViewportRef,
@@ -454,12 +459,12 @@ export function useSessionSearch({
     const others: SessionMeta[] = []
     for (const item of searchFilteredItems) {
       if (matching.length + others.length >= MAX_SEARCH_RESULTS) break
-      const matches = sessionMatchesCurrentFilter(item, currentFilter, { evaluateViews, statusFilter, labelFilterMap })
+      const matches = sessionMatchesCurrentFilter(item, currentFilter, { evaluateViews, statusFilter, labelFilterMap, labelConfigs })
       if (matches) matching.push(item)
       else others.push(item)
     }
     return { matchingFilterItems: matching, otherResultItems: others, exceededSearchLimit: exceeded }
-  }, [searchFilteredItems, currentFilter, evaluateViews, isSearchMode, statusFilter, labelFilterMap])
+  }, [searchFilteredItems, currentFilter, evaluateViews, isSearchMode, statusFilter, labelFilterMap, labelConfigs])
 
   // --- Pagination (browse = server-driven; search = single hydrated page) ---
 

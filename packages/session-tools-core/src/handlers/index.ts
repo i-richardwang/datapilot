@@ -64,3 +64,5 @@ export { handleSetSessionLabels } from './set-session-labels.ts';
 export type { SetSessionLabelsArgs } from './set-session-labels.ts';
 export { handleSetSessionStatus } from './set-session-status.ts';
 export type { SetSessionStatusArgs } from './set-session-status.ts';
+export { handleListBackgroundTasks } from './list-background-tasks.ts';
+export type { ListBackgroundTasksArgs } from './list-background-tasks.ts';

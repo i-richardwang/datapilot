@@ -254,6 +254,23 @@ const WORKSPACE_MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_batch_items_batch_status ON batch_items(batch_id, status);
     `,
   },
+  {
+    name: '0007_projects_tasks',
+    sql: `
+      -- Upstream v0.11.0 Projects & Kanban Tasks: project binding, task/subtask
+      -- hierarchy, board column, and Tasks Conductor linkage columns.
+      ALTER TABLE sessions ADD COLUMN project_id TEXT;
+      ALTER TABLE sessions ADD COLUMN parent_session_id TEXT;
+      ALTER TABLE sessions ADD COLUMN kanban_column TEXT;
+      ALTER TABLE sessions ADD COLUMN task_slug TEXT;
+      ALTER TABLE sessions ADD COLUMN task_run_id TEXT;
+      ALTER TABLE sessions ADD COLUMN task_node_id TEXT;
+      ALTER TABLE sessions ADD COLUMN task_node_count INTEGER;
+      ALTER TABLE sessions ADD COLUMN task_draft INTEGER;
+      CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_task_slug ON sessions(task_slug);
+    `,
+  },
 ];
 
 /**

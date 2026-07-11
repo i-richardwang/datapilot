@@ -36,7 +36,7 @@ export interface ParsedRoute {
 // Compound Route Types (new format)
 // =============================================================================
 
-export type NavigatorType = 'sessions' | 'sources' | 'skills' | 'automations' | 'batches' | 'settings'
+export type NavigatorType = 'sessions' | 'sources' | 'skills' | 'automations' | 'batches' | 'projects' | 'settings'
 
 export interface ParsedCompoundRoute {
   /** The navigator type */
@@ -49,6 +49,8 @@ export interface ParsedCompoundRoute {
   automationFilter?: AutomationFilter
   /** Batch filter (only for batches navigator) */
   batchFilter?: BatchFilter
+  /** Sessions presentation mode (only for sessions navigator). 'board' = Kanban view. */
+  viewMode?: 'list' | 'board'
   /** Details page info (null for empty state) */
   details: {
     type: string
@@ -64,14 +66,14 @@ export interface ParsedCompoundRoute {
  * Known prefixes that indicate a compound route
  */
 const COMPOUND_ROUTE_PREFIXES = [
-  'allSessions', 'flagged', 'archived', 'batchSessions', 'batch', 'state', 'label', 'view', 'sources', 'skills', 'automations', 'batches', 'settings'
+  'allSessions', 'flagged', 'archived', 'batchSessions', 'batch', 'state', 'label', 'view', 'board', 'sources', 'skills', 'automations', 'batches', 'projects', 'settings'
 ]
 
 /**
  * Check if a route is a compound route (new format)
  */
 export function isCompoundRoute(route: string): boolean {
-  const firstSegment = route.split('/')[0]
+  const firstSegment = route.split('?')[0].split('/')[0]
   return COMPOUND_ROUTE_PREFIXES.includes(firstSegment)
 }
 
@@ -92,10 +94,25 @@ export function isCompoundRoute(route: string): boolean {
  *   'settings/shortcuts' -> { navigator: 'settings', details: { type: 'shortcuts', id: 'shortcuts' } }
  */
 export function parseCompoundRoute(route: string): ParsedCompoundRoute | null {
-  const segments = route.split('/').filter(Boolean)
+  // Compound routes are pure slash-segment paths; defensively strip any query tail
+  // so a stray `?x=y` never leaks into segment parsing (e.g. into a labelId).
+  const [pathPart] = route.split('?')
+  const segments = pathPart.split('/').filter(Boolean)
   if (segments.length === 0) return null
 
   const first = segments[0]
+
+  // Kanban board — standalone route. A view of all sessions in board mode.
+  // Encoded as its own prefix (not `allSessions/board`) so it never collides
+  // with the positional `{filter}/session/{id}` detail parsing below.
+  if (first === 'board') {
+    return {
+      navigator: 'sessions',
+      sessionFilter: { kind: 'allSessions' },
+      viewMode: 'board',
+      details: null,
+    }
+  }
 
   // Settings navigator
   if (first === 'settings') {
@@ -161,6 +178,20 @@ export function parseCompoundRoute(route: string): ParsedCompoundRoute | null {
       }
     }
 
+    return null
+  }
+
+  // Projects navigator
+  if (first === 'projects') {
+    if (segments.length === 1) {
+      return { navigator: 'projects', details: null }
+    }
+    if (segments[1] === 'project' && segments[2]) {
+      return {
+        navigator: 'projects',
+        details: { type: 'project', id: segments[2] },
+      }
+    }
     return null
   }
 
@@ -347,7 +378,15 @@ export function buildCompoundRoute(parsed: ParsedCompoundRoute): string {
     return `${base}/batch/${parsed.details.id}`
   }
 
+  if (parsed.navigator === 'projects') {
+    if (!parsed.details) return 'projects'
+    return `projects/project/${parsed.details.id}`
+  }
+
   // Sessions navigator
+  // Board is a standalone view of all sessions; emit its own prefix.
+  if (parsed.viewMode === 'board') return 'board'
+
   let base: string
   const filter = parsed.sessionFilter
   if (!filter) return 'allSessions'
@@ -482,6 +521,14 @@ function convertCompoundToViewRoute(compound: ParsedCompoundRoute): ParsedRoute 
       return { type: 'view', name: 'batches', params: {} }
     }
     return { type: 'view', name: 'batch-info', id: compound.details.id, params: {} }
+  }
+
+  // Projects
+  if (compound.navigator === 'projects') {
+    if (!compound.details) {
+      return { type: 'view', name: 'projects', params: {} }
+    }
+    return { type: 'view', name: 'project-info', id: compound.details.id, params: {} }
   }
 
   // Sessions
@@ -640,6 +687,17 @@ function convertCompoundToNavigationState(compound: ParsedCompoundRoute): Naviga
     }
   }
 
+  // Projects
+  if (compound.navigator === 'projects') {
+    if (!compound.details) {
+      return { navigator: 'projects', details: null }
+    }
+    return {
+      navigator: 'projects',
+      details: { type: 'project', projectSlug: compound.details.id },
+    }
+  }
+
   // Sessions
   const filter = compound.sessionFilter || { kind: 'allSessions' as const }
   if (compound.details) {
@@ -652,6 +710,7 @@ function convertCompoundToNavigationState(compound: ParsedCompoundRoute): Naviga
   return {
     navigator: 'sessions',
     filter,
+    viewMode: compound.viewMode,
     details: null,
   }
 }
@@ -730,6 +789,16 @@ function convertParsedRouteToNavigationState(parsed: ParsedRoute): NavigationSta
         }
       }
       return { navigator: 'batches', details: null }
+    case 'projects':
+      return { navigator: 'projects', details: null }
+    case 'project-info':
+      if (parsed.id) {
+        return {
+          navigator: 'projects',
+          details: { type: 'project', projectSlug: parsed.id },
+        }
+      }
+      return { navigator: 'projects', details: null }
     case 'session':
       if (parsed.id) {
         // Reconstruct filter from params
@@ -854,10 +923,18 @@ function navigationStateToCompoundRoute(state: NavigationState): ParsedCompoundR
     }
   }
 
+  if (state.navigator === 'projects') {
+    return {
+      navigator: 'projects',
+      details: state.details ? { type: 'project', id: state.details.projectSlug } : null,
+    }
+  }
+
   // Sessions
   return {
     navigator: 'sessions',
     sessionFilter: state.filter,
+    viewMode: state.viewMode,
     details: state.details ? { type: 'session', id: state.details.sessionId } : null,
   }
 }

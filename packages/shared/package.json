@@ -1,6 +1,6 @@
 {
   "name": "@craft-agent/shared",
-  "version": "0.10.5",
+  "version": "0.11.1",
   "license": "Apache-2.0",
   "description": "Shared business logic for DataPilot - agent, auth, config, credentials, MCP integration",
   "type": "module",
@@ -29,6 +29,8 @@
     "./mcp": "./src/mcp/index.ts",
     "./prompts": "./src/prompts/index.ts",
     "./sessions": "./src/sessions/index.ts",
+    "./projects": "./src/projects/index.ts",
+    "./projects/types": "./src/projects/types.ts",
     "./sources": "./src/sources/index.ts",
     "./sources/types": "./src/sources/types.ts",
     "./skills": "./src/skills/index.ts",
@@ -75,6 +77,7 @@
     "./sessions/storage.db": "./src/sessions/storage.db.ts",
     "./automations/history-store.db": "./src/automations/history-store.db.ts",
     "./batches/batch-state-manager.db": "./src/batches/batch-state-manager.db.ts",
+    "./tasks": "./src/tasks/index.ts",
     "./i18n": "./src/i18n/index.ts",
     "./resources": "./src/resources/index.ts",
     "./agent/backend": "./src/agent/backend/index.ts",
@@ -110,9 +113,10 @@
     "i18next": "^26.0.3",
     "incr-regex-package": "^1.0.4",
     "shell-quote": "^1.8.3",
-    "@earendil-works/pi-agent-core": "0.79.9",
-    "@earendil-works/pi-ai": "0.79.9",
-    "@earendil-works/pi-coding-agent": "0.79.9"
+    "yaml": "^2.8.2",
+    "@earendil-works/pi-agent-core": "0.80.6",
+    "@earendil-works/pi-ai": "0.80.6",
+    "@earendil-works/pi-coding-agent": "0.80.6"
   },
   "peerDependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.197",

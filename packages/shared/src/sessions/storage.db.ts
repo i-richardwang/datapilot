@@ -56,6 +56,8 @@ export interface SessionMetadataQueryFilter {
   statusExclude?: string[];
   labelIncludeGroups?: string[][];
   labelExclude?: string[];
+  projectInclude?: string[];
+  projectExclude?: string[];
   search?: string;
 }
 
@@ -277,6 +279,14 @@ function sessionMetaToRow(session: StoredSessionMeta): Omit<typeof sessionsTable
     transferredSessionSummary: session.transferredSessionSummary ?? null,
     transferredSessionSummaryApplied: session.transferredSessionSummaryApplied ?? null,
     triggeredBy: session.triggeredBy ?? null,
+    projectId: session.projectId ?? null,
+    parentSessionId: session.parentSessionId ?? null,
+    kanbanColumn: session.kanbanColumn ?? null,
+    taskSlug: session.taskSlug ?? null,
+    taskRunId: session.taskRunId ?? null,
+    taskNodeId: session.taskNodeId ?? null,
+    taskNodeCount: session.taskNodeCount ?? null,
+    taskDraft: session.taskDraft ?? null,
   };
 }
 
@@ -340,6 +350,14 @@ function rowToSessionConfig(row: SessionRow, workspaceRootPath: string): Session
     transferredSessionSummary: row.transferredSessionSummary ?? undefined,
     transferredSessionSummaryApplied: row.transferredSessionSummaryApplied ?? undefined,
     triggeredBy: row.triggeredBy as SessionConfig['triggeredBy'],
+    projectId: row.projectId ?? undefined,
+    parentSessionId: row.parentSessionId ?? undefined,
+    kanbanColumn: row.kanbanColumn ?? undefined,
+    taskSlug: row.taskSlug ?? undefined,
+    taskRunId: row.taskRunId ?? undefined,
+    taskNodeId: row.taskNodeId ?? undefined,
+    taskNodeCount: row.taskNodeCount ?? undefined,
+    taskDraft: row.taskDraft ?? undefined,
   };
 }
 
@@ -415,6 +433,14 @@ function rowToMetadata(
     isArchived: row.isArchived ?? undefined,
     archivedAt: row.archivedAt ?? undefined,
     branchFromMessageId: row.branchFromMessageId ?? undefined,
+    projectId: row.projectId ?? undefined,
+    parentSessionId: row.parentSessionId ?? undefined,
+    kanbanColumn: row.kanbanColumn ?? undefined,
+    taskSlug: row.taskSlug ?? undefined,
+    taskRunId: row.taskRunId ?? undefined,
+    taskNodeId: row.taskNodeId ?? undefined,
+    taskNodeCount: row.taskNodeCount ?? undefined,
+    taskDraft: row.taskDraft ?? undefined,
   };
 }
 
@@ -462,6 +488,12 @@ function sessionWhereClause(filter?: SessionMetadataQueryFilter): SQL | undefine
       const clause = anyLabelMatchesSql(group);
       if (clause) conditions.push(clause);
     }
+  }
+  if (filter?.projectInclude && filter.projectInclude.length > 0) {
+    conditions.push(sql`${sessionsTable.projectId} IN (${sqlValueList(filter.projectInclude)})`);
+  }
+  if (filter?.projectExclude && filter.projectExclude.length > 0) {
+    conditions.push(sql`(${sessionsTable.projectId} IS NULL OR ${sessionsTable.projectId} NOT IN (${sqlValueList(filter.projectExclude)}))`);
   }
   if (filter?.labelExclude && filter.labelExclude.length > 0) {
     const clause = anyLabelMatchesSql(filter.labelExclude);
@@ -549,6 +581,12 @@ export async function createSession(
     sessionStatus?: SessionConfig['sessionStatus'];
     labels?: string[];
     isFlagged?: boolean;
+    projectId?: string;
+    parentSessionId?: string;
+    taskSlug?: string;
+    taskRunId?: string;
+    taskNodeId?: string;
+    taskDraft?: boolean;
   }
 ): Promise<SessionConfig> {
   ensureSessionsDir(workspaceRootPath);
@@ -578,6 +616,12 @@ export async function createSession(
     sessionStatus: options?.sessionStatus,
     labels: options?.labels,
     isFlagged: options?.isFlagged,
+    projectId: options?.projectId,
+    parentSessionId: options?.parentSessionId,
+    taskSlug: options?.taskSlug,
+    taskRunId: options?.taskRunId,
+    taskNodeId: options?.taskNodeId,
+    taskDraft: options?.taskDraft,
   };
 
   const storedSession: StoredSession = {
@@ -1283,6 +1327,7 @@ export async function updateSessionMetadata(
     | 'llmConnection'
     | 'isArchived'
     | 'archivedAt'
+    | 'projectId'
   >>
 ): Promise<void> {
   const db = getWorkspaceDb(workspaceRootPath);
@@ -1309,6 +1354,7 @@ export async function updateSessionMetadata(
   if (updates.llmConnection !== undefined) set.llmConnection = updates.llmConnection;
   if (updates.isArchived !== undefined) set.isArchived = updates.isArchived;
   if ('archivedAt' in updates) set.archivedAt = updates.archivedAt ?? null;
+  if ('projectId' in updates) set.projectId = updates.projectId ?? null;
 
   if (Object.keys(set).length === 0) return;
 
@@ -1354,6 +1400,43 @@ export async function setSessionLabels(
   labels: string[]
 ): Promise<void> {
   await updateSessionMetadata(workspaceRootPath, sessionId, { labels });
+}
+
+/**
+ * Set or clear the project binding for a session.
+ * Pass `null` to unbind.
+ */
+export async function setSessionProjectId(
+  workspaceRootPath: string,
+  sessionId: string,
+  projectId: string | null
+): Promise<void> {
+  await updateSessionMetadata(workspaceRootPath, sessionId, { projectId: projectId ?? undefined });
+}
+
+/**
+ * Unbind every session that referenced a given projectId.
+ * Called when a project is deleted — sessions are preserved, just unlinked.
+ * Returns the number of sessions touched.
+ */
+export async function unbindProjectFromSessions(
+  workspaceRootPath: string,
+  projectId: string
+): Promise<number> {
+  const db = getWorkspaceDb(workspaceRootPath);
+  const touched = db.select({ id: sessionsTable.id })
+    .from(sessionsTable)
+    .where(eq(sessionsTable.projectId, projectId))
+    .all();
+  if (touched.length === 0) return 0;
+  db.update(sessionsTable)
+    .set({ projectId: null })
+    .where(eq(sessionsTable.projectId, projectId))
+    .run();
+  for (const row of touched) {
+    dbEvents.emit('session:metadata', row.id);
+  }
+  return touched.length;
 }
 
 /**

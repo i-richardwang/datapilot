@@ -28,6 +28,7 @@ export function buildSessionListFilter(
   listFilter: Map<string, FilterMode>,
   labelFilter: Map<string, FilterMode>,
   labelConfigs: LabelConfig[],
+  projectFilter?: Map<string, FilterMode>,
 ): SessionListPageFilter {
   const f: SessionListPageFilter = {}
   const labelGroups: string[][] = []
@@ -105,6 +106,16 @@ export function buildSessionListFilter(
   }
 
   if (labelGroups.length > 0) f.labelIncludeGroups = labelGroups
+
+  // Secondary project chips (include narrows, exclude removes).
+  if (projectFilter && projectFilter.size > 0) {
+    const inc: string[] = []
+    const exc: string[] = []
+    for (const [id, mode] of projectFilter) (mode === 'include' ? inc : exc).push(id)
+    if (inc.length > 0) f.projectInclude = inc
+    if (exc.length > 0) f.projectExclude = exc
+  }
+
   return f
 }
 

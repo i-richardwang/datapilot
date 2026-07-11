@@ -128,6 +128,8 @@ export type {
   ApiTestResult,
   // Session self-management types
   SessionInfo,
+  BackgroundTaskInfo,
+  SendAgentMessageResult,
   ResolvedLabelsResult,
   ResolvedStatusResult,
 } from './context.ts';

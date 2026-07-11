@@ -31,6 +31,7 @@ export function isDetailNavState(navState: NavigationState | null): boolean {
     case 'skills':
     case 'automations':
     case 'batches':
+    case 'projects':
       return navState.details !== null
     default:
       return false
