@@ -22,6 +22,9 @@ export { sources } from './sources.sql.ts';
 // Sessions
 export { sessions, messages, turnUsage } from './sessions.sql.ts';
 
+// Projects
+export { projects } from './projects.sql.ts';
+
 // Automations
 export { automationHistory } from './automations.sql.ts';
 

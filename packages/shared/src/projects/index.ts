@@ -12,6 +12,11 @@ export type {
   ProjectPromptContext,
 } from './types.ts';
 
+// SQLite-backed storage (storage.db.ts) is the active implementation.
+// Configs live in the workspace.db projects table; assets/ and MEMORY.md stay
+// on disk under the project folder. storage.ts is the upstream file-based
+// implementation, kept as-is for cheap merges — port semantic changes to
+// storage.db.ts instead of editing call sites.
 export {
   // Path utilities
   ensureProjectsDir,

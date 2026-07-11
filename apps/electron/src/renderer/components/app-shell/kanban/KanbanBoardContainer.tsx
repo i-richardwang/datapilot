@@ -9,6 +9,7 @@ import { projectsAtom } from '@/atoms/projects'
 import { kanbanProjectFilterAtom, kanbanColumnStatusAtom, kanbanEditorTargetAtom } from '@/atoms/kanban'
 import { useNavigation } from '@/contexts/NavigationContext'
 import { useProjectColorTreatment } from '@/hooks/useProjectColorTreatment'
+import { useKanbanBoardMetas } from '@/hooks/useKanbanBoardMetas'
 import { useLabels } from '@/hooks/useLabels'
 import { getSessionTitle } from '@/utils/session'
 import { routes } from '@/lib/navigate'
@@ -97,12 +98,43 @@ export function KanbanBoardContainer() {
   const { activeWorkspaceId, llmConnections, sessionStatuses, onCreateSession, onSendMessage, onJumpToTaskSessions } =
     useAppShellContext()
   const { t } = useTranslation()
-  const metaMap = useAtomValue(sessionMetaMapAtom)
+  const windowMetaMap = useAtomValue(sessionMetaMapAtom)
   const projects = useAtomValue(projectsAtom)
   const [projectFilter, setProjectFilter] = useAtom(kanbanProjectFilterAtom)
   const [columnStatus, setColumnStatus] = useAtom(kanbanColumnStatusAtom)
   const treatment = useProjectColorTreatment()
   const updateSessionMeta = useSetAtom(updateSessionMetaAtom)
+
+  // The board's meta source: a server-backed fetch of the board population
+  // merged UNDER the windowed session-list map. The window map only holds
+  // (current window ∪ opened sessions) — deriving tiles from it alone drops
+  // cards beyond the loaded page in large workspaces. Window entries win the
+  // merge: they receive live streaming/event patches.
+  const { boardMetas, patchBoardMeta } = useKanbanBoardMetas(activeWorkspaceId)
+  const metaMap = React.useMemo(() => {
+    if (boardMetas.size === 0) return windowMetaMap
+    const merged = new Map(boardMetas)
+    for (const [id, meta] of windowMetaMap) merged.set(id, meta)
+    return merged
+  }, [boardMetas, windowMetaMap])
+
+  // Optimistic meta patch that reaches every board tile: updateSessionMetaAtom
+  // no-ops for sessions outside the window map, so mirror the patch into the
+  // board-local rows too (double-writes for in-window tiles are idempotent —
+  // the window entry wins the merge either way).
+  const patchMeta = React.useCallback(
+    (sessionId: string, patch: Partial<SessionMeta>) => {
+      updateSessionMeta(sessionId, patch)
+      patchBoardMeta(sessionId, patch)
+    },
+    [updateSessionMeta, patchBoardMeta]
+  )
+
+  // Stable one-shot reader over the latest merged map, for the TaskEditor's
+  // subscription-free prefill reads (same ref pattern as AppShell's listRequestRef).
+  const metaMapRef = React.useRef(metaMap)
+  metaMapRef.current = metaMap
+  const readMetaMap = React.useCallback(() => metaMapRef.current, [])
   const { navigate, navigateToSession } = useNavigation()
   // Label tree for resolving the reserved Task label (scoped tile-click navigation).
   const { labels: labelConfigs } = useLabels(activeWorkspaceId ?? null)
@@ -355,10 +387,10 @@ export function KanbanBoardContainer() {
         const prompt = child.name?.trim()
         if (!prompt) continue
         onSendMessage(child.id, prompt)
-        updateSessionMeta(child.id, { isProcessing: true })
+        patchMeta(child.id, { isProcessing: true })
       }
     },
-    [metaMap, statusesById, onSendMessage, updateSessionMeta, activeWorkspaceId, t]
+    [metaMap, statusesById, onSendMessage, patchMeta, activeWorkspaceId, t]
   )
 
   // Create a parent task tile in place — no navigation. It lands in ToDo (no
@@ -384,17 +416,17 @@ export function KanbanBoardContainer() {
   // the RPC lands.
   const handleChangeStatus = React.useCallback(
     (taskId: string, statusId: string) => {
-      updateSessionMeta(taskId, { sessionStatus: statusId })
+      patchMeta(taskId, { sessionStatus: statusId })
       void window.electronAPI.sessionCommand(taskId, { type: 'setSessionStatus', state: statusId })
     },
-    [updateSessionMeta]
+    [patchMeta]
   )
 
   const handleMoveTask = React.useCallback(
     (taskId: string, toColumn: KanbanColumnId) => {
       // Optimistic: the column derives from `kanbanColumn` first, so writing it
       // immediately reflows the tile before the RPC lands.
-      updateSessionMeta(taskId, { kanbanColumn: toColumn })
+      patchMeta(taskId, { kanbanColumn: toColumn })
       void window.electronAPI.sessionCommand(taskId, { type: 'setKanbanColumn', column: toColumn })
       // Optionally fold the status to the column's configured target. Project
       // columns carry their own `dropStatusId`; the default view reads the global
@@ -404,7 +436,7 @@ export function KanbanBoardContainer() {
         handleChangeStatus(taskId, autoStatus)
       }
     },
-    [updateSessionMeta, activeColumns, columnStatus, statusesById, handleChangeStatus]
+    [patchMeta, activeColumns, columnStatus, statusesById, handleChangeStatus]
   )
 
   // Persist a full ordered column set onto the focused project. The `projects:changed`
@@ -457,13 +489,13 @@ export function KanbanBoardContainer() {
       if (fallbackId) {
         for (const task of visibleTasks) {
           if (task.column !== columnId) continue
-          updateSessionMeta(task.id, { kanbanColumn: fallbackId })
+          patchMeta(task.id, { kanbanColumn: fallbackId })
           void window.electronAPI.sessionCommand(task.id, { type: 'setKanbanColumn', column: fallbackId })
         }
       }
       persistProjectColumns(remaining)
     },
-    [resolveEditableColumns, persistProjectColumns, visibleTasks, updateSessionMeta]
+    [resolveEditableColumns, persistProjectColumns, visibleTasks, patchMeta]
   )
 
   // Set the status auto-applied when a task is dropped into a column (header picker).
@@ -552,6 +584,7 @@ export function KanbanBoardContainer() {
         modelGroups={subtaskModelGroups}
         modelToConnection={modelToConnection}
         defaultModel={defaultSubtaskModel ?? DEFAULT_MODEL}
+        readMetaMap={readMetaMap}
       />
     )
   }

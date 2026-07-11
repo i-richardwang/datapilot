@@ -271,6 +271,31 @@ const WORKSPACE_MIGRATIONS: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_sessions_task_slug ON sessions(task_slug);
     `,
   },
+  {
+    name: '0008_projects',
+    sql: `
+      -- Project configs, split out of projects/{slug}/config.json so lookups by
+      -- id are indexed and project filters/joins against sessions.project_id
+      -- stay in SQL. Project folders remain on disk for assets/ and MEMORY.md.
+      -- Pre-existing config.json files are imported lazily on first read
+      -- (see projects/storage.db.ts).
+      CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        slug TEXT NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        working_directory TEXT,
+        details TEXT,
+        color_theme TEXT,
+        color TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        archived_at INTEGER,
+        kanban_columns TEXT
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_slug ON projects(slug);
+    `,
+  },
 ];
 
 /**

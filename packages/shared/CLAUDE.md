@@ -46,10 +46,12 @@ src/
 ├── credentials/        # Secure credential storage (AES-256-GCM)
 ├── headless/           # Non-interactive execution mode
 ├── mcp/                # MCP client, connection validation, McpClientPool
+├── projects/           # Workspace-scoped projects (SQLite config + on-disk assets/MEMORY.md)
 ├── prompts/            # System prompt generation
 ├── sessions/           # Session index, storage, persistence-queue
 ├── sources/            # Source types, storage, service
 ├── statuses/           # Dynamic status types, CRUD, storage
+├── tasks/              # Task specs (task.yaml) + run-log persistence (file-based, upstream form)
 ├── subscription/       # DataPilot subscription checking
 ├── utils/              # Debug logging, file handling, summarization
 ├── validation/         # URL validation
@@ -124,6 +126,13 @@ Cascading theme configuration: app → workspace (last wins)
 **6-color system:** `background`, `foreground`, `accent`, `info`, `success`, `destructive`
 
 **Functions:** `resolveTheme()`, `themeToCSS()`, dark mode support via `dark: { ... }` overrides
+
+### Projects (`src/projects/`)
+Workspace-scoped groupings of sessions with a bound working directory, prompt context (`details`), assets, and agent memory. Hybrid storage:
+- **Config → SQLite** (`storage.db.ts`, active implementation): the `projects` table in workspace.db (`db/schema/projects.sql.ts`, migration `0008_projects`). `loadProjectById` is an indexed PK lookup; slugs are UNIQUE. `storage.ts` is upstream's file-based implementation, kept untouched as merge reference — port upstream semantic changes into `storage.db.ts`, never repoint call sites at `storage.ts` (all imports go through `projects/index.ts`, the single switch seam).
+- **Assets + MEMORY.md → filesystem** (`{workspace}/projects/{slug}/`): agent-facing artifacts read/written by path; the slug doubles as the directory name, so `generateProjectSlug` checks the DB *and* leftover folders. `uploadProjectAsset` lives in `storage.db.ts` because its existence gate is a DB lookup.
+- **Legacy import:** pre-DB `config.json` files import once on first read (only while the table is empty) and are renamed `config.json.migrated` — an emptied table is never repopulated from stale files.
+- **Propagation:** no dbEvents; project mutations broadcast via `rpc/projects.ts` `broadcastChanged` (re-read full list + `projects:changed` push). The ConfigWatcher does not watch `projects/`.
 
 ### Session Persistence (`src/sessions/`)
 - **storage.db.ts:** Session CRUD against workspace.db (active implementation). Four write tiers — use the narrowest that fits:

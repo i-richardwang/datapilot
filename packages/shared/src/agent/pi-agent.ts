@@ -47,7 +47,7 @@ import { EventQueue } from './backend/event-queue.ts';
 // System prompt for DataPilot context
 import { getSystemPrompt } from '../prompts/system.ts';
 import { getCoAuthorPreference } from '../config/preferences.ts';
-import { loadProjectById, getProjectAssetsPath, listProjectAssets, getProjectMemoryPath, loadProjectMemory } from '../projects/storage.ts';
+import { loadProjectById, getProjectAssetsPath, listProjectAssets, getProjectMemoryPath, loadProjectMemory } from '../projects/index.ts';
 import type { ProjectPromptContext } from '../projects/types.ts';
 
 // Credential manager for token storage

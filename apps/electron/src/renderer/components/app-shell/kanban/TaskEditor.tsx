@@ -9,7 +9,7 @@ import { useAtomValue, useStore } from 'jotai'
 import { useProjects } from '@/hooks/useProjects'
 import { sourcesAtom } from '@/atoms/sources'
 import { skillsAtom } from '@/atoms/skills'
-import { sessionMetaMapAtom } from '@/atoms/sessions'
+import { sessionMetaMapAtom, type SessionMeta } from '@/atoms/sessions'
 import { getSessionTitle } from '@/utils/session'
 import {
   DropdownMenu,
@@ -489,6 +489,13 @@ export interface TaskEditorProps {
   modelToConnection: Map<string, string>
   /** Default model id. */
   defaultModel: string
+  /**
+   * One-shot reader for the board's merged session-meta map (server-backed board
+   * rows ∪ live window). The editor's prefill needs the edited tile and its
+   * quick-add children, which may live beyond the windowed `sessionMetaMapAtom`.
+   * Falls back to the window atom when absent.
+   */
+  readMetaMap?: () => ReadonlyMap<string, SessionMeta>
 }
 
 export function TaskEditor({
@@ -501,6 +508,7 @@ export function TaskEditor({
   modelGroups,
   modelToConnection,
   defaultModel,
+  readMetaMap,
 }: TaskEditorProps) {
   const { t } = useTranslation()
   const isEdit = target.mode === 'edit'
@@ -558,6 +566,13 @@ export function TaskEditor({
   // on every streaming metadata tick just to have read children once at open).
   const store = useStore()
 
+  // One-shot meta reads go through the host's merged board map when provided —
+  // the windowed atom alone misses tiles/children beyond the loaded page.
+  const readMetas = React.useCallback(
+    (): ReadonlyMap<string, SessionMeta> => (readMetaMap ? readMetaMap() : store.get(sessionMetaMapAtom)),
+    [readMetaMap, store]
+  )
+
   /**
    * The tile's quick-add children as editor rows, so hand-spawned subtasks show up (and get
    * adopted into the spec on save) instead of living only on the tile. Each row carries the
@@ -568,7 +583,7 @@ export function TaskEditor({
   const collectQuickAddRows = React.useCallback(
     (adoptedNodeIds: ReadonlySet<string>): EditorSubtask[] => {
       if (!editSessionId) return []
-      const metaMap = store.get(sessionMetaMapAtom)
+      const metaMap = readMetas()
       const children = [...metaMap.values()]
         .filter(
           (child) =>
@@ -588,7 +603,7 @@ export function TaskEditor({
     },
     // fallbackModel is stable for the life of an open editor (same reasoning as the prefill effect).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [store, editSessionId],
+    [readMetas, editSessionId],
   )
 
   // Edit-mode prefill: spec-backed tiles load their authored task.yaml; either way the tile's
@@ -598,7 +613,7 @@ export function TaskEditor({
     let cancelled = false
     // The tile's existing project binding (spec-less quick-add tiles have no spec.project, so fall
     // back to the session's own projectId) — prefilled into the picker and kept as the buildSpec floor.
-    const sessionMeta = editSessionId ? store.get(sessionMetaMapAtom).get(editSessionId) : undefined
+    const sessionMeta = editSessionId ? readMetas().get(editSessionId) : undefined
     const sessionProjectId = sessionMeta?.projectId ?? ''
     if (target.taskSlug) {
       void window.electronAPI
