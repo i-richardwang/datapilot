@@ -104,6 +104,7 @@ export const HANDLED_CHANNELS = [
   RPC_CHANNELS.batches.GET_STATUS,
   RPC_CHANNELS.batches.GET_STATE,
   RPC_CHANNELS.batches.GET_ITEMS,
+  RPC_CHANNELS.batches.IMPORT,
   RPC_CHANNELS.batches.DUPLICATE,
   RPC_CHANNELS.batches.DELETE,
   RPC_CHANNELS.batches.VALIDATE,
@@ -210,6 +211,64 @@ export function registerBatchesHandlers(server: RpcServer, deps: HandlerDeps): v
     })
     deps.sessionManager.notifyBatchesChanged(workspaceId)
     return created
+  })
+
+  // Import a batch from a migration bundle: writes the batch config into
+  // batches.json AND persists its full runtime state (meta + items) into the
+  // workspace DB. Unlike CREATE (which only registers the config), this
+  // restores a previously-run batch's items/status/timestamps so the list and
+  // item timeline reflect the source workspace.
+  server.handle(RPC_CHANNELS.batches.IMPORT, async (_ctx, workspaceId: string, payload: Record<string, unknown>) => {
+    const workspace = getWorkspaceByNameOrId(workspaceId)
+    if (!workspace) throw new Error('Workspace not found')
+
+    const { BatchesFileConfigSchema } = await import('@craft-agent/shared/batches')
+    const { saveBatchState } = await import('@craft-agent/shared/batches')
+
+    const config = payload.config as Record<string, unknown>
+    const state = payload.state as Record<string, unknown>
+
+    if (!config || !state) throw new Error('Invalid batch import payload: config and state are required')
+    if (!config.id) throw new Error('Invalid batch import payload: config.id is required')
+
+    // Register the config in batches.json (same path as CREATE, preserving id).
+    await withConfigMutex(workspace.rootPath, async () => {
+      const configPath = join(workspace.rootPath, BATCHES_CONFIG_FILE)
+
+      let fileConfig: { batches: Array<Record<string, unknown>> }
+      try {
+        const raw = await readFile(configPath, 'utf-8')
+        fileConfig = JSON.parse(raw)
+        if (!Array.isArray(fileConfig.batches)) fileConfig.batches = []
+      } catch (error) {
+        if (error instanceof Error && 'code' in error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+          fileConfig = { batches: [] }
+        } else {
+          throw error
+        }
+      }
+
+      // Replace-by-id rather than append, so re-running an import is idempotent.
+      // Import does NOT run withValidatedBatchLabels: migration may restore
+      // labels that don't exist in the target workspace yet (they're imported
+      // separately), and rejecting on unknown labels would block a valid batch.
+      const idx = fileConfig.batches.findIndex((b: Record<string, unknown>) => b.id === config.id)
+      const imported = config
+      if (idx >= 0) fileConfig.batches[idx] = imported
+      else fileConfig.batches.push(imported)
+
+      const validation = BatchesFileConfigSchema.safeParse(fileConfig)
+      if (!validation.success) {
+        throw new Error(`Invalid batch config: ${validation.error.message}`)
+      }
+      await writeFile(configPath, JSON.stringify(fileConfig, null, 2) + '\n', 'utf-8')
+    })
+
+    // Persist full runtime state (meta + item rows). saveBatchState replaces
+    // item rows wholesale, matching the source workspace's item order.
+    saveBatchState(workspace.rootPath, state as never)
+    deps.sessionManager.notifyBatchesChanged(workspaceId)
+    return { id: config.id }
   })
 
   // Update an existing batch (shallow merge of top-level fields, preserves identity)
