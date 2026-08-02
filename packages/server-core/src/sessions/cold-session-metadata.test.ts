@@ -6,6 +6,7 @@ import {
   loadSessionHeader,
   loadSession,
   saveSession,
+  listSessionMetadataPage,
   type SessionBundle,
   type StoredSession,
 } from '@craft-agent/shared/sessions'
@@ -260,5 +261,22 @@ describe('cold-session metadata persistence', () => {
     await expect(sm.importSession('ws_test', makeBundle(sessionId), 'move'))
       .rejects
       .toThrow(`Session ${sessionId} already exists in target workspace`)
+  })
+
+  it('import writes the session to the DB so it is listable after restart', async () => {
+    seedColdSession('workspace-anchor')
+    const sessionId = 'import-db-sync'
+    await sm.importSession('ws_test', makeBundle(sessionId), 'move')
+
+    // The DB is the authoritative store — imported sessions must appear in
+    // the DB-backed list, not just in the in-memory registry. Without the
+    // saveStoredSession call in importSession this fails (regression: imported
+    // sessions vanished from list after a server restart).
+    const page = listSessionMetadataPage(tmpRoot, {})
+    const ids = page.rows.map(r => r.id)
+    expect(ids).toContain(sessionId)
+
+    const reloaded = loadSession(tmpRoot, sessionId)
+    expect(reloaded?.id).toBe(sessionId)
   })
 })

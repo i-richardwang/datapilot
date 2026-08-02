@@ -10316,6 +10316,12 @@ export class SessionManager implements ISessionManager {
     sessionLog.info(`[import] Writing JSONL: ${sessionFile} (llmConnection=${storedSession.llmConnection ?? 'default'}, messages=${storedSession.messages.length})`)
     writeSessionJsonl(sessionFile, storedSession)
 
+    // Persist to the workspace SQLite DB (authoritative store). Import must
+    // mirror createSession's full-save path — the DB is the source of truth
+    // for session listing and cold reads; without this, imported sessions show
+    // up in-memory only and vanish from list after a server restart.
+    saveStoredSession(storedSession)
+
     // Write all bundle files (attachments, plans, data, downloads, etc.)
     // Uses restoreFiles() for path traversal, size, and base64 validation.
     restoreFiles(sessionDir, bundle.files)
